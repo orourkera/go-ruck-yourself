@@ -409,6 +409,29 @@ class LocationTrackingManager implements SessionManager {
       // Now we can safely trim location points
       _trimUploadedLocationPoints();
     } catch (e) {
+      final errorMessage = e.toString().toLowerCase();
+      
+      // Check if this is a 404 error indicating orphaned session
+      if (errorMessage.contains('404') || errorMessage.contains('not found')) {
+        AppLogger.error('[LOCATION_MANAGER] 🚨 ORPHANED SESSION DETECTED: Session $_activeSessionId does not exist on server');
+        AppLogger.error('[LOCATION_MANAGER] This indicates app crashed/restarted with stale session state');
+        
+        // Stop location tracking immediately to prevent further 404s
+        await _stopLocationTracking();
+        
+        // Update state to show error
+        _updateState(_currentState.copyWith(
+          isTracking: false,
+          errorMessage: 'Session no longer exists - please start a new ruck',
+        ));
+        
+        // Trigger session cleanup by sending stop event
+        handleEvent(SessionStopRequested());
+        
+        AppLogger.error('[LOCATION_MANAGER] Session stopped due to orphaned state. User should start new session.');
+        return;
+      }
+      
       AppLogger.warning('[LOCATION_MANAGER] Failed to upload location batch: $e');
       // Don't update _lastUploadedLocationIndex on failure - keep points in memory
     }
@@ -993,6 +1016,20 @@ double _calculateTotalDistanceWithValidation() {
   Future<void> dispose() async {
     await _stopLocationTracking();
     await _stateController.close();
+  }
+  
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: LocationTrackingManager doesn't handle session recovery
+    // Session recovery is handled by SessionLifecycleManager
+    return;
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: LocationTrackingManager doesn't handle crash recovery data
+    // Session recovery cleanup is handled by SessionLifecycleManager
+    return;
   }
   
   Map<String, double> _calculateElevationGain() {

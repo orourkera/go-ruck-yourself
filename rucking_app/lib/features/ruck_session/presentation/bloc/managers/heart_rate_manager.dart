@@ -458,6 +458,18 @@ class HeartRateManager implements SessionManager {
     AppLogger.info('[HEART_RATE_MANAGER] MEMORY_CLEANUP: Disposed with explicit memory cleanup and upload reset');
   }
 
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: This manager doesn't handle session recovery
+    return;
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: This manager doesn't handle crash recovery data
+    return;
+  }
+  
   // Getters for other managers
   int? get currentHeartRate => _currentState.currentHeartRate;
   double get averageHeartRate => _currentState.averageHeartRate;

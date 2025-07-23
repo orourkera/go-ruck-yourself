@@ -375,3 +375,11 @@ class StateAggregationRequested extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+/// Event to check for crashed sessions on app startup
+class CheckForCrashedSession extends ActiveSessionEvent {
+  const CheckForCrashedSession();
+  
+  @override
+  List<Object?> get props => [];
+}

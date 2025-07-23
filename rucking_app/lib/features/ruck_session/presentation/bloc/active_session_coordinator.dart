@@ -25,6 +25,7 @@ import 'managers/upload_manager.dart';
 import 'managers/memory_manager.dart';
 import 'managers/diagnostics_manager.dart';
 import 'managers/memory_pressure_manager.dart';
+import 'models/manager_states.dart';
 
 /// Main coordinator that orchestrates all session managers
 class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionState> {
@@ -106,6 +107,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     on<HeartRateBatchUploadRequested>(_onHeartRateBatchUploadRequested);
     on<StateAggregationRequested>(_onStateAggregationRequested);
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
+    on<CheckForCrashedSession>(_onCheckForCrashedSession);
     
     AppLogger.info('[COORDINATOR] ActiveSessionCoordinator initialized');
   }
@@ -203,7 +205,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Subscribe to memory manager state changes
     _managerSubscriptions.add(
       _memoryManager.stateStream.listen((state) {
-        AppLogger.debug('[COORDINATOR] Memory state updated: hasSession=${state.hasActiveSession}');
+        final hasSession = state is MemoryState ? state.hasActiveSession : false;
+        AppLogger.debug('[COORDINATOR] Memory state updated: hasSession=$hasSession');
         _aggregateAndEmitState();
       }),
     );
@@ -788,7 +791,24 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     AppLogger.error('[COORDINATOR] MEMORY_PRESSURE: ${managerEvent.memoryUsageMb}MB detected, triggering aggressive cleanup');
   }
   
-
+  /// Handle crash recovery check on app startup
+  Future<void> _onCheckForCrashedSession(
+    CheckForCrashedSession event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('[COORDINATOR] Crash recovery check requested');
+    
+    try {
+      // Delegate to lifecycle manager to check for crashed sessions
+      await _lifecycleManager.checkForCrashedSession();
+      
+      AppLogger.info('[COORDINATOR] Crash recovery check completed');
+      
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Error during crash recovery check: $e');
+      // Continue gracefully - not critical for app startup
+    }
+  }
   
   @override
   Future<void> close() async {

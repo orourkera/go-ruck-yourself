@@ -613,6 +613,17 @@ class UploadManager implements SessionManager {
   bool get isUploading => _currentState.isUploading;
   bool get isBatchUploadInProgress => _isBatchUploadInProgress;
   Map<String, dynamic> get uploadStats => getUploadStats();
+
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: This manager doesn't handle session recovery
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: This manager doesn't handle crash recovery data
+  }
+
 }
 
 /// Represents a task in the upload queue

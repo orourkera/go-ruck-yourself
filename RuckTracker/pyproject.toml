@@ -19,4 +19,5 @@ dependencies = [
     "pillow>=10.0.0", # Added for avatar image processing
     "redis>=4.0.0,<5.0.0", # Added Redis client for rate limiting
     "psutil>=5.8.0", # Added for system memory and CPU monitoring
+    "requests>=2.28.0", # Added for Mailjet API integration
 ]

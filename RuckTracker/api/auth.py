@@ -16,6 +16,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from supabase_client import get_supabase_client, get_supabase_admin_client
+from services.mailjet_service import sync_user_to_mailjet
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,36 @@ class SignUpResource(Resource):
                         return {'message': f'User created in auth, but failed to create user record: {db_error_message}'}, 500
                 
                 logger.info(f"Successfully handled user record for user {user_id}")
+                
+                # Sync user to Mailjet for email marketing
+                try:
+                    from datetime import datetime
+                    user_metadata = {
+                        'user_id': str(user_id),
+                        'signup_date': datetime.now().isoformat(),
+                        'signup_source': 'mobile_app'
+                    }
+                    
+                    # Add additional metadata from registration data
+                    if data.get('gender'):
+                        user_metadata['gender'] = data.get('gender')
+                    if data.get('date_of_birth'):
+                        user_metadata['date_of_birth'] = data.get('date_of_birth')
+                    
+                    mailjet_success = sync_user_to_mailjet(
+                        email=email,
+                        username=username,
+                        user_metadata=user_metadata
+                    )
+                    
+                    if mailjet_success:
+                        logger.info(f"✅ User {email} successfully synced to Mailjet")
+                    else:
+                        logger.warning(f"⚠️ Failed to sync user {email} to Mailjet (non-blocking)")
+                        
+                except Exception as mailjet_err:
+                    logger.error(f"❌ Mailjet sync error for {email}: {mailjet_err}")
+                    # Don't fail the registration if Mailjet sync fails
                     
                 user_response_data = auth_response.user.model_dump(mode='json') if auth_response.user else {}
                 
@@ -605,6 +636,33 @@ class UserProfileResource(Resource):
                 
             profile_data = insert_response.data[0]
             logger.info(f"Successfully created user profile for Google OAuth user: {g.user.id}")
+            
+            # Sync Google OAuth user to Mailjet for email marketing
+            try:
+                from datetime import datetime
+                user_email = getattr(g.user, 'email', data.get('email'))
+                username = data.get('username', '')
+                
+                user_metadata = {
+                    'user_id': str(g.user.id),
+                    'signup_date': datetime.now().isoformat(),
+                    'signup_source': 'google_oauth'
+                }
+                
+                mailjet_success = sync_user_to_mailjet(
+                    email=user_email,
+                    username=username,
+                    user_metadata=user_metadata
+                )
+                
+                if mailjet_success:
+                    logger.info(f"✅ Google OAuth user {user_email} successfully synced to Mailjet")
+                else:
+                    logger.warning(f"⚠️ Failed to sync Google OAuth user {user_email} to Mailjet (non-blocking)")
+                    
+            except Exception as mailjet_err:
+                logger.error(f"❌ Mailjet sync error for Google OAuth user {user_email}: {mailjet_err}")
+                # Don't fail the profile creation if Mailjet sync fails
             
             return profile_data, 201
             

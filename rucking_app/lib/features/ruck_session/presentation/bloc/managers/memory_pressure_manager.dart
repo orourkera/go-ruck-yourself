@@ -316,4 +316,15 @@ class MemoryPressureManager implements SessionManager {
   double get currentMemoryUsageMb => _getMemoryInfo()['memory_usage_mb'] as double;
   MemoryPressureLevel get currentPressureLevel => _currentState.pressureLevel;
   bool get isHighMemoryPressure => _currentState.pressureLevel.index >= MemoryPressureLevel.high.index;
+
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: This manager doesn't handle session recovery
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: This manager doesn't handle crash recovery data
+  }
+
 }

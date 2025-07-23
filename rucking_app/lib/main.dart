@@ -166,6 +166,17 @@ Future<void> _runApp() async {
     // Continue anyway - essential services should still work
   }
   
+  // 🔥 CRASH RECOVERY: Check for crashed sessions after services are initialized
+  try {
+    final activeSessionBloc = getIt<ActiveSessionBloc>();
+    // Trigger crash recovery through the bloc event system
+    activeSessionBloc.add(CheckForCrashedSession());
+    AppLogger.info('Session crash recovery check triggered');
+  } catch (e) {
+    AppLogger.error('Error during session crash recovery: $e');
+    // Continue anyway - not critical for app startup
+  }
+  
   // Debug: Check if AuthBloc is registered
   print('🔍 [Main] Checking if AuthBloc is registered...');
   if (getIt.isRegistered<AuthBloc>()) {

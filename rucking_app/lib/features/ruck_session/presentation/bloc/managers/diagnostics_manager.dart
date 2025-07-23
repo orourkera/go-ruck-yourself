@@ -38,10 +38,10 @@ class DiagnosticsManager implements SessionManager {
         _currentState = const DiagnosticsState();
 
   @override
-  Stream<DiagnosticsState> get stateStream => _stateController.stream;
+  Stream<SessionManagerState> get stateStream => _stateController.stream;
 
   @override
-  DiagnosticsState get currentState => _currentState;
+  SessionManagerState get currentState => _currentState;
 
   @override
   Future<void> handleEvent(ActiveSessionEvent event) async {
@@ -255,6 +255,16 @@ class DiagnosticsManager implements SessionManager {
   Future<void> dispose() async {
     _diagnosticsTimer?.cancel();
     await _stateController.close();
+  }
+
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: This manager doesn't handle session recovery
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: This manager doesn't handle crash recovery data
   }
 
   // Public methods for other managers to track events

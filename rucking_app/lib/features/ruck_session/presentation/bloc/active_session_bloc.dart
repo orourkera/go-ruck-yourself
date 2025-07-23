@@ -158,6 +158,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionReset>(_onSessionReset);
     on<SessionCleanupRequested>(_onSessionCleanupRequested);
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
+    on<CheckForCrashedSession>(_onCheckForCrashedSession);
     on<_CoordinatorStateForwarded>(_onCoordinatorStateForwarded);
   }
 
@@ -898,6 +899,31 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) {
     // Safely emit the coordinator state within an event handler context
     emit(event.state);
+  }
+  
+  Future<void> _onCheckForCrashedSession(
+    CheckForCrashedSession event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('Checking for crashed sessions on app startup');
+    
+    try {
+      // Create coordinator if it doesn't exist to handle crash recovery
+      if (_coordinator == null) {
+        _coordinator = _createCoordinator();
+        _setupCoordinatorSubscription();
+      }
+      
+      // Delegate crash recovery check to coordinator
+      // The coordinator will internally check with its SessionLifecycleManager
+      _coordinator!.add(event);
+      
+      AppLogger.info('Crash recovery check delegated to coordinator');
+      
+    } catch (e) {
+      AppLogger.error('Error during crash recovery check: $e');
+      // Continue gracefully - not critical for app startup
+    }
   }
   
   // All diagnostic and memory pressure methods removed - now handled by dedicated managers

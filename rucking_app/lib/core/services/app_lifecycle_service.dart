@@ -132,7 +132,11 @@ class AppLifecycleService with WidgetsBindingObserver {
         // Force immediate session state save in case of crash/termination
         try {
           AppLogger.info('💾 CRASH PROTECTION: Force-saving session state');
-          _activeSessionBloc?.add(const SessionPersistenceRequested(immediate: true));
+          // Trigger immediate batch upload to save session state
+          if (_activeSessionBloc?.state is ActiveSessionRunning) {
+            final state = _activeSessionBloc!.state as ActiveSessionRunning;
+            _activeSessionBloc?.add(SessionBatchUploadRequested(sessionId: state.sessionId));
+          }
           
           AppLogger.info('✅ Session will continue recording in background indefinitely');
           
@@ -196,8 +200,8 @@ class AppLifecycleService with WidgetsBindingObserver {
         // Immediately mark session as cancelled/paused - don't wait for async processing
         // This is our last chance to prevent orphaned sessions
         try {
-          // Force immediate session cancellation
-          _activeSessionBloc?.add(const SessionCancelled(reason: 'App terminated unexpectedly'));
+          // Force immediate session cleanup for app termination
+          _activeSessionBloc?.add(const SessionCleanupRequested());
           
           // Also try to persist the cancellation immediately (may not complete)
           AppLogger.info('🆘 Emergency: Attempting immediate session cancellation');

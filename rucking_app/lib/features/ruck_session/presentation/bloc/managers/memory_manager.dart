@@ -30,10 +30,10 @@ class MemoryManager implements SessionManager {
         _currentState = const MemoryState();
 
   @override
-  Stream<MemoryState> get stateStream => _stateController.stream;
+  Stream<SessionManagerState> get stateStream => _stateController.stream;
 
   @override
-  MemoryState get currentState => _currentState;
+  SessionManagerState get currentState => _currentState;
 
   @override
   Future<void> handleEvent(ActiveSessionEvent event) async {
@@ -249,6 +249,18 @@ class MemoryManager implements SessionManager {
     await _saveSessionData();
     _autoSaveTimer?.cancel();
     await _stateController.close();
+  }
+
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: This manager doesn't handle session recovery
+    return;
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: This manager doesn't handle crash recovery data
+    return;
   }
 
   // Getters for coordinator

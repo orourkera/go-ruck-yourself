@@ -342,6 +342,16 @@ class PhotoManager implements SessionManager {
   Future<void> dispose() async {
     await _stateController.close();
   }
+  
+  @override
+  Future<void> checkForCrashedSession() async {
+    // No-op: PhotoManager doesn't handle session recovery
+  }
+  
+  @override
+  Future<void> clearCrashRecoveryData() async {
+    // No-op: PhotoManager doesn't handle crash recovery data  
+  }
 
   // Getters for coordinator
   List<RuckPhoto> get photos => List.unmodifiable(_photos);

@@ -15,4 +15,10 @@ abstract class SessionManager {
   
   /// Clean up resources when the manager is disposed
   Future<void> dispose();
+  
+  /// Check for and recover active session on app startup
+  Future<void> checkForCrashedSession();
+  
+  /// Clear crash recovery data when session completes normally
+  Future<void> clearCrashRecoveryData();
 }
