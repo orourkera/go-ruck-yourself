@@ -404,9 +404,10 @@ class SessionLifecycleManager implements SessionManager {
         return;
       }
 
-      final sessionId = sessionData['sessionId'] as String?;
-      final startTimeStr = sessionData['startTime'] as String?;
-      final isActive = sessionData['isActive'] as bool? ?? false;
+      final sessionId = sessionData['session_id']?.toString();
+      final startTimeStr = sessionData['session_start_time'] as String?;
+      // If we have session data, assume it was active when stored
+      final isActive = sessionData['session_id'] != null;
 
       if (!isActive || sessionId == null || startTimeStr == null) {
         AppLogger.info('[RECOVERY] Session data incomplete or inactive');
@@ -430,9 +431,9 @@ class SessionLifecycleManager implements SessionManager {
       _activeSessionId = sessionId;
       _sessionStartTime = startTime;
 
-      final ruckWeight = (sessionData['ruckWeightKg'] as num?)?.toDouble() ?? 0.0;
-      final userWeight = (sessionData['userWeightKg'] as num?)?.toDouble() ?? 70.0;
-      final lastDuration = Duration(milliseconds: sessionData['duration'] ?? 0);
+      final ruckWeight = (sessionData['ruck_weight_kg'] as num?)?.toDouble() ?? 0.0;
+      final userWeight = 70.0; // Default weight if not stored
+      final lastDuration = Duration(seconds: (sessionData['elapsed_seconds'] as num?)?.toInt() ?? 0);
 
       _updateState(SessionLifecycleState(
         isActive: true,

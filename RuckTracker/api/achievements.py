@@ -395,7 +395,12 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'pace_faster_than':
                 target = criteria.get('target', 999999)
-                pace = session.get('average_pace', 999999)
+                pace = session.get('average_pace')
+                
+                # Check if pace is None or invalid
+                if pace is None:
+                    logger.info(f"PACE CHECK FAILED: pace is None")
+                    return False
                 
                 # CRITICAL: Pace achievements must also meet minimum distance requirements
                 achievement_name = achievement.get('name', '').lower()
@@ -438,7 +443,13 @@ class CheckSessionAchievementsResource(Resource):
         
             elif criteria_type == 'pace_slower_than':
                 target = criteria.get('target', 0)
-                pace = session.get('average_pace', 0)
+                pace = session.get('average_pace')
+                
+                # Check if pace is None or invalid
+                if pace is None:
+                    logger.info(f"PACE CHECK FAILED: pace is None")
+                    return False
+                
                 logger.info(f"PACE SLOWER THAN CHECK: pace={pace}, target={target}, result={pace >= target}")
                 logger.info(f"Session data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s")
                 return pace >= target

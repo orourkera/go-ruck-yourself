@@ -663,7 +663,16 @@ class RuckSessionCompleteResource(Resource):
             current_status = session_check.data[0]['status']
             started_at_str = session_check.data[0].get('started_at')
             if current_status not in ['in_progress', 'paused']:
-                return {'message': 'Session not in progress or paused'}, 400
+                logger.warning(f"Session {ruck_id} completion failed: status is '{current_status}', expected 'in_progress' or 'paused'")
+                if current_status == 'completed':
+                    # Session already completed, return success to avoid client errors
+                    return {
+                        'message': 'Session already completed',
+                        'session_id': ruck_id,
+                        'status': 'already_completed'
+                    }, 200
+                else:
+                    return {'message': f'Session not in progress or paused (current status: {current_status})'}, 400
             
             # Fetch user's allow_ruck_sharing preference to set default for is_public
             user_resp = supabase.table('user') \
