@@ -387,17 +387,27 @@ class SessionLifecycleManager implements SessionManager {
   /// Check for and recover active session on app startup
   Future<void> checkForCrashedSession() async {
     try {
-      final sessionData = await _storageService.getObject('active_session_data');
-      
+      print('[RECOVERY_DEBUG] Starting session recovery check');
+      SessionData? sessionData;
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        try {
+          sessionData = await _storageService.getObject('active_session_data');
+          print('[RECOVERY_DEBUG] Raw data on attempt $attempt: $sessionData');
+          break;
+        } catch (e) {
+          print('[RECOVERY_DEBUG] Storage read failed on attempt $attempt: $e');
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      }
       if (sessionData == null) {
-        AppLogger.info('[RECOVERY] No crashed session data found');
+        print('[RECOVERY_DEBUG] No data found after 3 attempts');
         return;
       }
 
       final sessionId = sessionData['sessionId'] as String?;
       final startTimeStr = sessionData['startTime'] as String?;
       final isActive = sessionData['isActive'] as bool? ?? false;
-      
+
       if (!isActive || sessionId == null || startTimeStr == null) {
         AppLogger.info('[RECOVERY] Session data incomplete or inactive');
         await _storageService.remove('active_session_data');
@@ -406,7 +416,7 @@ class SessionLifecycleManager implements SessionManager {
 
       final startTime = DateTime.parse(startTimeStr);
       final crashDuration = DateTime.now().difference(startTime);
-      
+
       // If session was started more than 6 hours ago, probably abandon it
       if (crashDuration.inHours > 6) {
         AppLogger.info('[RECOVERY] Session too old (${crashDuration.inHours}h), abandoning');
@@ -419,11 +429,11 @@ class SessionLifecycleManager implements SessionManager {
       // Restore session state
       _activeSessionId = sessionId;
       _sessionStartTime = startTime;
-      
+
       final ruckWeight = (sessionData['ruckWeightKg'] as num?)?.toDouble() ?? 0.0;
       final userWeight = (sessionData['userWeightKg'] as num?)?.toDouble() ?? 70.0;
       final lastDuration = Duration(milliseconds: sessionData['duration'] ?? 0);
-      
+
       _updateState(SessionLifecycleState(
         isActive: true,
         sessionId: sessionId,
@@ -437,6 +447,7 @@ class SessionLifecycleManager implements SessionManager {
         currentSession: null, // Will be loaded separately
         totalPausedDuration: Duration.zero,
         pausedAt: null,
+        isRecovered: true,  // Add this field to state class if needed
       ));
 
       // Restart timers and services
@@ -463,22 +474,21 @@ class SessionLifecycleManager implements SessionManager {
       }
 
       AppLogger.info('✅ Session recovery complete: $sessionId');
-      
     } catch (e) {
       AppLogger.error('[RECOVERY] Failed to recover crashed session: $e');
       await _storageService.remove('active_session_data');
     }
   }
 
-  /// Clear the crash recovery data when session completes normally
-  Future<void> clearCrashRecoveryData() async {
-    try {
-      await _storageService.remove('active_session_data');
-      AppLogger.debug('[RECOVERY] Cleared crash recovery data');
-    } catch (e) {
-      AppLogger.error('[RECOVERY] Failed to clear recovery data: $e');
-    }
+/// Clear the crash recovery data when session completes normally
+Future<void> clearCrashRecoveryData() async {
+  try {
+    await _storageService.remove('active_session_data');
+    AppLogger.debug('[RECOVERY] Cleared crash recovery data');
+  } catch (e) {
+    AppLogger.error('[RECOVERY] Failed to clear recovery data: $e');
   }
+}
 
   Future<void> dispose() async {
     _ticker?.cancel();
@@ -561,23 +571,33 @@ class SessionLifecycleManager implements SessionManager {
   Future<void> _persistSessionData() async {
     if (!_currentState.isActive || _activeSessionId == null) return;
     
-    try {
-      final sessionData = {
-        'sessionId': _activeSessionId,
-        'startTime': _sessionStartTime?.toIso8601String(),
-        'ruckWeightKg': _currentState.ruckWeightKg,
-        'userWeightKg': _currentState.userWeightKg,
-        'isActive': _currentState.isActive,
-        'duration': _currentState.duration.inMilliseconds,
-        'totalPausedDuration': _currentState.totalPausedDuration.inMilliseconds,
-      };
-      
-      await _storageService.setObject('active_session_data', sessionData);
-      AppLogger.debug('[LIFECYCLE] Session data persisted for crash recovery');
-      
-    } catch (e) {
-      AppLogger.error('[LIFECYCLE] Failed to persist session data: $e');
+    final sessionData = {
+      'sessionId': _activeSessionId,
+      'startTime': _sessionStartTime?.toIso8601String(),
+      'ruckWeightKg': _currentState.ruckWeightKg,
+      'userWeightKg': _currentState.userWeightKg,
+      'isActive': _currentState.isActive,
+      'duration': _currentState.duration.inMilliseconds,
+      'totalPausedDuration': _currentState.totalPausedDuration.inMilliseconds,
+    };
+    
+    bool saved = false;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await _storageService.setObject('active_session_data', sessionData);
+        // Confirm save
+        final savedData = await _storageService.getObject('active_session_data');
+        if (savedData != null) {
+          saved = true;
+          AppLogger.debug('[LIFECYCLE] Session data persisted successfully');
+          break;
+        }
+      } catch (e) {
+        AppLogger.warning('[LIFECYCLE] Persistence attempt $attempt failed: $e');
+      }
+      await Future.delayed(Duration(seconds: attempt));
     }
+    if (!saved) AppLogger.error('[LIFECYCLE] Failed to persist after 3 attempts');
   }
 
   /// Start connectivity monitoring for offline session sync

@@ -168,11 +168,14 @@ Future<void> _runApp() async {
   
   // 🔥 CRASH RECOVERY: Check for crashed sessions after services are initialized
   try {
+    print('[MAIN_DEBUG] Attempting to get ActiveSessionBloc');
     final activeSessionBloc = getIt<ActiveSessionBloc>();
-    // Trigger crash recovery through the bloc event system
+    print('[MAIN_DEBUG] Got ActiveSessionBloc, adding CheckForCrashedSession');
     activeSessionBloc.add(CheckForCrashedSession());
+    print('[MAIN_DEBUG] Added CheckForCrashedSession event');
     AppLogger.info('Session crash recovery check triggered');
   } catch (e) {
+    print('[MAIN_DEBUG] Error during session crash recovery: $e');
     AppLogger.error('Error during session crash recovery: $e');
     // Continue anyway - not critical for app startup
   }

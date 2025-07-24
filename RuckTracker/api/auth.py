@@ -156,8 +156,10 @@ class SignUpResource(Resource):
                     from datetime import datetime
                     user_metadata = {
                         'user_id': str(user_id),
-                        'signup_date': datetime.now().isoformat(),
-                        'signup_source': 'mobile_app'
+                        'signup_date': datetime.now().strftime('%d/%m/%Y'),
+                        'signup_source': 'mobile_app',
+                        'name': username,  # Full name/username for Mailjet 'name' field
+                        'firstname': username.split(' ')[0] if username else username  # First name extracted
                     }
                     
                     # Add additional metadata from registration data
@@ -645,8 +647,10 @@ class UserProfileResource(Resource):
                 
                 user_metadata = {
                     'user_id': str(g.user.id),
-                    'signup_date': datetime.now().isoformat(),
-                    'signup_source': 'google_oauth'
+                    'signup_date': datetime.now().strftime('%d/%m/%Y'),
+                    'signup_source': 'google_oauth',
+                    'name': username,  # Full name/username for Mailjet 'name' field
+                    'firstname': username.split(' ')[0] if username else username  # First name extracted
                 }
                 
                 mailjet_success = sync_user_to_mailjet(

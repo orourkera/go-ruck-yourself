@@ -186,17 +186,28 @@ class MailjetService:
             property_data = []
             
             # Add first name if provided (extract everything up to first space)
-            if name:
-                # Extract first name from username (e.g., "William Toffelson" -> "William")
-                first_name = name.split(' ')[0] if name else name
+            if properties and properties.get('firstname'):
                 property_data.append({
-                    "Name": "name",
-                    "Value": first_name
+                    "Name": "firstname",
+                    "Value": properties.get('firstname')
                 })
             
-            # Add signup date
-            from datetime import datetime
-            signup_date = datetime.now().strftime("%Y-%m-%d")
+            # Add name if provided
+            if properties and properties.get('name'):
+                property_data.append({
+                    "Name": "name",
+                    "Value": properties.get('name')
+                })
+            
+            # Add signup date from user_metadata if provided, otherwise use current date
+            signup_date = None
+            if properties and properties.get('signup_date'):
+                signup_date = properties.get('signup_date')  # Should already be in DD/MM/YYYY format
+            else:
+                # Fallback to current date in DD/MM/YYYY format
+                from datetime import datetime
+                signup_date = datetime.now().strftime('%d/%m/%Y')
+            
             property_data.append({
                 "Name": "signupdate", 
                 "Value": signup_date
@@ -264,17 +275,16 @@ class MailjetService:
         logger.info(f"📧 MAILJET USER SIGNUP SYNC: {email}")
         
         try:
-            # For now, just sync email and name without custom properties
-            # Custom properties require pre-defined contact properties in Mailjet
-            logger.debug(f"📧 Syncing basic contact info for {email}")
+            # Sync email, name, and custom properties from user_metadata
+            logger.debug(f"📧 Syncing contact info for {email}")
             if user_metadata:
-                logger.debug(f"📧 User metadata available but skipping custom properties: {list(user_metadata.keys())}")
+                logger.debug(f"📧 User metadata available, including custom properties: {list(user_metadata.keys())}")
             
-            # Create/update the contact with basic info only
+            # Create/update the contact with user metadata as custom properties
             success = self.create_or_update_contact(
                 email=email,
                 name=username,
-                properties=None  # Skip custom properties for now
+                properties=user_metadata  # Pass user_metadata as custom properties
             )
             
             if not success:
