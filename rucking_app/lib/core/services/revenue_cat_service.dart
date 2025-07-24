@@ -6,7 +6,17 @@ import 'package:flutter/services.dart';
 
 class RevenueCatService {
   bool _isInitialized = false;
-  bool get _isDebugMode => dotenv.env['REVENUECAT_DEBUG'] == 'true';
+  bool _forceDebugMode = false; // Fallback debug mode when dotenv fails
+  
+  bool get _isDebugMode {
+    if (_forceDebugMode) return true;
+    try {
+      return dotenv.env['REVENUECAT_DEBUG'] == 'true';
+    } catch (e) {
+      // If dotenv isn't initialized, assume production mode
+      return false;
+    }
+  }
 
   // New flag for managing mock subscription state in debug mode
   bool _mockUserSubscribed = false;
@@ -22,18 +32,28 @@ class RevenueCatService {
       return;
     }
     String? apiKey;
-    if (Platform.isIOS) {
-      apiKey = dotenv.env['REVENUECAT_API_KEY_IOS'];
-      debugPrint('RevenueCatService: Using iOS API key');
-    } else if (Platform.isAndroid) {
-      apiKey = dotenv.env['REVENUECAT_API_KEY_ANDROID'];
-      debugPrint('RevenueCatService: Using Android API key');
-    } else {
-      apiKey = dotenv.env['REVENUECAT_API_KEY']; // Fallback
+    try {
+      if (Platform.isIOS) {
+        apiKey = dotenv.env['REVENUECAT_API_KEY_IOS'];
+        debugPrint('RevenueCatService: Using iOS API key');
+      } else if (Platform.isAndroid) {
+        apiKey = dotenv.env['REVENUECAT_API_KEY_ANDROID'];
+        debugPrint('RevenueCatService: Using Android API key');
+      } else {
+        apiKey = dotenv.env['REVENUECAT_API_KEY']; // Fallback
+      }
+    } catch (e) {
+      debugPrint('RevenueCat: Could not access dotenv, using debug mode: $e');
+      _forceDebugMode = true;
+      _isInitialized = true;
+      return;
     }
     
     if (apiKey == null || apiKey.isEmpty) {
-      throw Exception('RevenueCat API key is missing from .env file for this platform');
+      debugPrint('RevenueCat: API key is missing from .env file, using debug mode');
+      _forceDebugMode = true;
+      _isInitialized = true;
+      return;
     }
     
     try {

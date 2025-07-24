@@ -46,64 +46,53 @@ class DeviceTokenResource(Resource):
             user_id = g.user_id
             supabase = get_supabase_admin_client()
 
-            # First, try to find and update existing token
+            # NEW STRATEGY: Deactivate all existing tokens for this user/device_type, then insert new one
+            # This prevents duplication and ensures clean state
             try:
-                # Look for existing token for this user
-                existing_query = supabase.table('user_device_tokens').select('id')
+                # Step 1: Deactivate all existing active tokens for this user and device type
+                logger.info(f"Deactivating existing tokens for user {user_id}, device_type {device_type}")
+                deactivate_result = supabase.table('user_device_tokens').update({
+                    'is_active': False,
+                    'updated_at': 'now()'
+                }).eq('user_id', user_id).eq('device_type', device_type).eq('is_active', True).execute()
                 
-                if device_id:
-                    # Try to find by device_id first
-                    existing_query = existing_query.eq('user_id', user_id).eq('device_id', device_id)
-                else:
-                    # Fallback to FCM token
-                    existing_query = existing_query.eq('user_id', user_id).eq('fcm_token', fcm_token)
+                deactivated_count = len(deactivate_result.data) if deactivate_result.data else 0
+                logger.info(f"Deactivated {deactivated_count} existing tokens for user {user_id}")
                 
-                existing_result = existing_query.execute()
-                
-                if existing_result.data and len(existing_result.data) > 0:
-                    # Update existing token
-                    token_id = existing_result.data[0]['id']
-                    try:
-                        supabase.table('user_device_tokens').update({
-                            'fcm_token': fcm_token,
-                            'device_id': device_id,
-                            'device_type': device_type,
-                            'app_version': app_version,
-                            'is_active': True,
-                            'updated_at': 'now()'
-                        }).eq('id', token_id).execute()
-                        
-                        logger.info(f"Device token updated for user {user_id}")
-                        result_data = {'token_id': str(token_id)}
-                    except Exception as e:
-                        logger.error(f"Error updating device token: {e}")
+                # Step 2: Insert new active token
+                try:
+                    insert_result = supabase.table('user_device_tokens').insert({
+                        'user_id': user_id,
+                        'fcm_token': fcm_token,
+                        'device_id': device_id,
+                        'device_type': device_type,
+                        'app_version': app_version,
+                        'is_active': True
+                    }).execute()
+                    
+                    if insert_result.data and len(insert_result.data) > 0:
+                        result_data = {'token_id': str(insert_result.data[0]['id'])}
+                        if deactivated_count > 0:
+                            logger.info(f"Replaced {deactivated_count} old tokens with new token for user {user_id}")
+                        else:
+                            logger.info(f"Registered first device token for user {user_id}")
+                    else:
+                        logger.error(f"Insert succeeded but no data returned for user {user_id}")
                         return build_api_response(
                             success=False, 
-                            error="Failed to update device token", 
+                            error="Failed to register device token - no data returned", 
                             status_code=500
                         )
-                else:
-                    # Insert new token
-                    try:
-                        insert_result = supabase.table('user_device_tokens').insert({
-                            'user_id': user_id,
-                            'fcm_token': fcm_token,
-                            'device_id': device_id,
-                            'device_type': device_type,
-                            'app_version': app_version,
-                            'is_active': True
-                        }).execute()
                         
-                        logger.info(f"New device token registered for user {user_id}")
-                        result_data = {'token_id': str(insert_result.data[0]['id']) if insert_result.data else None}
-                    except Exception as e:
-                        logger.error(f"Error inserting device token: {e}")
-                        return build_api_response(
-                            success=False, 
-                            error="Failed to register device token", 
-                            status_code=500
-                        )
+                except Exception as e:
+                    logger.error(f"Error inserting new device token for user {user_id}: {e}")
+                    return build_api_response(
+                        success=False, 
+                        error="Failed to register device token", 
+                        status_code=500
+                    )
                 
+                # Return success response
                 return build_api_response(
                     success=True,
                     data=result_data,

@@ -10,6 +10,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/services/navigation_service.dart';
@@ -227,11 +228,15 @@ class FirebaseMessagingService {
       final deviceId = await _getDeviceId();
       final deviceType = Platform.isIOS ? 'ios' : 'android';
       
+      // Get actual app version
+      final packageInfo = await PackageInfo.fromPlatform();
+      final appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+      
       final response = await apiClient.post('/device-token', {
         'fcm_token': token,
         'device_id': deviceId,
         'device_type': deviceType,
-        'app_version': '1.0.0', // You might want to get this from package_info
+        'app_version': appVersion,
       });
       
       print('🔔 Device token registration response: $response');

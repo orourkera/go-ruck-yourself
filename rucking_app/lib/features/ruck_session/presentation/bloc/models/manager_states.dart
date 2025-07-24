@@ -23,6 +23,11 @@ class SessionLifecycleState extends SessionManagerState {
   final bool isSaving;
   final bool isLoading;
   final RuckSession? currentSession;
+  final bool isRecovered;
+  final double? totalDistanceKm;
+  final double? elevationGain;
+  final double? elevationLoss;
+  final double? caloriesBurned;
 
   const SessionLifecycleState({
     this.isActive = false,
@@ -37,6 +42,11 @@ class SessionLifecycleState extends SessionManagerState {
     this.isSaving = false,
     this.isLoading = false,
     this.currentSession,
+    this.isRecovered = false,
+    this.totalDistanceKm,
+    this.elevationGain,
+    this.elevationLoss,
+    this.caloriesBurned,
   });
 
   SessionLifecycleState copyWith({
@@ -52,6 +62,11 @@ class SessionLifecycleState extends SessionManagerState {
     bool? isSaving,
     bool? isLoading,
     RuckSession? currentSession,
+    bool? isRecovered,
+    double? totalDistanceKm,
+    double? elevationGain,
+    double? elevationLoss,
+    double? caloriesBurned,
   }) {
     return SessionLifecycleState(
       isActive: isActive ?? this.isActive,
@@ -66,6 +81,11 @@ class SessionLifecycleState extends SessionManagerState {
       isSaving: isSaving ?? this.isSaving,
       isLoading: isLoading ?? this.isLoading,
       currentSession: currentSession ?? this.currentSession,
+      isRecovered: isRecovered ?? this.isRecovered,
+      totalDistanceKm: totalDistanceKm ?? this.totalDistanceKm,
+      elevationGain: elevationGain ?? this.elevationGain,
+      elevationLoss: elevationLoss ?? this.elevationLoss,
+      caloriesBurned: caloriesBurned ?? this.caloriesBurned,
     );
   }
 
@@ -83,6 +103,11 @@ class SessionLifecycleState extends SessionManagerState {
         isSaving,
         isLoading,
         currentSession,
+        isRecovered,
+        totalDistanceKm,
+        elevationGain,
+        elevationLoss,
+        caloriesBurned,
       ];
 }
 

@@ -435,6 +435,11 @@ class SessionLifecycleManager implements SessionManager {
       final userWeight = 70.0; // Default weight if not stored
       final lastDuration = Duration(seconds: (sessionData['elapsed_seconds'] as num?)?.toInt() ?? 0);
 
+      final totalDistance = (sessionData['total_distance_km'] as num?)?.toDouble() ?? 0.0;
+      final elevationGain = (sessionData['elevation_gain_m'] as num?)?.toDouble() ?? 0.0;
+      final elevationLoss = (sessionData['elevation_loss_m'] as num?)?.toDouble() ?? 0.0;
+      final caloriesBurned = (sessionData['calories_burned'] as num?)?.toDouble() ?? 0.0;
+
       _updateState(SessionLifecycleState(
         isActive: true,
         sessionId: sessionId,
@@ -445,9 +450,14 @@ class SessionLifecycleManager implements SessionManager {
         errorMessage: '🔄 Session recovered from unexpected app closure',
         isLoading: false,
         isSaving: false,
-        currentSession: null, // Will be loaded separately
+        currentSession: null,
         totalPausedDuration: Duration.zero,
-        pausedAt: null
+        pausedAt: null,
+        // Add recovered metrics (extend state if needed)
+        totalDistanceKm: totalDistance,
+        elevationGain: elevationGain,
+        elevationLoss: elevationLoss,
+        caloriesBurned: caloriesBurned,
       ));
 
       // Restart timers and services
@@ -567,18 +577,40 @@ Future<void> clearCrashRecoveryData() async {
     });
   }
 
-  /// Persist session data for crash recovery
+  /// Persist session data for crash recovery - includes all metrics
   Future<void> _persistSessionData() async {
     if (!_currentState.isActive || _activeSessionId == null) return;
     
+    double totalDistance = 0.0;
+    double elevationGain = 0.0; 
+    double elevationLoss = 0.0;
+    double calories = 0.0;
+    
+    try {
+      final blocState = GetIt.I<ActiveSessionBloc>().state;
+      if (blocState is ActiveSessionRunning) {
+        totalDistance = blocState.distanceKm;
+        elevationGain = blocState.elevationGain;
+        elevationLoss = blocState.elevationLoss;
+        calories = blocState.calories;
+      }
+    } catch (e) {
+      AppLogger.warning('Failed to get metrics for persistence: $e');
+    }
+
     final sessionData = {
-      'sessionId': _activeSessionId,
-      'startTime': _sessionStartTime?.toIso8601String(),
-      'ruckWeightKg': _currentState.ruckWeightKg,
-      'userWeightKg': _currentState.userWeightKg,
-      'isActive': _currentState.isActive,
-      'duration': _currentState.duration.inMilliseconds,
-      'totalPausedDuration': _currentState.totalPausedDuration.inMilliseconds,
+      'session_id': _activeSessionId,  // Align with user's key
+      'session_start_time': _sessionStartTime?.toIso8601String(),
+      'ruck_weight_kg': _currentState.ruckWeightKg,
+      'user_weight_kg': _currentState.userWeightKg,
+      'is_active': _currentState.isActive,
+      'elapsed_seconds': _currentState.duration.inSeconds,
+      'total_paused_duration_seconds': _currentState.totalPausedDuration.inSeconds,
+      'last_persisted_at': DateTime.now().toIso8601String(),
+      'total_distance_km': totalDistance,
+      'elevation_gain_m': elevationGain,
+      'elevation_loss_m': elevationLoss,
+      'calories_burned': calories,
     };
     
     bool saved = false;

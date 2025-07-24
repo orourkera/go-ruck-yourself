@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -36,7 +37,13 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       try {
         final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
-          // Consider adding a timeLimit if not already handled by Geolocator defaults
+          timeLimit: const Duration(seconds: 10), // Prevent infinite wait
+        ).timeout(
+          const Duration(seconds: 15), // Double timeout protection
+          onTimeout: () {
+            debugPrint('⏰ Ruck buddies location request timed out after 15 seconds');
+            throw TimeoutException('Location request timed out', const Duration(seconds: 15));
+          },
         );
         lat = position.latitude;
         lon = position.longitude;

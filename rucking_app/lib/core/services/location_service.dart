@@ -222,8 +222,18 @@ class LocationServiceImpl implements LocationService {
   @override
   Future<LocationPoint?> getCurrentLocation() async {
     try {
+      AppLogger.info('📍 Requesting current location with timeout...');
+      
+      // 🔥 FIX: Add timeout to prevent app hangs
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10), // Prevent infinite wait
+      ).timeout(
+        const Duration(seconds: 15), // Double timeout protection
+        onTimeout: () {
+          AppLogger.warning('⏰ Location request timed out after 15 seconds');
+          throw TimeoutException('Location request timed out', const Duration(seconds: 15));
+        },
       );
       
       return LocationPoint(

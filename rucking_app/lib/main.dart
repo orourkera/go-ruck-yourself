@@ -36,9 +36,56 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry/sentry.dart';
+import 'dart:async';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // 🔥 CRITICAL: Wrap entire app in runZonedGuarded to catch ALL uncaught exceptions
+  // This is the MOST IMPORTANT crash handling - catches async errors that bypass other handlers
+  runZonedGuarded(
+    () async {
+      // Ensure Flutter binding is initialized inside the zone to prevent zone mismatch
+      WidgetsFlutterBinding.ensureInitialized();
+      
+      // Critical: Set binary messenger instance
+      _setUpBinaryMessenger();
+      
+      // Run app with proper error handling
+      await _initializeApp();
+    },
+    (error, stackTrace) async {
+      // This catches ALL uncaught async exceptions that would otherwise crash the app silently
+      AppLogger.error('🚨 UNCAUGHT ASYNC ERROR: $error');
+      AppLogger.error('Stack: $stackTrace');
+      
+      try {
+        // Send to Crashlytics IMMEDIATELY before app potentially crashes
+        await FirebaseCrashlytics.instance.recordError(
+          error, 
+          stackTrace, 
+          fatal: true,
+          information: [
+            'UNCAUGHT_ASYNC_EXCEPTION',
+            'This error was caught by runZonedGuarded',
+            'App version: ${await _getAppVersion()}',
+          ],
+        );
+        
+        // Force send crash report immediately (don't wait for next app launch)
+        await FirebaseCrashlytics.instance.sendUnsentReports();
+        
+        AppLogger.info('Crash report sent successfully');
+      } catch (crashlyticsError) {
+        AppLogger.error('Failed to send crash report: $crashlyticsError');
+        // Last resort: print to console so we can see it in logs
+        print('🚨 CRASH REPORT FAILED - UNCAUGHT ERROR: $error');
+        print('Stack: $stackTrace');
+      }
+    },
+  );
+}
+
+Future<void> _runApp() async {
   
   // 🛡️ CRITICAL: ANR Prevention - Configure Flutter engine for stability
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -74,7 +121,7 @@ void main() async {
         return event;
       };
     },
-    appRunner: () => _runApp(),
+    appRunner: () => _initializeApp(),
   );
   
   // Set global tags after initialization
@@ -85,7 +132,22 @@ void main() async {
   );
 }
 
-Future<void> _runApp() async {
+/// Helper function to get app version for crash reports
+Future<String> _getAppVersion() async {
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    return '${packageInfo.version}+${packageInfo.buildNumber}';
+  } catch (e) {
+    return 'unknown';
+  }
+}
+
+/// Set up binary messenger (moved from main for organization)
+void _setUpBinaryMessenger() {
+  // Binary messenger setup if needed
+}
+
+Future<void> _initializeApp() async {
   
   // Initialize Firebase first
   await Firebase.initializeApp();
