@@ -177,30 +177,15 @@ class CheckSessionAchievementsResource(Resource):
             logger.info(f"Checking achievements for session {session_id}, user {user_id}")
             logger.info(f"Session data: {session}")
             
-            # Validate session data - skip achievement checking for sessions with invalid/extreme values
-            distance_km = session.get('distance_km', 0)
-            duration_seconds = session.get('duration_seconds', 0)
-            
-            # Skip if distance is extremely small (likely invalid data) or duration is too short
-            if distance_km < 0.001 or duration_seconds <= 0:  # Less than 1 meter or no duration
-                logger.warning(f"Skipping achievement check for session {session_id} - invalid data: distance={distance_km}km, duration={duration_seconds}s")
+            # Global min requirements
+            if not self._validateSessionForAchievements(session):
                 return {
                     'status': 'success', 
                     'new_achievements': [],
                     'session_id': session_id,
-                    'message': 'Session has invalid data - skipped achievement check'
+                    'message': 'Session does not meet minimum requirements for achievements'
                 }, 200
         
-            # Skip if session is suspiciously short (likely a test session)
-            if duration_seconds < 60 and distance_km < 0.1:  # Less than 1 minute AND less than 100 meters
-                logger.warning(f"Skipping achievement check for session {session_id} - likely test session: distance={distance_km}km, duration={duration_seconds}s")
-                return {
-                    'status': 'success', 
-                    'new_achievements': [],
-                    'session_id': session_id,
-                    'message': 'Session too short - likely test session'
-                }, 200
-            
             # BATCH APPROACH: Get all data in fewer queries
             logger.info("Starting batch achievement check...")
             
@@ -331,6 +316,11 @@ class CheckSessionAchievementsResource(Resource):
             logger.error(f"Error checking session achievements: {str(e)}")
             return {'error': 'Failed to check session achievements'}, 500
     
+    def _validateSessionForAchievements(self, session: Dict) -> bool:
+        distance_km = session.get('distance_km', 0)
+        duration_seconds = session.get('duration_seconds', 0)
+        return duration_seconds >= 300 and distance_km >= 0.5
+
     def _check_achievement_criteria(self, supabase, user_id: str, session: Dict, achievement: Dict, user_stats: Dict = None) -> bool:
         """Check if user meets criteria for a specific achievement"""
         try:
@@ -438,8 +428,8 @@ class CheckSessionAchievementsResource(Resource):
                 session_distance = session.get('distance_km', 0)
                 
                 # If this is a distance-specific pace achievement, check distance requirement
-                if required_distance > 0 and session_distance < required_distance:
-                    logger.info(f"PACE CHECK FAILED: {achievement_name} requires {required_distance}km but session only {session_distance}km")
+                if required_distance > 0 and not (required_distance * 0.95 <= session_distance <= required_distance * 1.05):
+                    logger.info(f"PACE CHECK FAILED: Distance {session_distance}km not within tolerance of {required_distance}km")
                     return False
                 
                 logger.info(f"PACE FASTER THAN CHECK: pace={pace}, target={target}, result={pace <= target}")
@@ -467,6 +457,9 @@ class CheckSessionAchievementsResource(Resource):
                         return False
             
                 target = criteria.get('target', 0)
+                daily_distance = sum(s.get('distance_km', 0) for s in sessions_today)  # Assume sessions_today fetched
+                if daily_distance > 50:
+                    return False  # Unrealistic
                 return total_distance >= target
         
             elif criteria_type == 'time_of_day':
@@ -533,7 +526,6 @@ class CheckSessionAchievementsResource(Resource):
                 return self._check_monthly_consistency(supabase, user_id, target, min_rucks)
         
             elif criteria_type == 'negative_split':
-                # Check if this session had a negative split
                 return self._check_negative_split(session)
         
             elif criteria_type == 'pace_consistency':
@@ -626,15 +618,13 @@ class CheckSessionAchievementsResource(Resource):
             
             streak = 0
             current_date = datetime.utcnow().date()
-            
-            for session in response.data:
-                session_date = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00')).date()
+            session_dates = sorted(set(datetime.fromisoformat(s['started_at'].replace('Z', '+00:00')).date() for s in response.data), reverse=True)
+            for session_date in session_dates:
                 if session_date == current_date:
                     streak += 1
                     current_date -= timedelta(days=1)
                 else:
                     break
-            
             return streak
         except Exception as e:
             logger.error(f"Error calculating daily streak: {str(e)}")

@@ -191,6 +191,34 @@ class SessionLifecycleManager implements SessionManager {
       final finalDuration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
       AppLogger.info('[LIFECYCLE] Final session duration: ${finalDuration.inSeconds}s (${finalDuration.inMinutes}m ${finalDuration.inSeconds % 60}s)');
 
+      // CRITICAL: Call completion API with retry and persistence
+      bool completionSuccessful = false;
+      String? completionError;
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await _apiClient.post('/rucks/$_activeSessionId/complete', {
+            'duration_seconds': finalDuration.inSeconds,
+          });
+          completionSuccessful = true;
+          break;
+        } catch (e) {
+          completionError = e.toString();
+          AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
+          await Future.delayed(Duration(seconds: attempt * 2)); // Backoff
+        }
+      }
+
+      if (!completionSuccessful) {
+        // Persist for later retry
+        await _storageService.setObject('pending_completion_$_activeSessionId', {
+          'duration_seconds': finalDuration.inSeconds,
+        });
+        AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted for retry: $completionError');
+      } else {
+        // Clear any previous pending
+        await _storageService.remove('pending_completion_$_activeSessionId');
+      }
+
       final newState = _currentState.copyWith(
         isActive: false,
         // Keep the sessionId so downstream managers & UI can access it
@@ -416,6 +444,23 @@ class SessionLifecycleManager implements SessionManager {
       _startSessionPersistenceTimer();
       _startSophisticatedTimerSystem();
       _startConnectivityMonitoring();
+
+      // Check for pending completions
+      final pendingKeys = await _storageService.getAllKeys().then((keys) => keys.where((k) => k.startsWith('pending_completion_')).toList());
+      for (final key in pendingKeys) {
+        final data = await _storageService.getObject(key);
+        if (data != null) {
+          final sessionId = key.split('_').last;
+          try {
+            await _apiClient.post('/rucks/$sessionId/complete', data);
+            await _storageService.remove(key);
+            AppLogger.info('[RECOVERY] Successfully completed pending session $sessionId');
+          } catch (e) {
+            AppLogger.warning('[RECOVERY] Failed to complete pending session $sessionId: $e');
+            // Leave for next try
+          }
+        }
+      }
 
       AppLogger.info('✅ Session recovery complete: $sessionId');
       

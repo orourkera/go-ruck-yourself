@@ -51,11 +51,11 @@ class MailjetService:
     
     def create_or_update_contact(self, email: str, name: str = None, properties: Dict[str, Any] = None) -> bool:
         """
-        Create or update a contact in Mailjet
+        Create or update a contact in Mailjet and add custom properties
         
         Args:
             email: Contact email address
-            name: Contact name (optional)
+            name: Contact name (for custom 'name' property)
             properties: Additional contact properties (optional)
             
         Returns:
@@ -68,39 +68,41 @@ class MailjetService:
         try:
             logger.info(f"📧 Creating/updating Mailjet contact: {email}")
             
-            # Prepare contact data
+            # Step 1: Create basic contact
             contact_data = {
                 "Email": email,
                 "IsExcludedFromCampaigns": False
             }
             
-            if name:
-                contact_data["Name"] = name
+            logger.debug(f"📧 Creating contact with basic data: {contact_data}")
             
-            # Add custom properties if provided (skip for now to avoid API errors)
-            # Custom properties require pre-defined contact properties in Mailjet
-            if properties:
-                logger.debug(f"📧 Skipping custom properties to avoid API errors: {list(properties.keys())}")
-                # contact_data.update(properties)  # Commented out to prevent API errors
-            
-            # Log the data being sent for debugging
-            logger.debug(f"📧 Sending to Mailjet API: {contact_data}")
-            
-            # Create contact using POST - Mailjet expects direct JSON object
             response = requests.post(
                 self.contacts_url,
                 headers=self.headers,
                 json=contact_data
             )
             
-            if response.status_code in [200, 201]:
-                result = response.json()
-                logger.info(f"✅ Contact sync successful: {email}")
-                logger.debug(f"📧 Mailjet response: {result}")
-                return True
-            else:
-                logger.error(f"❌ Failed to sync contact {email}: {response.status_code} - {response.text}")
+            if response.status_code not in [200, 201]:
+                logger.error(f"❌ Failed to create contact {email}: {response.status_code} - {response.text}")
                 return False
+            
+            result = response.json()
+            contact_id = result.get('Data', [{}])[0].get('ID') if result.get('Data') else None
+            
+            if not contact_id:
+                logger.error(f"❌ No contact ID returned for {email}")
+                return False
+                
+            logger.info(f"✅ Contact created: {email} (ID: {contact_id})")
+            
+            # Step 2: Add custom properties if provided
+            if name or properties:
+                success = self._add_contact_properties(contact_id, email, name, properties)
+                if not success:
+                    logger.warning(f"⚠️ Contact created but failed to add custom properties for {email}")
+                    # Don't return False - contact creation succeeded
+            
+            return True
                 
         except Exception as e:
             logger.error(f"❌ Error syncing contact {email} to Mailjet: {e}", exc_info=True)
@@ -162,6 +164,89 @@ class MailjetService:
                 
         except Exception as e:
             logger.error(f"❌ Error adding contact {email} to Mailjet list {target_list_id}: {e}", exc_info=True)
+            return False
+    
+    def _add_contact_properties(self, contact_id: int, email: str, name: str = None, properties: Dict[str, Any] = None) -> bool:
+        """
+        Add custom properties to a Mailjet contact
+        
+        Args:
+            contact_id: Mailjet contact ID
+            email: Contact email (for logging)
+            name: Contact name (for 'name' custom property)
+            properties: Additional custom properties
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            logger.info(f"📧 Adding custom properties to contact {email} (ID: {contact_id})")
+            
+            # Prepare custom properties data
+            property_data = []
+            
+            # Add first name if provided (extract everything up to first space)
+            if name:
+                # Extract first name from username (e.g., "William Toffelson" -> "William")
+                first_name = name.split(' ')[0] if name else name
+                property_data.append({
+                    "Name": "name",
+                    "Value": first_name
+                })
+            
+            # Add signup date
+            from datetime import datetime
+            signup_date = datetime.now().strftime("%Y-%m-%d")
+            property_data.append({
+                "Name": "signupdate", 
+                "Value": signup_date
+            })
+            
+            # Add other properties if provided
+            if properties:
+                if properties.get('signup_source'):
+                    property_data.append({
+                        "Name": "newsletter_sub",
+                        "Value": properties.get('signup_source')
+                    })
+                
+                # Add any other custom properties
+                for key, value in properties.items():
+                    if key not in ['signup_source'] and value is not None:
+                        # Map to available custom properties
+                        if key == 'country':
+                            property_data.append({
+                                "Name": "country",
+                                "Value": str(value)
+                            })
+            
+            if not property_data:
+                logger.debug(f"📧 No custom properties to add for {email}")
+                return True
+            
+            # Send custom properties
+            properties_payload = {
+                "Data": property_data
+            }
+            
+            logger.debug(f"📧 Sending custom properties: {properties_payload}")
+            
+            contactdata_url = f"{self.base_url}/contactdata/{contact_id}"
+            response = requests.put(
+                contactdata_url,
+                headers=self.headers,
+                json=properties_payload
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"✅ Custom properties added successfully for {email}")
+                return True
+            else:
+                logger.error(f"❌ Failed to add custom properties for {email}: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error adding custom properties for {email}: {e}", exc_info=True)
             return False
     
     def sync_user_signup(self, email: str, username: str = None, user_metadata: Dict[str, Any] = None) -> bool:
