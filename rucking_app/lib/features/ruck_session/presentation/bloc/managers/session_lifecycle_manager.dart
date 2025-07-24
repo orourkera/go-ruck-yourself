@@ -34,6 +34,9 @@ class SessionLifecycleManager implements SessionManager {
   final StreamController<SessionLifecycleState> _stateController;
   SessionLifecycleState _currentState;
   
+  // Callback for notifying recovery completion
+  Function(Map<String, dynamic>)? _onRecoveryCompleted;
+  
   DateTime? _sessionStartTime;
   String? _activeSessionId;
   Timer? _ticker;
@@ -76,6 +79,11 @@ class SessionLifecycleManager implements SessionManager {
 
   @override
   SessionLifecycleState get currentState => _currentState;
+  
+  /// Set recovery completion callback
+  void setRecoveryCallback(Function(Map<String, dynamic>) callback) {
+    _onRecoveryCompleted = callback;
+  }
 
   @override
   Future<void> handleEvent(manager_events.ActiveSessionEvent event) async {
@@ -453,12 +461,16 @@ class SessionLifecycleManager implements SessionManager {
         currentSession: null,
         totalPausedDuration: Duration.zero,
         pausedAt: null,
-        // Add recovered metrics (extend state if needed)
-        totalDistanceKm: totalDistance,
-        elevationGain: elevationGain,
-        elevationLoss: elevationLoss,
-        caloriesBurned: caloriesBurned,
+        isRecovered: true,
       ));
+
+      // Send recovery data to coordinator so it can initialize managers
+      _notifyRecoveryCompleted({
+        'total_distance_km': totalDistance,
+        'elevation_gain_m': elevationGain,
+        'elevation_loss_m': elevationLoss,
+        'calories_burned': caloriesBurned,
+      });
 
       // Restart timers and services
       _startTimer();
@@ -940,5 +952,15 @@ Future<void> clearCrashRecoveryData() async {
       persistenceInterval: persistenceInterval,
       batchUploadInterval: batchUploadInterval,
     );
+  }
+  
+  /// Notify coordinator of recovery completion with metrics
+  void _notifyRecoveryCompleted(Map<String, dynamic> recoveredMetrics) {
+    if (_onRecoveryCompleted != null) {
+      _onRecoveryCompleted!(recoveredMetrics);
+      AppLogger.info('[LIFECYCLE] Recovery metrics sent to coordinator: $recoveredMetrics');
+    } else {
+      AppLogger.warning('[LIFECYCLE] No recovery callback set - metrics not sent');
+    }
   }
 }

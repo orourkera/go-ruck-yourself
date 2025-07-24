@@ -123,6 +123,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       connectivityService: _connectivityService,
     );
     
+    // Set recovery callback to handle metric restoration
+    _lifecycleManager.setRecoveryCallback(_handleRecoveredMetrics);
+    
     // Initialize location manager
     _locationManager = LocationTrackingManager(
       locationService: _locationService,
@@ -829,5 +832,34 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     await _memoryPressureManager.dispose();
     
     return super.close();
+  }
+  
+  /// Handle recovered metrics from crash recovery
+  void _handleRecoveredMetrics(Map<String, dynamic> recoveredMetrics) {
+    AppLogger.info('[COORDINATOR] Handling recovered metrics: $recoveredMetrics');
+    
+    try {
+      final distance = (recoveredMetrics['total_distance_km'] as num?)?.toDouble() ?? 0.0;
+      final elevationGain = (recoveredMetrics['elevation_gain_m'] as num?)?.toDouble() ?? 0.0;
+      final elevationLoss = (recoveredMetrics['elevation_loss_m'] as num?)?.toDouble() ?? 0.0;
+      final calories = (recoveredMetrics['calories_burned'] as num?)?.toDouble() ?? 0.0;
+      
+      // Initialize location manager with recovered distance and elevation
+      _locationManager.restoreMetricsFromRecovery(
+        totalDistanceKm: distance,
+        elevationGainM: elevationGain,
+        elevationLossM: elevationLoss,
+      );
+      
+      AppLogger.info('[COORDINATOR] Metrics restored: ${distance}km, ${elevationGain}m gain, ${elevationLoss}m loss, ${calories} cal');
+      
+      // Force state aggregation after recovery
+      Timer(const Duration(milliseconds: 500), () {
+        _aggregateAndEmitState();
+      });
+      
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Error handling recovered metrics: $e');
+    }
   }
 }
