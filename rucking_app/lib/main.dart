@@ -261,9 +261,8 @@ Future<void> _runApp() async {
     rethrow;
   }
   
-  // 🔄 Session Recovery - DISABLED (was causing app hangs)
-  // TODO: Implement session persistence safely in the future
-  print('📝 [Main] Session recovery disabled for stability');
+  // 🔄 Session Recovery is active and handled in the UI layer
+  print('📝 [Main] Session recovery ready - handled by AppStartupService');
   
   // Run the app
   runApp(

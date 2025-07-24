@@ -77,9 +77,11 @@ class MailjetService:
             if name:
                 contact_data["Name"] = name
             
-            # Add custom properties if provided
+            # Add custom properties if provided (skip for now to avoid API errors)
+            # Custom properties require pre-defined contact properties in Mailjet
             if properties:
-                contact_data.update(properties)
+                logger.debug(f"📧 Skipping custom properties to avoid API errors: {list(properties.keys())}")
+                # contact_data.update(properties)  # Commented out to prevent API errors
             
             # Create or update contact using PUT (upsert)
             response = requests.put(
@@ -174,31 +176,17 @@ class MailjetService:
         logger.info(f"📧 MAILJET USER SIGNUP SYNC: {email}")
         
         try:
-            # Prepare contact properties
-            properties = {}
-            
-            # Add user metadata to properties
+            # For now, just sync email and name without custom properties
+            # Custom properties require pre-defined contact properties in Mailjet
+            logger.debug(f"📧 Syncing basic contact info for {email}")
             if user_metadata:
-                # Map common fields
-                if 'signup_date' in user_metadata:
-                    properties['signup_date'] = user_metadata['signup_date']
-                if 'signup_source' in user_metadata:
-                    properties['signup_source'] = user_metadata['signup_source']
-                if 'user_id' in user_metadata:
-                    properties['ruck_user_id'] = user_metadata['user_id']
-                    
-                # Add any other custom properties
-                for key, value in user_metadata.items():
-                    if key not in ['signup_date', 'signup_source', 'user_id'] and value is not None:
-                        # Convert to Mailjet-friendly property name
-                        property_name = key.lower().replace(' ', '_')
-                        properties[property_name] = str(value)
+                logger.debug(f"📧 User metadata available but skipping custom properties: {list(user_metadata.keys())}")
             
-            # Create/update the contact
+            # Create/update the contact with basic info only
             success = self.create_or_update_contact(
                 email=email,
                 name=username,
-                properties=properties
+                properties=None  # Skip custom properties for now
             )
             
             if not success:

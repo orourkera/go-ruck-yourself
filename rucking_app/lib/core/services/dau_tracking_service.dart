@@ -4,6 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/services/enhanced_api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_state.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_event.dart';
+import 'package:rucking_app/core/models/user.dart';
+import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:get_it/get_it.dart';
 
 /// Service for tracking Daily Active Users (DAU) via app foreground detection
@@ -31,8 +36,8 @@ class DauTrackingService with WidgetsBindingObserver {
     
     WidgetsBinding.instance.addObserver(this);
     
-    // Small delay to ensure authentication is ready
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Wait for authentication to be fully ready
+    await _waitForAuthenticationReady();
     
     AppLogger.debug('DAU tracking - Starting initialization');
     
@@ -63,7 +68,8 @@ class DauTrackingService with WidgetsBindingObserver {
   /// Track app open and update last_active_at if needed
   Future<void> _trackAppOpen() async {
     try {
-      final user = await _authService.getCurrentUser();
+      // Double-check authentication state before making API calls
+      final user = await _getValidatedUser();
       if (user == null) {
         AppLogger.debug('No authenticated user - skipping DAU tracking');
         return;
@@ -105,7 +111,8 @@ class DauTrackingService with WidgetsBindingObserver {
   /// Send last_active_at update to the backend
   Future<bool> _sendLastActiveUpdate() async {
     try {
-      final user = await _authService.getCurrentUser();
+      // Validate authentication before making API call
+      final user = await _getValidatedUser();
       if (user == null) {
         AppLogger.debug('DAU tracking - No authenticated user, skipping update');
         return false;
@@ -129,15 +136,7 @@ class DauTrackingService with WidgetsBindingObserver {
       return true;
       
     } catch (e) {
-      // More detailed error logging
-      if (e.toString().contains('ServerException')) {
-        AppLogger.error('DAU tracking - Server error (likely auth/permissions): $e');
-      } else if (e.toString().contains('TimeoutException')) {
-        AppLogger.warning('DAU tracking - Request timeout: $e');
-      } else {
-        AppLogger.warning('DAU tracking - Failed to update last_active_at: $e');
-      }
-      return false;
+      return await _handleApiError(e);
     }
   }
   
@@ -178,5 +177,104 @@ class DauTrackingService with WidgetsBindingObserver {
     }
     
     return success;
+  }
+  
+  /// Wait for authentication to be fully ready before making API calls
+  Future<void> _waitForAuthenticationReady() async {
+    final authBloc = GetIt.instance<AuthBloc>();
+    
+    // Wait up to 10 seconds for authentication to complete
+    for (int i = 0; i < 40; i++) {
+      final currentState = authBloc.state;
+      
+      if (currentState is Authenticated) {
+        AppLogger.debug('DAU tracking - Authentication confirmed ready');
+        return;
+      } else if (currentState is Unauthenticated || currentState is AuthError) {
+        AppLogger.debug('DAU tracking - User not authenticated, skipping');
+        return;
+      }
+      
+      // AuthInitial or AuthLoading - wait a bit more
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+    
+    AppLogger.warning('DAU tracking - Timeout waiting for authentication state');
+  }
+  
+  /// Get validated user ensuring authentication state is consistent
+  Future<User?> _getValidatedUser() async {
+    try {
+      final authBloc = GetIt.instance<AuthBloc>();
+      final currentState = authBloc.state;
+      
+      // First check: Ensure AuthBloc shows user as authenticated
+      if (currentState is! Authenticated) {
+        AppLogger.debug('DAU tracking - AuthBloc state is not Authenticated: ${currentState.runtimeType}');
+        return null;
+      }
+      
+      // Second check: Verify AuthService agrees
+      final user = await _authService.getCurrentUser();
+      if (user == null) {
+        AppLogger.warning('DAU tracking - AuthBloc shows authenticated but AuthService returned null');
+        return null;
+      }
+      
+      // Third check: Ensure user data is consistent
+      if (user.userId != currentState.user.userId) {
+        AppLogger.warning('DAU tracking - User ID mismatch between AuthBloc and AuthService');
+        return null;
+      }
+      
+      return user;
+    } catch (e) {
+      AppLogger.error('DAU tracking - Error validating user: $e');
+      return null;
+    }
+  }
+  
+  /// Handle API errors with proper authentication recovery
+  Future<bool> _handleApiError(dynamic error) async {
+    if (error is UnauthorizedException || 
+        error.toString().contains('Not authenticated') ||
+        error.toString().contains('UnauthorizedException')) {
+      
+      AppLogger.warning('DAU tracking - Authentication error detected: $error');
+      
+      // Try to refresh the token
+      try {
+        final refreshedToken = await _authService.refreshToken();
+        if (refreshedToken != null) {
+          AppLogger.info('DAU tracking - Token refreshed successfully, retrying operation');
+          // Token refreshed, let the retry happen on next app cycle
+          return false;
+        }
+      } catch (refreshError) {
+        AppLogger.error('DAU tracking - Token refresh failed: $refreshError');
+      }
+      
+      // If token refresh failed, trigger re-authentication
+      try {
+        final authBloc = GetIt.instance<AuthBloc>();
+        AppLogger.info('DAU tracking - Triggering authentication check due to auth error');
+        authBloc.add(AuthCheckRequested());
+      } catch (e) {
+        AppLogger.error('DAU tracking - Failed to trigger auth check: $e');
+      }
+      
+      return false;
+    }
+    
+    // Handle other types of errors
+    if (error.toString().contains('ServerException')) {
+      AppLogger.error('DAU tracking - Server error (likely auth/permissions): $error');
+    } else if (error.toString().contains('TimeoutException')) {
+      AppLogger.warning('DAU tracking - Request timeout: $error');
+    } else {
+      AppLogger.warning('DAU tracking - Failed to update last_active_at: $error');
+    }
+    
+    return false;
   }
 }
