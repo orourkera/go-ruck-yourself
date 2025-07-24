@@ -11,6 +11,7 @@ from typing import List, Dict, Any
 import time
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
+from .redis_cache_service import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 

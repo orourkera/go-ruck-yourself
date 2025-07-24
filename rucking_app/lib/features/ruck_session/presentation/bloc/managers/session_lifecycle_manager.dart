@@ -388,7 +388,7 @@ class SessionLifecycleManager implements SessionManager {
   Future<void> checkForCrashedSession() async {
     try {
       print('[RECOVERY_DEBUG] Starting session recovery check');
-      SessionData? sessionData;
+      Map<String, dynamic>? sessionData;
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
           sessionData = await _storageService.getObject('active_session_data');
@@ -446,8 +446,7 @@ class SessionLifecycleManager implements SessionManager {
         isSaving: false,
         currentSession: null, // Will be loaded separately
         totalPausedDuration: Duration.zero,
-        pausedAt: null,
-        isRecovered: true,  // Add this field to state class if needed
+        pausedAt: null
       ));
 
       // Restart timers and services
