@@ -204,6 +204,14 @@ class PushNotificationService:
         success_count = 0
         failure_count = 0
         
+        # Idempotency check
+        notif_type = notification_data.get('type', 'generic')
+        event_id = notification_data.get('session_id') or notification_data.get('duel_id') or notification_data.get('event_id') or 'global'
+        notif_id = f"{notif_type}_{event_id}"
+        if cache_get(f"notif_sent:{notif_id}"):
+            logger.warning(f"Duplicate notification skipped: {notif_id}")
+            return True
+
         for i, token in enumerate(device_tokens):
             logger.info(f"📱 Sending notification {i+1}/{len(device_tokens)} to token: {token[:20]}...")
             
@@ -269,6 +277,9 @@ class PushNotificationService:
         logger.info(f"   ❌ Failed: {failure_count}/{total_tokens}")
         logger.info(f"   📈 Success rate: {(success_count/total_tokens)*100:.1f}%")
         
+        # After successful send
+        cache_set(f"notif_sent:{notif_id}", True, 86400)
+
         return success_count > 0
 
     def send_duel_comment_notification(
@@ -761,16 +772,9 @@ def get_user_device_tokens(user_ids: List[str]) -> List[str]:
             for i, record in enumerate(response.data):
                 logger.info(f"   {i+1}. User: {record.get('user_id')}, Device: {record.get('device_id')}, Active: {record.get('is_active')}, Token: {record.get('fcm_token', 'null')[:30]}...")
             
-            # Extract valid tokens
-            tokens = []
-            for item in response.data:
-                token = item.get('fcm_token')
-                if token and token.strip():
-                    tokens.append(token)
-                    logger.info(f"✅ Valid token found for user {item.get('user_id')}: {token[:30]}...")
-                else:
-                    logger.warning(f"⚠️ Invalid/empty token for user {item.get('user_id')}: '{token}'")
-            
+            # Extract unique valid tokens
+            tokens = list(set(item.get('fcm_token') for item in response.data if item.get('fcm_token') and item.get('fcm_token').strip()))
+
             active_tokens = len(tokens)
             total_records = len(response.data)
             

@@ -286,8 +286,40 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           break;
         
         case NotificationType.follow:
-          Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
-          // Navigate to user profile in the future
+          final userId = notification.data?['user_id']?.toString();
+          if (userId != null) {
+            Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+            
+            // Create a minimal RuckBuddy to navigate to user profile via RuckBuddyDetailScreen
+            final ruckBuddy = RuckBuddy(
+              id: '', // Not used for profile view
+              userId: userId,
+              ruckWeightKg: 0,
+              durationSeconds: 0,
+              distanceKm: 0,
+              caloriesBurned: 0,
+              elevationGainM: 0,
+              elevationLossM: 0,
+              createdAt: DateTime.now(),
+              user: UserInfo(
+                id: userId,
+                username: '',  // Will be fetched by detail screen
+                gender: '',
+              ),
+            );
+            
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RuckBuddyDetailScreen(
+                  ruckBuddy: ruckBuddy,
+                  focusComment: false,
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
           break;
           
         case NotificationType.clubEventCreated:
@@ -319,6 +351,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             );
           } else {
             print('🎯 DEBUG: No eventId or clubId found in notification data');
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+          break;
+          
+        case NotificationType.duelInvitation:
+          final duelId = notification.data?['duel_id']?.toString();
+          if (duelId != null) {
+            Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+            
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DuelDetailScreen(
+                  duelId: duelId,
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+          break;
+          
+        case NotificationType.clubMembershipRequest:
+        case NotificationType.clubMembershipApproved:
+        case NotificationType.clubMembershipRejected:
+          final clubId = notification.data?['club_id']?.toString();
+          if (clubId != null) {
+            Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
+            
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ClubDetailScreen(clubId: clubId),
+              ),
+            );
+          } else {
             Navigator.of(context, rootNavigator: true).pop();
           }
           break;

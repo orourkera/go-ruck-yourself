@@ -47,6 +47,9 @@ abstract class StorageService {
   /// Check if a key exists
   Future<bool> hasKey(String key);
   
+  /// Get all keys
+  Future<Set<String>> getAllKeys();
+  
   /// Remove a specific value
   Future<void> remove(String key);
   
@@ -159,6 +162,11 @@ class StorageServiceImpl implements StorageService {
   @override
   Future<bool> hasKey(String key) async {
     return _prefs.containsKey(key);
+  }
+  
+  @override
+  Future<Set<String>> getAllKeys() async {
+    return _prefs.getKeys();
   }
   
   @override
