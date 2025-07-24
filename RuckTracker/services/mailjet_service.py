@@ -83,8 +83,11 @@ class MailjetService:
                 logger.debug(f"📧 Skipping custom properties to avoid API errors: {list(properties.keys())}")
                 # contact_data.update(properties)  # Commented out to prevent API errors
             
-            # Create or update contact using PUT (upsert)
-            response = requests.put(
+            # Log the data being sent for debugging
+            logger.debug(f"📧 Sending to Mailjet API: {contact_data}")
+            
+            # Create contact using POST - Mailjet expects direct JSON object
+            response = requests.post(
                 self.contacts_url,
                 headers=self.headers,
                 json=contact_data
