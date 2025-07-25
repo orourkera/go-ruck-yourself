@@ -33,8 +33,21 @@ class UserResource(Resource):
     
     def get(self, user_id):
         """Get a user by ID"""
-        user = User.query.get_or_404(user_id)
-        return {"user": user.to_dict()}, 200
+        # Debug logging for User model
+        if User is None:
+            logger.error("User model is None - database initialization failed!")
+            return {"error": "Database initialization error"}, 500
+            
+        if not hasattr(User, 'query'):
+            logger.error("User.query is None - SQLAlchemy not properly initialized!")
+            return {"error": "Database query interface not available"}, 500
+            
+        try:
+            user = User.query.get_or_404(user_id)
+            return {"user": user.to_dict()}, 200
+        except Exception as e:
+            logger.error(f"Error querying user {user_id}: {str(e)}")
+            return {"error": "Database query failed"}, 500
     
     def put(self, user_id):
         """Update a user's information"""
