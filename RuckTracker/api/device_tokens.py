@@ -46,52 +46,38 @@ class DeviceTokenResource(Resource):
             user_id = g.user_id
             supabase = get_supabase_admin_client()
 
-            # NEW STRATEGY: Deactivate all existing tokens for this user/device_type, then insert new one
-            # This prevents duplication and ensures clean state
+            # UPSERT STRATEGY: Use Supabase upsert to handle duplicate device tokens gracefully
             try:
-                # Step 1: Deactivate all existing active tokens for this user and device type
-                logger.info(f"Deactivating existing tokens for user {user_id}, device_type {device_type}")
-                deactivate_result = supabase.table('user_device_tokens').update({
-                    'is_active': False,
+                # Prepare token data
+                token_data = {
+                    'user_id': user_id,
+                    'fcm_token': fcm_token,
+                    'device_id': device_id,
+                    'device_type': device_type,
+                    'app_version': app_version,
+                    'is_active': True,
                     'updated_at': 'now()'
-                }).eq('user_id', user_id).eq('device_type', device_type).eq('is_active', True).execute()
+                }
                 
-                deactivated_count = len(deactivate_result.data) if deactivate_result.data else 0
-                logger.info(f"Deactivated {deactivated_count} existing tokens for user {user_id}")
+                # Use upsert to insert or update if exists
+                # On conflict with (user_id, device_id), update the existing record
+                upsert_result = supabase.table('user_device_tokens').upsert(
+                    token_data,
+                    on_conflict='user_id,device_id'  # Specify the unique constraint columns
+                ).execute()
                 
-                # Step 2: Insert new active token
-                try:
-                    insert_result = supabase.table('user_device_tokens').insert({
-                        'user_id': user_id,
-                        'fcm_token': fcm_token,
-                        'device_id': device_id,
-                        'device_type': device_type,
-                        'app_version': app_version,
-                        'is_active': True
-                    }).execute()
-                    
-                    if insert_result.data and len(insert_result.data) > 0:
-                        result_data = {'token_id': str(insert_result.data[0]['id'])}
-                        if deactivated_count > 0:
-                            logger.info(f"Replaced {deactivated_count} old tokens with new token for user {user_id}")
-                        else:
-                            logger.info(f"Registered first device token for user {user_id}")
-                    else:
-                        logger.error(f"Insert succeeded but no data returned for user {user_id}")
-                        return build_api_response(
-                            success=False, 
-                            error="Failed to register device token - no data returned", 
-                            status_code=500
-                        )
-                        
-                except Exception as e:
-                    logger.error(f"Error inserting new device token for user {user_id}: {e}")
+                if upsert_result.data and len(upsert_result.data) > 0:
+                    token_record = upsert_result.data[0]
+                    result_data = {'token_id': str(token_record['id'])}
+                    logger.info(f"Successfully upserted device token for user {user_id}, device {device_id}")
+                else:
+                    logger.error(f"Upsert succeeded but no data returned for user {user_id}")
                     return build_api_response(
                         success=False, 
-                        error="Failed to register device token", 
+                        error="Failed to register device token - no data returned", 
                         status_code=500
                     )
-                
+                    
                 # Return success response
                 return build_api_response(
                     success=True,

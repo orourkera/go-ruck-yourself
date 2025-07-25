@@ -185,6 +185,29 @@ class SafeTileLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use a simple, stable tile layer to prevent widget tree issues
     try {
+      if (!dotenv.isInitialized) {
+        AppLogger.error('DotEnv not initialized - using fallback tiles');
+        return TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.ruckingapp',
+          errorTileCallback: (tile, error, stackTrace) {
+            // Suppress common network errors from fallback tiles
+            if (error.toString().contains('ClientException') || 
+                error.toString().contains('SocketException') ||
+                error.toString().contains('connection abort')) {
+              AppLogger.debug('Fallback network error (suppressed): ${error.runtimeType}');
+            } else {
+              AppLogger.warning('Fallback tile loading error: $error');
+            }
+            onTileError?.call();
+          },
+          tileBuilder: (context, tileWidget, tile) {
+            onTileLoaded?.call();
+            return tileWidget;
+          },
+        );
+      }
+
       final apiKey = dotenv.env['STADIA_MAPS_API_KEY'];
       final style = this.style ?? 'stamen_terrain';
       

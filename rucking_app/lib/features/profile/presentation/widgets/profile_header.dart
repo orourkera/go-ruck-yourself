@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/profile/domain/entities/user_profile.dart';
 import 'package:rucking_app/features/profile/presentation/widgets/follow_button.dart';
+import 'package:rucking_app/shared/widgets/user_avatar.dart';
 
 class ProfileHeader extends StatelessWidget {
   final UserProfile profile;
@@ -24,9 +25,10 @@ class ProfileHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Center(
-            child: CircleAvatar(
-              radius: 50,
-              backgroundImage: profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
+            child: UserAvatar(
+              avatarUrl: profile.avatarUrl,
+              username: profile.username,
+              size: 100, // radius 50 = diameter 100
             ),
           ),
           SizedBox(height: 8),

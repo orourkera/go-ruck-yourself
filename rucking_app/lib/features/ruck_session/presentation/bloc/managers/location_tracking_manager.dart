@@ -1061,9 +1061,33 @@ double _calculateTotalDistanceWithValidation() {
   List<LocationPoint> get locationPoints => List.unmodifiable(_locationPoints);
   List<TerrainSegment> get terrainSegments => List.unmodifiable(_terrainSegments);
   Position? get currentPosition => _currentState.currentPosition;
-  double get elevationGain => _calculateElevationGain()['gain'] ?? 0.0;
-  double get elevationLoss => _calculateElevationGain()['loss'] ?? 0.0;
+  double get elevationGain => _currentState.elevationGain;
+  double get elevationLoss => _currentState.elevationLoss;
   List<SessionSplit> get splits => _splitTrackingService.getSplits()
       .map((splitData) => SessionSplit.fromJson(splitData))
       .toList();
+      
+  /// Restore metrics from crash recovery
+  void restoreMetricsFromRecovery({
+    required double totalDistanceKm,
+    required double elevationGainM,
+    required double elevationLossM,
+  }) {
+    AppLogger.info('[LOCATION_MANAGER] Restoring metrics from crash recovery: '
+        'distance=${totalDistanceKm}km, elevation_gain=${elevationGainM}m, elevation_loss=${elevationLossM}m');
+  
+    // Update private elevation tracking fields
+    _elevationGain = elevationGainM;
+    _elevationLoss = elevationLossM;
+  
+    _updateState(_currentState.copyWith(
+      totalDistance: totalDistanceKm,
+      elevationGain: elevationGainM,
+      elevationLoss: elevationLossM,
+      isGpsReady: true, // Mark as GPS ready since we have recovered data
+    ));
+  
+    AppLogger.info('[LOCATION_MANAGER] Metrics restored successfully');
+  AppLogger.debug('[LOCATION_MANAGER] Elevation getter test: gain=${elevationGain}m, loss=${elevationLoss}m');
+  }
 }

@@ -1,17 +1,21 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:get_it/get_it.dart';
 import 'package:uuid/uuid.dart';
+import 'package:geolocator/geolocator.dart';
 
 
 import '../../../../../core/config/app_config.dart';
-import '../../../../../core/utils/error_handler.dart';
-import '../../../../../core/services/app_error_handler.dart';
+import '../../../../../core/models/location_point.dart';
+import '../../../../../core/services/location_service.dart';
 import '../../../../../core/services/api_client.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/storage_service.dart';
 import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/services/connectivity_service.dart';
+import '../../../../../core/utils/error_handler.dart';
+import '../../../../../core/services/app_error_handler.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../data/repositories/session_repository.dart';
@@ -443,10 +447,30 @@ class SessionLifecycleManager implements SessionManager {
       final userWeight = 70.0; // Default weight if not stored
       final lastDuration = Duration(seconds: (sessionData['elapsed_seconds'] as num?)?.toInt() ?? 0);
 
-      final totalDistance = (sessionData['total_distance_km'] as num?)?.toDouble() ?? 0.0;
-      final elevationGain = (sessionData['elevation_gain_m'] as num?)?.toDouble() ?? 0.0;
-      final elevationLoss = (sessionData['elevation_loss_m'] as num?)?.toDouble() ?? 0.0;
-      final caloriesBurned = (sessionData['calories_burned'] as num?)?.toDouble() ?? 0.0;
+      final totalDistance = (sessionData['distance_km'] as num?)?.toDouble() ?? 0.0;
+      final elevationGain = (sessionData['elevation_gain'] as num?)?.toDouble() ?? 0.0;
+      final elevationLoss = (sessionData['elevation_loss'] as num?)?.toDouble() ?? 0.0;
+      final caloriesBurned = (sessionData['calories'] as num?)?.toDouble() ?? 0.0;
+      
+      // Calculate gap distance from last saved location to current location
+      double gapDistance = 0.0;
+      LocationPoint? lastSavedLocation;
+      try {
+        final lastLocationData = sessionData['last_location'] as Map<String, dynamic>?;
+        if (lastLocationData != null) {
+          lastSavedLocation = LocationPoint.fromJson(lastLocationData);
+          AppLogger.info('[LIFECYCLE] Last saved location: ${lastSavedLocation.latitude}, ${lastSavedLocation.longitude}');
+          
+          // Get current location to calculate gap distance
+          gapDistance = await _calculateGapDistance(lastSavedLocation);
+          AppLogger.info('[LIFECYCLE] Calculated gap distance: ${gapDistance}km');
+        }
+      } catch (e) {
+        AppLogger.warning('[LIFECYCLE] Could not calculate gap distance: $e');
+      }
+      
+      final recoveredDistance = totalDistance + gapDistance;
+      AppLogger.info('[LIFECYCLE] Recovery data - Distance: ${totalDistance}km + gap: ${gapDistance}km = ${recoveredDistance}km, Elevation: ${elevationGain}m gain/${elevationLoss}m loss, Calories: $caloriesBurned');
 
       _updateState(SessionLifecycleState(
         isActive: true,
@@ -466,10 +490,12 @@ class SessionLifecycleManager implements SessionManager {
 
       // Send recovery data to coordinator so it can initialize managers
       _notifyRecoveryCompleted({
-        'total_distance_km': totalDistance,
-        'elevation_gain_m': elevationGain,
-        'elevation_loss_m': elevationLoss,
-        'calories_burned': caloriesBurned,
+        'distance_km': recoveredDistance, // Send recovered distance including gap
+        'elevation_gain': elevationGain,
+        'elevation_loss': elevationLoss,
+        'calories': caloriesBurned,
+        'last_location': lastSavedLocation?.toJson(), // Pass last location for potential route reconstruction
+        'gap_distance_km': gapDistance, // Track how much distance was added from gap
       });
 
       // Restart timers and services
@@ -598,6 +624,7 @@ Future<void> clearCrashRecoveryData() async {
     double elevationLoss = 0.0;
     double calories = 0.0;
     
+    LocationPoint? lastLocationPoint;
     try {
       final blocState = GetIt.I<ActiveSessionBloc>().state;
       if (blocState is ActiveSessionRunning) {
@@ -605,6 +632,10 @@ Future<void> clearCrashRecoveryData() async {
         elevationGain = blocState.elevationGain;
         elevationLoss = blocState.elevationLoss;
         calories = blocState.calories;
+        // Save the last location point for gap calculation on recovery
+        if (blocState.locationPoints.isNotEmpty) {
+          lastLocationPoint = blocState.locationPoints.last;
+        }
       }
     } catch (e) {
       AppLogger.warning('Failed to get metrics for persistence: $e');
@@ -619,10 +650,12 @@ Future<void> clearCrashRecoveryData() async {
       'elapsed_seconds': _currentState.duration.inSeconds,
       'total_paused_duration_seconds': _currentState.totalPausedDuration.inSeconds,
       'last_persisted_at': DateTime.now().toIso8601String(),
-      'total_distance_km': totalDistance,
-      'elevation_gain_m': elevationGain,
-      'elevation_loss_m': elevationLoss,
-      'calories_burned': calories,
+      'distance_km': totalDistance,
+      'elevation_gain': elevationGain,
+      'elevation_loss': elevationLoss,
+      'calories': calories,
+      // Save last location for gap distance calculation
+      'last_location': lastLocationPoint?.toJson(),
     };
     
     bool saved = false;
@@ -962,5 +995,63 @@ Future<void> clearCrashRecoveryData() async {
     } else {
       AppLogger.warning('[LIFECYCLE] No recovery callback set - metrics not sent');
     }
+  }
+  
+  /// Calculate distance between last saved location and current location
+  Future<double> _calculateGapDistance(LocationPoint lastSavedLocation) async {
+    try {
+      // Get the location service from the service locator
+      final locationService = GetIt.I<LocationService>();
+      
+      // Check location permission first
+      bool hasPermission = await locationService.hasLocationPermission();
+      if (!hasPermission) {
+        AppLogger.warning('[LIFECYCLE] Location permission not available for gap calculation');
+        return 0.0;
+      }
+      
+      // Get current position with a reasonable timeout
+      final currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      
+      // Calculate distance using Haversine formula
+      final distance = _haversineDistance(
+        lastSavedLocation.latitude,
+        lastSavedLocation.longitude,
+        currentPosition.latitude,
+        currentPosition.longitude,
+      );
+      
+      AppLogger.info('[LIFECYCLE] Gap distance from (${lastSavedLocation.latitude}, ${lastSavedLocation.longitude}) '
+          'to (${currentPosition.latitude}, ${currentPosition.longitude}): ${distance}km');
+      
+      return distance;
+    } catch (e) {
+      AppLogger.warning('[LIFECYCLE] Could not get current location for gap calculation: $e');
+      return 0.0;
+    }
+  }
+  
+  /// Calculate distance between two GPS points using Haversine formula
+  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371.0; // Earth radius in kilometers
+    
+    final double dLat = _toRadians(lat2 - lat1);
+    final double dLon = _toRadians(lon2 - lon1);
+    
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadians(lat1)) * math.cos(_toRadians(lat2)) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+  
+  /// Convert degrees to radians
+  double _toRadians(double degrees) {
+    return degrees * (math.pi / 180.0);
   }
 }

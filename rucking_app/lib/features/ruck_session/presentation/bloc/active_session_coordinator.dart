@@ -839,10 +839,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     AppLogger.info('[COORDINATOR] Handling recovered metrics: $recoveredMetrics');
     
     try {
-      final distance = (recoveredMetrics['total_distance_km'] as num?)?.toDouble() ?? 0.0;
-      final elevationGain = (recoveredMetrics['elevation_gain_m'] as num?)?.toDouble() ?? 0.0;
-      final elevationLoss = (recoveredMetrics['elevation_loss_m'] as num?)?.toDouble() ?? 0.0;
-      final calories = (recoveredMetrics['calories_burned'] as num?)?.toDouble() ?? 0.0;
+      final distance = (recoveredMetrics['distance_km'] as num?)?.toDouble() ?? 0.0;
+      final elevationGain = (recoveredMetrics['elevation_gain'] as num?)?.toDouble() ?? 0.0;
+      final elevationLoss = (recoveredMetrics['elevation_loss'] as num?)?.toDouble() ?? 0.0;
+      final calories = (recoveredMetrics['calories'] as num?)?.toDouble() ?? 0.0;
       
       // Initialize location manager with recovered distance and elevation
       _locationManager.restoreMetricsFromRecovery(
