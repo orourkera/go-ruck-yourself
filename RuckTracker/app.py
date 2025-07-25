@@ -311,6 +311,15 @@ from .api.planned_rucks import (
     PlannedRuckActionsResource,
     TodayPlannedRucksResource
 )
+from .api.gpx_import import (
+    GPXImportResource,
+    GPXValidateResource
+)
+from .api.gpx_export import (
+    RouteGPXExportResource,
+    SessionGPXExportResource,
+    GPXExportBatchResource
+)
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
@@ -558,6 +567,13 @@ api.add_resource(PlannedRucksResource, '/api/planned-rucks')
 api.add_resource(PlannedRuckResource, '/api/planned-rucks/<string:planned_ruck_id>')
 api.add_resource(PlannedRuckActionsResource, '/api/planned-rucks/<string:planned_ruck_id>/<string:action>')
 api.add_resource(TodayPlannedRucksResource, '/api/planned-rucks/today')
+
+# GPX Import/Export Endpoints
+api.add_resource(GPXImportResource, '/api/gpx/import')
+api.add_resource(GPXValidateResource, '/api/gpx/validate')
+api.add_resource(RouteGPXExportResource, '/api/routes/<string:route_id>/gpx')
+api.add_resource(SessionGPXExportResource, '/api/sessions/<int:session_id>/gpx')
+api.add_resource(GPXExportBatchResource, '/api/gpx/export-batch')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource

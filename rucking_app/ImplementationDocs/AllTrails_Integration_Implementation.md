@@ -105,23 +105,23 @@
 ### 🏗️ **Phase 1: Foundation & Backend (Week 1-2)**
 
 #### Database & Schema
-- [ ] **1.1** Run `create_routes_tables.sql` migration on development database
+- [x] **1.1** Run `create_routes_tables.sql` migration on development database
 - [ ] **1.2** Run `create_routes_tables.sql` migration on production database
 - [ ] **1.3** Test database constraints and RLS policies
 - [ ] **1.4** Verify PostGIS extension is working for geographic queries
 
 #### Backend Models & API
-- [ ] **2.1** Create `RuckTracker/models/route.py` - Route model
-- [ ] **2.2** Create `RuckTracker/models/planned_ruck.py` - Planned ruck model  
-- [ ] **2.3** Create `RuckTracker/models/route_analytics.py` - Analytics model
-- [ ] **2.4** Update `RuckTracker/models/__init__.py` - Export new models
-- [ ] **2.5** Create `RuckTracker/api/routes.py` - Routes CRUD API
-- [ ] **2.6** Create `RuckTracker/api/planned_rucks.py` - Planned rucks API
-- [ ] **2.7** Create `RuckTracker/api/route_analytics.py` - Analytics API
-- [ ] **2.8** Create `RuckTracker/api/gpx_import.py` - GPX parsing endpoint
-- [ ] **2.9** Create `RuckTracker/api/gpx_export.py` - GPX generation endpoint
-- [ ] **2.10** Update `RuckTracker/app.py` - Register all new API routes
-- [ ] **2.11** Update `RuckTracker/requirements.txt` - Add GPX dependencies
+- [x] **2.1** Create `RuckTracker/models/route.py` - Route model
+- [x] **2.2** Create `RuckTracker/models/planned_ruck.py` - Planned ruck model  
+- [x] **2.3** Create `RuckTracker/models/route_analytics.py` - Analytics model
+- [x] **2.4** Update `RuckTracker/models/__init__.py` - Export new models
+- [x] **2.5** Create `RuckTracker/api/routes.py` - Routes CRUD API
+- [x] **2.6** Create `RuckTracker/api/planned_rucks.py` - Planned rucks API
+- [x] **2.7** Create `RuckTracker/services/route_analytics_service.py` - Analytics service
+- [x] **2.8** Create `RuckTracker/api/gpx_import.py` - GPX parsing endpoint
+- [x] **2.9** Create `RuckTracker/api/gpx_export.py` - GPX generation endpoint
+- [x] **2.10** Update `RuckTracker/app.py` - Register all new API routes
+- [x] **2.11** No additional dependencies needed - uses Python standard library
 - [ ] **2.12** Test all API endpoints with Postman/curl
 
 ### 📱 **Phase 2: Flutter Models & Services (Week 2-3)**
