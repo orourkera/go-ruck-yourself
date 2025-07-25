@@ -26,8 +26,11 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/create_se
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
+
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/managers/app_update_manager.dart';
+import 'package:rucking_app/core/services/app_update_service.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/user_avatar.dart';
 import 'package:get_it/get_it.dart';
@@ -353,6 +356,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       _checkForPhotoUploadError();
       _checkForSessionRecovery();
       _requestEarlyPermissions(); // Request permissions early for better UX
+      _checkForAppUpdates(); // Check for app updates
     });
   }
   
@@ -596,6 +600,27 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
     return _loadData();
   }
 
+  /// Check for app updates and show modal if available
+  Future<void> _checkForAppUpdates() async {
+    if (!mounted) return;
+    
+    try {
+      // Add a small delay to let the UI settle
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (!mounted) return;
+      
+      // Trigger update check which will show modal if update is available
+      await AppUpdateManager.instance.checkAndPromptForUpdate(
+        context,
+        promptContext: UpdatePromptContext.homeScreen,
+      );
+    } catch (e) {
+      // Silent fail - update checks are non-critical
+      print('Failed to check for app updates: $e');
+    }
+  }
+
   // Helper function to process session response
   List<dynamic> _processSessionResponse(dynamic response) {
     List<dynamic> processedSessions = [];
@@ -677,6 +702,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Update banner widget
+
                   // Header with user greeting
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/app_update_service.dart';
-import 'package:rucking_app/core/network/api_client.dart';
+import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/shared/widgets/app_update_widgets.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
@@ -70,17 +70,8 @@ class AppUpdateManager {
     UpdatePromptContext promptContext,
     List<String>? features,
   ) async {
-    switch (promptContext) {
-      case UpdatePromptContext.homeScreen:
-        // Banner is shown by HomeScreen widget directly
-        break;
-        
-      case UpdatePromptContext.afterSession:
-      case UpdatePromptContext.manual:
-      case UpdatePromptContext.automatic:
-        await _showUpdateBottomSheet(context, updateInfo, features);
-        break;
-    }
+    // Always show modal for better UX - no more banner pushing content down
+    await _showUpdateBottomSheet(context, updateInfo, features);
   }
   
   /// Show update bottom sheet

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/core/services/app_update_service.dart';
-import 'package:rucking_app/shared/styles/app_colors.dart';
-import 'package:rucking_app/shared/styles/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Non-intrusive update banner for home screen
 class UpdateAvailableBanner extends StatelessWidget {
