@@ -298,6 +298,20 @@ from .api.device_tokens import DeviceTokenResource
 from .api.test_notification import TestNotificationResource
 from .api.leaderboard import LeaderboardResource, LeaderboardMyRankResource
 
+# AllTrails integration API imports
+from .api.routes import (
+    RoutesResource,
+    RouteResource,
+    RouteElevationResource,
+    RouteSearchResource
+)
+from .api.planned_rucks import (
+    PlannedRucksResource,
+    PlannedRuckResource,
+    PlannedRuckActionsResource,
+    TodayPlannedRucksResource
+)
+
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
 # rate_limit_resource(RefreshTokenResource, "30 per minute")  # Disabled - too restrictive
@@ -532,6 +546,18 @@ api.add_resource(TestNotificationResource, '/api/test-notification')
 # Leaderboard Endpoints
 api.add_resource(LeaderboardResource, '/api/leaderboard')
 api.add_resource(LeaderboardMyRankResource, '/api/leaderboard/my-rank')
+
+# AllTrails Integration Endpoints
+api.add_resource(RoutesResource, '/api/routes')
+api.add_resource(RouteResource, '/api/routes/<string:route_id>')
+api.add_resource(RouteElevationResource, '/api/routes/<string:route_id>/elevation')
+api.add_resource(RouteSearchResource, '/api/routes/search')
+
+# Planned Rucks Endpoints
+api.add_resource(PlannedRucksResource, '/api/planned-rucks')
+api.add_resource(PlannedRuckResource, '/api/planned-rucks/<string:planned_ruck_id>')
+api.add_resource(PlannedRuckActionsResource, '/api/planned-rucks/<string:planned_ruck_id>/<string:action>')
+api.add_resource(TodayPlannedRucksResource, '/api/planned-rucks/today')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
