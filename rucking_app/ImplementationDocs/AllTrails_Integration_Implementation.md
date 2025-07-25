@@ -127,16 +127,14 @@
 ### 📱 **Phase 2: Flutter Models & Services (Week 2-3)**
 
 #### Core Models
-- [ ] **3.1** Create `lib/core/models/route.dart` - Route data model
-- [ ] **3.2** Create `lib/core/models/route_elevation_point.dart` - Elevation model
-- [ ] **3.3** Create `lib/core/models/route_point_of_interest.dart` - POI model
-- [ ] **3.4** Create `lib/core/models/planned_ruck.dart` - Planned ruck model
-- [ ] **3.5** Update `lib/features/ruck_session/domain/models/ruck_session.dart` - Add route fields
-
-#### Core Services
-- [ ] **4.1** Create `lib/core/services/route_service.dart` - Route API service
-- [ ] **4.2** Create `lib/core/services/planned_ruck_service.dart` - Planned ruck API service
-- [ ] **4.3** Create `lib/core/services/gpx_parser_service.dart` - GPX file parsing
+- [x] **3.1** Create `lib/core/models/route.dart` - Route data model
+- [x] **3.2** Create `lib/core/models/route_elevation_point.dart` - Elevation model
+- [x] **3.3** Create `lib/core/models/route_point_of_interest.dart` - POI model
+- [x] **3.4** Create `lib/core/models/planned_ruck.dart` - Planned ruck model
+- [x] **3.5** Update `lib/features/ruck_session/domain/models/ruck_session.dart` - Add route fields
+- [x] **3.6** Create `lib/core/repositories/routes_repository.dart` - Routes API
+- [x] **3.7** Create `lib/core/repositories/planned_rucks_repository.dart` - Planned rucks API
+- [x] **3.8** Create `lib/core/services/gpx_service.dart` - GPX parsing/generation
 - [ ] **4.4** Create `lib/core/services/gpx_export_service.dart` - GPX file generation
 - [ ] **4.5** Create `lib/core/services/route_progress_tracker.dart` - Route progress tracking
 - [ ] **4.6** Create `lib/core/services/route_navigation_service.dart` - Turn guidance
@@ -187,10 +185,10 @@
 ### 🧠 **Phase 5: State Management (Week 5-6)**
 
 #### BLoC Implementation
-- [ ] **10.1** Create `lib/features/planned_rucks/presentation/bloc/planned_ruck_event.dart` - Events
-- [ ] **10.2** Create `lib/features/planned_rucks/presentation/bloc/planned_ruck_state.dart` - States
-- [ ] **10.3** Create `lib/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart` - Main BLoC
-- [ ] **10.4** Create `lib/features/planned_rucks/presentation/bloc/route_import_bloc.dart` - Import BLoC
+- [x] **10.1** Create `lib/features/planned_rucks/presentation/bloc/planned_ruck_event.dart` - Events
+- [x] **10.2** Create `lib/features/planned_rucks/presentation/bloc/planned_ruck_state.dart` - States
+- [x] **10.3** Create `lib/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart` - Main BLoC
+- [x] **10.4** Create `lib/features/planned_rucks/presentation/bloc/route_import_bloc.dart` - Import BLoC
 - [ ] **10.5** Update `lib/features/ruck_session/presentation/bloc/active_session_bloc.dart` - Add route data and progress
 
 #### Navigation Integration

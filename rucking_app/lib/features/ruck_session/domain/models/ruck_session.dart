@@ -3,6 +3,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
+import 'package:rucking_app/core/models/route.dart';
 
 /// Enum representing the status of a ruck session
 enum RuckStatus {
@@ -44,6 +45,9 @@ class RuckSession {
     List<SessionSplit>? splits,
     List<RuckPhoto>? photos,
     bool? isManual,
+    String? routeId,
+    String? plannedRuckId,
+    Route? route,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -74,6 +78,9 @@ class RuckSession {
       splits: splits ?? this.splits,
       photos: photos ?? this.photos,
       isManual: isManual ?? this.isManual,
+      routeId: routeId ?? this.routeId,
+      plannedRuckId: plannedRuckId ?? this.plannedRuckId,
+      route: route ?? this.route,
     );
   }
 
@@ -106,6 +113,11 @@ class RuckSession {
   final List<SessionSplit>? splits;
   final List<RuckPhoto>? photos;
   final bool isManual;
+  
+  // Route integration fields
+  final String? routeId; // ID of the route used for this session
+  final String? plannedRuckId; // ID of the planned ruck that was completed
+  final Route? route; // Full route data (loaded separately)
 
   RuckSession({
     this.id,
@@ -136,6 +148,9 @@ class RuckSession {
     this.splits,
     this.photos,
     this.isManual = false,
+    this.routeId,
+    this.plannedRuckId,
+    this.route,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -284,6 +299,11 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
                 .toList()
             : null,
         isManual: json['is_manual'] as bool? ?? false,
+        routeId: json['route_id'] as String?,
+        plannedRuckId: json['planned_ruck_id'] as String?,
+        route: json['route'] != null && json['route'] is Map<String, dynamic>
+            ? Route.fromJson(json['route'] as Map<String, dynamic>)
+            : null,
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -340,6 +360,9 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'splits': splits?.map((e) => e.toJson()).toList(),
       'photos': photos?.map((e) => e.toJson()).toList(),
       'is_manual': isManual,
+      'route_id': routeId,
+      'planned_ruck_id': plannedRuckId,
+      'route': route?.toJson(),
     };
   }
 }
