@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- AllTrails Integration: File Provider Paths -->
+    
+    <!-- Internal storage for GPX files -->
+    <files-path name="gpx_files" path="shared_imports/" />
+    
+    <!-- Cache directory for temporary files -->
+    <cache-path name="gpx_cache" path="gpx_temp/" />
+    
+    <!-- External files directory for user-accessible GPX exports -->
+    <external-files-path name="gpx_exports" path="GPX_Exports/" />
+    
+    <!-- Downloads directory for GPX file exports -->
+    <external-path name="gpx_downloads" path="Download/" />
+    
+    <!-- Support for sharing from other apps -->
+    <external-path name="external_storage" path="." />
+</paths>

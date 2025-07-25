@@ -40,6 +40,16 @@ import 'package:rucking_app/features/achievements/di/achievement_injection_conta
 import 'package:rucking_app/features/premium/di/premium_injection_container.dart';
 import 'package:rucking_app/features/duels/di/duels_injection_container.dart';
 import 'package:rucking_app/features/leaderboard/di/leaderboard_injection_container.dart';
+// AllTrails Integration
+import 'package:rucking_app/core/repositories/routes_repository.dart';
+import 'package:rucking_app/core/repositories/planned_rucks_repository.dart';
+import 'package:rucking_app/core/services/gpx_service.dart';
+import 'package:rucking_app/core/services/gpx_export_service.dart';
+import 'package:rucking_app/core/services/route_progress_tracker.dart';
+import 'package:rucking_app/core/services/route_navigation_service.dart';
+import 'package:rucking_app/core/utils/eta_calculator.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_import_bloc.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
@@ -247,6 +257,25 @@ Future<void> setupServiceLocator() async {
   ));
 
   getIt.registerFactory<HealthBloc>(() => HealthBloc(healthService: getIt<HealthService>()));
+  
+  // AllTrails Integration Services
+  print('🔧 [ServiceLocator] Registering AllTrails services...');
+  getIt.registerSingleton<RoutesRepository>(RoutesRepository());
+  getIt.registerSingleton<PlannedRucksRepository>(PlannedRucksRepository());
+  getIt.registerSingleton<GPXService>(GPXService());
+  getIt.registerSingleton<GPXExportService>(GPXExportService());
+  getIt.registerSingleton<ETACalculator>(ETACalculator());
+  
+  // AllTrails BLoCs
+  print('🔧 [ServiceLocator] Registering AllTrails BLoCs...');
+  getIt.registerFactory<PlannedRuckBloc>(() => PlannedRuckBloc(
+    plannedRucksRepository: getIt<PlannedRucksRepository>(),
+    routesRepository: getIt<RoutesRepository>(),
+  ));
+  getIt.registerFactory<RouteImportBloc>(() => RouteImportBloc(
+    gpxService: getIt<GPXService>(),
+    routesRepository: getIt<RoutesRepository>(),
+  ));
   getIt.registerFactory<ProfileBloc>(() => ProfileBloc(
     avatarService: getIt<AvatarService>(),
     authBloc: getIt<AuthBloc>(),

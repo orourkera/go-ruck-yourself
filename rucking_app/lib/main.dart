@@ -22,6 +22,8 @@ import 'package:rucking_app/features/duels/presentation/bloc/create_duel/create_
 import 'package:rucking_app/features/duels/presentation/bloc/duel_stats/duel_stats_bloc.dart';
 import 'package:rucking_app/features/duels/presentation/bloc/duel_invitations/duel_invitations_bloc.dart';
 import 'package:rucking_app/features/leaderboard/presentation/bloc/leaderboard_bloc.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_import_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -369,6 +371,13 @@ Future<void> _initializeApp() async {
         ),
         BlocProvider<LeaderboardBloc>(
           create: (context) => getIt<LeaderboardBloc>(),
+        ),
+        // AllTrails Integration BLoCs
+        BlocProvider<PlannedRuckBloc>(
+          create: (context) => getIt<PlannedRuckBloc>(),
+        ),
+        BlocProvider<RouteImportBloc>(
+          create: (context) => getIt<RouteImportBloc>(),
         ),
       ],
       child: RuckingApp(),

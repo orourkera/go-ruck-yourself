@@ -81,6 +81,50 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.ruck.app" />
             </intent-filter>
+            
+            <!-- AllTrails Integration: GPX file sharing intent filters -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/gpx+xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            
+            <!-- GPX file opening intent filters -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" android:pathPattern=".*\.gpx" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:mimeType="application/gpx+xml" />
+            </intent-filter>
+            
+            <!-- AllTrails URL sharing -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="alltrails.com" />
+            </intent-filter>
         </activity>
         
         <!-- Don't delete the meta-data below.
@@ -103,6 +147,26 @@
         
         <!-- Heartbeat receiver for session monitoring -->
         <receiver android:name=".SessionHeartbeatReceiver" android:enabled="true" android:exported="false" />
+        
+        <!-- AllTrails Integration: File share receiver -->
+        <receiver android:name=".FileShareReceiver" android:enabled="true" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <data android:mimeType="application/gpx+xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <data android:mimeType="application/xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <data android:mimeType="text/xml" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <data android:scheme="file" android:pathPattern=".*\.gpx" />
+            </intent-filter>
+        </receiver>
         
         <!-- Location tracking service -->
         <service 
@@ -129,6 +193,17 @@
         <meta-data
             android:name="com.baseflow.geolocator.notification.text"
             android:value="Tracking location in background" />
+            
+        <!-- AllTrails Integration: File Provider for GPX file sharing -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.ruck.app.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
             
     </application>
     

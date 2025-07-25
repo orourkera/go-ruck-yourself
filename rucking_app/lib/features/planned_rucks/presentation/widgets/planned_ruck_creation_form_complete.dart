@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Form widget for creating a planned ruck when importing a route
 class PlannedRuckCreationForm extends StatefulWidget {

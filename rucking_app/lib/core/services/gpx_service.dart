@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 import 'package:rucking_app/core/models/route.dart';
@@ -7,7 +8,7 @@ import 'package:rucking_app/core/models/route_elevation_point.dart';
 import 'package:rucking_app/core/models/route_point_of_interest.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/core/config/api_config.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 
 /// Service for parsing and generating GPX files
 /// Handles AllTrails GPX import, route export, and session export
@@ -80,7 +81,7 @@ class GpxService {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiConfig.baseUrl}/gpx/import'),
+        Uri.parse('${AppConfig.apiBaseUrl}/gpx/import'),
       );
 
       request.headers.addAll(await _getHeaders());
@@ -116,7 +117,7 @@ class GpxService {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiConfig.baseUrl}/gpx/validate'),
+        Uri.parse('${AppConfig.apiBaseUrl}/gpx/validate'),
       );
 
       request.headers.addAll(await _getHeaders());
@@ -160,7 +161,7 @@ class GpxService {
         'include_pois': includePois.toString(),
       };
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/gpx/export/route/$routeId')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId')
           .replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
@@ -197,7 +198,7 @@ class GpxService {
         'include_heart_rate': includeHeartRate.toString(),
       };
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/gpx/export/session/$sessionId')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/ruck-sessions/$sessionId/gpx')
           .replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
@@ -775,5 +776,3 @@ extension on double {
   double asin() => math.asin(this);
   double sqrt() => math.sqrt(this);
 }
-
-import 'dart:math' as math;

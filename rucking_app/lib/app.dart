@@ -48,6 +48,14 @@ import 'package:rucking_app/features/duels/presentation/screens/duel_stats_scree
 import 'package:rucking_app/features/clubs/presentation/screens/clubs_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/create_club_screen.dart';
+// AllTrails Integration
+import 'package:rucking_app/features/planned_rucks/presentation/screens/my_rucks_screen.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/route_preview_screen.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/route_search_screen.dart';
+import 'package:rucking_app/core/navigation/deep_link_handler.dart';
+import 'package:rucking_app/core/services/gpx_service.dart';
 import 'package:rucking_app/features/clubs/domain/models/club.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/create_event_screen.dart';
@@ -724,6 +732,46 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                             body: const Center(child: Text('Missing event ID')),
                           ),
                         );
+                      // AllTrails Integration Routes
+                      case '/my_rucks':
+                        return MaterialPageRoute(
+                          builder: (_) => const MyRucksScreen(),
+                        );
+                      case '/route_import':
+                        return MaterialPageRoute(
+                          builder: (_) => const RouteImportScreen(),
+                        );
+                      case '/planned_ruck_detail':
+                        final args = settings.arguments;
+                        if (args is String) {
+                          return MaterialPageRoute(
+                            builder: (_) => PlannedRuckDetailScreen(plannedRuckId: args),
+                          );
+                        }
+                        return MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(title: const Text('Error')),
+                            body: const Center(child: Text('Missing planned ruck ID')),
+                          ),
+                        );
+                      case '/route_preview':
+                        final args = settings.arguments;
+                        if (args is String) {
+                          return MaterialPageRoute(
+                            builder: (_) => RoutePreviewScreen(routeId: args),
+                          );
+                        }
+                        return MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(title: const Text('Error')),
+                            body: const Center(child: Text('Missing route ID')),
+                          ),
+                        );
+                      case '/route_search':
+                        return MaterialPageRoute(
+                          builder: (_) => const RouteSearchScreen(),
+                        );
+                      
                       default:
                         // Handle dynamic routes
                         if (settings.name != null) {

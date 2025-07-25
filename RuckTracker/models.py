@@ -1,5 +1,5 @@
 from datetime import datetime
-from .app import db
+from .extensions import db
 from flask_login import UserMixin
 from sqlalchemy.dialects.postgresql import UUID
 import uuid

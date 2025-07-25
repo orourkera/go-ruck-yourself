@@ -74,6 +74,15 @@ dependencies:
   # Health Integration
   health: ^12.1.0
   
+  # Navigation
+  go_router: ^14.6.2
+  
+  # File Handling & XML Processing
+  xml: ^6.4.2
+  file_picker: ^8.1.6
+  mime: ^1.0.4
+  archive: ^3.6.1
+  
   # Utils
   intl: ^0.20.2
   json_annotation: ^4.9.0

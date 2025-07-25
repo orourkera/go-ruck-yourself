@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/models/route.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/widgets/difficulty_badge.dart';
 import 'package:rucking_app/core/widgets/status_badge.dart';
 

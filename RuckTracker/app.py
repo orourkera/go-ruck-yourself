@@ -96,6 +96,9 @@ app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 db.init_app(app)
 migrate.init_app(app, db)
 
+# Import models after db initialization to avoid circular imports
+from . import models
+
 # Configure Redis connection with SSL options to skip certificate verification for Heroku Redis
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 

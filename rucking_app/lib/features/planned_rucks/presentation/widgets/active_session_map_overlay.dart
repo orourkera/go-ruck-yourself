@@ -4,8 +4,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:rucking_app/core/models/ruck_session.dart';
 import 'package:rucking_app/core/models/route.dart';
 import 'package:rucking_app/core/models/location_point.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Interactive map overlay for active rucking sessions with real-time tracking
 class ActiveSessionMapOverlay extends StatefulWidget {
