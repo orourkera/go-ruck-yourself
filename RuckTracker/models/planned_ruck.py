@@ -77,8 +77,15 @@ class PlannedRuck:
         
         # Optionally include route data
         if include_route and self.route:
-            data['route'] = self.route
-            
+            # Ensure route is a dictionary, not a Response object
+            if isinstance(self.route, dict):
+                data['route'] = self.route
+            else:
+                # Log warning if route is not a dict (could be Response object)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"PlannedRuck.route is not a dict, type: {type(self.route)}")
+        
         return data
 
     @classmethod

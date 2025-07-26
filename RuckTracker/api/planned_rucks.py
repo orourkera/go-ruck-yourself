@@ -95,9 +95,12 @@ class PlannedRucksResource(Resource):
             for planned_ruck in planned_rucks:
                 try:
                     logger.debug(f"Converting PlannedRuck to dict: {planned_ruck.id}")
-                    planned_ruck_dict = planned_ruck.to_dict()
+                    # Always convert to dict without including route from PlannedRuck object
+                    # to avoid any potential Response objects stored in self.route
+                    planned_ruck_dict = planned_ruck.to_dict(include_route=False)
                     logger.debug(f"PlannedRuck dict type: {type(planned_ruck_dict)}")
                     
+                    # Add route data separately from our clean routes_by_id dict
                     if include_route and planned_ruck.route_id in routes_by_id:
                         planned_ruck_dict['route'] = routes_by_id[planned_ruck.route_id]
                     
