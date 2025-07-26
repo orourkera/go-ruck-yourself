@@ -40,3 +40,14 @@ def error_response(message, details=None):
     if details is not None:
         response_body["details"] = details
     return response_body
+
+
+# Legacy function names for backward compatibility
+def api_response(data=None, success=True, error=None, status_code=200):
+    """Legacy function name for build_api_response"""
+    return build_api_response(data, success, error, status_code)
+
+
+def api_error(message, details=None):
+    """Legacy function name for error_response"""
+    return error_response(message, details)

@@ -130,7 +130,21 @@ class PlannedRucksResource(Resource):
             logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
             logger.debug(f"Response data types: {[(k, type(v)) for k, v in response_data.items()]}")
             
-            return success_response(response_data)
+            # Final check to ensure no Response objects are in the data
+            def clean_data(obj):
+                """Recursively clean data to remove any Response objects"""
+                if hasattr(obj, '__class__') and 'Response' in str(obj.__class__):
+                    logger.warning(f"Found Response object in data: {type(obj)}")
+                    return None
+                elif isinstance(obj, dict):
+                    return {k: clean_data(v) for k, v in obj.items() if clean_data(v) is not None}
+                elif isinstance(obj, list):
+                    return [clean_data(item) for item in obj if clean_data(item) is not None]
+                else:
+                    return obj
+            
+            cleaned_response_data = clean_data(response_data)
+            return success_response(cleaned_response_data)
             
         except Exception as e:
             logger.error(f"Error fetching planned rucks: {e}")
