@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/core/config/api_config.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 
 /// Repository for managing planned ruck sessions
 /// Provides methods to create, manage, and track planned rucks
@@ -40,7 +40,7 @@ class PlannedRucksRepository {
       if (fromDate != null) queryParams['from_date'] = fromDate.toIso8601String();
       if (toDate != null) queryParams['to_date'] = toDate.toIso8601String();
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/planned-rucks')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks')
           .replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
@@ -80,7 +80,7 @@ class PlannedRucksRepository {
         'include_route': includeRoute.toString(),
       };
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/planned-rucks/$plannedRuckId')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId')
           .replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
@@ -113,7 +113,7 @@ class PlannedRucksRepository {
   Future<PlannedRuck> createPlannedRuck(PlannedRuck plannedRuck) async {
     try {
       final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/planned-rucks'),
+        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks'),
         headers: await _getHeaders(),
         body: json.encode(plannedRuck.toJson()),
       );
@@ -141,7 +141,7 @@ class PlannedRucksRepository {
   Future<PlannedRuck> updatePlannedRuck(String plannedRuckId, PlannedRuck plannedRuck) async {
     try {
       final response = await _httpClient.put(
-        Uri.parse('${ApiConfig.baseUrl}/planned-rucks/$plannedRuckId'),
+        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId'),
         headers: await _getHeaders(),
         body: json.encode(plannedRuck.toJson()),
       );
@@ -168,7 +168,7 @@ class PlannedRucksRepository {
   Future<bool> deletePlannedRuck(String plannedRuckId) async {
     try {
       final response = await _httpClient.delete(
-        Uri.parse('${ApiConfig.baseUrl}/planned-rucks/$plannedRuckId'),
+        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId'),
         headers: await _getHeaders(),
       );
 
@@ -192,7 +192,7 @@ class PlannedRucksRepository {
   Future<PlannedRuck?> startPlannedRuck(String plannedRuckId) async {
     try {
       final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/planned-rucks/$plannedRuckId/start'),
+        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId/start'),
         headers: await _getHeaders(),
       );
 
@@ -223,7 +223,7 @@ class PlannedRucksRepository {
       };
 
       final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/planned-rucks/$plannedRuckId/complete'),
+        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId/complete'),
         headers: await _getHeaders(),
         body: json.encode(requestBody),
       );
@@ -256,7 +256,7 @@ class PlannedRucksRepository {
       }
 
       final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/planned-rucks/$plannedRuckId/cancel'),
+        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId/cancel'),
         headers: await _getHeaders(),
         body: requestBody.isNotEmpty ? json.encode(requestBody) : null,
       );

@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/features/planned_rucks/presentation/screens/my_rucks_screen.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/screens/active_session_screen.dart';
+
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_event.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_import_bloc.dart';
 import 'package:rucking_app/core/di/injection_container.dart';
 
@@ -69,7 +70,7 @@ class AllTrailsRouter {
               child: BlocProvider.value(
                 value: context.read<PlannedRuckBloc>(),
                 child: PlannedRuckDetailScreen(
-                  plannedRuck: extra ?? _getPlannedRuckById(context, ruckId),
+                  plannedRuckId: ruckId,
                 ),
               ),
               transitionsBuilder: _slideFromRightTransition,
@@ -140,15 +141,20 @@ class AllTrailsRouter {
       name: 'route-preview',
       pageBuilder: (context, state) {
         final routeId = state.pathParameters['routeId']!;
-        final route = state.extra as Route?;
+        final route = state.extra as route_model.Route?;
         
         return CustomTransitionPage<void>(
           key: state.pageKey,
           child: MultiBlocProvider(
             providers: [
               BlocProvider(
-                create: (context) => getIt<RouteImportBloc>()
-                  ..add(PreviewRoute(routeId: routeId, route: route)),
+                create: (context) {
+                  final bloc = getIt<RouteImportBloc>();
+                  if (route != null) {
+                    bloc.add(PreviewRoute(route: route!));
+                  }
+                  return bloc;
+                },
               ),
               BlocProvider(
                 create: (context) => getIt<PlannedRuckBloc>(),
@@ -156,7 +162,6 @@ class AllTrailsRouter {
             ],
             child: RoutePreviewScreen(
               routeId: routeId,
-              route: route,
             ),
           ),
           transitionsBuilder: _scaleTransition,
@@ -179,9 +184,8 @@ class AllTrailsRouter {
             providers: [
               BlocProvider(
                 create: (context) => getIt<RouteImportBloc>()
-                  ..add(SearchRoutes(
+                  ..add(SearchAllTrailsRoutes(
                     query: searchQuery,
-                    filters: filters,
                   )),
               ),
               BlocProvider(
@@ -244,7 +248,7 @@ class AllTrailsRouter {
   static void navigateToRoutePreview(
     BuildContext context,
     String routeId, {
-    Route? route,
+    route_model.Route? route,
   }) {
     context.goNamed(
       'route-preview',
@@ -364,11 +368,11 @@ class AllTrailsRouter {
 
   static RouteImportEvent _getInitialImportEvent(String? routeUrl, String? routeId) {
     if (routeId != null) {
-      return ImportFromAllTrails(routeId: routeId);
+      return ImportAllTrailsRoute(routeId: routeId);
     } else if (routeUrl != null) {
-      return ImportFromUrl(url: routeUrl);
+      return ImportGpxFromUrl(url: routeUrl);
     }
-    return const ResetImport();
+    return const ClearImportState();
   }
 
   static String? _extractAllTrailsRouteId(String url) {
@@ -429,7 +433,7 @@ class AllTrailsRouter {
 /// Route Preview Screen for shared routes
 class RoutePreviewScreen extends StatelessWidget {
   final String routeId;
-  final Route? route;
+  final route_model.Route? route;
 
   const RoutePreviewScreen({
     super.key,
@@ -457,7 +461,7 @@ class RoutePreviewScreen extends StatelessWidget {
       ),
       body: BlocBuilder<RouteImportBloc, RouteImportState>(
         builder: (context, state) {
-          if (state is RoutePreviewLoaded) {
+          if (state is RouteImportPreview) {
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(

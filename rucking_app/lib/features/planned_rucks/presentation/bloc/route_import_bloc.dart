@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/core/models/route.dart';
@@ -7,6 +8,7 @@ import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/core/repositories/planned_rucks_repository.dart';
 import 'package:rucking_app/core/services/gpx_service.dart';
+import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 // Events
@@ -315,15 +317,18 @@ class RouteImportPreview extends RouteImportState {
 class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
   final RoutesRepository _routesRepository;
   final PlannedRucksRepository _plannedRucksRepository;
-  final GPXService _gpxService;
+  final GpxService _gpxService;
+  final AuthService _authService;
 
   RouteImportBloc({
     required RoutesRepository routesRepository,
     required PlannedRucksRepository plannedRucksRepository,
-    required GPXService gpxService,
+    required GpxService gpxService,
+    required AuthService authService,
   })  : _routesRepository = routesRepository,
         _plannedRucksRepository = plannedRucksRepository,
         _gpxService = gpxService,
+        _authService = authService,
         super(const RouteImportInitial()) {
     
     on<ImportGpxFile>(_onImportGpxFile);
@@ -346,24 +351,41 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       emit(RouteImportValidating(fileName: event.gpxFile.path.split('/').last));
 
       // First validate the file
-      final validationResult = await _gpxService.validateGpxFile(event.gpxFile.path);
+      final validationResult = await _gpxService.validateGpxFile(event.gpxFile);
       
       if (!validationResult.isValid) {
         emit(RouteImportError.validation(
-          message: validationResult.error ?? 'Invalid GPX file',
+          message: validationResult.errors.isNotEmpty ? validationResult.errors.first : 'Invalid GPX file',
         ));
         return;
       }
 
       // Parse the route from GPX
-      final route = await _gpxService.parseGpxFile(event.gpxFile.path);
+      final gpxContent = await event.gpxFile.readAsString();
+      final parsedData = await _gpxService.parseGpxContent(gpxContent);
       
-      if (route == null) {
+      if (parsedData.trackPoints.isEmpty) {
         emit(RouteImportError.validation(
           message: 'Could not parse route from GPX file',
         ));
         return;
       }
+
+      // Convert parsed data to Route object
+      final route = Route(
+        name: parsedData.name,
+        description: parsedData.description,
+        source: parsedData.source,
+        externalUrl: parsedData.externalUrl,
+        routePolyline: '',
+        startLatitude: parsedData.trackPoints.first.latitude,
+        startLongitude: parsedData.trackPoints.first.longitude,
+        endLatitude: parsedData.trackPoints.last.latitude,
+        endLongitude: parsedData.trackPoints.last.longitude,
+        distanceKm: parsedData.totalDistanceKm,
+        elevationGainM: parsedData.elevationGainM,
+        elevationLossM: parsedData.elevationLossM,
+      );
 
       // Show preview
       emit(RouteImportPreview(
@@ -387,15 +409,38 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
     try {
       emit(const RouteImportInProgress(message: 'Downloading GPX file...'));
 
-      // Download and parse GPX from URL
-      final route = await _gpxService.importGpxFromUrl(event.url);
+      // Download GPX content from URL
+      final response = await http.get(Uri.parse(event.url));
+      if (response.statusCode != 200) {
+        emit(RouteImportError.network());
+        return;
+      }
       
-      if (route == null) {
+      // Parse GPX content
+      final parsedData = await _gpxService.parseGpxContent(response.body);
+      
+      if (parsedData.trackPoints.isEmpty) {
         emit(RouteImportError.validation(
           message: 'Could not parse route from URL',
         ));
         return;
       }
+      
+      // Convert to Route object
+      final route = Route(
+        name: parsedData.name,
+        description: parsedData.description,
+        source: parsedData.source,
+        externalUrl: event.url,
+        routePolyline: '',
+        startLatitude: parsedData.trackPoints.first.latitude,
+        startLongitude: parsedData.trackPoints.first.longitude,
+        endLatitude: parsedData.trackPoints.last.latitude,
+        endLongitude: parsedData.trackPoints.last.longitude,
+        distanceKm: parsedData.totalDistanceKm,
+        elevationGainM: parsedData.elevationGainM,
+        elevationLossM: parsedData.elevationLossM,
+      );
 
       // Show preview
       emit(RouteImportPreview(
@@ -422,19 +467,36 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
     try {
       emit(RouteImportValidating(fileName: event.gpxFile.path.split('/').last));
 
-      final validationResult = await _gpxService.validateGpxFile(event.gpxFile.path);
+      final validationResult = await _gpxService.validateGpxFile(event.gpxFile);
       
       if (!validationResult.isValid) {
         emit(RouteImportError.validation(
-          message: validationResult.error ?? 'Invalid GPX file',
+          message: validationResult.errors.isNotEmpty ? validationResult.errors.first : 'Invalid GPX file',
         ));
         return;
       }
 
       // Parse the route for preview
-      final route = await _gpxService.parseGpxFile(event.gpxFile.path);
+      final gpxContent = await event.gpxFile.readAsString();
+      final parsedData = await _gpxService.parseGpxContent(gpxContent);
       
-      if (route != null) {
+      if (parsedData.trackPoints.isNotEmpty) {
+        // Convert parsed data to Route object
+        final route = Route(
+          name: parsedData.name,
+          description: parsedData.description,
+          source: parsedData.source,
+          externalUrl: parsedData.externalUrl,
+          routePolyline: '',
+          startLatitude: parsedData.trackPoints.first.latitude,
+          startLongitude: parsedData.trackPoints.first.longitude,
+          endLatitude: parsedData.trackPoints.last.latitude,
+          endLongitude: parsedData.trackPoints.last.longitude,
+          distanceKm: parsedData.totalDistanceKm,
+          elevationGainM: parsedData.elevationGainM,
+          elevationLossM: parsedData.elevationLossM,
+        );
+        
         emit(RouteImportValidated(
           route: route,
           warnings: validationResult.warnings,
@@ -461,13 +523,12 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
     try {
       emit(RouteImportSearching(query: event.query));
 
-      final routes = await _routesRepository.searchRoutes(
-        query: event.query,
+      final routes = await _routesRepository.getRoutes(
+        search: event.query,
         nearLatitude: event.nearLatitude,
         nearLongitude: event.nearLongitude,
-        maxDistance: event.maxDistance,
-        difficulty: event.difficulty?.value,
-        routeType: event.routeType?.value,
+        maxDistance: event.maxDistance?.toDouble(),
+        difficulty: event.difficulty?.name,
         limit: 20,
       );
 
@@ -499,7 +560,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       final route = await _routesRepository.getRoute(
         event.routeId,
         includeElevation: true,
-        includePOIs: true,
+        includePois: true,
       );
 
       if (route == null) {
@@ -573,8 +634,17 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           progress: 0.7,
         ));
 
+        final currentUser = await _authService.getCurrentUser();
+        if (currentUser == null) {
+          emit(RouteImportError.validation(
+            message: 'User not authenticated',
+          ));
+          return;
+        }
+
         plannedRuck = await _plannedRucksRepository.createPlannedRuck(
           PlannedRuck(
+            userId: currentUser.userId,
             routeId: importedRoute.id!,
             route: importedRoute,
             plannedDate: event.plannedDate ?? DateTime.now().add(const Duration(days: 1)),

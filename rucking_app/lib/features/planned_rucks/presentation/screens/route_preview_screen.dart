@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_import_bloc.dart';
 import 'package:rucking_app/shared/widgets/buttons/primary_button.dart';
 import 'package:rucking_app/shared/widgets/buttons/secondary_button.dart';
@@ -41,8 +41,12 @@ class RoutePreviewScreen extends StatelessWidget {
       ),
       body: BlocBuilder<RouteImportBloc, RouteImportState>(
         builder: (context, state) {
-          if (state is RouteImportLoading) {
-            return const LoadingOverlay();
+          if (state is RouteImportInProgress) {
+            return LoadingOverlay(
+              isVisible: true,
+              message: 'Loading route preview...',
+              child: Container(),
+            );
           }
           
           if (state is RouteImportError) {
@@ -50,7 +54,7 @@ class RoutePreviewScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.error_outline,
                     size: 64,
                     color: AppColors.white,
@@ -80,52 +84,59 @@ class RoutePreviewScreen extends StatelessWidget {
             );
           }
           
-          // For now, create a mock route for preview
-          final mockRoute = Route(
-            id: routeId,
-            name: 'Preview Route',
-            description: 'This is a route preview placeholder',
-            coordinatePoints: [],
-            elevationProfile: [],
-            pointsOfInterest: [],
-            distance: 5000,
-            totalAscent: 200,
-            totalDescent: 150,
-            difficulty: 'Moderate',
-            tags: ['hiking', 'scenic'],
-            source: 'preview',
-            isPublic: true,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
+          // Get the actual route data from the BLoC state
+          route_model.Route? route;
+          List<String> warnings = [];
+          
+          if (state is RouteImportPreview) {
+            route = state.route;
+            warnings = state.warnings;
+          } else if (state is RouteImportValidated) {
+            route = state.route;
+            warnings = state.warnings;
+          } else if (state is RouteImportSuccess) {
+            route = state.importedRoute;
+          }
+          
+          if (route == null) {
+            return const Center(
+              child: Text('No route data available'),
+            );
+          }
           
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Show warnings if any
+                if (warnings.isNotEmpty) ...[
+                  _buildWarningsSection(warnings),
+                  const SizedBox(height: 16),
+                ],
+                
                 // Route Header
-                _buildRouteHeader(context, mockRoute),
+                _buildRouteHeader(context, route),
                 const SizedBox(height: 24),
                 
                 // Route Map
-                _buildRouteMap(context, mockRoute),
+                _buildRouteMap(context, route),
                 const SizedBox(height: 24),
                 
                 // Route Stats
-                _buildRouteStats(context, mockRoute),
+                _buildRouteStats(context, route),
                 const SizedBox(height: 24),
                 
                 // Elevation Profile
-                _buildElevationProfile(context, mockRoute),
+                _buildElevationProfile(context, route),
                 const SizedBox(height: 24),
                 
                 // Route Details
-                _buildRouteDetails(context, mockRoute),
+                _buildRouteDetails(context, route),
                 const SizedBox(height: 24),
                 
                 // Action Buttons
-                _buildActionButtons(context, mockRoute),
+                _buildActionButtons(context, route),
                 const SizedBox(height: 32),
               ],
             ),
@@ -135,7 +146,64 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildRouteHeader(BuildContext context, Route route) {
+  Widget _buildWarningsSection(List<String> warnings) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.warning.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.warning_amber,
+                color: AppColors.warning,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Import Warnings',
+                style: AppTextStyles.titleSmall.copyWith(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...warnings.map((warning) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '• ',
+                  style: TextStyle(color: AppColors.warning),
+                ),
+                Expanded(
+                  child: Text(
+                    warning,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildRouteHeader(BuildContext context, route_model.Route route) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -153,19 +221,11 @@ class RoutePreviewScreen extends StatelessWidget {
               color: AppColors.getTextColor(context),
             ),
           ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          children: route.tags.map((tag) => Chip(
-            label: Text(tag),
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-          )).toList(),
-        ),
       ],
     );
   }
   
-  Widget _buildRouteMap(BuildContext context, Route route) {
+  Widget _buildRouteMap(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 4,
       child: Container(
@@ -187,7 +247,7 @@ class RoutePreviewScreen extends StatelessWidget {
                   color: AppColors.backgroundLight,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     'Interactive map will be displayed here\nonce route data is loaded',
                     textAlign: TextAlign.center,
@@ -202,7 +262,7 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildRouteStats(BuildContext context, Route route) {
+  Widget _buildRouteStats(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -223,7 +283,7 @@ class RoutePreviewScreen extends StatelessWidget {
                   child: _buildStatItem(
                     context,
                     'Distance',
-                    '${(route.distance / 1000).toStringAsFixed(1)} km',
+                    '${route.distanceKm.toStringAsFixed(1)} km',
                     Icons.straighten,
                   ),
                 ),
@@ -231,7 +291,7 @@ class RoutePreviewScreen extends StatelessWidget {
                   child: _buildStatItem(
                     context,
                     'Ascent',
-                    '${route.totalAscent.toInt()} m',
+                    '+${route.elevationGainM?.toStringAsFixed(0) ?? '0'}m',
                     Icons.trending_up,
                   ),
                 ),
@@ -239,7 +299,7 @@ class RoutePreviewScreen extends StatelessWidget {
                   child: _buildStatItem(
                     context,
                     'Difficulty',
-                    route.difficulty ?? 'Unknown',
+                    '${route.trailDifficulty ?? 'Unknown'}',
                     Icons.bar_chart,
                   ),
                 ),
@@ -272,7 +332,7 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildElevationProfile(BuildContext context, Route route) {
+  Widget _buildElevationProfile(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -293,7 +353,7 @@ class RoutePreviewScreen extends StatelessWidget {
                 color: AppColors.backgroundLight,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'Elevation chart will be displayed here\nonce route elevation data is loaded',
                   textAlign: TextAlign.center,
@@ -307,7 +367,7 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildRouteDetails(BuildContext context, Route route) {
+  Widget _buildRouteDetails(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -322,17 +382,17 @@ class RoutePreviewScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _buildDetailRow('Source', route.source),
-            _buildDetailRow('Created', _formatDate(route.createdAt)),
+            _buildDetailRow(context, 'Source', route.source),
+            _buildDetailRow(context, 'Created', _formatDate(route.createdAt)),
             if (route.pointsOfInterest.isNotEmpty)
-              _buildDetailRow('Points of Interest', '${route.pointsOfInterest.length} locations'),
+              _buildDetailRow(context, 'Points of Interest', '${route.pointsOfInterest.length} locations'),
           ],
         ),
       ),
     );
   }
   
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -356,7 +416,7 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildActionButtons(BuildContext context, Route route) {
+  Widget _buildActionButtons(BuildContext context, route_model.Route route) {
     return Column(
       children: [
         SizedBox(
@@ -394,7 +454,8 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Unknown';
     return '${date.day}/${date.month}/${date.year}';
   }
   
@@ -410,7 +471,7 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  void _planRuckWithRoute(BuildContext context, Route route) {
+  void _planRuckWithRoute(BuildContext context, route_model.Route route) {
     // Navigate to planned ruck creation with this route
     Navigator.of(context).pop(); // Go back with result
     ScaffoldMessenger.of(context).showSnackBar(
@@ -418,7 +479,7 @@ class RoutePreviewScreen extends StatelessWidget {
     );
   }
   
-  void _downloadGPX(BuildContext context, Route route) {
+  void _downloadGPX(BuildContext context, route_model.Route route) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('GPX download starting...')),
     );

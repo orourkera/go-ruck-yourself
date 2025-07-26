@@ -12,9 +12,9 @@ import 'package:rucking_app/features/planned_rucks/presentation/widgets/empty_ru
 import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
 import 'package:rucking_app/core/widgets/error_widget.dart';
-import 'package:rucking_app/core/widgets/loading_indicator.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/loading_indicator.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+
 
 /// Main screen for displaying and managing planned rucks
 class MyRucksScreen extends StatefulWidget {
@@ -69,7 +69,7 @@ class _MyRucksScreenState extends State<MyRucksScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundLight,
       appBar: MyRucksAppBar(
         searchController: _searchController,
         onSearchChanged: (query) {
@@ -114,7 +114,7 @@ class _MyRucksScreenState extends State<MyRucksScreen>
                 // Tabs
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.surfaceLight,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),
@@ -126,7 +126,7 @@ class _MyRucksScreenState extends State<MyRucksScreen>
                   child: TabBar(
                     controller: _tabController,
                     labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textSecondary,
+                    unselectedLabelColor: AppColors.textDarkSecondary,
                     indicatorColor: AppColors.primary,
                     tabs: const [
                       Tab(text: 'Today'),
@@ -376,7 +376,7 @@ class _MyRucksScreenState extends State<MyRucksScreen>
   void _navigateToDetail(PlannedRuck ruck) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => PlannedRuckDetailScreen(plannedRuck: ruck),
+        builder: (context) => PlannedRuckDetailScreen(plannedRuckId: ruck.id!),
       ),
     );
   }

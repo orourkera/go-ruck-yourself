@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
+import 'package:rucking_app/core/models/route_elevation_point.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Interactive elevation profile chart widget
 class ElevationProfileChart extends StatefulWidget {
-  final List<ElevationPoint> elevationData;
-  final Route route;
+  final List<RouteElevationPoint> elevationData;
+  final route_model.Route route;
   final double? height;
   final bool showDetailedTooltips;
   final bool showGradientAreas;
   final bool isInteractive;
-  final ValueChanged<ElevationPoint?>? onPointSelected;
+  final ValueChanged<RouteElevationPoint?>? onPointSelected;
 
   const ElevationProfileChart({
     super.key,
@@ -72,7 +73,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     return Container(
       height: widget.height ?? 200,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -96,7 +97,6 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
                 builder: (context, child) {
                   return LineChart(
                     _buildChartData(),
-                    swapAnimationDuration: const Duration(milliseconds: 300),
                   );
                 },
               ),
@@ -114,10 +114,10 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     return Container(
       height: widget.height ?? 200,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.divider,
+          color: AppColors.greyLight,
           style: BorderStyle.solid,
         ),
       ),
@@ -128,13 +128,13 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
             Icon(
               Icons.show_chart,
               size: 48,
-              color: AppColors.textSecondary,
+              color: AppColors.textDarkSecondary,
             ),
             const SizedBox(height: 8),
             Text(
               'No elevation data available',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textDarkSecondary,
               ),
             ),
           ],
@@ -167,7 +167,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           Container(
             width: 1,
             height: 40,
-            color: AppColors.divider,
+            color: AppColors.greyLight,
           ),
           Expanded(
             child: _buildStatItem(
@@ -180,7 +180,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           Container(
             width: 1,
             height: 40,
-            color: AppColors.divider,
+            color: AppColors.greyLight,
           ),
           Expanded(
             child: _buildStatItem(
@@ -206,15 +206,15 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         const SizedBox(height: 4),
         Text(
           value,
-          style: AppTextStyles.subtitle2.copyWith(
+          style: AppTextStyles.titleSmall.copyWith(
             fontWeight: FontWeight.bold,
             color: color,
           ),
         ),
         Text(
           label,
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.textSecondary,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textDarkSecondary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -226,7 +226,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: AppColors.backgroundLight,
         borderRadius: const BorderRadius.vertical(
           bottom: Radius.circular(12),
         ),
@@ -237,8 +237,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           Expanded(
             child: Text(
               '0 mi',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textDarkSecondary,
               ),
             ),
           ),
@@ -256,7 +256,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
             ),
             label: Text(
               _showFullProfile ? 'Simplified' : 'Detailed',
-              style: AppTextStyles.caption,
+              style: AppTextStyles.bodySmall,
             ),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primary,
@@ -268,8 +268,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           Expanded(
             child: Text(
               widget.route.formattedDistance,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textDarkSecondary,
               ),
               textAlign: TextAlign.end,
             ),
@@ -291,14 +291,14 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         verticalInterval: _getVerticalInterval(),
         getDrawingHorizontalLine: (value) {
           return FlLine(
-            color: AppColors.divider.withOpacity(0.3),
+            color: AppColors.greyLight.withOpacity(0.3),
             strokeWidth: 1,
             dashArray: [5, 5],
           );
         },
         getDrawingVerticalLine: (value) {
           return FlLine(
-            color: AppColors.divider.withOpacity(0.2),
+            color: AppColors.greyLight.withOpacity(0.2),
             strokeWidth: 1,
             dashArray: [3, 3],
           );
@@ -337,17 +337,17 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         show: true,
         border: Border(
           bottom: BorderSide(
-            color: AppColors.divider,
+            color: AppColors.greyLight,
             width: 1,
           ),
           left: BorderSide(
-            color: AppColors.divider,
+            color: AppColors.greyLight,
             width: 1,
           ),
         ),
       ),
       minX: 0,
-      maxX: widget.route.distance,
+      maxX: widget.route.distanceKm,
       minY: _getMinY(),
       maxY: _getMaxY(),
       lineBarsData: [
@@ -426,7 +426,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
   List<FlSpot> _getChartSpots() {
     if (_showFullProfile || widget.elevationData.length <= 50) {
       return widget.elevationData.map((point) {
-        return FlSpot(point.distance, point.elevation);
+        return FlSpot(point.distanceKm, point.elevationM);
       }).toList();
     }
     
@@ -436,13 +436,13 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     
     for (int i = 0; i < widget.elevationData.length; i += step.ceil()) {
       final point = widget.elevationData[i];
-      simplified.add(FlSpot(point.distance, point.elevation));
+      simplified.add(FlSpot(point.distanceKm, point.elevationM));
     }
     
     // Always include the last point
-    if (simplified.last.x != widget.elevationData.last.distance) {
+    if (simplified.last.x != widget.elevationData.last.distanceKm) {
       final lastPoint = widget.elevationData.last;
-      simplified.add(FlSpot(lastPoint.distance, lastPoint.elevation));
+      simplified.add(FlSpot(lastPoint.distanceKm, lastPoint.elevationM));
     }
     
     return simplified;
@@ -458,7 +458,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
 
   LineTouchTooltipData _buildTooltipData() {
     return LineTouchTooltipData(
-      tooltipBgColor: AppColors.surface.withOpacity(0.95),
+      tooltipBgColor: AppColors.backgroundLight.withOpacity(0.95),
       tooltipRoundedRadius: 8,
       tooltipPadding: const EdgeInsets.all(12),
       tooltipMargin: 8,
@@ -472,10 +472,10 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         final elevation = spot.y;
         
         // Find the actual elevation point for more details
-        ElevationPoint? elevationPoint;
+        RouteElevationPoint? elevationPoint;
         try {
           elevationPoint = widget.elevationData.firstWhere(
-            (point) => (point.distance - distance).abs() < 0.01,
+            (point) => (point.distanceKm - distance).abs() < 0.01,
           );
         } catch (e) {
           // Point not found, use basic info
@@ -483,17 +483,17 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         
         return [
           LineTooltipItem(
-            '${distance.toStringAsFixed(1)} mi\n${elevation.toInt()} ft',
-            AppTextStyles.body2.copyWith(
-              color: AppColors.textPrimary,
+            'Distance: ${distance.toStringAsFixed(1)} km\nElevation: ${elevation.toStringAsFixed(0)} m',
+            AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textDark,
               fontWeight: FontWeight.bold,
             ),
             children: [
-              if (elevationPoint?.grade != null)
+              if (elevationPoint?.gradePercent != null)
                 TextSpan(
-                  text: '\nGrade: ${elevationPoint!.grade!.toStringAsFixed(1)}%',
-                  style: AppTextStyles.caption.copyWith(
-                    color: _getGradeColor(elevationPoint.grade!),
+                  text: '\nGrade: ${elevationPoint!.gradePercent!.toStringAsFixed(1)}%',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: _getGradeColor(elevationPoint.gradePercent!),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -508,17 +508,17 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     if (value == 0) {
       return Text(
         '0',
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.textSecondary,
+        style: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.textDarkSecondary,
         ),
       );
     }
     
-    if (value == widget.route.distance) {
+    if (value == widget.route.distanceKm) {
       return Text(
         value.toStringAsFixed(1),
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.textSecondary,
+        style: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.textDarkSecondary,
         ),
       );
     }
@@ -528,8 +528,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     if (value % interval == 0) {
       return Text(
         value.toStringAsFixed(value < 10 ? 1 : 0),
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.textSecondary,
+        style: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.textDarkSecondary,
         ),
       );
     }
@@ -541,8 +541,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     if (value % _getHorizontalInterval() == 0) {
       return Text(
         '${value.toInt()}',
-        style: AppTextStyles.caption.copyWith(
-          color: AppColors.textSecondary,
+        style: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.textDarkSecondary,
         ),
       );
     }
@@ -552,19 +552,19 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
   // Helper methods
 
   ElevationStats _calculateElevationStats() {
-    double minElevation = widget.elevationData.first.elevation;
-    double maxElevation = widget.elevationData.first.elevation;
+    double minElevation = widget.elevationData.first.elevationM;
+    double maxElevation = widget.elevationData.first.elevationM;
     double totalGain = 0.0;
-    double previousElevation = widget.elevationData.first.elevation;
+    double previousElevation = widget.elevationData.first.elevationM;
     
     for (final point in widget.elevationData) {
-      if (point.elevation < minElevation) minElevation = point.elevation;
-      if (point.elevation > maxElevation) maxElevation = point.elevation;
+      if (point.elevationM < minElevation) minElevation = point.elevationM;
+      if (point.elevationM > maxElevation) maxElevation = point.elevationM;
       
-      if (point.elevation > previousElevation) {
-        totalGain += point.elevation - previousElevation;
+      if (point.elevationM > previousElevation) {
+        totalGain += point.elevationM - previousElevation;
       }
-      previousElevation = point.elevation;
+      previousElevation = point.elevationM;
     }
     
     return ElevationStats(
@@ -596,7 +596,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
   }
 
   double _getVerticalInterval() {
-    final distance = widget.route.distance;
+    final distance = widget.route.distanceKm;
     if (distance > 20) return distance / 4;
     if (distance > 10) return distance / 5;
     if (distance > 5) return 1;
@@ -617,12 +617,12 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
       final distance = spot.x;
       
       // Find the closest elevation point
-      ElevationPoint? closestPoint;
+      RouteElevationPoint? closestPoint;
       double closestDistance = double.infinity;
       
       for (int i = 0; i < widget.elevationData.length; i++) {
         final point = widget.elevationData[i];
-        final diff = (point.distance - distance).abs();
+        final diff = (point.distanceKm - distance).abs();
         
         if (diff < closestDistance) {
           closestDistance = diff;

@@ -262,7 +262,7 @@ Future<void> setupServiceLocator() async {
   print('🔧 [ServiceLocator] Registering AllTrails services...');
   getIt.registerSingleton<RoutesRepository>(RoutesRepository());
   getIt.registerSingleton<PlannedRucksRepository>(PlannedRucksRepository());
-  getIt.registerSingleton<GPXService>(GPXService());
+  getIt.registerSingleton<GpxService>(GpxService());
   getIt.registerSingleton<GPXExportService>(GPXExportService());
   getIt.registerSingleton<ETACalculator>(ETACalculator());
   
@@ -270,11 +270,12 @@ Future<void> setupServiceLocator() async {
   print('🔧 [ServiceLocator] Registering AllTrails BLoCs...');
   getIt.registerFactory<PlannedRuckBloc>(() => PlannedRuckBloc(
     plannedRucksRepository: getIt<PlannedRucksRepository>(),
-    routesRepository: getIt<RoutesRepository>(),
   ));
   getIt.registerFactory<RouteImportBloc>(() => RouteImportBloc(
-    gpxService: getIt<GPXService>(),
     routesRepository: getIt<RoutesRepository>(),
+    plannedRucksRepository: getIt<PlannedRucksRepository>(),
+    gpxService: getIt<GpxService>(),
+    authService: getIt<AuthService>(),
   ));
   getIt.registerFactory<ProfileBloc>(() => ProfileBloc(
     avatarService: getIt<AvatarService>(),

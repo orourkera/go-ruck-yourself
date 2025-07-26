@@ -1,20 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_import_bloc.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/widgets/import_method_selector.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/gpx_file_picker.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/url_import_form.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_search_widget.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_preview_card.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/import_progress_indicator.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/widgets/planned_ruck_creation_form.dart';
-import 'package:rucking_app/core/widgets/error_widget.dart';
-import 'package:rucking_app/core/widgets/loading_indicator.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/loading_indicator.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Screen for importing routes from various sources
 class RouteImportScreen extends StatefulWidget {
@@ -51,20 +46,24 @@ class _RouteImportScreenState extends State<RouteImportScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark 
+          ? AppColors.backgroundDark 
+          : AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? AppColors.surfaceDark 
+            : AppColors.surfaceLight,
         elevation: 2,
         title: Text(
           'Import Route',
-          style: AppTextStyles.headline6.copyWith(
+          style: AppTextStyles.titleLarge.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
+          unselectedLabelColor: AppColors.getSecondaryTextColor(context),
           indicatorColor: AppColors.primary,
           onTap: (index) {
             _pageController.animateToPage(
@@ -148,15 +147,15 @@ class _RouteImportScreenState extends State<RouteImportScreen>
         children: [
           Text(
             'Import from GPX File',
-            style: AppTextStyles.headline6.copyWith(
+            style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Select a GPX file from your device to import the route.',
-            style: AppTextStyles.body1.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.getSecondaryTextColor(context),
             ),
           ),
           const SizedBox(height: 24),
@@ -205,15 +204,15 @@ class _RouteImportScreenState extends State<RouteImportScreen>
         children: [
           Text(
             'Import from URL',
-            style: AppTextStyles.headline6.copyWith(
+            style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Paste a URL to a GPX file or AllTrails route.',
-            style: AppTextStyles.body1.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.getSecondaryTextColor(context),
             ),
           ),
           const SizedBox(height: 24),
@@ -251,7 +250,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -307,20 +306,20 @@ class _RouteImportScreenState extends State<RouteImportScreen>
               Icon(
                 Icons.search_off,
                 size: 64,
-                color: AppColors.textSecondary,
+                color: AppColors.getSecondaryTextColor(context),
               ),
               const SizedBox(height: 16),
               Text(
                 'No routes found',
-                style: AppTextStyles.headline6.copyWith(
+                style: AppTextStyles.titleLarge.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Try adjusting your search criteria.',
-                style: AppTextStyles.body1.copyWith(
-                  color: AppColors.textSecondary,
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: AppColors.getSecondaryTextColor(context),
                 ),
               ),
             ],
@@ -362,20 +361,20 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           Icon(
             Icons.search,
             size: 64,
-            color: AppColors.textSecondary,
+            color: AppColors.getSecondaryTextColor(context),
           ),
           const SizedBox(height: 16),
           Text(
             'Search Routes',
-            style: AppTextStyles.headline6.copyWith(
+            style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Search through previously imported routes.',
-            style: AppTextStyles.body1.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.getSecondaryTextColor(context),
             ),
           ),
         ],
@@ -385,7 +384,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
 
   /// Build route preview section
   Widget _buildRoutePreview(RouteImportState state) {
-    Route? route;
+    route_model.Route? route;
     List<String> warnings = [];
 
     if (state is RouteImportPreview) {
@@ -405,7 +404,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
         children: [
           Text(
             'Route Preview',
-            style: AppTextStyles.subtitle1.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -422,25 +421,54 @@ class _RouteImportScreenState extends State<RouteImportScreen>
 
   /// Build planned ruck creation form
   Widget _buildPlannedRuckForm() {
-    return PlannedRuckCreationForm(
-      createPlannedRuck: _createPlannedRuck,
-      plannedDate: _plannedDate,
-      notes: _notes,
-      onCreatePlannedRuckChanged: (value) {
-        setState(() {
-          _createPlannedRuck = value;
-        });
-      },
-      onPlannedDateChanged: (date) {
-        setState(() {
-          _plannedDate = date;
-        });
-      },
-      onNotesChanged: (notes) {
-        setState(() {
-          _notes = notes;
-        });
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          title: Text('Create planned ruck'),
+          value: _createPlannedRuck,
+          onChanged: (value) {
+            setState(() {
+              _createPlannedRuck = value;
+            });
+          },
+        ),
+        if (_createPlannedRuck) ...[
+          const SizedBox(height: 16),
+          ListTile(
+            title: Text('Planned Date'),
+            subtitle: Text(_plannedDate?.toString().split(' ')[0] ?? 'Select date'),
+            trailing: Icon(Icons.calendar_today),
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _plannedDate ?? DateTime.now().add(Duration(days: 1)),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(Duration(days: 365)),
+              );
+              if (date != null) {
+                setState(() {
+                  _plannedDate = date;
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+              hintText: 'Add notes for this planned ruck...',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            onChanged: (value) {
+              setState(() {
+                _notes = value.isEmpty ? null : value;
+              });
+            },
+          ),
+        ],
+      ],
     );
   }
 
@@ -449,7 +477,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -471,8 +499,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                 }
               },
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
-                side: BorderSide(color: AppColors.divider),
+                foregroundColor: AppColors.getSecondaryTextColor(context),
+                side: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight),
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: Text(
@@ -493,7 +521,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                disabledBackgroundColor: AppColors.textSecondary.withOpacity(0.3),
+                disabledBackgroundColor: AppColors.getSecondaryTextColor(context).withOpacity(0.3),
               ),
               child: Text(_getImportButtonText(state)),
             ),
@@ -525,7 +553,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                 const SizedBox(width: 8),
                 Text(
                   'Tips',
-                  style: AppTextStyles.subtitle2.copyWith(
+                  style: AppTextStyles.titleSmall.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.warning,
                   ),
@@ -543,15 +571,15 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                     height: 4,
                     margin: const EdgeInsets.only(top: 8, right: 8),
                     decoration: BoxDecoration(
-                      color: AppColors.textSecondary,
+                      color: AppColors.getSecondaryTextColor(context),
                       shape: BoxShape.circle,
                     ),
                   ),
                   Expanded(
                     child: Text(
                       tip,
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.getSecondaryTextColor(context),
                       ),
                     ),
                   ),
@@ -587,7 +615,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
   }
 
   void _confirmImport(RouteImportState state) {
-    Route? route;
+    route_model.Route? route;
     
     if (state is RouteImportPreview) {
       route = state.route;
@@ -635,7 +663,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                     Expanded(
                       child: Text(
                         'Planned ruck created for ${state.plannedRuck!.formattedPlannedDate}',
-                        style: AppTextStyles.body2.copyWith(
+                        style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.success,
                         ),
                       ),

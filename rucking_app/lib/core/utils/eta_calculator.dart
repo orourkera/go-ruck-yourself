@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:rucking_app/core/models/route.dart';
 import 'package:rucking_app/core/models/route_elevation_point.dart';
 
@@ -101,16 +101,17 @@ class ETACalculator {
   
   /// 📏 **Calculate Remaining Distance**
   double _calculateRemainingDistance(Route route, double currentLat, double currentLon) {
-    if (route.coordinatePoints.isEmpty) return 0.0;
+    if (route.elevationPoints.isEmpty) return 0.0;
     
     // Find closest point on route
     int closestIndex = 0;
     double minDistance = double.infinity;
     
-    for (int i = 0; i < route.coordinatePoints.length; i++) {
-      final point = route.coordinatePoints[i];
+    for (int i = 0; i < route.elevationPoints.length; i++) {
+      final point = route.elevationPoints[i];
+      if (point.latitude == null || point.longitude == null) continue;
       final distance = _calculateHaversineDistance(
-        currentLat, currentLon, point.latitude, point.longitude
+        currentLat, currentLon, point.latitude!, point.longitude!
       );
       if (distance < minDistance) {
         minDistance = distance;
@@ -120,11 +121,13 @@ class ETACalculator {
     
     // Calculate remaining distance from closest point
     double remainingDistance = 0.0;
-    for (int i = closestIndex; i < route.coordinatePoints.length - 1; i++) {
-      final current = route.coordinatePoints[i];
-      final next = route.coordinatePoints[i + 1];
+    for (int i = closestIndex; i < route.elevationPoints.length - 1; i++) {
+      final current = route.elevationPoints[i];
+      final next = route.elevationPoints[i + 1];
+      if (current.latitude == null || current.longitude == null || 
+          next.latitude == null || next.longitude == null) continue;
       remainingDistance += _calculateHaversineDistance(
-        current.latitude, current.longitude, next.latitude, next.longitude
+        current.latitude!, current.longitude!, next.latitude!, next.longitude!
       );
     }
     
@@ -164,7 +167,7 @@ class ETACalculator {
   
   /// ⛰️ **Calculate Elevation Adjustment Factor**
   double _calculateElevationAdjustment(Route route, double currentLat, double currentLon) {
-    if (route.elevationProfile.isEmpty) return 1.0;
+    if (route.elevationPoints.isEmpty) return 1.0;
     
     // Find current position in elevation profile
     int currentIndex = 0;
@@ -172,10 +175,10 @@ class ETACalculator {
     double totalElevationLoss = 0.0;
     
     // Calculate remaining elevation changes
-    for (int i = currentIndex; i < route.elevationProfile.length - 1; i++) {
-      final current = route.elevationProfile[i];
-      final next = route.elevationProfile[i + 1];
-      final elevationChange = next.elevation - current.elevation;
+    for (int i = currentIndex; i < route.elevationPoints.length - 1; i++) {
+      final current = route.elevationPoints[i];
+      final next = route.elevationPoints[i + 1];
+      final elevationChange = next.elevationM - current.elevationM;
       
       if (elevationChange > 0) {
         totalElevationGain += elevationChange;
@@ -197,7 +200,7 @@ class ETACalculator {
   double _calculateTerrainMultiplier(Route route) {
     // This would ideally use terrain data from the route
     // For now, use route difficulty or default to moderate terrain
-    final difficulty = route.difficulty?.toLowerCase() ?? 'moderate';
+    final difficulty = route.trailDifficulty?.toLowerCase() ?? 'moderate';
     
     switch (difficulty) {
       case 'easy':

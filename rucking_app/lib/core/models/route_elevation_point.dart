@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 
 /// Route elevation point model for detailed elevation profiles
@@ -234,8 +235,7 @@ extension on double {
   double sqrt() => math.sqrt(this);
 }
 
-// Import dart:math for mathematical functions
-import 'dart:math' as math;
+
 
 /// Grade categories for UI styling and difficulty assessment
 enum GradeCategory {

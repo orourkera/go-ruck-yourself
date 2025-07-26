@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/navigation/alltrails_router.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
 
 /// Enhanced bottom navigation configuration with AllTrails integration
 class BottomNavigationConfig {
@@ -13,7 +14,7 @@ class BottomNavigationConfig {
   static const int profileIndex = 3;
 
   /// Get navigation items with dynamic badges and states
-  static List<BottomNavigationItem> getNavigationItems(BuildContext context) {
+  static List<BottomNavigationItem> getNavigationItems(BuildContext? context) {
     return [
       // Home/Dashboard
       BottomNavigationItem(
@@ -32,7 +33,7 @@ class BottomNavigationConfig {
         activeIcon: Icons.route,
         label: 'My Rucks',
         route: AllTrailsRouter.myRucks,
-        badgeCount: _getPlannedRucksBadgeCount(context),
+        badgeCount: context != null ? _getPlannedRucksBadgeCount(context) : null,
       ),
       
       // Explore/Import Routes
@@ -69,7 +70,7 @@ class BottomNavigationConfig {
     
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.backgroundLight,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -138,7 +139,7 @@ class BottomNavigationConfig {
                     isActive ? item.activeIcon : item.icon,
                     color: isActive 
                         ? AppColors.primary 
-                        : AppColors.textSecondary,
+                        : AppColors.textDarkSecondary,
                     size: 24,
                   ),
                 ),
@@ -159,10 +160,10 @@ class BottomNavigationConfig {
             if (showLabel)
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: isActive 
                       ? AppColors.primary 
-                      : AppColors.textSecondary,
+                      : AppColors.textDarkSecondary,
                   fontWeight: isActive 
                       ? FontWeight.w600 
                       : FontWeight.normal,
@@ -180,21 +181,21 @@ class BottomNavigationConfig {
 
   static Widget _buildBadge(int count) {
     return Container(
-      min: 16,
+      width: 16,
       height: 16,
       padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: AppColors.error,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: AppColors.surface,
+          color: AppColors.backgroundLight,
           width: 2,
         ),
       ),
       child: Center(
         child: Text(
           count > 99 ? '99+' : count.toString(),
-          style: AppTextStyles.caption.copyWith(
+          style: AppTextStyles.bodySmall.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 10,
@@ -234,7 +235,7 @@ class BottomNavigationConfig {
       final plannedRuckBloc = context.read<PlannedRuckBloc>();
       final state = plannedRuckBloc.state;
       
-      if (state is PlannedRucksLoaded) {
+      if (state is PlannedRuckLoaded) {
         // Count today's rucks and overdue rucks
         final urgentCount = state.todaysRucks.length + state.overdueRucks.length;
         return urgentCount > 0 ? urgentCount : null;

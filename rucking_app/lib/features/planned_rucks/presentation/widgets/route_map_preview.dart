@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
+import 'package:rucking_app/core/models/route_point_of_interest.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 
 /// Interactive map widget showing route preview with optional controls
 class RouteMapPreview extends StatefulWidget {
-  final Route route;
+  final route_model.Route route;
   final bool isInteractive;
   final bool showControls;
   final bool isHeroImage;
@@ -128,11 +131,13 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
       child: FlutterMap(
         mapController: _mapController,
         options: MapOptions(
-          center: _getRouteCenter(),
-          zoom: _getOptimalZoom(),
-          interactiveFlags: widget.isInteractive 
-              ? InteractiveFlag.all 
-              : InteractiveFlag.none,
+          initialCenter: _getRouteCenter(),
+          initialZoom: _getOptimalZoom(),
+          interactionOptions: InteractionOptions(
+            flags: widget.isInteractive 
+                ? InteractiveFlag.all 
+                : InteractiveFlag.none,
+          ),
           onTap: widget.onTap != null 
               ? (_, __) => widget.onTap!() 
               : null,
@@ -141,23 +146,21 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         ),
         children: [
           // Base map layer
-          TileLayer(
-            urlTemplate: _getMapTileUrl(),
-            userAgentPackageName: 'com.example.rucking_app',
-            tileSize: 256,
-            maxZoom: 18,
+          SafeTileLayer(
+            style: _getMapStyle(),
+            retinaMode: false,
           ),
           
           // Route polyline
           PolylineLayer(
             polylines: [
               Polyline(
-                points: widget.route.waypoints.map((w) => LatLng(w.latitude, w.longitude)).toList(),
+                points: _getRoutePoints(),
                 strokeWidth: 4.0,
                 color: AppColors.primary,
                 borderColor: Colors.white,
                 borderStrokeWidth: 2.0,
-                pattern: StrokePattern.solid,
+                pattern: const StrokePattern.solid(),
               ),
             ],
           ),
@@ -185,7 +188,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
 
   Widget _buildLoadingMap() {
     return Container(
-      color: AppColors.surface,
+      color: AppColors.backgroundLight,
       child: Stack(
         children: [
           // Shimmer effect for map loading
@@ -195,9 +198,9 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.primary.withOpacity(0.1),
-                  AppColors.primary.withOpacity(0.05),
-                  AppColors.primary.withOpacity(0.1),
+                  AppColors.textDarkSecondary.withOpacity(0.1),
+                  AppColors.textDarkSecondary.withOpacity(0.05),
+                  AppColors.textDarkSecondary.withOpacity(0.1),
                 ],
               ),
             ),
@@ -209,7 +212,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
               width: 200,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.3),
+                color: AppColors.textDarkSecondary.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -314,8 +317,8 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                 IconButton(
                   onPressed: () {
                     _mapController.move(
-                      _mapController.center,
-                      _mapController.zoom + 1,
+                      _mapController.camera.center,
+                      _mapController.camera.zoom + 1,
                     );
                   },
                   icon: const Icon(Icons.add),
@@ -323,13 +326,13 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                 ),
                 Container(
                   height: 1,
-                  color: AppColors.divider,
+                  color: AppColors.greyLight,
                 ),
                 IconButton(
                   onPressed: () {
                     _mapController.move(
-                      _mapController.center,
-                      _mapController.zoom - 1,
+                      _mapController.camera.center,
+                      _mapController.camera.zoom - 1,
                     );
                   },
                   icon: const Icon(Icons.remove),
@@ -357,7 +360,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
             child: IconButton(
               onPressed: _fitRouteBounds,
               icon: const Icon(Icons.center_focus_strong),
-              color: AppColors.primary,
+              color: AppColors.textDarkSecondary,
               tooltip: 'Fit route to view',
             ),
           ),
@@ -393,7 +396,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                 children: [
                   Text(
                     widget.route.name,
-                    style: AppTextStyles.subtitle1.copyWith(
+                    style: AppTextStyles.titleMedium.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -411,11 +414,11 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                       const SizedBox(width: 4),
                       Text(
                         widget.route.formattedDistance,
-                        style: AppTextStyles.caption.copyWith(
+                        style: AppTextStyles.bodySmall.copyWith(
                           color: Colors.white.withOpacity(0.8),
                         ),
                       ),
-                      if (widget.route.elevationGain != null) ...[
+                      if (widget.route.elevationGainM != null) ...[
                         const SizedBox(width: 12),
                         Icon(
                           Icons.trending_up,
@@ -425,7 +428,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                         const SizedBox(width: 4),
                         Text(
                           widget.route.formattedElevationGain,
-                          style: AppTextStyles.caption.copyWith(
+                          style: AppTextStyles.bodySmall.copyWith(
                             color: Colors.white.withOpacity(0.8),
                           ),
                         ),
@@ -449,16 +452,18 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   }
 
   List<Marker> _buildRouteMarkers() {
-    if (widget.route.waypoints.isEmpty) return [];
+    final points = _getRoutePoints();
+    if (points.isEmpty) return [];
     
-    final waypoints = widget.route.waypoints;
     final markers = <Marker>[];
     
     // Start marker
     markers.add(
       Marker(
-        point: LatLng(waypoints.first.latitude, waypoints.first.longitude),
-        builder: (context) => _buildRoutePointMarker(
+        point: points.first,
+        width: 32,
+        height: 32,
+        child: _buildRoutePointMarker(
           icon: Icons.play_arrow,
           color: AppColors.success,
           label: 'Start',
@@ -467,16 +472,18 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     );
     
     // End marker (if different from start)
-    if (waypoints.length > 1) {
-      final lastPoint = waypoints.last;
-      final firstPoint = waypoints.first;
+    if (points.length > 1) {
+      final lastPoint = points.last;
+      final firstPoint = points.first;
       
       if (lastPoint.latitude != firstPoint.latitude || 
           lastPoint.longitude != firstPoint.longitude) {
         markers.add(
           Marker(
-            point: LatLng(lastPoint.latitude, lastPoint.longitude),
-            builder: (context) => _buildRoutePointMarker(
+            point: lastPoint,
+            width: 32,
+            height: 32,
+            child: _buildRoutePointMarker(
               icon: Icons.flag,
               color: AppColors.error,
               label: 'End',
@@ -493,7 +500,9 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     return widget.route.pointsOfInterest.map((poi) {
       return Marker(
         point: LatLng(poi.latitude, poi.longitude),
-        builder: (context) => GestureDetector(
+        width: 24,
+        height: 24,
+        child: GestureDetector(
           onTap: () {
             _showPOIDetails(poi);
           },
@@ -504,10 +513,14 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   }
 
   Marker _buildSelectedWaypointMarker() {
-    final waypoint = widget.route.waypoints[_selectedWaypointIndex];
+    final points = _getRoutePoints();
+    if (_selectedWaypointIndex >= points.length) return Marker(point: points.first, child: Container());
+    
     return Marker(
-      point: LatLng(waypoint.latitude, waypoint.longitude),
-      builder: (context) => _buildRoutePointMarker(
+      point: points[_selectedWaypointIndex],
+      width: 32,
+      height: 32,
+      child: _buildRoutePointMarker(
         icon: Icons.location_on,
         color: AppColors.warning,
         label: 'Selected',
@@ -548,7 +561,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     );
   }
 
-  Widget _buildPOIMarker(PointOfInterest poi) {
+  Widget _buildPOIMarker(RoutePointOfInterest poi) {
     return Container(
       width: 24,
       height: 24,
@@ -568,7 +581,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         ],
       ),
       child: Icon(
-        _getPOIIcon(poi.type),
+        _getPOIIcon(poi.poiType),
         color: Colors.white,
         size: 14,
       ),
@@ -577,23 +590,50 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
 
   // Helper methods
 
+  List<LatLng> _getRoutePoints() {
+    // Create basic route points from start/end coordinates
+    // In a full implementation, this would decode the routePolyline
+    final points = <LatLng>[
+      LatLng(widget.route.startLatitude, widget.route.startLongitude),
+    ];
+    
+    // Add any elevation points if available
+    if (widget.route.elevationPoints.isNotEmpty) {
+      for (final point in widget.route.elevationPoints) {
+        if (point.latitude != null && point.longitude != null) {
+          points.add(LatLng(point.latitude!, point.longitude!));
+        }
+      }
+    }
+    
+    // Add end point if different from start
+    if (widget.route.endLatitude != null && widget.route.endLongitude != null) {
+      final endPoint = LatLng(widget.route.endLatitude!, widget.route.endLongitude!);
+      if (points.isEmpty || points.last != endPoint) {
+        points.add(endPoint);
+      }
+    }
+    
+    return points;
+  }
+
   LatLng _getRouteCenter() {
-    if (widget.route.waypoints.isEmpty) {
+    final points = _getRoutePoints();
+    if (points.isEmpty) {
       return const LatLng(37.7749, -122.4194); // Default to SF
     }
     
-    final waypoints = widget.route.waypoints;
     double totalLat = 0;
     double totalLng = 0;
     
-    for (final waypoint in waypoints) {
-      totalLat += waypoint.latitude;
-      totalLng += waypoint.longitude;
+    for (final point in points) {
+      totalLat += point.latitude;
+      totalLng += point.longitude;
     }
     
     return LatLng(
-      totalLat / waypoints.length,
-      totalLng / waypoints.length,
+      totalLat / points.length,
+      totalLng / points.length,
     );
   }
 
@@ -624,14 +664,14 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     return 16.0;
   }
 
-  String _getMapTileUrl() {
+  String _getMapStyle() {
     switch (_currentViewType) {
       case MapViewType.satellite:
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+        return 'alidade_satellite';
       case MapViewType.terrain:
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+        return 'stamen_terrain';
       default:
-        return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        return 'osm_bright';
     }
   }
 
@@ -662,19 +702,19 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   }
 
   void _fitRouteBounds() {
-    if (widget.route.waypoints.isEmpty) return;
+    final points = _getRoutePoints();
+    if (points.isEmpty) return;
     
-    final waypoints = widget.route.waypoints;
-    double minLat = waypoints.first.latitude;
-    double maxLat = waypoints.first.latitude;
-    double minLng = waypoints.first.longitude;
-    double maxLng = waypoints.first.longitude;
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
     
-    for (final waypoint in waypoints) {
-      minLat = minLat < waypoint.latitude ? minLat : waypoint.latitude;
-      maxLat = maxLat > waypoint.latitude ? maxLat : waypoint.latitude;
-      minLng = minLng < waypoint.longitude ? minLng : waypoint.longitude;
-      maxLng = maxLng > waypoint.longitude ? maxLng : waypoint.longitude;
+    for (final point in points) {
+      minLat = minLat < point.latitude ? minLat : point.latitude;
+      maxLat = maxLat > point.latitude ? maxLat : point.latitude;
+      minLng = minLng < point.longitude ? minLng : point.longitude;
+      maxLng = maxLng > point.longitude ? maxLng : point.longitude;
     }
     
     _mapController.fitBounds(
@@ -688,7 +728,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     );
   }
 
-  void _showPOIDetails(PointOfInterest poi) {
+  void _showPOIDetails(RoutePointOfInterest poi) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -699,18 +739,18 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
           children: [
             Row(
               children: [
-                Icon(_getPOIIcon(poi.type), size: 16),
+                Icon(_getPOIIcon(poi.poiType), size: 16),
                 const SizedBox(width: 8),
-                Text(poi.type.toUpperCase()),
+                Text(poi.poiType.toUpperCase()),
               ],
             ),
             if (poi.description?.isNotEmpty == true) ...[
               const SizedBox(height: 8),
               Text(poi.description!),
             ],
-            if (poi.distance != null) ...[
+            if (poi.distanceFromStartKm > 0) ...[
               const SizedBox(height: 8),
-              Text('${poi.distance!.toStringAsFixed(1)} miles from start'),
+              Text('${poi.distanceFromStartKm.toStringAsFixed(1)} km from start'),
             ],
           ],
         ),

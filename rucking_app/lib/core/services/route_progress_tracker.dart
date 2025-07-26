@@ -1,7 +1,8 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'dart:async';
 import 'package:rucking_app/core/models/route.dart';
 import 'package:rucking_app/core/models/route_elevation_point.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 
 /// 🎯 **Route Progress Tracker**
 /// 
@@ -20,7 +21,7 @@ class RouteProgressTracker {
   int _currentSegmentIndex = 0;
   double _totalDistanceTraveled = 0.0;
   double _routeDistanceTraveled = 0.0;
-  List<RouteCoordinate> _actualPath = [];
+  List<LocationPoint> _actualPath = [];
   Set<int> _passedMilestones = {};
   
   // Progress metrics
@@ -45,7 +46,13 @@ class RouteProgressTracker {
     double? bearing,
   }) {
     final currentTime = DateTime.now();
-    final currentLocation = RouteCoordinate(latitude: latitude, longitude: longitude);
+    final currentLocation = LocationPoint(
+      latitude: latitude,
+      longitude: longitude,
+      elevation: 0.0, // Default elevation
+      timestamp: currentTime,
+      accuracy: 0.0, // Default accuracy
+    );
     
     // Add to actual path
     _actualPath.add(currentLocation);
@@ -127,17 +134,18 @@ class RouteProgressTracker {
   
   /// 🎯 **Find Closest Point on Route**
   Map<String, dynamic> _findClosestPointOnRoute(double latitude, double longitude) {
-    if (_route.coordinatePoints.isEmpty) {
+    if (_route.elevationPoints.isEmpty) {
       return {'distance': double.infinity, 'index': 0};
     }
     
     double minDistance = double.infinity;
     int closestIndex = 0;
     
-    for (int i = 0; i < _route.coordinatePoints.length; i++) {
-      final point = _route.coordinatePoints[i];
+    for (int i = 0; i < _route.elevationPoints.length; i++) {
+      final point = _route.elevationPoints[i];
+      if (point.latitude == null || point.longitude == null) continue;
       final distance = _calculateHaversineDistance(
-        latitude, longitude, point.latitude, point.longitude
+        latitude, longitude, point.latitude!, point.longitude!
       );
       
       if (distance < minDistance) {
@@ -151,24 +159,26 @@ class RouteProgressTracker {
   
   /// 📊 **Calculate Progress Percentage**
   double _calculateProgressPercentage() {
-    if (_route.coordinatePoints.isEmpty) return 0.0;
+    if (_route.elevationPoints.isEmpty) return 0.0;
     
-    final totalRoutePoints = _route.coordinatePoints.length;
+    final totalRoutePoints = _route.elevationPoints.length;
     return (_currentSegmentIndex / (totalRoutePoints - 1)).clamp(0.0, 1.0);
   }
   
   /// 📏 **Calculate Remaining Distance**
   double _calculateRemainingDistance(int currentIndex) {
-    if (_route.coordinatePoints.isEmpty || currentIndex >= _route.coordinatePoints.length - 1) {
+    if (_route.elevationPoints.isEmpty || currentIndex >= _route.elevationPoints.length - 1) {
       return 0.0;
     }
     
     double remainingDistance = 0.0;
-    for (int i = currentIndex; i < _route.coordinatePoints.length - 1; i++) {
-      final current = _route.coordinatePoints[i];
-      final next = _route.coordinatePoints[i + 1];
+    for (int i = currentIndex; i < _route.elevationPoints.length - 1; i++) {
+      final current = _route.elevationPoints[i];
+      final next = _route.elevationPoints[i + 1];
+      if (current.latitude == null || current.longitude == null ||
+          next.latitude == null || next.longitude == null) continue;
       remainingDistance += _calculateHaversineDistance(
-        current.latitude, current.longitude, next.latitude, next.longitude
+        current.latitude!, current.longitude!, next.latitude!, next.longitude!
       );
     }
     
@@ -194,7 +204,13 @@ class RouteProgressTracker {
           type: MilestoneType.pointOfInterest,
           name: poi.name,
           description: poi.description ?? 'Point of Interest',
-          location: RouteCoordinate(latitude: poi.latitude, longitude: poi.longitude),
+          location: LocationPoint(
+            latitude: poi.latitude,
+            longitude: poi.longitude,
+            elevation: 0.0,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+          ),
           distanceFromStart: _routeDistanceTraveled,
         ));
       }
@@ -209,13 +225,19 @@ class RouteProgressTracker {
         type: MilestoneType.distance,
         name: '${kmMarks}km Mark',
         description: 'Distance milestone reached',
-        location: RouteCoordinate(latitude: latitude, longitude: longitude),
+        location: LocationPoint(
+          latitude: latitude,
+          longitude: longitude,
+          elevation: 0.0,
+          timestamp: DateTime.now(),
+          accuracy: 0.0,
+        ),
         distanceFromStart: _routeDistanceTraveled,
       ));
     }
     
     // Check elevation milestones (significant elevation changes)
-    if (_route.elevationProfile.isNotEmpty) {
+    if (_route.elevationPoints.isNotEmpty) {
       final currentElevation = _getElevationAtPosition(_currentSegmentIndex);
       if (currentElevation != null) {
         // Check for peak/valley milestones
@@ -282,10 +304,10 @@ class RouteProgressTracker {
   
   /// 🎯 **Get Elevation at Position**
   double? _getElevationAtPosition(int segmentIndex) {
-    if (_route.elevationProfile.isEmpty || segmentIndex >= _route.elevationProfile.length) {
+    if (_route.elevationPoints.isEmpty || segmentIndex >= _route.elevationPoints.length) {
       return null;
     }
-    return _route.elevationProfile[segmentIndex].elevation;
+    return _route.elevationPoints[segmentIndex].elevationM;
   }
   
   /// 📍 **Get Next Waypoint**
@@ -297,25 +319,35 @@ class RouteProgressTracker {
     }
     
     // Return finish line if near end
-    if (currentIndex >= _route.coordinatePoints.length - 10) {
-      final finishPoint = _route.coordinatePoints.last;
-      return RouteWaypoint(
-        name: 'Finish',
-        type: 'finish',
-        location: finishPoint,
-        description: 'Route finish point',
-      );
+    if (currentIndex >= _route.elevationPoints.length - 10) {
+      final finishPoint = _route.elevationPoints.last;
+      if (finishPoint.latitude != null && finishPoint.longitude != null) {
+        return RouteWaypoint(
+          name: 'Finish',
+          type: 'finish',
+          location: LocationPoint(
+            latitude: finishPoint.latitude!,
+            longitude: finishPoint.longitude!,
+            elevation: finishPoint.elevationM,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+          ),
+          description: 'Route finish point',
+        );
+      }
     }
     
     // Return a point 500m ahead
     final lookAheadDistance = 500.0; // meters
     double accumulatedDistance = 0.0;
     
-    for (int i = currentIndex; i < _route.coordinatePoints.length - 1; i++) {
-      final current = _route.coordinatePoints[i];
-      final next = _route.coordinatePoints[i + 1];
+    for (int i = currentIndex; i < _route.elevationPoints.length - 1; i++) {
+      final current = _route.elevationPoints[i];
+      final next = _route.elevationPoints[i + 1];
+      if (current.latitude == null || current.longitude == null ||
+          next.latitude == null || next.longitude == null) continue;
       final segmentDistance = _calculateHaversineDistance(
-        current.latitude, current.longitude, next.latitude, next.longitude
+        current.latitude!, current.longitude!, next.latitude!, next.longitude!
       );
       
       accumulatedDistance += segmentDistance;
@@ -323,7 +355,13 @@ class RouteProgressTracker {
         return RouteWaypoint(
           name: 'Next Point',
           type: 'navigation',
-          location: next,
+          location: LocationPoint(
+            latitude: next.latitude!,
+            longitude: next.longitude!,
+            elevation: next.elevationM,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+          ),
           description: 'Continue straight',
         );
       }
@@ -395,7 +433,7 @@ class RouteProgressTracker {
 
 /// 📈 **Route Progress Update**
 class RouteProgressUpdate {
-  final RouteCoordinate currentLocation;
+  final LocationPoint currentLocation;
   final double distanceToRoute;
   final bool isOnRoute;
   final bool wasOnRoute;
@@ -439,7 +477,7 @@ class RouteMilestone {
   final MilestoneType type;
   final String name;
   final String description;
-  final RouteCoordinate location;
+  final LocationPoint location;
   final double distanceFromStart;
   
   const RouteMilestone({
@@ -468,7 +506,7 @@ class RouteDeviation {
 
 /// 📍 **Deviation Point**
 class DeviationPoint {
-  final RouteCoordinate location;
+  final LocationPoint location;
   final double deviationDistance;
   final DateTime timestamp;
   
@@ -483,7 +521,7 @@ class DeviationPoint {
 class RouteWaypoint {
   final String name;
   final String type;
-  final RouteCoordinate location;
+  final LocationPoint location;
   final String description;
   
   const RouteWaypoint({

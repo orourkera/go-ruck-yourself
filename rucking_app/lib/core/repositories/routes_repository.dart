@@ -4,7 +4,7 @@ import 'package:rucking_app/core/models/route.dart';
 import 'package:rucking_app/core/models/route_elevation_point.dart';
 import 'package:rucking_app/core/models/route_point_of_interest.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/core/config/api_config.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 
 /// Repository for managing route data and AllTrails integration
 /// Provides methods to search, retrieve, create, and manage routes
@@ -60,7 +60,7 @@ class RoutesRepository {
       if (isPublic != null) queryParams['is_public'] = isPublic.toString();
       if (isVerified != null) queryParams['is_verified'] = isVerified.toString();
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/routes').replace(queryParameters: queryParams);
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/routes').replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
         uri,
@@ -101,7 +101,7 @@ class RoutesRepository {
       if (includeElevation) queryParams['include_elevation'] = 'true';
       if (includePois) queryParams['include_pois'] = 'true';
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/routes/$routeId')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId')
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await _httpClient.get(
@@ -134,7 +134,7 @@ class RoutesRepository {
   Future<Route> createRoute(Route route) async {
     try {
       final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/routes'),
+        Uri.parse('${AppConfig.apiBaseUrl}/routes'),
         headers: await _getHeaders(),
         body: json.encode(route.toJson()),
       );
@@ -162,7 +162,7 @@ class RoutesRepository {
   Future<Route> updateRoute(String routeId, Route route) async {
     try {
       final response = await _httpClient.put(
-        Uri.parse('${ApiConfig.baseUrl}/routes/$routeId'),
+        Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId'),
         headers: await _getHeaders(),
         body: json.encode(route.toJson()),
       );
@@ -189,7 +189,7 @@ class RoutesRepository {
   Future<bool> deleteRoute(String routeId) async {
     try {
       final response = await _httpClient.delete(
-        Uri.parse('${ApiConfig.baseUrl}/routes/$routeId'),
+        Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId'),
         headers: await _getHeaders(),
       );
 
@@ -213,7 +213,7 @@ class RoutesRepository {
   Future<List<RouteElevationPoint>> getRouteElevation(String routeId) async {
     try {
       final response = await _httpClient.get(
-        Uri.parse('${ApiConfig.baseUrl}/routes/$routeId/elevation'),
+        Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId/elevation'),
         headers: await _getHeaders(),
       );
 
@@ -242,7 +242,7 @@ class RoutesRepository {
   Future<List<RoutePointOfInterest>> getRoutePois(String routeId) async {
     try {
       final response = await _httpClient.get(
-        Uri.parse('${ApiConfig.baseUrl}/routes/$routeId/pois'),
+        Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId/pois'),
         headers: await _getHeaders(),
       );
 
@@ -279,7 +279,7 @@ class RoutesRepository {
         'timeframe': timeframe,
       };
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/routes/trending')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/routes/trending')
           .replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
@@ -321,7 +321,7 @@ class RoutesRepository {
         'created_by_me': 'true',
       };
 
-      final uri = Uri.parse('${ApiConfig.baseUrl}/routes')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/routes')
           .replace(queryParameters: queryParams);
 
       final response = await _httpClient.get(
@@ -361,7 +361,7 @@ class RoutesRepository {
       };
 
       final response = await _httpClient.post(
-        Uri.parse('${ApiConfig.baseUrl}/routes/$routeId/rate'),
+        Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId/rate'),
         headers: await _getHeaders(),
         body: json.encode(requestBody),
       );

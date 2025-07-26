@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 
 /// Route point of interest model for waypoints and landmarks
@@ -228,8 +229,6 @@ extension on double {
   double sqrt() => math.sqrt(this);
 }
 
-// Import dart:math for mathematical functions
-import 'dart:math' as math;
 
 /// Point of Interest types with metadata
 enum PoiType {

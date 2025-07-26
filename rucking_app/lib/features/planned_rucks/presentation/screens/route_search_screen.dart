@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_import_bloc.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_preview_card.dart';
-import 'package:rucking_app/core/models/route.dart';
+
+import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/buttons/primary_button.dart';
@@ -240,33 +240,41 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
           return _buildEmptySearch(context);
         }
         
-        if (state is RouteImportLoading) {
-          return const LoadingOverlay();
+        if (state is RouteImportSearching) {
+          return const LoadingOverlay(
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
         
         if (state is RouteImportError) {
           return _buildErrorState(context, state.message);
         }
         
-        // Mock search results for now
-        final mockResults = _getMockSearchResults();
-        final filteredResults = _filterResults(mockResults);
-        
-        if (filteredResults.isEmpty) {
-          return _buildNoResults(context);
+        // Handle search results from BLoC state
+        if (state is RouteImportSearchResults) {
+          final filteredResults = _filterResults(state.routes);
+          
+          if (filteredResults.isEmpty) {
+            return _buildNoResults(context);
+          }
+          
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: filteredResults.length,
+            itemBuilder: (context, index) {
+              final route = filteredResults[index];
+              return Padding(
+                padding: EdgeInsets.only(bottom: index < filteredResults.length - 1 ? 16 : 0),
+                child: _buildRouteSearchCard(context, route),
+              );
+            },
+          );
         }
         
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: filteredResults.length,
-          itemBuilder: (context, index) {
-            final route = filteredResults[index];
-            return Padding(
-              padding: EdgeInsets.only(bottom: index < filteredResults.length - 1 ? 16 : 0),
-              child: _buildRouteSearchCard(context, route),
-            );
-          },
-        );
+        // No search results yet
+        return _buildNoResults(context);
       },
     );
   }
@@ -383,7 +391,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     );
   }
   
-  Widget _buildRouteSearchCard(BuildContext context, Route route) {
+  Widget _buildRouteSearchCard(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
       child: InkWell(
@@ -437,17 +445,17 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                 children: [
                   _buildStatChip(
                     Icons.straighten,
-                    '${(route.distance / 1000).toStringAsFixed(1)} km',
+                    '${route.distanceKm.toStringAsFixed(1)} km',
                   ),
                   const SizedBox(width: 8),
                   _buildStatChip(
                     Icons.trending_up,
-                    '${route.totalAscent.toInt()} m',
+                    '${(route.elevationGainM ?? 0).toInt()} m',
                   ),
                   const SizedBox(width: 8),
                   _buildStatChip(
                     Icons.bar_chart,
-                    route.difficulty ?? 'Unknown',
+                    'Easy', 
                   ),
                 ],
               ),
@@ -455,20 +463,14 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               const SizedBox(height: 12),
               
               // Tags
-              if (route.tags.isNotEmpty)
-                Wrap(
-                  spacing: 4,
-                  children: route.tags.take(3).map((tag) => Chip(
-                    label: Text(
-                      tag,
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: AppColors.getTextColor(context),
-                      ),
-                    ),
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  )).toList(),
-                ),
+              // if (route.tags.isNotEmpty)
+              //   Wrap(
+              //     spacing: 4,
+              //     children: route.tags.take(3).map((tag) => Chip(
+              //       label: Text(tag, style: const TextStyle(fontSize: 12)),
+              //       backgroundColor: AppColors.primary.withOpacity(0.1),
+              //     )).toList(),
+              //   ),
             ],
           ),
         ),
@@ -500,46 +502,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     );
   }
   
-  List<Route> _getMockSearchResults() {
-    return [
-      Route(
-        id: 'route1',
-        name: 'Mountain Trail Loop',
-        description: 'Scenic mountain trail with great views',
-        coordinatePoints: [],
-        elevationProfile: [],
-        pointsOfInterest: [],
-        distance: 8500,
-        totalAscent: 350,
-        totalDescent: 350,
-        difficulty: 'Moderate',
-        tags: ['mountain', 'scenic', 'loop'],
-        source: 'imported',
-        isPublic: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Route(
-        id: 'route2',
-        name: 'Riverside Walk',
-        description: 'Easy walk along the river',
-        coordinatePoints: [],
-        elevationProfile: [],
-        pointsOfInterest: [],
-        distance: 5200,
-        totalAscent: 80,
-        totalDescent: 75,
-        difficulty: 'Easy',
-        tags: ['river', 'easy', 'family'],
-        source: 'created',
-        isPublic: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    ];
-  }
+
   
-  List<Route> _filterResults(List<Route> routes) {
+  List<route_model.Route> _filterResults(List<route_model.Route> routes) {
     var filteredRoutes = routes;
     
     // Apply search query filter
@@ -547,8 +512,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       filteredRoutes = filteredRoutes.where((route) {
         final query = _searchQuery.toLowerCase();
         return route.name.toLowerCase().contains(query) ||
-               (route.description?.toLowerCase().contains(query) ?? false) ||
-               route.tags.any((tag) => tag.toLowerCase().contains(query));
+               (route.description?.toLowerCase().contains(query) ?? false);
       }).toList();
     }
     
@@ -563,7 +527,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
           case 'saved':
             return route.source == 'saved';
           case 'recent':
-            return DateTime.now().difference(route.createdAt).inDays <= 7;
+            return route.createdAt != null && DateTime.now().difference(route.createdAt!).inDays <= 7;
           default:
             return true;
         }
@@ -591,11 +555,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
     );
   }
   
-  void _selectRoute(BuildContext context, Route route) {
+  void _selectRoute(BuildContext context, route_model.Route route) {
     Navigator.of(context).pop(route);
   }
   
-  void _showRouteOptions(BuildContext context, Route route) {
+  void _showRouteOptions(BuildContext context, route_model.Route route) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(

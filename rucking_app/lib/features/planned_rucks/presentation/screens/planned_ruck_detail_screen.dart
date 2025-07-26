@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_event.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_map_preview.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/elevation_profile_chart.dart';
-import 'package:rucking_app/core/widgets/difficulty_badge.dart';
-import 'package:rucking_app/core/widgets/status_badge.dart';
-import 'package:rucking_app/core/theme/app_colors.dart';
-import 'package:rucking_app/core/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
+import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Detailed view screen for a planned ruck
 class PlannedRuckDetailScreen extends StatefulWidget {
-  final PlannedRuck plannedRuck;
+  final String plannedRuckId;
 
   const PlannedRuckDetailScreen({
     super.key,
-    required this.plannedRuck,
+    required this.plannedRuckId,
   });
 
   @override
@@ -29,12 +28,18 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   late TabController _tabController;
   late ScrollController _scrollController;
   bool _showAppBarTitle = false;
+  PlannedRuck? _plannedRuck;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _scrollController = ScrollController();
+    
+    // Load the planned ruck using the ID
+    context.read<PlannedRuckBloc>().add(
+      LoadPlannedRuckById(plannedRuckId: widget.plannedRuckId),
+    );
     
     _scrollController.addListener(() {
       final shouldShow = _scrollController.offset > 200;
@@ -55,63 +60,88 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final route = widget.plannedRuck.route;
-    
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          // App bar with hero image
-          _buildSliverAppBar(route),
+    return BlocConsumer<PlannedRuckBloc, PlannedRuckState>(
+      listener: (context, state) {
+        if (state is PlannedRuckLoading) {
+          // Show loading if needed
+        } else if (state is PlannedRuckError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.accent,
+            ),
+          );
+        } else if (state is PlannedRuckLoaded) {
+          // Find the specific planned ruck from the loaded state
+          final plannedRuck = state.plannedRucks
+              .where((ruck) => ruck.id == widget.plannedRuckId)
+              .firstOrNull;
           
-          // Tab bar
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _TabBarDelegate(
-              tabBar: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.primary,
-                tabs: const [
-                  Tab(text: 'Overview'),
-                  Tab(text: 'Map & Route'),
-                  Tab(text: 'Details'),
-                ],
+          if (plannedRuck != null) {
+            setState(() {
+              _plannedRuck = plannedRuck;
+            });
+          }
+        }
+      },
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          body: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              // App bar with hero image
+              _buildSliverAppBar(_plannedRuck?.route),
+              
+              // Tab bar
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _TabBarDelegate(
+                  tabBar: TabBar(
+                    controller: _tabController,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: AppColors.textDarkSecondary,
+                    indicatorColor: AppColors.primary,
+                    tabs: const [
+                      Tab(text: 'Overview'),
+                      Tab(text: 'Map & Route'),
+                      Tab(text: 'Details'),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              
+              // Tab content
+              SliverFillRemaining(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildOverviewTab(),
+                    _buildMapTab(),
+                    _buildDetailsTab(),
+                  ],
+                ),
+              ),
+            ],
           ),
           
-          // Tab content
-          SliverFillRemaining(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildOverviewTab(),
-                _buildMapTab(),
-                _buildDetailsTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-      
-      // Floating action buttons
-      floatingActionButton: _buildFloatingActions(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          // Floating action buttons
+          floatingActionButton: _buildFloatingActions(),
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        );
+      },
     );
   }
 
-  Widget _buildSliverAppBar(Route? route) {
+  Widget _buildSliverAppBar(route_model.Route? route) {
     return SliverAppBar(
       expandedHeight: 300,
       pinned: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.backgroundLight,
       title: _showAppBarTitle 
           ? Text(
               route?.name ?? 'Planned Ruck',
-              style: AppTextStyles.headline6.copyWith(
+              style: AppTextStyles.titleLarge.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             )
@@ -127,7 +157,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.primary.withOpacity(0.8),
+                    AppColors.primary.withValues(alpha: 0.8),
                     AppColors.primary,
                   ],
                 ),
@@ -156,12 +186,12 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                   // Route name
                   Text(
                     route?.name ?? 'Unnamed Route',
-                    style: AppTextStyles.headline4.copyWith(
+                    style: AppTextStyles.headlineMedium.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.grey.shade600.withAlpha(128),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -176,15 +206,34 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                   // Status and badges
                   Row(
                     children: [
-                      StatusBadge(
-                        status: widget.plannedRuck.status,
-                        backgroundColor: Colors.white.withOpacity(0.9),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withAlpha(26),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _plannedRuck?.status.name.toLowerCase() ?? '',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                      if (route?.difficulty != null) ...[
-                        const SizedBox(width: 8),
-                        DifficultyBadge(
-                          difficulty: route!.difficulty!,
-                          backgroundColor: Colors.white.withOpacity(0.9),
+                      if (route?.trailDifficulty != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withAlpha(26),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            route?.trailDifficulty ?? 'Unknown',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -197,13 +246,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                     Row(
                       children: [
                         _buildQuickStat(Icons.straighten, route.formattedDistance),
-                        if (route.elevationGain != null) ...[
+                        if (route.elevationGainM != null) ...[
                           const SizedBox(width: 16),
                           _buildQuickStat(Icons.trending_up, route.formattedElevationGain),
                         ],
-                        if (route.duration != null) ...[
+                        if (route.estimatedDurationMinutes != null) ...[
                           const SizedBox(width: 16),
-                          _buildQuickStat(Icons.access_time, route.formattedDuration),
+                          _buildQuickStat(Icons.access_time, route.formattedEstimatedDuration),
                         ],
                       ],
                     ),
@@ -223,17 +272,17 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
         Icon(
           icon,
           size: 16,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         const SizedBox(width: 4),
         Text(
           value,
-          style: AppTextStyles.body2.copyWith(
-            color: Colors.white.withOpacity(0.9),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: Colors.white.withValues(alpha: 0.9),
             fontWeight: FontWeight.w600,
             shadows: [
               Shadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 2,
                 offset: const Offset(0, 1),
               ),
@@ -245,7 +294,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   Widget _buildOverviewTab() {
-    final route = widget.plannedRuck.route;
+    final route = _plannedRuck?.route;
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -257,12 +306,12 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             'Planned Ruck Details',
             Icons.calendar_today,
             [
-              _buildInfoRow('Planned Date', widget.plannedRuck.formattedPlannedDate),
-              _buildInfoRow('Status', widget.plannedRuck.status.value),
-              if (widget.plannedRuck.notes?.isNotEmpty == true)
-                _buildInfoRow('Notes', widget.plannedRuck.notes!),
-              if (widget.plannedRuck.completedAt != null)
-                _buildInfoRow('Completed', widget.plannedRuck.formattedCompletedAt!),
+              _buildInfoRow('Planned Date', _plannedRuck?.formattedPlannedDate ?? ''),
+              _buildInfoRow('Status', _plannedRuck?.status.value ?? ''),
+              if (_plannedRuck?.notes?.isNotEmpty == true)
+                _buildInfoRow('Notes', _plannedRuck!.notes!),
+              if (_plannedRuck?.completedAt != null)
+                _buildInfoRow('Completed', '${_plannedRuck!.completedAt!.day}/${_plannedRuck!.completedAt!.month}/${_plannedRuck!.completedAt!.year}'),
             ],
           ),
           
@@ -274,13 +323,12 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               'Route Overview',
               Icons.route,
               [
-                if (route.location?.isNotEmpty == true)
-                  _buildInfoRow('Location', route.location!),
+                _buildInfoRow('Location', '${route.startLatitude.toStringAsFixed(4)}, ${route.startLongitude.toStringAsFixed(4)}'),
                 _buildInfoRow('Distance', route.formattedDistance),
-                if (route.elevationGain != null)
+                if (route.elevationGainM != null)
                   _buildInfoRow('Elevation Gain', route.formattedElevationGain),
-                if (route.duration != null)
-                  _buildInfoRow('Estimated Duration', route.formattedDuration),
+                if (route.estimatedDurationMinutes != null)
+                  _buildInfoRow('Estimated Duration', route.formattedEstimatedDuration),
                 if (route.routeType != null)
                   _buildInfoRow('Route Type', _getRouteTypeLabel(route.routeType!)),
               ],
@@ -297,7 +345,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               [
                 Text(
                   route!.description!,
-                  style: AppTextStyles.body1,
+                  style: AppTextStyles.bodyLarge,
                 ),
               ],
             ),
@@ -306,7 +354,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
           ],
           
           // Ratings and reviews
-          if (route?.averageRating != null || route?.totalReviews != null) ...[
+          if (route?.averageRating != null || route?.totalCompletedCount != null) ...[
             _buildRatingsCard(route!),
             const SizedBox(height: 16),
           ],
@@ -319,7 +367,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   Widget _buildMapTab() {
-    final route = widget.plannedRuck.route;
+    final route = _plannedRuck?.route;
     
     if (route == null) {
       return const Center(
@@ -340,15 +388,15 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
         ),
         
         // Elevation profile
-        if (route.elevationProfile.isNotEmpty) ...[
+        if (route.elevationPoints.isNotEmpty) ...[
           Container(
             height: 200,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.backgroundLight,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, -2),
                 ),
@@ -359,14 +407,14 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               children: [
                 Text(
                   'Elevation Profile',
-                  style: AppTextStyles.subtitle1.copyWith(
+                  style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
                   child: ElevationProfileChart(
-                    elevationData: route.elevationProfile,
+                    elevationData: route.elevationPoints,
                     route: route,
                   ),
                 ),
@@ -379,7 +427,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   Widget _buildDetailsTab() {
-    final route = widget.plannedRuck.route;
+    final route = _plannedRuck?.route;
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -392,16 +440,16 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               'Technical Details',
               Icons.analytics,
               [
-                if (route.maxElevation != null)
-                  _buildInfoRow('Max Elevation', '${route.maxElevation!.toInt()} ft'),
-                if (route.minElevation != null)
-                  _buildInfoRow('Min Elevation', '${route.minElevation!.toInt()} ft'),
-                if (route.averageGrade != null)
-                  _buildInfoRow('Average Grade', '${route.averageGrade!.toStringAsFixed(1)}%'),
-                if (route.maxGrade != null)
-                  _buildInfoRow('Max Grade', '${route.maxGrade!.toStringAsFixed(1)}%'),
-                if (route.estimatedCalories != null)
-                  _buildInfoRow('Estimated Calories', '${route.estimatedCalories} cal'),
+                if (route.elevationGainM != null)
+                  _buildInfoRow('Elevation Gain', '${route.elevationGainM!.toStringAsFixed(0)} m'),
+                if (route.elevationLossM != null)
+                  _buildInfoRow('Elevation Loss', '${route.elevationLossM!.toStringAsFixed(0)} m'),
+                if (route.trailDifficulty != null)
+                  _buildInfoRow('Difficulty', route.trailDifficulty!),
+                if (route.trailType != null)
+                  _buildInfoRow('Trail Type', route.trailType!),
+                if (route.surfaceType != null)
+                  _buildInfoRow('Surface Type', route.surfaceType!),
               ],
             ),
             
@@ -419,7 +467,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             'Source Information',
             Icons.info,
             [
-              _buildInfoRow('Created', widget.plannedRuck.formattedCreatedAt),
+              if (_plannedRuck?.createdAt != null)
+                _buildInfoRow('Created', '${_plannedRuck!.createdAt!.day}/${_plannedRuck!.createdAt!.month}/${_plannedRuck!.createdAt!.year}'),
               if (route?.source?.isNotEmpty == true)
                 _buildInfoRow('Route Source', route!.source!),
               if (route?.id != null)
@@ -448,7 +497,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: AppTextStyles.subtitle1.copyWith(
+                  style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -472,8 +521,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             width: 120,
             child: Text(
               label,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textDarkSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -481,7 +530,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
           Expanded(
             child: Text(
               value,
-              style: AppTextStyles.body2,
+              style: AppTextStyles.bodyMedium,
             ),
           ),
         ],
@@ -489,7 +538,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
     );
   }
 
-  Widget _buildRatingsCard(Route route) {
+  Widget _buildRatingsCard(route_model.Route route) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -506,7 +555,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                 const SizedBox(width: 8),
                 Text(
                   'Ratings & Reviews',
-                  style: AppTextStyles.subtitle1.copyWith(
+                  style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -514,48 +563,46 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             ),
             const SizedBox(height: 16),
             
-            if (route.averageRating != null) ...[
-              Row(
-                children: [
-                  // Star rating
-                  Row(
-                    children: List.generate(5, (index) {
-                      return Icon(
-                        index < route.averageRating!.floor()
-                            ? Icons.star
-                            : index < route.averageRating!
-                                ? Icons.star_half
-                                : Icons.star_border,
-                        color: Colors.amber,
-                        size: 20,
-                      );
-                    }),
+            Row(
+              children: [
+                // Star rating
+                Row(
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < route.averageRating!.floor()
+                          ? Icons.star
+                          : index < route.averageRating!
+                              ? Icons.star_half
+                              : Icons.star_border,
+                      color: Colors.amber,
+                      size: 20,
+                    );
+                  }),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  route.averageRating!.toStringAsFixed(1),
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 8),
+                ),
+                if (route.totalCompletedCount != null) ...[
                   Text(
-                    route.averageRating!.toStringAsFixed(1),
-                    style: AppTextStyles.subtitle1.copyWith(
-                      fontWeight: FontWeight.bold,
+                    ' (${route.totalCompletedCount} reviews)',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textDarkSecondary,
                     ),
                   ),
-                  if (route.totalReviews != null) ...[
-                    Text(
-                      ' (${route.totalReviews} reviews)',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
-            ],
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPOICard(Route route) {
+  Widget _buildPOICard(route_model.Route route) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -572,7 +619,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                 const SizedBox(width: 8),
                 Text(
                   'Points of Interest',
-                  style: AppTextStyles.subtitle1.copyWith(
+                  style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -586,7 +633,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                 child: Row(
                   children: [
                     Icon(
-                      _getPOIIcon(poi.type),
+                      _getPOIIcon(poi.poiType),
                       size: 16,
                       color: AppColors.primary,
                     ),
@@ -594,14 +641,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                     Expanded(
                       child: Text(
                         poi.name,
-                        style: AppTextStyles.body2,
+                        style: AppTextStyles.bodyMedium,
                       ),
                     ),
-                    if (poi.distance != null)
-                      Text(
-                        '${poi.distance!.toStringAsFixed(1)} mi',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.textSecondary,
+                    Text(
+                        '${poi.distanceFromStartKm.toStringAsFixed(1)} km',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textDarkSecondary,
                         ),
                       ),
                   ],
@@ -614,8 +660,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   '+${route.pointsOfInterest.length - 5} more points of interest',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textDarkSecondary,
                   ),
                 ),
               ),
@@ -642,7 +688,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
                 const SizedBox(width: 8),
                 Text(
                   'Weather Forecast',
-                  style: AppTextStyles.subtitle1.copyWith(
+                  style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -652,8 +698,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             
             Text(
               'Weather information will be available closer to your planned date.',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textDarkSecondary,
               ),
             ),
           ],
@@ -670,7 +716,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
         FloatingActionButton(
           heroTag: 'share',
           onPressed: _shareRoute,
-          backgroundColor: AppColors.surface,
+          backgroundColor: AppColors.backgroundLight,
           foregroundColor: AppColors.primary,
           child: const Icon(Icons.share),
         ),
@@ -692,13 +738,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
 
   // Helper methods
 
-  String _getRouteTypeLabel(RouteType type) {
+  String _getRouteTypeLabel(route_model.RouteType type) {
     switch (type) {
-      case RouteType.loop:
+      case route_model.RouteType.loop:
         return 'Loop';
-      case RouteType.outAndBack:
+      case route_model.RouteType.outAndBack:
         return 'Out & Back';
-      case RouteType.pointToPoint:
+      case route_model.RouteType.pointToPoint:
         return 'Point to Point';
     }
   }
@@ -719,55 +765,48 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   Color _getPrimaryActionColor() {
-    switch (widget.plannedRuck.status) {
+    switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
-        return widget.plannedRuck.canStart ? AppColors.primary : AppColors.textSecondary;
+        return _plannedRuck!.canStart ? AppColors.primary : AppColors.textDarkSecondary;
       case PlannedRuckStatus.inProgress:
         return AppColors.info;
-      case PlannedRuckStatus.paused:
-        return AppColors.primary;
       default:
-        return AppColors.textSecondary;
+        return AppColors.textDarkSecondary;
     }
   }
 
   IconData _getPrimaryActionIcon() {
-    switch (widget.plannedRuck.status) {
+    switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         return Icons.play_arrow;
       case PlannedRuckStatus.inProgress:
         return Icons.visibility;
-      case PlannedRuckStatus.paused:
-        return Icons.play_arrow;
       default:
         return Icons.edit;
     }
   }
 
   String _getPrimaryActionLabel() {
-    switch (widget.plannedRuck.status) {
+    switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
-        return widget.plannedRuck.canStart ? 'Start Ruck' : 'Edit';
+        return _plannedRuck!.canStart ? 'Start Ruck' : 'Edit';
       case PlannedRuckStatus.inProgress:
         return 'View Session';
-      case PlannedRuckStatus.paused:
-        return 'Resume';
       default:
         return 'Edit';
     }
   }
 
   void _performPrimaryAction() {
-    switch (widget.plannedRuck.status) {
+    switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
-        if (widget.plannedRuck.canStart) {
+        if (_plannedRuck!.canStart) {
           context.read<PlannedRuckBloc>().add(
-            StartPlannedRuck(plannedRuckId: widget.plannedRuck.id!),
+            StartPlannedRuck(plannedRuckId: _plannedRuck!.id!),
           );
         }
         break;
       case PlannedRuckStatus.inProgress:
-      case PlannedRuckStatus.paused:
         // Navigate to active session
         break;
       default:
@@ -799,7 +838,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: AppColors.surface,
+      color: AppColors.backgroundLight,
       child: tabBar,
     );
   }
