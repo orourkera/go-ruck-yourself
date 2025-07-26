@@ -114,34 +114,21 @@ class PlannedRucksResource(Resource):
                         else:
                             logger.warning(f"Skipping non-dict route data: {type(route_item)}")
             
-            # Build response with clean data only
+            # Build response with clean data (no Response objects)
             planned_rucks_data = []
             for planned_ruck in planned_rucks:
                 try:
-                    logger.debug(f"Converting PlannedRuck to dict: {planned_ruck.id}")
-                    
-                    # Create clean planned ruck dict manually to avoid any embedded objects
-                    clean_planned_ruck = {
-                        'id': planned_ruck.id,
-                        'user_id': planned_ruck.user_id,
-                        'route_id': planned_ruck.route_id,
-                        'scheduled_date': planned_ruck.scheduled_date.isoformat() if planned_ruck.scheduled_date else None,
-                        'target_duration_minutes': planned_ruck.target_duration_minutes,
-                        'target_weight_lbs': planned_ruck.target_weight_lbs,
-                        'notes': planned_ruck.notes,
-                        'status': planned_ruck.status,
-                        'created_at': planned_ruck.created_at.isoformat() if planned_ruck.created_at else None,
-                        'updated_at': planned_ruck.updated_at.isoformat() if planned_ruck.updated_at else None
-                    }
+                    # Use the model's to_dict method but don't include route yet
+                    clean_planned_ruck = planned_ruck.to_dict(include_route=False)
                     
                     # Add clean route data if requested
                     if include_route and planned_ruck.route_id in routes_by_id:
                         clean_planned_ruck['route'] = routes_by_id[planned_ruck.route_id]
                     
                     planned_rucks_data.append(clean_planned_ruck)
-                    logger.debug(f"Added clean planned ruck: {planned_ruck.id}")
+                    
                 except Exception as e:
-                    logger.error(f"Error converting PlannedRuck {planned_ruck.id} to dict: {e}")
+                    logger.warning(f"Error converting planned ruck {planned_ruck.id} to dict: {e}")
                     continue
             
             response_data = {
