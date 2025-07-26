@@ -9,6 +9,8 @@ from dateutil import tz
 
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
+from RuckTracker.utils.auth_helper import get_current_user_id
+from RuckTracker.utils.api_response import check_auth_and_respond
 
 logger = logging.getLogger(__name__)
 
@@ -646,17 +648,21 @@ class RuckSessionCompleteResource(Resource):
     def post(self, ruck_id):
         """Complete a ruck session"""
         try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
+            # Check authentication with proper token expiry detection
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                logger.warning(f"Session completion failed for ruck {ruck_id}: Authentication failed - {auth_response[0].get('error')}")
+                return auth_response
             data = request.get_json()
             if not data:
                 return {'message': 'No data provided'}, 400
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            supabase = get_supabase_client()
             # Check if session exists
             session_check = supabase.table('ruck_session') \
                 .select('id,status,started_at') \
                 .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
+                .eq('user_id', user_id) \
                 .execute()
             if not session_check.data or len(session_check.data) == 0:
                 return {'message': 'Session not found'}, 404
@@ -677,7 +683,7 @@ class RuckSessionCompleteResource(Resource):
             # Fetch user's allow_ruck_sharing preference to set default for is_public
             user_resp = supabase.table('user') \
                 .select('allow_ruck_sharing') \
-                .eq('id', g.user.id) \
+                .eq('id', user_id) \
                 .single() \
                 .execute()
         
@@ -973,14 +979,14 @@ class RuckSessionCompleteResource(Resource):
             logger.info(f"Session {ruck_id} completion - achievement checking moved to frontend post-navigation")
             completed_session['new_achievements'] = []  # Empty for now, populated by separate API call
         
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            cache_delete_pattern(f"ruck_session:{user_id}:*")
             cache_delete_pattern("ruck_buddies:*")
-            cache_delete_pattern(f"weekly_stats:{g.user.id}:*")
-            cache_delete_pattern(f"monthly_stats:{g.user.id}:*")
-            cache_delete_pattern(f"yearly_stats:{g.user.id}:*")
-            cache_delete_pattern(f"user_lifetime_stats:{g.user.id}")
-            cache_delete_pattern(f"user_recent_rucks:{g.user.id}")
-            cache_delete_pattern(f'user_profile:{g.user.id}:*')
+            cache_delete_pattern(f"weekly_stats:{user_id}:*")
+            cache_delete_pattern(f"monthly_stats:{user_id}:*")
+            cache_delete_pattern(f"yearly_stats:{user_id}:*")
+            cache_delete_pattern(f"user_lifetime_stats:{user_id}")
+            cache_delete_pattern(f"user_recent_rucks:{user_id}")
+            cache_delete_pattern(f'user_profile:{user_id}:*')
 
             # Fetch and include splits data in the response
             try:

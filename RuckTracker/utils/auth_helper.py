@@ -5,7 +5,10 @@ from flask import request, g
 from functools import wraps
 import jwt
 import os
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 def get_current_user_id() -> Optional[str]:
     """
@@ -36,9 +39,16 @@ def get_current_user_id() -> Optional[str]:
             # Cache in g for this request
             g.user_id = user_id
             return user_id
-        except jwt.InvalidTokenError:
-            # Token is invalid, continue to other methods
-            pass
+        except jwt.ExpiredSignatureError:
+            # Token has expired - this should trigger client-side token refresh
+            logger.warning(f"JWT token expired for request: {request.endpoint}")
+            # Store the expired status for the API to return 401
+            g.token_expired = True
+            return None
+        except jwt.InvalidTokenError as e:
+            # Token is invalid for other reasons
+            logger.warning(f"Invalid JWT token: {e}")
+            return None
     
     # Try to get from Supabase auth (if available)
     supabase_auth = request.headers.get('X-Supabase-Auth')

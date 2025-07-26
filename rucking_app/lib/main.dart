@@ -40,6 +40,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry/sentry.dart';
 import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   // 🔥 CRITICAL: Wrap entire app in runZonedGuarded to catch ALL uncaught exceptions
@@ -421,6 +422,18 @@ Future<void> _initializeApp() async {
       AppLogger.error('[Main] Error in deferred initialization: $e');
     }
   });
+
+  WidgetsBinding.instance.addObserver(AppLifecycleObserver(
+    onBackground: () {
+      final blocState = getIt<ActiveSessionBloc>().state;
+      if (blocState is ActiveSessionRunning) {
+        Sentry.captureMessage('App backgrounded during active session', level: SentryLevel.warning, withScope: (scope) {
+          scope.setTag('session_id', blocState.sessionId ?? 'unknown');
+          scope.setExtra('duration', blocState.duration.inSeconds);
+        });
+      }
+    },
+  ));
 }
 
 /// Custom BlocObserver for debugging
@@ -471,4 +484,17 @@ class AppBlocObserver extends BlocObserver {
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await FirebaseMessagingService.handleBackgroundMessage(message);
+}
+
+class AppLifecycleObserver extends WidgetsBindingObserver {
+  final VoidCallback onBackground;
+
+  AppLifecycleObserver({required this.onBackground});
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      onBackground();
+    }
+  }
 }

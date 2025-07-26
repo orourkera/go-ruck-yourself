@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:get_it/get_it.dart';
 import 'package:uuid/uuid.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 
 import '../../../../../core/config/app_config.dart';
@@ -203,32 +204,41 @@ class SessionLifecycleManager implements SessionManager {
       final finalDuration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
       AppLogger.info('[LIFECYCLE] Final session duration: ${finalDuration.inSeconds}s (${finalDuration.inMinutes}m ${finalDuration.inSeconds % 60}s)');
 
-      // CRITICAL: Call completion API with retry and persistence
-      bool completionSuccessful = false;
-      String? completionError;
-      for (int attempt = 1; attempt <= 3; attempt++) {
-        try {
-          await _apiClient.post('/rucks/$_activeSessionId/complete', {
+      try {
+        bool completionSuccessful = false;
+        String? completionError;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await _apiClient.post('/rucks/$_activeSessionId/complete', {
+              'duration_seconds': finalDuration.inSeconds,
+            });
+            completionSuccessful = true;
+            break;
+          } catch (e) {
+            completionError = e.toString();
+            AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
+            await Future.delayed(Duration(seconds: attempt * 2)); // Backoff
+          }
+        }
+
+        if (!completionSuccessful) {
+          // Persist for later retry
+          await _storageService.setObject('pending_completion_$_activeSessionId', {
             'duration_seconds': finalDuration.inSeconds,
           });
-          completionSuccessful = true;
-          break;
-        } catch (e) {
-          completionError = e.toString();
-          AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
-          await Future.delayed(Duration(seconds: attempt * 2)); // Backoff
+          AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted for retry: $completionError');
+        } else {
+          // Clear any previous pending
+          await _storageService.remove('pending_completion_$_activeSessionId');
         }
-      }
-
-      if (!completionSuccessful) {
-        // Persist for later retry
-        await _storageService.setObject('pending_completion_$_activeSessionId', {
-          'duration_seconds': finalDuration.inSeconds,
+      } catch (e) {
+        AppLogger.error('Session complete failed: $e');
+        Sentry.captureException(e, stackTrace: StackTrace.current, withScope: (scope) {
+          scope.level = SentryLevel.warning;
+          scope.setTag('session_id', _activeSessionId ?? 'unknown');
+          scope.setExtra('duration', finalDuration.inSeconds);
         });
-        AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted for retry: $completionError');
-      } else {
-        // Clear any previous pending
-        await _storageService.remove('pending_completion_$_activeSessionId');
+        // Existing persistence...
       }
 
       final newState = _currentState.copyWith(
