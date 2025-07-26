@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:go_router/go_router.dart';
+import 'package:rucking_app/core/di/injection_container.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
+import 'package:rucking_app/core/theme/app_colors.dart';
+import 'package:rucking_app/core/theme/app_text_styles.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_event.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/screens/my_rucks_screen.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
-import 'package:rucking_app/core/di/injection_container.dart';
+import 'package:rucking_app/core/navigation/alltrails_router.dart';
 
 /// Preview widget for planned rucks on the home screen
 class PlannedRucksPreview extends StatelessWidget {
@@ -162,7 +162,7 @@ class PlannedRucksPreview extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () => _navigateToImportRoute(context),
+            onPressed: () => _navigateToRouteImport(context),
             icon: const Icon(Icons.add),
             label: const Text('Plan Your First Ruck'),
             style: OutlinedButton.styleFrom(
@@ -275,23 +275,10 @@ class PlannedRucksPreview extends StatelessWidget {
   }
 
   void _navigateToMyRucks(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BlocProvider(
-          create: (context) => getIt<PlannedRuckBloc>()..add(LoadPlannedRucks()),
-          child: const MyRucksScreen(),
-        ),
-      ),
-    );
+    context.go(AllTrailsRouter.myRucks);
   }
 
-  void _navigateToImportRoute(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const RouteImportScreen(),
-      ),
-    );
+  void _navigateToRouteImport(BuildContext context) {
+    context.go('${AllTrailsRouter.myRucks}/import');
   }
 }
