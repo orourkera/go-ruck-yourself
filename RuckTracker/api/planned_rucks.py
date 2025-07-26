@@ -88,7 +88,19 @@ class PlannedRucksResource(Resource):
                     'trail_difficulty, trail_type, surface_type'
                 ).in_('id', list(route_ids)).execute()
                 
-                routes_by_id = {route['id']: route for route in routes_result.data}
+                logger.debug(f"Routes result type: {type(routes_result)}, data type: {type(routes_result.data)}")
+                logger.debug(f"Routes data count: {len(routes_result.data) if routes_result.data else 0}")
+                
+                # Ensure we only use plain dict data, not Response objects
+                routes_by_id = {}
+                if routes_result.data:
+                    for route_data in routes_result.data:
+                        logger.debug(f"Route data type: {type(route_data)}")
+                        # Ensure route_data is a plain dict
+                        if isinstance(route_data, dict):
+                            routes_by_id[route_data['id']] = route_data
+                        else:
+                            logger.warning(f"Skipping non-dict route data: {type(route_data)}")
             
             # Build response
             planned_rucks_data = []
