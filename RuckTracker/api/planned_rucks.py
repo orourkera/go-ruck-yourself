@@ -60,6 +60,7 @@ class PlannedRucksResource(Resource):
             query = query.range(offset, offset + limit - 1)
             
             result = query.execute()
+            logger.info(f"Supabase query result type: {type(result)}, data count: {len(result.data) if result.data else 0}")
             
             # Convert to PlannedRuck objects and optionally include route data
             planned_rucks = []
@@ -67,7 +68,9 @@ class PlannedRucksResource(Resource):
             
             for planned_ruck_data in result.data:
                 try:
+                    logger.debug(f"Processing planned ruck data: {planned_ruck_data}")
                     planned_ruck = PlannedRuck.from_dict(planned_ruck_data)
+                    logger.debug(f"Created PlannedRuck object: {type(planned_ruck)}")
                     
                     if include_route:
                         route_ids.add(planned_ruck.route_id)
@@ -90,19 +93,29 @@ class PlannedRucksResource(Resource):
             # Build response
             planned_rucks_data = []
             for planned_ruck in planned_rucks:
-                planned_ruck_dict = planned_ruck.to_dict()
-                
-                if include_route and planned_ruck.route_id in routes_by_id:
-                    planned_ruck_dict['route'] = routes_by_id[planned_ruck.route_id]
-                
-                planned_rucks_data.append(planned_ruck_dict)
+                try:
+                    logger.debug(f"Converting PlannedRuck to dict: {planned_ruck.id}")
+                    planned_ruck_dict = planned_ruck.to_dict()
+                    logger.debug(f"PlannedRuck dict type: {type(planned_ruck_dict)}")
+                    
+                    if include_route and planned_ruck.route_id in routes_by_id:
+                        planned_ruck_dict['route'] = routes_by_id[planned_ruck.route_id]
+                    
+                    planned_rucks_data.append(planned_ruck_dict)
+                except Exception as e:
+                    logger.error(f"Error converting PlannedRuck {planned_ruck.id} to dict: {e}")
+                    continue
             
-            return success_response({
+            response_data = {
                 'planned_rucks': planned_rucks_data,
                 'count': len(planned_rucks_data),
                 'offset': offset,
                 'limit': limit
-            })
+            }
+            logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
+            logger.debug(f"Response data types: {[(k, type(v)) for k, v in response_data.items()]}")
+            
+            return success_response(response_data)
             
         except Exception as e:
             logger.error(f"Error fetching planned rucks: {e}")

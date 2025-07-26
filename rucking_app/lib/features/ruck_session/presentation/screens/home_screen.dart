@@ -54,6 +54,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/widgets/planned_rucks_preview.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -963,6 +964,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                       ),
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  
+                  // Planned Rucks Preview
+                  const PlannedRucksPreview(),
                   const SizedBox(height: 24),
                   
                   // Achievements summary
