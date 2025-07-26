@@ -52,19 +52,31 @@ class _RouteImportScreenState extends State<RouteImportScreen>
       appBar: AppBar(
         backgroundColor: Theme.of(context).brightness == Brightness.dark 
             ? AppColors.surfaceDark 
-            : AppColors.surfaceLight,
+            : AppColors.primary,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? AppColors.textLight 
+            : Colors.white,
         elevation: 2,
         title: Text(
           'Import Route',
           style: AppTextStyles.titleLarge.copyWith(
             fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? AppColors.textLight 
+                : Colors.white,
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.getSecondaryTextColor(context),
-          indicatorColor: AppColors.primary,
+          labelColor: Theme.of(context).brightness == Brightness.dark 
+              ? AppColors.primary 
+              : Colors.white,
+          unselectedLabelColor: Theme.of(context).brightness == Brightness.dark 
+              ? AppColors.getSecondaryTextColor(context) 
+              : Colors.white70,
+          indicatorColor: Theme.of(context).brightness == Brightness.dark 
+              ? AppColors.primary 
+              : Colors.white,
           onTap: (index) {
             _pageController.animateToPage(
               index,

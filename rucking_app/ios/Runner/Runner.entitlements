@@ -17,5 +17,13 @@
 		<string>group.com.ruck.app.shared</string>
 	</array>
 	
+	<!-- Universal Links for Share Sheet Support -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:getrucky.com</string>
+		<string>applinks:alltrails.com</string>
+		<string>applinks:www.alltrails.com</string>
+	</array>
+	
 </dict>
 </plist>

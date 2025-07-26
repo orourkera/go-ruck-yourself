@@ -103,11 +103,7 @@
 			<string>com.ruck.app.alltrails</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>https</string>
-			</array>
-			<key>CFBundleURLTypes</key>
-			<array>
-				<string>alltrails.com</string>
+				<string>ruckapp</string>
 			</array>
 		</dict>
 	</array>
@@ -128,6 +124,18 @@
 			<array>
 				<string>com.topografix.gpx</string>
 				<string>public.xml</string>
+			</array>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>AllTrails Route URL</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.url</string>
 			</array>
 			<key>LSHandlerRank</key>
 			<string>Default</string>
@@ -166,6 +174,13 @@
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.ruck.app.shared</string>
+	</array>
+	
+	<!-- User Activity Types for URL Sharing -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.ruck.app.route-import</string>
+		<string>com.ruck.app.alltrails-url</string>
 	</array>
 	
 </dict>

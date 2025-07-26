@@ -33,9 +33,21 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Search Routes'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: Text(
+          'Search Routes',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? AppColors.textLight 
+                : Colors.white,
+          ),
+        ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? AppColors.surfaceDark 
+            : AppColors.primary,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? AppColors.textLight 
+            : Colors.white,
+        elevation: 2,
       ),
       body: Column(
         children: [

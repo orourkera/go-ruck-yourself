@@ -25,9 +25,21 @@ class RoutePreviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Route Preview'),
-        backgroundColor: AppColors.backgroundLight,
-        elevation: 0,
+        title: Text(
+          'Route Preview',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? AppColors.textLight 
+                : Colors.white,
+          ),
+        ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? AppColors.surfaceDark 
+            : AppColors.primary,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark 
+            ? AppColors.textLight 
+            : Colors.white,
+        elevation: 2,
         actions: [
           IconButton(
             icon: const Icon(Icons.share),

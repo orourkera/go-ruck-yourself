@@ -28,26 +28,38 @@ class GPXImportResource(Resource):
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return error_response("Authentication required", 401)
+                return {
+                    "success": False,
+                    "message": "Authentication required"
+                }, 401
             
             # Get GPX data from request
             data = request.get_json()
             if not data:
-                return error_response("Request body required", 400)
+                return {
+                    "success": False,
+                    "message": "Request body required"
+                }, 400
             
             gpx_content = data.get('gpx_content')
             source_url = data.get('source_url')  # Optional AllTrails URL
             custom_name = data.get('name')  # Optional custom name override
             
             if not gpx_content:
-                return error_response("gpx_content is required", 400)
+                return {
+                    "success": False,
+                    "message": "gpx_content is required"
+                }, 400
             
             # Parse GPX content
             try:
                 route_data = self._parse_gpx_content(gpx_content, user_id, source_url, custom_name)
             except Exception as e:
                 logger.error(f"GPX parsing error: {e}")
-                return error_response(f"Invalid GPX format: {str(e)}", 400)
+                return {
+                    "success": False,
+                    "message": f"Invalid GPX format: {str(e)}"
+                }, 400
             
             supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
             
@@ -55,7 +67,10 @@ class GPXImportResource(Resource):
             route_result = supabase.table('routes').insert(route_data['route']).execute()
             
             if not route_result.data:
-                return error_response("Failed to create route", 500)
+                return {
+                    "success": False,
+                    "message": "Failed to create route"
+                }, 500
             
             created_route = route_result.data[0]
             route_id = created_route['id']
@@ -85,16 +100,22 @@ class GPXImportResource(Resource):
             except Exception as e:
                 logger.warning(f"Failed to record import analytics: {e}")
             
-            return success_response({
-                'route': created_route,
-                'elevation_points_created': elevation_points_created,
-                'pois_created': pois_created,
-                'message': 'GPX file imported successfully'
-            }, 201)
+            return {
+                "success": True,
+                "message": "GPX file imported successfully",
+                "data": {
+                    'route': created_route,
+                    'elevation_points_created': elevation_points_created,
+                    'pois_created': pois_created
+                }
+            }, 201
             
         except Exception as e:
             logger.error(f"Error importing GPX: {e}")
-            return error_response("Failed to import GPX file", 500)
+            return {
+                "success": False,
+                "message": "Failed to import GPX file"
+            }, 500
     
     def _parse_gpx_content(self, gpx_content: str, user_id: str, source_url: Optional[str] = None, custom_name: Optional[str] = None) -> Dict[str, Any]:
         """Parse GPX XML content and extract route data."""
@@ -431,11 +452,17 @@ class GPXValidateResource(Resource):
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return error_response("Authentication required", 401)
+                return {
+                    "success": False,
+                    "message": "Authentication required"
+                }, 401
             
             data = request.get_json()
             if not data or not data.get('gpx_content'):
-                return error_response("gpx_content is required", 400)
+                return {
+                    "success": False,
+                    "message": "gpx_content is required"
+                }, 400
             
             gpx_content = data['gpx_content']
             
@@ -464,15 +491,26 @@ class GPXValidateResource(Resource):
                     'source': route_data['source']
                 }
                 
-                return success_response(validation_result)
+                return {
+                    "success": True,
+                    "message": "GPX validation completed",
+                    "data": validation_result
+                }, 200
                 
             except ValueError as e:
-                return success_response({
-                    'valid': False,
-                    'error': str(e),
-                    'message': 'Invalid GPX format'
-                })
+                return {
+                    "success": True,
+                    "message": "GPX validation completed",
+                    "data": {
+                        'valid': False,
+                        'error': str(e),
+                        'message': 'Invalid GPX format'
+                    }
+                }, 200
                 
         except Exception as e:
             logger.error(f"Error validating GPX: {e}")
-            return error_response("Failed to validate GPX file", 500)
+            return {
+                "success": False,
+                "message": "Failed to validate GPX file"
+            }, 500
