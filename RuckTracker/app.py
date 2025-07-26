@@ -829,6 +829,17 @@ def health():
         'version': '1.0.0'
     })
 
+@app.route('/api/app/version-info')
+def app_version_info():
+    """App version information for update checks"""
+    return jsonify({
+        'latest_version': '1.0.0',
+        'min_required_version': '1.0.0',
+        'force_update': False,
+        'update_url': 'https://apps.apple.com/app/rucking-app',
+        'release_notes': 'Latest version with improved performance and bug fixes.'
+    })
+
 logger.info("Application initialized successfully! All API endpoints registered.")
 
 # ============================================================================
