@@ -32,8 +32,8 @@ class AppErrorWidget extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               'Oops! Something went wrong',
-              style: AppTextStyles.headlineSmall.copyWith(
-                color: AppColors.textPrimary,
+              style: AppTextStyles.titleLarge.copyWith(
+                color: AppColors.textDark,
               ),
               textAlign: TextAlign.center,
             ),
@@ -41,7 +41,7 @@ class AppErrorWidget extends StatelessWidget {
             Text(
               message,
               style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
+                color: AppColors.textDarkSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -53,7 +53,7 @@ class AppErrorWidget extends StatelessWidget {
                 label: Text(retryButtonText ?? 'Try Again'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,

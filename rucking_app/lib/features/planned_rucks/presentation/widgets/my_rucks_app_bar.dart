@@ -63,7 +63,7 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.backgroundLight,
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
       title: _isSearching ? _buildSearchField() : _buildTitle(),
@@ -96,9 +96,9 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
       children: [
         Text(
           'My Rucks',
-          style: AppTextStyles.headline6.copyWith(
+          style: AppTextStyles.titleLarge.copyWith(
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.textDark,
           ),
         ),
         const Spacer(),
@@ -114,13 +114,13 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
         controller: widget.searchController,
         autofocus: true,
         onChanged: widget.onSearchChanged,
-        style: AppTextStyles.body1.copyWith(
-          color: AppColors.textPrimary,
+        style: AppTextStyles.bodyLarge.copyWith(
+          color: AppColors.textDark,
         ),
         decoration: InputDecoration(
           hintText: 'Search rucks by name or notes...',
-          hintStyle: AppTextStyles.body1.copyWith(
-            color: AppColors.textSecondary,
+          hintStyle: AppTextStyles.bodyLarge.copyWith(
+            color: AppColors.textDarkSecondary,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 0),
@@ -154,14 +154,14 @@ class SimpleMyRucksAppBar extends StatelessWidget implements PreferredSizeWidget
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.backgroundLight,
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
       title: Text(
         title,
-        style: AppTextStyles.headline6.copyWith(
+        style: AppTextStyles.titleLarge.copyWith(
           fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+          color: AppColors.textDark,
         ),
       ),
       actions: actions,
@@ -194,7 +194,7 @@ class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.backgroundLight,
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
       title: Column(
@@ -203,9 +203,9 @@ class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget 
         children: [
           Text(
             title,
-            style: AppTextStyles.headline6.copyWith(
+            style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.textDark,
             ),
           ),
           const SizedBox(height: 2),
@@ -215,7 +215,7 @@ class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget 
                 context,
                 icon: Icons.list_alt,
                 label: totalRucks.toString(),
-                color: AppColors.textSecondary,
+                color: AppColors.textDarkSecondary,
               ),
               const SizedBox(width: 8),
               _buildStatChip(
@@ -268,7 +268,7 @@ class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget 
           const SizedBox(width: 4),
           Text(
             label,
-            style: AppTextStyles.caption.copyWith(
+            style: AppTextStyles.bodySmall.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
             ),

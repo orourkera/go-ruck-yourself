@@ -30,7 +30,7 @@ class StatusFilterChips extends StatelessWidget {
               label: 'All',
               isSelected: selectedStatus == null,
               onTap: () => onStatusSelected(null),
-              color: AppColors.textSecondary,
+              color: AppColors.textDarkSecondary,
               icon: Icons.list_alt,
             ),
             const SizedBox(width: 8),
@@ -87,7 +87,7 @@ class StatusFilterChips extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: AppTextStyles.caption.copyWith(
+              style: AppTextStyles.bodySmall.copyWith(
                 color: isSelected ? Colors.white : color,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
@@ -104,14 +104,12 @@ class StatusFilterChips extends StatelessWidget {
         return 'Planned';
       case PlannedRuckStatus.inProgress:
         return 'In Progress';
-      case PlannedRuckStatus.paused:
-        return 'Paused';
+
       case PlannedRuckStatus.completed:
         return 'Completed';
       case PlannedRuckStatus.cancelled:
         return 'Cancelled';
-      case PlannedRuckStatus.missed:
-        return 'Missed';
+
     }
   }
 
@@ -121,14 +119,12 @@ class StatusFilterChips extends StatelessWidget {
         return AppColors.primary;
       case PlannedRuckStatus.inProgress:
         return AppColors.info;
-      case PlannedRuckStatus.paused:
-        return AppColors.warning;
+
       case PlannedRuckStatus.completed:
         return AppColors.success;
       case PlannedRuckStatus.cancelled:
-        return AppColors.textSecondary;
-      case PlannedRuckStatus.missed:
-        return AppColors.error;
+        return AppColors.textDarkSecondary;
+
     }
   }
 
@@ -138,14 +134,12 @@ class StatusFilterChips extends StatelessWidget {
         return Icons.schedule;
       case PlannedRuckStatus.inProgress:
         return Icons.play_arrow;
-      case PlannedRuckStatus.paused:
-        return Icons.pause;
+
       case PlannedRuckStatus.completed:
         return Icons.check_circle;
       case PlannedRuckStatus.cancelled:
         return Icons.cancel;
-      case PlannedRuckStatus.missed:
-        return Icons.warning;
+
     }
   }
 }
@@ -154,16 +148,16 @@ class StatusFilterChips extends StatelessWidget {
 class AdvancedStatusFilterChips extends StatefulWidget {
   final PlannedRuckStatus? selectedStatus;
   final ValueChanged<PlannedRuckStatus?> onStatusSelected;
-  final ValueChanged<DateRange?>? onDateRangeSelected;
-  final DateRange? selectedDateRange;
+  final ValueChanged<DateTimeRange?>? onDateTimeRangeSelected;
+  final DateTimeRange? selectedDateTimeRange;
   final bool showDateFilter;
 
   const AdvancedStatusFilterChips({
     super.key,
     this.selectedStatus,
     required this.onStatusSelected,
-    this.onDateRangeSelected,
-    this.selectedDateRange,
+    this.onDateTimeRangeSelected,
+    this.selectedDateTimeRange,
     this.showDateFilter = false,
   });
 
@@ -202,10 +196,10 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
                   ),
                   label: Text(
                     _showMoreFilters ? 'Less Filters' : 'More Filters',
-                    style: AppTextStyles.caption,
+                    style: AppTextStyles.bodySmall,
                   ),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
+                    foregroundColor: AppColors.textDarkSecondary,
                     minimumSize: const Size(0, 32),
                   ),
                 ),
@@ -228,10 +222,10 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surface.withOpacity(0.5),
+              color: AppColors.backgroundLight.withOpacity(0.5),
               border: Border(
                 top: BorderSide(
-                  color: AppColors.divider,
+                  color: AppColors.greyLight,
                   width: 0.5,
                 ),
               ),
@@ -241,7 +235,7 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
               children: [
                 Text(
                   'Date Range',
-                  style: AppTextStyles.subtitle2.copyWith(
+                  style: AppTextStyles.titleSmall.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -249,10 +243,10 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    _buildDateRangeChip('Today', _getTodayRange()),
-                    _buildDateRangeChip('This Week', _getThisWeekRange()),
-                    _buildDateRangeChip('This Month', _getThisMonthRange()),
-                    _buildDateRangeChip('Custom', null, isCustom: true),
+                    _buildDateTimeRangeChip('Today', _getTodayRange()),
+                    _buildDateTimeRangeChip('This Week', _getThisWeekRange()),
+                    _buildDateTimeRangeChip('This Month', _getThisMonthRange()),
+                    _buildDateTimeRangeChip('Custom', null, isCustom: true),
                   ],
                 ),
               ],
@@ -262,15 +256,15 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
     );
   }
 
-  Widget _buildDateRangeChip(String label, DateRange? range, {bool isCustom = false}) {
-    final isSelected = widget.selectedDateRange == range;
+  Widget _buildDateTimeRangeChip(String label, DateTimeRange? range, {bool isCustom = false}) {
+    final isSelected = widget.selectedDateTimeRange == range;
     
     return GestureDetector(
       onTap: () {
         if (isCustom) {
           _showCustomDatePicker();
         } else {
-          widget.onDateRangeSelected?.call(range);
+          widget.onDateTimeRangeSelected?.call(range);
         }
       },
       child: AnimatedContainer(
@@ -280,14 +274,14 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.divider,
+            color: isSelected ? AppColors.primary : AppColors.greyLight,
             width: 1,
           ),
         ),
         child: Text(
           label,
-          style: AppTextStyles.caption.copyWith(
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: isSelected ? Colors.white : AppColors.textDarkSecondary,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -295,33 +289,33 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
     );
   }
 
-  DateRange _getTodayRange() {
+  DateTimeRange _getTodayRange() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    return DateRange(start: today, end: today.add(const Duration(days: 1)));
+    return DateTimeRange(start: today, end: today.add(const Duration(days: 1)));
   }
 
-  DateRange _getThisWeekRange() {
+  DateTimeRange _getThisWeekRange() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
-    return DateRange(start: startOfWeek, end: endOfWeek);
+    return DateTimeRange(start: startOfWeek, end: endOfWeek);
   }
 
-  DateRange _getThisMonthRange() {
+  DateTimeRange _getThisMonthRange() {
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.year, now.month + 1, 0);
-    return DateRange(start: startOfMonth, end: endOfMonth);
+    return DateTimeRange(start: startOfMonth, end: endOfMonth);
   }
 
   bool _hasActiveFilters() {
-    return widget.selectedStatus != null || widget.selectedDateRange != null;
+    return widget.selectedStatus != null || widget.selectedDateTimeRange != null;
   }
 
   void _clearAllFilters() {
     widget.onStatusSelected(null);
-    widget.onDateRangeSelected?.call(null);
+    widget.onDateTimeRangeSelected?.call(null);
   }
 
   Future<void> _showCustomDatePicker() async {
@@ -329,7 +323,7 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
       context: context,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialDateRange: widget.selectedDateRange,
+      initialDateRange: widget.selectedDateTimeRange,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -343,7 +337,7 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
     );
 
     if (dateRange != null) {
-      widget.onDateRangeSelected?.call(dateRange);
+      widget.onDateTimeRangeSelected?.call(dateRange);
     }
   }
 }

@@ -63,7 +63,7 @@ class UrgentRucksBanner extends StatelessWidget {
                     children: [
                       Text(
                         _getTitle(),
-                        style: AppTextStyles.subtitle1.copyWith(
+                        style: AppTextStyles.titleMedium.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -71,7 +71,7 @@ class UrgentRucksBanner extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         _getMessage(),
-                        style: AppTextStyles.body2.copyWith(
+                        style: AppTextStyles.bodyMedium.copyWith(
                           color: Colors.white.withOpacity(0.9),
                         ),
                       ),
@@ -204,7 +204,7 @@ class CompactUrgentRucksBanner extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 message,
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: backgroundColor ?? AppColors.warning,
                   fontWeight: FontWeight.w600,
                 ),

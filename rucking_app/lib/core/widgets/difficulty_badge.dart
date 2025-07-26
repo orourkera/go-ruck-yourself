@@ -33,7 +33,7 @@ class DifficultyBadge extends StatelessWidget {
       ),
       child: Text(
         difficulty.toUpperCase(),
-        style: (compact ? AppTextStyles.caption : AppTextStyles.bodySmall).copyWith(
+        style: AppTextStyles.bodySmall.copyWith(
           color: color,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,

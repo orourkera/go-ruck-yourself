@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/core/models/route_point_of_interest.dart';
@@ -638,20 +637,20 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   }
 
   double _getOptimalZoom() {
-    if (widget.route.waypoints.length < 2) return 14.0;
+    final points = _getRoutePoints();
+    if (points.length < 2) return 14.0;
     
     // Calculate bounds and determine appropriate zoom level
-    final waypoints = widget.route.waypoints;
-    double minLat = waypoints.first.latitude;
-    double maxLat = waypoints.first.latitude;
-    double minLng = waypoints.first.longitude;
-    double maxLng = waypoints.first.longitude;
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
     
-    for (final waypoint in waypoints) {
-      minLat = minLat < waypoint.latitude ? minLat : waypoint.latitude;
-      maxLat = maxLat > waypoint.latitude ? maxLat : waypoint.latitude;
-      minLng = minLng < waypoint.longitude ? minLng : waypoint.longitude;
-      maxLng = maxLng > waypoint.longitude ? maxLng : waypoint.longitude;
+    for (final point in points) {
+      minLat = minLat < point.latitude ? minLat : point.latitude;
+      maxLat = maxLat > point.latitude ? maxLat : point.latitude;
+      minLng = minLng < point.longitude ? minLng : point.longitude;
+      maxLng = maxLng > point.longitude ? maxLng : point.longitude;
     }
     
     final latDiff = maxLat - minLat;
@@ -717,13 +716,13 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
       maxLng = maxLng > point.longitude ? maxLng : point.longitude;
     }
     
-    _mapController.fitBounds(
-      LatLngBounds(
-        LatLng(minLat, minLng),
-        LatLng(maxLat, maxLng),
-      ),
-      options: const FitBoundsOptions(
-        padding: EdgeInsets.all(50),
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds(
+          LatLng(minLat, minLng),
+          LatLng(maxLat, maxLng),
+        ),
+        padding: const EdgeInsets.all(50),
       ),
     );
   }

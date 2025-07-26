@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/widgets/difficulty_badge.dart';
 
+// Import enums for cleaner code
+typedef Route = route_model.Route;
+typedef RouteType = route_model.RouteType;
+typedef RouteDifficulty = route_model.RouteDifficulty;
+
 /// Card widget for previewing a route before import
 class RoutePreviewCard extends StatelessWidget {
-  final Route route;
+  final route_model.Route route;
   final List<String> warnings;
   final VoidCallback? onTap;
   final bool showImportButton;
@@ -42,37 +47,37 @@ class RoutePreviewCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       route.name,
-                      style: AppTextStyles.headline6.copyWith(
+                      style: AppTextStyles.titleLarge.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (route.difficulty != null) ...[
+                  if (route.trailDifficulty != null) ...[
                     const SizedBox(width: 12),
-                    DifficultyBadge(difficulty: route.difficulty!),
+                    DifficultyBadge(difficulty: route.trailDifficulty!),
                   ],
                 ],
               ),
 
               const SizedBox(height: 8),
 
-              // Location
-              if (route.location?.isNotEmpty == true) ...[
+              // Source information instead of location
+              if (route.source.isNotEmpty) ...[
                 Row(
                   children: [
                     Icon(
-                      Icons.location_on,
+                      Icons.source,
                       size: 16,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textDarkSecondary,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        route.location!,
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
+                        'Source: ${route.source}',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textDarkSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -93,37 +98,32 @@ class RoutePreviewCard extends StatelessWidget {
                   ),
                   
                   // Elevation gain
-                  if (route.elevationGain != null) ...[
+                  if (route.elevationGainM != null) ...[
                     const SizedBox(width: 16),
                     _buildStatItem(
                       Icons.trending_up,
-                      route.formattedElevationGain,
+                      '${route.elevationGainM!.toInt()}m',
                     ),
                   ],
-                  
-                  // Duration
-                  if (route.duration != null) ...[
-                    const SizedBox(width: 16),
-                    _buildStatItem(
-                      Icons.access_time,
-                      route.formattedDuration,
-                    ),
-                  ],
+
                 ],
               ),
 
               // Route type
-              if (route.routeType != null) ...[
+              if (route.trailType != null) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    _getRouteTypeLabel(route.routeType!),
-                    style: AppTextStyles.caption.copyWith(
+                    _getRouteTypeLabel(_parseRouteType(route.trailType!)),
+                    style: AppTextStyles.bodySmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                     ),
@@ -136,40 +136,36 @@ class RoutePreviewCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   route.description!,
-                  style: AppTextStyles.body2,
+                  style: AppTextStyles.bodyMedium,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
 
-              // Ratings and popularity
-              if (route.averageRating != null || route.totalReviews != null) ...[
+              // Ratings and usage info
+              if (route.averageRating != null) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    if (route.averageRating != null) ...[
-                      Icon(
-                        Icons.star,
-                        size: 16,
-                        color: Colors.amber,
+                    Icon(
+                      Icons.star,
+                      size: 16,
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      route.averageRating!.toStringAsFixed(1),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        route.averageRating!.toStringAsFixed(1),
-                        style: AppTextStyles.body2.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '(${route.totalCompletedCount} completed)',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textDarkSecondary,
                       ),
-                    ],
-                    if (route.totalReviews != null) ...[
-                      if (route.averageRating != null) const SizedBox(width: 8),
-                      Text(
-                        '(${route.totalReviews} reviews)',
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               ],
@@ -199,7 +195,7 @@ class RoutePreviewCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             'Warnings',
-                            style: AppTextStyles.subtitle2.copyWith(
+                            style: AppTextStyles.titleSmall.copyWith(
                               color: AppColors.warning,
                               fontWeight: FontWeight.bold,
                             ),
@@ -224,7 +220,7 @@ class RoutePreviewCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 warning,
-                                style: AppTextStyles.body2.copyWith(
+                                style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.warning.withOpacity(0.8),
                                 ),
                               ),
@@ -271,18 +267,34 @@ class RoutePreviewCard extends StatelessWidget {
         Icon(
           icon,
           size: 16,
-          color: AppColors.textSecondary,
+          color: AppColors.textDarkSecondary,
         ),
         const SizedBox(width: 4),
         Text(
           value,
-          style: AppTextStyles.body2.copyWith(
-            color: AppColors.textSecondary,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textDarkSecondary,
             fontWeight: FontWeight.w500,
           ),
         ),
       ],
     );
+  }
+
+  // Helper methods to parse string properties to enums
+  RouteType _parseRouteType(String type) {
+    switch (type.toLowerCase()) {
+      case 'loop':
+        return RouteType.loop;
+      case 'out_and_back':
+      case 'out-and-back':
+        return RouteType.outAndBack;
+      case 'point_to_point':
+      case 'point-to-point':
+        return RouteType.pointToPoint;
+      default:
+        return RouteType.loop;
+    }
   }
 
   String _getRouteTypeLabel(RouteType type) {
@@ -299,7 +311,7 @@ class RoutePreviewCard extends StatelessWidget {
 
 /// Compact version of route preview card
 class CompactRoutePreviewCard extends StatelessWidget {
-  final Route route;
+  final route_model.Route route;
   final VoidCallback? onTap;
   final bool showImportButton;
 
@@ -331,7 +343,7 @@ class CompactRoutePreviewCard extends StatelessWidget {
                   children: [
                     Text(
                       route.name,
-                      style: AppTextStyles.subtitle2.copyWith(
+                      style: AppTextStyles.titleSmall.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                       maxLines: 1,
@@ -343,16 +355,16 @@ class CompactRoutePreviewCard extends StatelessWidget {
                         Icon(
                           Icons.straighten,
                           size: 14,
-                          color: AppColors.textSecondary,
+                          color: AppColors.textDarkSecondary,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           route.formattedDistance,
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textSecondary,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textDarkSecondary,
                           ),
                         ),
-                        if (route.difficulty != null) ...[
+                        if (route.trailDifficulty != null) ...[
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -360,13 +372,13 @@ class CompactRoutePreviewCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: _getDifficultyColor(route.difficulty!).withOpacity(0.1),
+                              color: _getDifficultyColor(_parseDifficulty(route.trailDifficulty!)).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _getDifficultyLabel(route.difficulty!),
-                              style: AppTextStyles.caption.copyWith(
-                                color: _getDifficultyColor(route.difficulty!),
+                              _getDifficultyLabel(_parseDifficulty(route.trailDifficulty!)),
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: _getDifficultyColor(_parseDifficulty(route.trailDifficulty!)),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -399,6 +411,22 @@ class CompactRoutePreviewCard extends StatelessWidget {
     );
   }
 
+  // Helper method to parse string difficulty to enum
+  RouteDifficulty _parseDifficulty(String difficulty) {
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        return RouteDifficulty.easy;
+      case 'moderate':
+        return RouteDifficulty.moderate;
+      case 'hard':
+        return RouteDifficulty.hard;
+      case 'extreme':
+        return RouteDifficulty.extreme;
+      default:
+        return RouteDifficulty.easy;
+    }
+  }
+
   String _getDifficultyLabel(RouteDifficulty difficulty) {
     switch (difficulty) {
       case RouteDifficulty.easy:
@@ -407,6 +435,8 @@ class CompactRoutePreviewCard extends StatelessWidget {
         return 'Moderate';
       case RouteDifficulty.hard:
         return 'Hard';
+      case RouteDifficulty.extreme:
+        return 'Extreme';
     }
   }
 
@@ -417,6 +447,8 @@ class CompactRoutePreviewCard extends StatelessWidget {
       case RouteDifficulty.moderate:
         return AppColors.warning;
       case RouteDifficulty.hard:
+        return AppColors.error;
+      case RouteDifficulty.extreme:
         return AppColors.error;
     }
   }

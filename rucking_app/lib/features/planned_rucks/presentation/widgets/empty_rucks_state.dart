@@ -52,9 +52,9 @@ class EmptyRucksState extends StatelessWidget {
             // Title
             Text(
               title,
-              style: AppTextStyles.headline6.copyWith(
+              style: AppTextStyles.titleLarge.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: AppColors.textDark,
               ),
               textAlign: TextAlign.center,
             ),
@@ -64,8 +64,8 @@ class EmptyRucksState extends StatelessWidget {
             // Subtitle
             Text(
               subtitle,
-              style: AppTextStyles.body1.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.textDarkSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -242,9 +242,9 @@ class _EmptyStateWithLoadingState extends State<EmptyStateWithLoading>
             // Title
             Text(
               widget.isLoading ? 'Loading...' : widget.title,
-              style: AppTextStyles.headline6.copyWith(
+              style: AppTextStyles.titleLarge.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: AppColors.textDark,
               ),
               textAlign: TextAlign.center,
             ),
@@ -255,8 +255,8 @@ class _EmptyStateWithLoadingState extends State<EmptyStateWithLoading>
             if (!widget.isLoading)
               Text(
                 widget.subtitle,
-                style: AppTextStyles.body1.copyWith(
-                  color: AppColors.textSecondary,
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: AppColors.textDarkSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),

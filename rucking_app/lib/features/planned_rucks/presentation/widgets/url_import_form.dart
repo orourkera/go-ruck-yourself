@@ -97,7 +97,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: AppColors.divider),
+                borderSide: BorderSide(color: AppColors.greyLight),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -220,7 +220,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
         break;
       default:
         icon = Icons.link;
-        color = AppColors.textSecondary;
+        color = AppColors.textDarkSecondary;
         displayName = 'Generic URL';
     }
 
@@ -241,7 +241,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
           const SizedBox(width: 6),
           Text(
             'Detected: $displayName',
-            style: AppTextStyles.caption.copyWith(
+            style: AppTextStyles.bodySmall.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
             ),
@@ -257,7 +257,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
       children: [
         Text(
           'Quick Actions',
-          style: AppTextStyles.subtitle2.copyWith(
+          style: AppTextStyles.titleSmall.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -294,22 +294,22 @@ class _UrlImportFormState extends State<UrlImportForm> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.backgroundLight,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppColors.divider,
+            color: AppColors.greyLight,
             width: 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: AppColors.textSecondary),
+            Icon(icon, size: 16, color: AppColors.textDarkSecondary),
             const SizedBox(width: 6),
             Text(
               label,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textDarkSecondary,
               ),
             ),
           ],
@@ -443,9 +443,9 @@ class _CompactUrlInputState extends State<CompactUrlInput> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: AppColors.greyLight),
       ),
       child: Row(
         children: [

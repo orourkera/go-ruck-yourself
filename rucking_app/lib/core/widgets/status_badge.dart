@@ -43,7 +43,7 @@ class StatusBadge extends StatelessWidget {
           ],
           Text(
             config.displayText,
-            style: (compact ? AppTextStyles.caption : AppTextStyles.bodySmall).copyWith(
+            style: AppTextStyles.bodySmall.copyWith(
               color: config.textColor,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,

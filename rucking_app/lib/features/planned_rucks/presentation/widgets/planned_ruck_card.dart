@@ -52,7 +52,7 @@ class PlannedRuckCard extends StatelessWidget {
                       children: [
                         Text(
                           route?.name ?? 'Unnamed Route',
-                          style: AppTextStyles.headline6.copyWith(
+                          style: AppTextStyles.titleLarge.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                           maxLines: 2,
@@ -61,7 +61,7 @@ class PlannedRuckCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           plannedRuck.formattedPlannedDate,
-                          style: AppTextStyles.subtitle2.copyWith(
+                          style: AppTextStyles.titleSmall.copyWith(
                             color: _getDateTextColor(),
                             fontWeight: FontWeight.w500,
                           ),
@@ -70,7 +70,7 @@ class PlannedRuckCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  StatusBadge(status: plannedRuck.status),
+                  StatusBadge(status: plannedRuck.status.name),
                 ],
               ),
 
@@ -80,72 +80,58 @@ class PlannedRuckCard extends StatelessWidget {
               if (route != null) ...[
                 Row(
                   children: [
-                    if (route.difficulty != null) ...[
-                      DifficultyBadge(difficulty: route.difficulty!),
+                    if (route.trailDifficulty != null) ...[
+                      DifficultyBadge(difficulty: route.trailDifficulty!),
                       const SizedBox(width: 8),
                     ],
                     Icon(
                       Icons.straighten,
                       size: 16,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textDarkSecondary,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       route.formattedDistance,
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textDarkSecondary,
                       ),
                     ),
-                    if (route.elevationGain != null) ...[
+                    if (route.elevationGainM != null) ...[
                       const SizedBox(width: 16),
                       Icon(
                         Icons.trending_up,
                         size: 16,
-                        color: AppColors.textSecondary,
+                        color: AppColors.textDarkSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         route.formattedElevationGain,
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textDarkSecondary,
                         ),
                       ),
                     ],
-                    if (route.duration != null) ...[
-                      const SizedBox(width: 16),
-                      Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        route.formattedDuration,
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+
                   ],
                 ),
                 const SizedBox(height: 8),
               ],
 
               // Location
-              if (route?.location?.isNotEmpty == true) ...[
+              if (route?.source?.isNotEmpty == true) ...[
                 Row(
                   children: [
                     Icon(
                       Icons.location_on,
                       size: 16,
-                      color: AppColors.textSecondary,
+                      color: AppColors.textDarkSecondary,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        route!.location!,
-                        style: AppTextStyles.body2.copyWith(
-                          color: AppColors.textSecondary,
+                        'Source: ${route?.source ?? 'Unknown'}',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textDarkSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -160,7 +146,7 @@ class PlannedRuckCard extends StatelessWidget {
               if (plannedRuck.notes?.isNotEmpty == true) ...[
                 Text(
                   plannedRuck.notes!,
-                  style: AppTextStyles.body2,
+                  style: AppTextStyles.bodyMedium,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -170,14 +156,14 @@ class PlannedRuckCard extends StatelessWidget {
               // Progress indicator for in-progress rucks
               if (plannedRuck.status == PlannedRuckStatus.inProgress) ...[
                 LinearProgressIndicator(
-                  value: plannedRuck.completionPercentage / 100,
-                  backgroundColor: AppColors.surface,
+                  value: 0.0 / 100,
+                  backgroundColor: AppColors.greyLight,
                   valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${plannedRuck.completionPercentage.toInt()}% complete',
-                  style: AppTextStyles.caption.copyWith(
+                  '${0.0.toInt()}% complete',
+                  style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -204,7 +190,7 @@ class PlannedRuckCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         'Overdue',
-                        style: AppTextStyles.caption.copyWith(
+                        style: AppTextStyles.bodySmall.copyWith(
                           color: AppColors.error,
                           fontWeight: FontWeight.w500,
                         ),
@@ -226,7 +212,7 @@ class PlannedRuckCard extends StatelessWidget {
                         icon: const Icon(Icons.edit, size: 16),
                         label: const Text('Edit'),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
+                          foregroundColor: AppColors.textDarkSecondary,
                           minimumSize: const Size(0, 32),
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                         ),
@@ -284,15 +270,15 @@ class PlannedRuckCard extends StatelessWidget {
                           children: [
                             Text(
                               'Completed',
-                              style: AppTextStyles.subtitle2.copyWith(
+                              style: AppTextStyles.titleSmall.copyWith(
                                 color: AppColors.success,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             if (plannedRuck.completedAt != null)
                               Text(
-                                plannedRuck.formattedCompletedAt!,
-                                style: AppTextStyles.caption.copyWith(
+                                plannedRuck.completedAt?.toString() ?? 'N/A',
+                                style: AppTextStyles.bodySmall.copyWith(
                                   color: AppColors.success.withOpacity(0.8),
                                 ),
                               ),
@@ -337,7 +323,7 @@ class PlannedRuckCard extends StatelessWidget {
       return AppColors.warning;
     }
     
-    return AppColors.textSecondary;
+    return AppColors.textDarkSecondary;
   }
 
   /// Get start button text based on status
@@ -347,7 +333,7 @@ class PlannedRuckCard extends StatelessWidget {
         return 'Start';
       case PlannedRuckStatus.inProgress:
         return 'Resume';
-      case PlannedRuckStatus.paused:
+      case PlannedRuckStatus.planned:
         return 'Resume';
       default:
         return 'Start';

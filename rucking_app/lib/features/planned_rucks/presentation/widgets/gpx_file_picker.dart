@@ -78,7 +78,7 @@ class _GpxFilePickerState extends State<GpxFilePicker>
       height: 160,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _selectedFile != null ? AppColors.success.withOpacity(0.1) : AppColors.surface,
+        color: _selectedFile != null ? AppColors.success.withOpacity(0.1) : AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _selectedFile != null 
@@ -106,7 +106,7 @@ class _GpxFilePickerState extends State<GpxFilePicker>
             _selectedFile != null 
                 ? 'GPX File Selected'
                 : 'Select GPX File',
-            style: AppTextStyles.subtitle1.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: _selectedFile != null ? AppColors.success : AppColors.primary,
             ),
@@ -118,8 +118,8 @@ class _GpxFilePickerState extends State<GpxFilePicker>
             _selectedFile != null 
                 ? 'Tap to change file'
                 : 'Tap to browse files',
-            style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textDarkSecondary,
             ),
           ),
         ],
@@ -154,7 +154,7 @@ class _GpxFilePickerState extends State<GpxFilePicker>
                 const SizedBox(width: 8),
                 Text(
                   'Selected File',
-                  style: AppTextStyles.subtitle2.copyWith(
+                  style: AppTextStyles.titleSmall.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -168,13 +168,13 @@ class _GpxFilePickerState extends State<GpxFilePicker>
                 Icon(
                   Icons.insert_drive_file,
                   size: 16,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textDarkSecondary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     fileName,
-                    style: AppTextStyles.body2,
+                    style: AppTextStyles.bodyMedium,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -190,13 +190,13 @@ class _GpxFilePickerState extends State<GpxFilePicker>
                 Icon(
                   Icons.storage,
                   size: 16,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textDarkSecondary,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   fileSizeFormatted,
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textDarkSecondary,
                   ),
                 ),
               ],
@@ -304,7 +304,7 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
       decoration: BoxDecoration(
         color: _isDragOver 
             ? AppColors.primary.withOpacity(0.1)
-            : AppColors.surface,
+            : AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _isDragOver 
@@ -328,16 +328,16 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
                 Icon(
                   Icons.cloud_upload,
                   size: 64,
-                  color: _isDragOver ? AppColors.primary : AppColors.textSecondary,
+                  color: _isDragOver ? AppColors.primary : AppColors.textDarkSecondary,
                 ),
               
               const SizedBox(height: 16),
               
               Text(
                 'Drag & Drop GPX File',
-                style: AppTextStyles.subtitle1.copyWith(
+                style: AppTextStyles.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: _isDragOver ? AppColors.primary : AppColors.textPrimary,
+                  color: _isDragOver ? AppColors.primary : AppColors.textDark,
                 ),
               ),
               
@@ -345,8 +345,8 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
               
               Text(
                 'or click to browse',
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textDarkSecondary,
                 ),
               ),
             ],
@@ -402,10 +402,10 @@ class CompactGpxFilePicker extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: AppColors.divider,
+          color: AppColors.greyLight,
           width: 1,
         ),
       ),
@@ -423,7 +423,7 @@ class CompactGpxFilePicker extends StatelessWidget {
               children: [
                 Text(
                   selectedFileName ?? 'No file selected',
-                  style: AppTextStyles.body1.copyWith(
+                  style: AppTextStyles.bodyLarge.copyWith(
                     fontWeight: selectedFileName != null ? FontWeight.w600 : FontWeight.w400,
                   ),
                   maxLines: 1,
@@ -431,8 +431,8 @@ class CompactGpxFilePicker extends StatelessWidget {
                 ),
                 Text(
                   'GPX files only',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textDarkSecondary,
                   ),
                 ),
               ],

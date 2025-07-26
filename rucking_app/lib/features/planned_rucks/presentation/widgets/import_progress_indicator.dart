@@ -73,7 +73,7 @@ class _ImportProgressIndicatorState extends State<ImportProgressIndicator>
             // Progress message
             Text(
               widget.message,
-              style: AppTextStyles.body1.copyWith(
+              style: AppTextStyles.bodyLarge.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w500,
               ),
@@ -85,7 +85,7 @@ class _ImportProgressIndicatorState extends State<ImportProgressIndicator>
               const SizedBox(height: 4),
               Text(
                 '${(widget.progress! * 100).toInt()}%',
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.primary.withOpacity(0.8),
                   fontWeight: FontWeight.w600,
                 ),
@@ -248,7 +248,7 @@ class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
             widget.currentStep < widget.steps.length 
                 ? widget.steps[widget.currentStep]
                 : 'Complete',
-            style: AppTextStyles.subtitle1.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
             ),
@@ -260,8 +260,8 @@ class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
           // Step counter
           Text(
             'Step ${widget.currentStep + 1} of ${widget.steps.length}',
-            style: AppTextStyles.body2.copyWith(
-              color: AppColors.textSecondary,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textDarkSecondary,
             ),
           ),
         ],
@@ -305,7 +305,7 @@ class CompactProgressIndicator extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             message,
-            style: AppTextStyles.body2.copyWith(
+            style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w500,
             ),
@@ -314,7 +314,7 @@ class CompactProgressIndicator extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               '${(progress! * 100).toInt()}%',
-              style: AppTextStyles.caption.copyWith(
+              style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.primary.withOpacity(0.8),
               ),
             ),
@@ -407,7 +407,7 @@ class _IconProgressIndicatorState extends State<IconProgressIndicator>
           const SizedBox(height: 12),
           Text(
             widget.message,
-            style: AppTextStyles.body1.copyWith(
+            style: AppTextStyles.bodyLarge.copyWith(
               color: color,
               fontWeight: FontWeight.w500,
             ),
