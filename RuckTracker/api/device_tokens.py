@@ -6,8 +6,8 @@ from flask import request, g
 from flask_restful import Resource
 
 from RuckTracker.supabase_client import get_supabase_admin_client
-from RuckTracker.api.auth import auth_required
-from RuckTracker.utils.api_response import build_api_response
+from RuckTracker.utils.auth_helper import get_current_user_id
+from RuckTracker.utils.api_response import build_api_response, check_auth_and_respond
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,14 @@ logger = logging.getLogger(__name__)
 class DeviceTokenResource(Resource):
     """Resource for managing user device tokens"""
     
-    @auth_required
     def post(self):
         """Register or update a device token for push notifications"""
         try:
+            # Check authentication
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
             data = request.get_json()
             
             if not data:
@@ -42,8 +46,7 @@ class DeviceTokenResource(Resource):
             device_type = data.get('device_type')  # 'ios' or 'android'
             app_version = data.get('app_version')
             
-            # Get user from token
-            user_id = g.user_id
+            # Get supabase client
             supabase = get_supabase_admin_client()
 
             # UPSERT STRATEGY: Use Supabase upsert to handle duplicate device tokens gracefully
@@ -101,12 +104,16 @@ class DeviceTokenResource(Resource):
                 status_code=500
             )
     
-    @auth_required
     def delete(self):
         """Deactivate device tokens for the current user"""
         try:
+            # Check authentication
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
+                
             data = request.get_json() or {}
-            user_id = g.user_id
             supabase = get_supabase_admin_client()
             
             # If specific token or device_id provided, deactivate only that

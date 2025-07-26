@@ -183,6 +183,7 @@ Future<void> _initializeApp() async {
   String? supabaseKey;
   
   try {
+    await dotenv.load(fileName: '.env');
     AppLogger.info('.env file loaded successfully');
     supabaseUrl = dotenv.env['SUPABASE_URL'];
     supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
@@ -192,14 +193,11 @@ Future<void> _initializeApp() async {
     supabaseUrl = Platform.environment['SUPABASE_URL'];
     supabaseKey = Platform.environment['SUPABASE_ANON_KEY'];
     
-    // If still no values, try hardcoded fallback for production
+    // No hardcoded fallback - force proper configuration
     if ((supabaseUrl == null || supabaseUrl.isEmpty) && 
         (supabaseKey == null || supabaseKey.isEmpty)) {
-      AppLogger.warning('No environment variables found, checking for embedded values');
-      // Add production fallback values here if needed
-      supabaseUrl = 'https://zmxapklvrbafuwhkefhf.supabase.co';
-      supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpteGFwa2x2cmJhZnV3aGtlZmhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjY0MzUyNTEsImV4cCI6MjA0MjAxMTI1MX0.A1ErhbQIYOhLSDgdDVk9sE1Hcb0YAfzjhxmOHM9CHGo';
-      AppLogger.info('Using embedded production values');
+      AppLogger.error('Supabase configuration not found in .env file or environment variables');
+      AppLogger.error('Please ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in .env file');
     }
   }
   
