@@ -343,8 +343,18 @@ def load_user():
     g.user_id = None
     g.access_token = None
     
+    # Debug logging for GPX endpoints
+    if '/gpx/' in request.path:
+        logger.debug(f"GPX endpoint called: {request.method} {request.path}")
+        logger.debug(f"Headers: {dict(request.headers)}")
+    
     auth_header = request.headers.get('Authorization')
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
+    
+    if '/gpx/' in request.path:
+        logger.debug(f"Auth header present: {bool(auth_header)}")
+        if auth_header:
+            logger.debug(f"Auth header: {auth_header[:20]}...")
     
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split("Bearer ")[1].strip()

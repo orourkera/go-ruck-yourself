@@ -3,7 +3,7 @@ GPX Import API endpoints for processing AllTrails GPX files.
 Handles parsing GPX data and creating route records.
 """
 
-from flask import request, jsonify
+from flask import request, jsonify, g
 from flask_restful import Resource
 import logging
 import xml.etree.ElementTree as ET
@@ -449,8 +449,15 @@ class GPXValidateResource(Resource):
     def post(self):
         """Validate GPX content and return parsed metadata."""
         try:
+            logger.debug(f"GPX validation called. g.user_id exists: {hasattr(g, 'user_id')}")
+            if hasattr(g, 'user_id'):
+                logger.debug(f"g.user_id value: {g.user_id}")
+            
             user_id = get_current_user_id()
+            logger.debug(f"get_current_user_id() returned: {user_id}")
+            
             if not user_id:
+                logger.warning("GPX validation failed: no user_id found")
                 return {
                     "success": False,
                     "message": "Authentication required"
