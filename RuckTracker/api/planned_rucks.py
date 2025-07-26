@@ -66,164 +66,42 @@ class PlannedRucksResource(Resource):
             result = query.execute()
             planned_rucks_data = result.data or []
             
-            # Test if result.data itself is JSON serializable
-            import json
-            try:
-                json.dumps(result.data)
-                logger.info("✅ result.data is JSON serializable")
-            except Exception as json_error:
-                logger.error(f"❌ result.data is NOT JSON serializable: {json_error}")
-                logger.error(f"result.data type: {type(result.data)}")
-                if result.data:
-                    for i, item in enumerate(result.data):
-                        logger.error(f"Item {i} type: {type(item)}")
-                        if hasattr(item, '__dict__'):
-                            logger.error(f"Item {i} attributes: {list(item.__dict__.keys()) if hasattr(item, '__dict__') else 'no __dict__'}")
-            
-            # If empty, return immediately
-            if not result.data:
-                logger.info("No planned rucks found, returning empty result")
-                return jsonify({"success": True, "data": {"planned_rucks": [], "count": 0, "offset": offset, "limit": limit}}), 200
-            
-            # CRITICAL FIX: Convert raw Supabase data to JSON and back to strip Response objects
-            logger.info(f"Found {len(result.data)} raw planned rucks from database")
-            
-            # Step 1: Try JSON round-trip to clean the data
-            import json
-            try:
-                # First, convert to JSON string (this will fail if Response objects are present)
-                json_string = json.dumps(result.data)
-                # Then parse back to Python objects (now clean)
-                clean_raw_data = json.loads(json_string)
-                logger.info(f"Successfully cleaned {len(clean_raw_data)} records via JSON round-trip")
-            except (TypeError, ValueError) as e:
-                logger.error(f"JSON round-trip failed: {e}")
-                # Fallback: manual field extraction
-                clean_raw_data = []
-                for item in result.data:
-                    try:
-                        # Extract only primitive fields manually
-                        clean_item = {}
-                        for key, value in item.items():
-                            if isinstance(value, (str, int, float, bool, type(None))):
-                                clean_item[key] = value
-                            elif hasattr(value, 'isoformat'):  # datetime
-                                clean_item[key] = value.isoformat()
-                            else:
-                                logger.warning(f"Skipping non-primitive field {key}: {type(value)}")
-                        clean_raw_data.append(clean_item)
-                    except Exception as field_error:
-                        logger.error(f"Error cleaning item: {field_error}")
-                        continue
-            
-            # Build response with cleaned data
-            planned_rucks_data = []
-            for planned_ruck_data in clean_raw_data:
-                try:
-                    # Create response dict from cleaned data
-                    clean_data = {
-                        'id': planned_ruck_data.get('id'),
-                        'user_id': planned_ruck_data.get('user_id'),
-                        'route_id': planned_ruck_data.get('route_id'),
-                        'name': planned_ruck_data.get('name'),
-                        'status': planned_ruck_data.get('status', 'planned')
+            # If empty:
+            if not planned_rucks_data:
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "planned_rucks": [],
+                        "count": 0,
+                        "offset": offset,
+                        "limit": limit
                     }
-                    planned_rucks_data.append(clean_data)
-                except Exception as e:
-                    logger.warning(f"Error processing cleaned data: {e}")
-                    continue
-            
-            # Skip route fetching for now
-            response_data = {
-                'planned_rucks': planned_rucks_data,
-                'count': len(planned_rucks_data),
-                'offset': offset,
-                'limit': limit
-            }
-            logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
-            
-            # Fetch route data if requested
+                }), 200
+
+            # Collect route_ids:
+            route_ids = {pr['route_id'] for pr in planned_rucks_data if pr.get('route_id')}
+
+            # Fetch routes if include_route and route_ids:
             routes_by_id = {}
             if include_route and route_ids:
-                routes_result = supabase.table('routes').select(
-                    'id, name, description, distance_km, elevation_gain_m, '
-                    'trail_difficulty, trail_type, surface_type'
-                ).in_('id', list(route_ids)).execute()
-                
-                logger.debug(f"Routes result type: {type(routes_result)}, data type: {type(routes_result.data)}")
-                logger.debug(f"Routes data count: {len(routes_result.data) if routes_result.data else 0}")
-                
-                # Extract raw data from Supabase response to avoid Response objects
-                routes_by_id = {}
-                if routes_result.data:
-                    # Convert to plain dict to avoid any Supabase Response objects
-                    raw_routes_data = []
-                    for route_item in routes_result.data:
-                        if isinstance(route_item, dict):
-                            # Create a new clean dict with only the data we need
-                            clean_route = {
-                                'id': route_item.get('id'),
-                                'name': route_item.get('name'),
-                                'description': route_item.get('description'),
-                                'distance_km': route_item.get('distance_km'),
-                                'elevation_gain_m': route_item.get('elevation_gain_m'),
-                                'trail_difficulty': route_item.get('trail_difficulty'),
-                                'trail_type': route_item.get('trail_type'),
-                                'surface_type': route_item.get('surface_type')
-                            }
-                            routes_by_id[clean_route['id']] = clean_route
-                            logger.debug(f"Added clean route: {clean_route['id']}")
-                        else:
-                            logger.warning(f"Skipping non-dict route data: {type(route_item)}")
-            
-            # TEMPORARY: Return empty response to test if endpoint works
-            logger.info(f"Found {len(planned_rucks)} planned rucks, returning empty for testing")
-            planned_rucks_data = []
-            
-            response_data = {
-                'planned_rucks': planned_rucks_data,
-                'count': len(planned_rucks_data),
-                'offset': offset,
-                'limit': limit
-            }
-            logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
-            
-            # Debug: Check for Response objects before returning
-            import json
-            def find_response_objects(obj, path="root"):
-                """Find any Response objects in the data structure"""
-                obj_type_str = str(type(obj))
-                if 'Response' in obj_type_str:
-                    logger.error(f"Found Response object at {path}: {obj_type_str}")
-                    return True
-                elif isinstance(obj, dict):
-                    found = False
-                    for k, v in obj.items():
-                        if find_response_objects(v, f"{path}.{k}"):
-                            found = True
-                    return found
-                elif isinstance(obj, list):
-                    found = False
-                    for i, item in enumerate(obj):
-                        if find_response_objects(item, f"{path}[{i}]"):
-                            found = True
-                    return found
-                return False
-            
-            logger.debug("Checking for Response objects in response_data...")
-            if find_response_objects(response_data):
-                logger.error("Response objects found in data! Returning empty response.")
-                return jsonify({"success": True, "data": {"planned_rucks": [], "count": 0, "offset": offset, "limit": limit}})
-            
-            # Test JSON serialization
-            try:
-                json.dumps(response_data)
-                logger.debug("JSON serialization test passed")
-            except Exception as e:
-                logger.error(f"JSON serialization test failed: {e}")
-                return jsonify({"success": True, "data": {"planned_rucks": [], "count": 0, "offset": offset, "limit": limit}})
-            
-            return jsonify({"success": True, "data": {"planned_rucks": planned_rucks_data, "count": len(planned_rucks_data), "offset": offset, "limit": limit}})
+                routes_result = supabase.table('routes').select('id, name, description, distance_km, elevation_gain_m, trail_difficulty, trail_type, surface_type').in_('id', list(route_ids)).execute()
+                routes_by_id = {route['id']: route for route in routes_result.data or []}
+
+            # Add routes to planned_rucks_data:
+            for pr in planned_rucks_data:
+                if include_route and pr.get('route_id') in routes_by_id:
+                    pr['route'] = routes_by_id[pr['route_id']]
+
+            # Return:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'planned_rucks': planned_rucks_data,
+                    'count': len(planned_rucks_data),
+                    'offset': offset,
+                    'limit': limit
+                }
+            }), 200
             
         except Exception as e:
             logger.error(f"Error fetching planned rucks: {e}")
