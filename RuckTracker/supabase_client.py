@@ -33,8 +33,8 @@ def get_supabase_client(user_jwt=None):
     if user_jwt:
         options = ClientOptions(
             headers={"Authorization": f"Bearer {user_jwt}"},
-            # CRITICAL: disable auto-refresh to prevent thread creation
-            auto_refresh_token=False
+            # Enable auto-refresh for proper token handling
+            auto_refresh_token=True
         )
         return create_client(url, key, options)
     
@@ -44,11 +44,11 @@ def get_supabase_client(user_jwt=None):
             if _client_instance is None:
                 try:
                     options = ClientOptions(
-                        # CRITICAL: disable auto-refresh to prevent thread exhaustion
-                        auto_refresh_token=False
+                        # Enable auto-refresh for proper session handling
+                        auto_refresh_token=True
                     )
                     _client_instance = create_client(url, key, options)
-                    logger.info("Supabase client singleton created successfully (auto-refresh disabled)")
+                    logger.info("Supabase client singleton created successfully (auto-refresh enabled)")
                 except Exception as e:
                     logger.error(f"Failed to create Supabase client: {e}")
                     raise
