@@ -275,10 +275,24 @@ class PlannedRucksPreview extends StatelessWidget {
   }
 
   void _navigateToMyRucks(BuildContext context) {
-    context.go(AllTrailsRouter.myRucks);
+    try {
+      if (context.mounted) {
+        context.go(AllTrailsRouter.myRucks);
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      // Fallback navigation if needed
+    }
   }
 
   void _navigateToRouteImport(BuildContext context) {
-    context.go('${AllTrailsRouter.myRucks}/import');
+    try {
+      if (context.mounted) {
+        context.go('${AllTrailsRouter.myRucks}/import');
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      // Fallback navigation if needed
+    }
   }
 }

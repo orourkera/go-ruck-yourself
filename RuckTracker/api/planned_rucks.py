@@ -150,7 +150,12 @@ class PlannedRucksResource(Resource):
             }
             logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
             
-            return success_response(response_data)
+            return jsonify({
+                'planned_rucks': planned_rucks_data,
+                'count': len(planned_rucks_data),
+                'offset': offset,
+                'limit': limit
+            }), 200
             
             # Fetch route data if requested
             routes_by_id = {}

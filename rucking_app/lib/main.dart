@@ -429,7 +429,7 @@ Future<void> _initializeApp() async {
       if (blocState is ActiveSessionRunning) {
         Sentry.captureMessage('App backgrounded during active session', level: SentryLevel.warning, withScope: (scope) {
           scope.setTag('session_id', blocState.sessionId ?? 'unknown');
-          scope.setExtra('duration', blocState.duration.inSeconds);
+          scope.setExtra('duration', blocState.elapsedSeconds);
         });
       }
     },
