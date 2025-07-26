@@ -599,6 +599,18 @@ api.add_resource(WellKnownResource, '/.well-known/<string:filename>')
 def landing():
     return render_template('landing.html')
 
+# Debug route to list all registered routes
+@app.route('/debug/routes')
+def list_routes():
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'rule': str(rule)
+        })
+    return jsonify(sorted(routes, key=lambda x: x['rule']))
+
 # Auth redirect route to handle password reset from email and avoid Gmail scanner issues
 @app.route('/auth/redirect')
 def auth_redirect():
