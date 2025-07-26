@@ -91,32 +91,55 @@ class PlannedRucksResource(Resource):
                 logger.debug(f"Routes result type: {type(routes_result)}, data type: {type(routes_result.data)}")
                 logger.debug(f"Routes data count: {len(routes_result.data) if routes_result.data else 0}")
                 
-                # Ensure we only use plain dict data, not Response objects
+                # Extract raw data from Supabase response to avoid Response objects
                 routes_by_id = {}
                 if routes_result.data:
-                    for route_data in routes_result.data:
-                        logger.debug(f"Route data type: {type(route_data)}")
-                        # Ensure route_data is a plain dict
-                        if isinstance(route_data, dict):
-                            routes_by_id[route_data['id']] = route_data
+                    # Convert to plain dict to avoid any Supabase Response objects
+                    raw_routes_data = []
+                    for route_item in routes_result.data:
+                        if isinstance(route_item, dict):
+                            # Create a new clean dict with only the data we need
+                            clean_route = {
+                                'id': route_item.get('id'),
+                                'name': route_item.get('name'),
+                                'description': route_item.get('description'),
+                                'distance_km': route_item.get('distance_km'),
+                                'elevation_gain_m': route_item.get('elevation_gain_m'),
+                                'trail_difficulty': route_item.get('trail_difficulty'),
+                                'trail_type': route_item.get('trail_type'),
+                                'surface_type': route_item.get('surface_type')
+                            }
+                            routes_by_id[clean_route['id']] = clean_route
+                            logger.debug(f"Added clean route: {clean_route['id']}")
                         else:
-                            logger.warning(f"Skipping non-dict route data: {type(route_data)}")
+                            logger.warning(f"Skipping non-dict route data: {type(route_item)}")
             
-            # Build response
+            # Build response with clean data only
             planned_rucks_data = []
             for planned_ruck in planned_rucks:
                 try:
                     logger.debug(f"Converting PlannedRuck to dict: {planned_ruck.id}")
-                    # Always convert to dict without including route from PlannedRuck object
-                    # to avoid any potential Response objects stored in self.route
-                    planned_ruck_dict = planned_ruck.to_dict(include_route=False)
-                    logger.debug(f"PlannedRuck dict type: {type(planned_ruck_dict)}")
                     
-                    # Add route data separately from our clean routes_by_id dict
+                    # Create clean planned ruck dict manually to avoid any embedded objects
+                    clean_planned_ruck = {
+                        'id': planned_ruck.id,
+                        'user_id': planned_ruck.user_id,
+                        'route_id': planned_ruck.route_id,
+                        'scheduled_date': planned_ruck.scheduled_date.isoformat() if planned_ruck.scheduled_date else None,
+                        'target_duration_minutes': planned_ruck.target_duration_minutes,
+                        'target_weight_lbs': planned_ruck.target_weight_lbs,
+                        'notes': planned_ruck.notes,
+                        'status': planned_ruck.status,
+                        'created_at': planned_ruck.created_at.isoformat() if planned_ruck.created_at else None,
+                        'updated_at': planned_ruck.updated_at.isoformat() if planned_ruck.updated_at else None
+                    }
+                    
+                    # Add clean route data if requested
                     if include_route and planned_ruck.route_id in routes_by_id:
-                        planned_ruck_dict['route'] = routes_by_id[planned_ruck.route_id]
+                        clean_planned_ruck['route'] = routes_by_id[planned_ruck.route_id]
                     
-                    planned_rucks_data.append(planned_ruck_dict)
+                    planned_rucks_data.append(clean_planned_ruck)
+                    logger.debug(f"Added clean planned ruck: {planned_ruck.id}")
                 except Exception as e:
                     logger.error(f"Error converting PlannedRuck {planned_ruck.id} to dict: {e}")
                     continue
@@ -128,23 +151,8 @@ class PlannedRucksResource(Resource):
                 'limit': limit
             }
             logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
-            logger.debug(f"Response data types: {[(k, type(v)) for k, v in response_data.items()]}")
             
-            # Final check to ensure no Response objects are in the data
-            def clean_data(obj):
-                """Recursively clean data to remove any Response objects"""
-                if hasattr(obj, '__class__') and 'Response' in str(obj.__class__):
-                    logger.warning(f"Found Response object in data: {type(obj)}")
-                    return None
-                elif isinstance(obj, dict):
-                    return {k: clean_data(v) for k, v in obj.items() if clean_data(v) is not None}
-                elif isinstance(obj, list):
-                    return [clean_data(item) for item in obj if clean_data(item) is not None]
-                else:
-                    return obj
-            
-            cleaned_response_data = clean_data(response_data)
-            return success_response(cleaned_response_data)
+            return success_response(response_data)
             
         except Exception as e:
             logger.error(f"Error fetching planned rucks: {e}")
