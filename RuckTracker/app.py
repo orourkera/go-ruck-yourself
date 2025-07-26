@@ -356,6 +356,18 @@ def load_user():
         if auth_header:
             logger.debug(f"Auth header: {auth_header[:20]}...")
     
+    if request.path.startswith('/api/gpx/'):
+        logger.info(f"GPX endpoint request: {request.path}")
+        logger.info(f"Authorization header present: {bool(auth_header)}")
+        if auth_header:
+            logger.info(f"Header starts with Bearer: {auth_header.startswith('Bearer ')}")
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split("Bearer ")[1].strip()
+                logger.info(f"Token length: {len(token)}")
+                logger.info(f"Token preview: {token[:20]}...{token[-10:] if len(token) > 30 else token}")
+        else:
+            logger.warning("No Authorization header found for GPX request")
+    
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split("Bearer ")[1].strip()
         try:
@@ -367,16 +379,18 @@ def load_user():
             
             # Call the Supabase auth API directly to validate the token
             # This avoids thread creation from the auth refresh logic
+            if request.path.startswith('/api/gpx/'):
+                logger.info(f"Attempting Supabase token validation for GPX request")
             user_response = supabase_admin.auth.get_user(token)
-            
-            if user_response and hasattr(user_response, 'user') and user_response.user:
+            if user_response and user_response.user:
                 g.user = user_response.user
                 g.user_id = user_response.user.id
-                g.access_token = token
-                logger.debug(f"User {user_response.user.id} authenticated successfully")
+                if request.path.startswith('/api/gpx/'):
+                    logger.info(f"Successfully set g.user_id: {g.user_id}")
                 return
             else:
-                logger.warning("Token validation failed – no user returned from Supabase")
+                if request.path.startswith('/api/gpx/'):
+                    logger.warning(f"Supabase token validation failed: user_response={bool(user_response)}, user={bool(user_response.user if user_response else None)}")
         except Exception as token_error:
             logger.error(f"Token validation exception: {str(token_error)}")
 
