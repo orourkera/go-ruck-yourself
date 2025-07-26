@@ -13,7 +13,16 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Screen for importing routes from various sources
 class RouteImportScreen extends StatefulWidget {
-  const RouteImportScreen({super.key});
+  final String? initialUrl;
+  final String? importType;
+  final String? platform;
+  
+  const RouteImportScreen({
+    super.key,
+    this.initialUrl,
+    this.importType,
+    this.platform,
+  });
 
   @override
   State<RouteImportScreen> createState() => _RouteImportScreenState();
@@ -34,6 +43,24 @@ class _RouteImportScreenState extends State<RouteImportScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _plannedDate = DateTime.now().add(const Duration(days: 1));
+    
+    // If we have an initial URL from a deep link, switch to URL tab and start import
+    if (widget.initialUrl != null && widget.importType == 'url') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Switch to URL tab
+        _tabController.animateTo(1);
+        _pageController.animateToPage(
+          1,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        
+        // Trigger URL import
+        context.read<RouteImportBloc>().add(ImportFromUrl(
+          url: widget.initialUrl!,
+        ));
+      });
+    }
   }
 
   @override

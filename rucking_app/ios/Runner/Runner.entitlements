@@ -23,6 +23,13 @@
 		<string>applinks:getrucky.com</string>
 		<string>applinks:alltrails.com</string>
 		<string>applinks:www.alltrails.com</string>
+		<string>applinks:strava.com</string>
+		<string>applinks:www.strava.com</string>
+		<string>applinks:connect.garmin.com</string>
+		<string>applinks:komoot.com</string>
+		<string>applinks:www.komoot.com</string>
+		<string>applinks:www.mapmyrun.com</string>
+		<string>applinks:www.mapmyride.com</string>
 	</array>
 	
 </dict>

@@ -283,6 +283,65 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       return;
     }
     
+    // Check if this is a route/activity URL that should be imported
+    bool isRouteUrl = false;
+    String? platformName;
+    
+    // Handle AllTrails URLs: https://www.alltrails.com/trail/...
+    if (uri.scheme == 'https' && 
+        (uri.host == 'alltrails.com' || uri.host == 'www.alltrails.com') &&
+        uri.path.contains('/trail/')) {
+      isRouteUrl = true;
+      platformName = 'AllTrails';
+    }
+    
+    // Handle Strava URLs: https://www.strava.com/routes/... or https://www.strava.com/activities/...
+    else if (uri.scheme == 'https' && 
+        (uri.host == 'strava.com' || uri.host == 'www.strava.com') &&
+        (uri.path.contains('/routes/') || uri.path.contains('/activities/'))) {
+      isRouteUrl = true;
+      platformName = 'Strava';
+    }
+    
+    // Handle Garmin Connect URLs: https://connect.garmin.com/modern/course/...
+    else if (uri.scheme == 'https' && 
+        uri.host == 'connect.garmin.com' &&
+        uri.path.contains('/course/')) {
+      isRouteUrl = true;
+      platformName = 'Garmin Connect';
+    }
+    
+    // Handle Komoot URLs: https://www.komoot.com/tour/...
+    else if (uri.scheme == 'https' && 
+        (uri.host == 'komoot.com' || uri.host == 'www.komoot.com') &&
+        uri.path.contains('/tour/')) {
+      isRouteUrl = true;
+      platformName = 'Komoot';
+    }
+    
+    // Handle MapMyRun/MapMyRide URLs: https://www.mapmyrun.com/routes/...
+    else if (uri.scheme == 'https' && 
+        (uri.host?.contains('mapmyrun.com') == true || 
+         uri.host?.contains('mapmyride.com') == true) &&
+        uri.path.contains('/routes/')) {
+      isRouteUrl = true;
+      platformName = uri.host?.contains('mapmyrun.com') == true ? 'MapMyRun' : 'MapMyRide';
+    }
+    
+    if (isRouteUrl && platformName != null) {
+      print('🗺️ Processing $platformName URL: ${uri.toString()}');
+      // Navigate to route import screen with the URL
+      _navigatorKey.currentState?.pushNamed(
+        '/route_import',
+        arguments: {
+          'source_url': uri.toString(),
+          'import_type': 'url',
+          'platform': platformName
+        },
+      );
+      return;
+    }
+    
     // If we get here, it's an unknown deeplink format
     print('❌ Unknown deeplink format:');
     print('  URI: $uri');
@@ -738,8 +797,13 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           builder: (_) => const MyRucksScreen(),
                         );
                       case '/route_import':
+                        final args = settings.arguments as Map<String, dynamic>?;
                         return MaterialPageRoute(
-                          builder: (_) => const RouteImportScreen(),
+                          builder: (_) => RouteImportScreen(
+                            initialUrl: args?['source_url'] as String?,
+                            importType: args?['import_type'] as String?,
+                            platform: args?['platform'] as String?,
+                          ),
                         );
                       case '/planned_ruck_detail':
                         final args = settings.arguments;
