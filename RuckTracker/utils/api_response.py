@@ -23,23 +23,23 @@ def build_api_response(data=None, success=True, error=None, status_code=200):
     return response_body, status_code
 
 
-def success_response(data=None, message=None):
+def success_response(data=None, message=None, status_code=200):
     response_body = {"success": True}
     if data is not None:
         response_body["data"] = data
     if message is not None:
         response_body["message"] = message
-    return response_body
+    return response_body, status_code
 
 
-def error_response(message, details=None):
+def error_response(message, details=None, status_code=400):
     response_body = {
         "success": False,
         "error": message
     }
     if details is not None:
         response_body["details"] = details
-    return response_body
+    return response_body, status_code
 
 
 # Legacy function names for backward compatibility
