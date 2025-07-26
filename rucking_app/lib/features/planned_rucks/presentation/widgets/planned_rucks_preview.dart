@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:rucking_app/core/di/injection_container.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -8,7 +7,6 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_event.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
-import 'package:rucking_app/core/navigation/alltrails_router.dart';
 
 /// Preview widget for planned rucks on the home screen
 class PlannedRucksPreview extends StatelessWidget {
@@ -277,7 +275,7 @@ class PlannedRucksPreview extends StatelessWidget {
   void _navigateToMyRucks(BuildContext context) {
     try {
       if (context.mounted) {
-        context.go(AllTrailsRouter.myRucks);
+        Navigator.of(context).pushNamed('/my_rucks');
       }
     } catch (e) {
       debugPrint('Navigation error: $e');
@@ -288,7 +286,7 @@ class PlannedRucksPreview extends StatelessWidget {
   void _navigateToRouteImport(BuildContext context) {
     try {
       if (context.mounted) {
-        context.go('${AllTrailsRouter.myRucks}/import');
+        Navigator.of(context).pushNamed('/route_import');
       }
     } catch (e) {
       debugPrint('Navigation error: $e');

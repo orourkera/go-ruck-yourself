@@ -64,10 +64,7 @@ class PlannedRucksResource(Resource):
             query = query.range(offset, offset + limit - 1)
             
             result = query.execute()
-            logger.info(f"Supabase query result type: {type(result)}")
-            logger.info(f"Supabase result.data type: {type(result.data)}")
-            logger.info(f"Supabase result.data length: {len(result.data) if result.data else 0}")
-            logger.info(f"Supabase result.data content: {result.data}")
+            planned_rucks_data = result.data or []
             
             # Test if result.data itself is JSON serializable
             import json
@@ -149,13 +146,6 @@ class PlannedRucksResource(Resource):
                 'limit': limit
             }
             logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
-            
-            return jsonify({
-                'planned_rucks': planned_rucks_data,
-                'count': len(planned_rucks_data),
-                'offset': offset,
-                'limit': limit
-            }), 200
             
             # Fetch route data if requested
             routes_by_id = {}

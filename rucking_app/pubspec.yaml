@@ -24,9 +24,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  # Core Navigation (keeping newer version)
+  go_router: ^14.6.2
+  
+  # Backend & Auth
   supabase_flutter: ^2.3.4
   google_sign_in: ^6.1.5
   sign_in_with_apple: ^6.1.1
+  
   # UI
   cupertino_icons: ^1.0.5
   flutter_svg: ^2.0.7
@@ -39,6 +45,7 @@ dependencies:
   
   # State Management
   flutter_bloc: ^9.1.0
+  bloc: ^9.0.0
   equatable: ^2.0.5
   flutter_riverpod: ^2.4.0
   dartz: ^0.10.1
@@ -74,9 +81,6 @@ dependencies:
   # Health Integration
   health: ^12.1.0
   
-  # Navigation
-  go_router: ^14.6.2
-  
   # File Handling & XML Processing
   xml: ^6.4.2
   file_picker: ^8.1.6
@@ -84,6 +88,8 @@ dependencies:
   archive: ^3.6.1
   
   # Utils
+  injectable: ^2.3.2
+  logger: ^2.0.2+1
   intl: ^0.20.2
   json_annotation: ^4.9.0
   permission_handler: ^12.0.0+1
