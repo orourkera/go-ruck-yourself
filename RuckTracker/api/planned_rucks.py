@@ -152,6 +152,41 @@ class PlannedRucksResource(Resource):
             }
             logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
             
+            # Debug: Check for Response objects before returning
+            import json
+            def find_response_objects(obj, path="root"):
+                """Find any Response objects in the data structure"""
+                obj_type_str = str(type(obj))
+                if 'Response' in obj_type_str:
+                    logger.error(f"Found Response object at {path}: {obj_type_str}")
+                    return True
+                elif isinstance(obj, dict):
+                    found = False
+                    for k, v in obj.items():
+                        if find_response_objects(v, f"{path}.{k}"):
+                            found = True
+                    return found
+                elif isinstance(obj, list):
+                    found = False
+                    for i, item in enumerate(obj):
+                        if find_response_objects(item, f"{path}[{i}]"):
+                            found = True
+                    return found
+                return False
+            
+            logger.debug("Checking for Response objects in response_data...")
+            if find_response_objects(response_data):
+                logger.error("Response objects found in data! Returning empty response.")
+                return success_response({'planned_rucks': [], 'count': 0, 'offset': offset, 'limit': limit})
+            
+            # Test JSON serialization
+            try:
+                json.dumps(response_data)
+                logger.debug("JSON serialization test passed")
+            except Exception as e:
+                logger.error(f"JSON serialization test failed: {e}")
+                return success_response({'planned_rucks': [], 'count': 0, 'offset': offset, 'limit': limit})
+            
             return success_response(response_data)
             
         except Exception as e:
