@@ -24,8 +24,12 @@ class PlannedRucksResource(Resource):
     def get(self):
         """Get user's planned rucks with optional filtering."""
         try:
-            user_id = get_current_user_id()
+            user_id = get_current_user_id(request.headers.get('Authorization'))
+            logger.info(f"Current user_id: {user_id}")
+            logger.info(f"Auth header present: {'Authorization' in request.headers}")
+            
             if not user_id:
+                logger.warning("No user_id found, authentication may have failed")
                 return error_response("Authentication required", 401)
             
             # Get query parameters
@@ -60,16 +64,71 @@ class PlannedRucksResource(Resource):
             query = query.range(offset, offset + limit - 1)
             
             result = query.execute()
-            logger.info(f"Supabase query result type: {type(result)}, data count: {len(result.data) if result.data else 0}")
+            logger.info(f"Supabase query result type: {type(result)}")
+            logger.info(f"Supabase result.data type: {type(result.data)}")
+            logger.info(f"Supabase result.data length: {len(result.data) if result.data else 0}")
+            logger.info(f"Supabase result.data content: {result.data}")
             
-            # TEMPORARY: Skip model conversion, use raw data to isolate Response object issue
+            # Test if result.data itself is JSON serializable
+            import json
+            try:
+                json.dumps(result.data)
+                logger.info("✅ result.data is JSON serializable")
+            except Exception as json_error:
+                logger.error(f"❌ result.data is NOT JSON serializable: {json_error}")
+                logger.error(f"result.data type: {type(result.data)}")
+                if result.data:
+                    for i, item in enumerate(result.data):
+                        logger.error(f"Item {i} type: {type(item)}")
+                        if hasattr(item, '__dict__'):
+                            logger.error(f"Item {i} attributes: {list(item.__dict__.keys()) if hasattr(item, '__dict__') else 'no __dict__'}")
+            
+            # If empty, return immediately
+            if not result.data:
+                logger.info("No planned rucks found, returning empty result")
+                return success_response({
+                    'planned_rucks': [],
+                    'count': 0,
+                    'offset': offset,
+                    'limit': limit
+                })
+            
+            # CRITICAL FIX: Convert raw Supabase data to JSON and back to strip Response objects
             logger.info(f"Found {len(result.data)} raw planned rucks from database")
             
-            # Build response with raw data only
+            # Step 1: Try JSON round-trip to clean the data
+            import json
+            try:
+                # First, convert to JSON string (this will fail if Response objects are present)
+                json_string = json.dumps(result.data)
+                # Then parse back to Python objects (now clean)
+                clean_raw_data = json.loads(json_string)
+                logger.info(f"Successfully cleaned {len(clean_raw_data)} records via JSON round-trip")
+            except (TypeError, ValueError) as e:
+                logger.error(f"JSON round-trip failed: {e}")
+                # Fallback: manual field extraction
+                clean_raw_data = []
+                for item in result.data:
+                    try:
+                        # Extract only primitive fields manually
+                        clean_item = {}
+                        for key, value in item.items():
+                            if isinstance(value, (str, int, float, bool, type(None))):
+                                clean_item[key] = value
+                            elif hasattr(value, 'isoformat'):  # datetime
+                                clean_item[key] = value.isoformat()
+                            else:
+                                logger.warning(f"Skipping non-primitive field {key}: {type(value)}")
+                        clean_raw_data.append(clean_item)
+                    except Exception as field_error:
+                        logger.error(f"Error cleaning item: {field_error}")
+                        continue
+            
+            # Build response with cleaned data
             planned_rucks_data = []
-            for planned_ruck_data in result.data:
+            for planned_ruck_data in clean_raw_data:
                 try:
-                    # Create clean dict from raw data only
+                    # Create response dict from cleaned data
                     clean_data = {
                         'id': planned_ruck_data.get('id'),
                         'user_id': planned_ruck_data.get('user_id'),
@@ -79,7 +138,7 @@ class PlannedRucksResource(Resource):
                     }
                     planned_rucks_data.append(clean_data)
                 except Exception as e:
-                    logger.warning(f"Error processing raw data: {e}")
+                    logger.warning(f"Error processing cleaned data: {e}")
                     continue
             
             # Skip route fetching for now
