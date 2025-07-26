@@ -56,7 +56,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
         );
         
         // Trigger URL import
-        context.read<RouteImportBloc>().add(ImportFromUrl(
+        context.read<RouteImportBloc>().add(ImportGpxFromUrl(
           url: widget.initialUrl!,
         ));
       });

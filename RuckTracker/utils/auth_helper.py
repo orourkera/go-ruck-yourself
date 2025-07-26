@@ -14,55 +14,18 @@ def get_current_user_id() -> Optional[str]:
     """
     Extract the current user ID from the request
     
-    This function checks for authentication in the following order:
-    1. JWT token in Authorization header
-    2. User ID from Flask's g object (if set by middleware)
-    3. Falls back to None if no authentication found
+    This function uses the Flask g object that is set by the app's 
+    @app.before_request middleware which handles Supabase authentication.
     
     Returns:
         User ID as string if authenticated, None otherwise
     """
-    # First, check if user_id is already set in Flask's g object
+    # Check if user_id is set in Flask's g object by the middleware
     if hasattr(g, 'user_id') and g.user_id:
         return g.user_id
     
-    # Try to extract from Authorization header
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        try:
-            # Decode JWT token (replace with your actual JWT secret)
-            jwt_secret = os.environ.get('JWT_SECRET', 'your-secret-key')
-            payload = jwt.decode(token, jwt_secret, algorithms=['HS256'])
-            user_id = payload.get('user_id') or payload.get('sub')
-            
-            # Cache in g for this request
-            g.user_id = user_id
-            return user_id
-        except jwt.ExpiredSignatureError:
-            # Token has expired - this should trigger client-side token refresh
-            logger.warning(f"JWT token expired for request: {request.endpoint}")
-            # Store the expired status for the API to return 401
-            g.token_expired = True
-            return None
-        except jwt.InvalidTokenError as e:
-            # Token is invalid for other reasons
-            logger.warning(f"Invalid JWT token: {e}")
-            return None
-    
-    # Try to get from Supabase auth (if available)
-    supabase_auth = request.headers.get('X-Supabase-Auth')
-    if supabase_auth:
-        try:
-            # Parse Supabase auth header - adjust based on your implementation
-            # This is a placeholder - implement based on your Supabase setup
-            return _extract_user_from_supabase_auth(supabase_auth)
-        except Exception:
-            pass
-    
-    # Fallback: check for user_id in session or other sources
-    # This is application-specific - adjust as needed
-    return request.form.get('user_id') or request.args.get('user_id')
+    # If no user_id in g, authentication failed
+    return None
 
 
 def _extract_user_from_supabase_auth(auth_header: str) -> Optional[str]:

@@ -14,7 +14,6 @@ import re
 
 from ..supabase_client import get_supabase_client
 from ..models import Route, RouteElevationPoint, RoutePointOfInterest
-from ..utils.response_helper import success_response, error_response
 from ..utils.auth_helper import get_current_user_id
 from ..services.route_analytics_service import RouteAnalyticsService
 

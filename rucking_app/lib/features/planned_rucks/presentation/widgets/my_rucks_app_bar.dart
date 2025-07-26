@@ -63,9 +63,12 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: AppColors.primary,
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      centerTitle: true,
       title: _isSearching ? _buildSearchField() : _buildTitle(),
       actions: [
         if (!_isSearching) ...[
@@ -92,18 +95,12 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
   }
 
   Widget _buildTitle() {
-    return Row(
-      children: [
-        Text(
-          'My Rucks',
-          style: AppTextStyles.titleLarge.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textDark,
-          ),
-        ),
-        const Spacer(),
-        // Quick stats could go here
-      ],
+    return Text(
+      'MY RUCKS',
+      style: AppTextStyles.titleLarge.copyWith(
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
     );
   }
 
@@ -115,12 +112,12 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
         autofocus: true,
         onChanged: widget.onSearchChanged,
         style: AppTextStyles.bodyLarge.copyWith(
-          color: AppColors.textDark,
+          color: Colors.white,
         ),
         decoration: InputDecoration(
           hintText: 'Search rucks by name or notes...',
           hintStyle: AppTextStyles.bodyLarge.copyWith(
-            color: AppColors.textDarkSecondary,
+            color: Colors.white70,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 0),
@@ -154,14 +151,17 @@ class SimpleMyRucksAppBar extends StatelessWidget implements PreferredSizeWidget
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: AppColors.primary,
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      centerTitle: true,
       title: Text(
-        title,
+        title.toUpperCase(),
         style: AppTextStyles.titleLarge.copyWith(
           fontWeight: FontWeight.bold,
-          color: AppColors.textDark,
+          color: Colors.white,
         ),
       ),
       actions: actions,
@@ -194,18 +194,21 @@ class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: AppColors.primary,
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      centerTitle: true,
       title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            title,
+            title.toUpperCase(),
             style: AppTextStyles.titleLarge.copyWith(
               fontWeight: FontWeight.bold,
-              color: AppColors.textDark,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 2),
