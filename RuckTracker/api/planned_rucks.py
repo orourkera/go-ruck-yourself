@@ -24,7 +24,7 @@ class PlannedRucksResource(Resource):
     def get(self):
         """Get user's planned rucks with optional filtering."""
         try:
-            user_id = get_current_user_id(request.headers.get('Authorization'))
+            user_id = get_current_user_id()
             logger.info(f"Current user_id: {user_id}")
             logger.info(f"Auth header present: {'Authorization' in request.headers}")
             
