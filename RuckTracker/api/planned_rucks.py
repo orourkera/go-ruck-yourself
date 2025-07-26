@@ -62,23 +62,36 @@ class PlannedRucksResource(Resource):
             result = query.execute()
             logger.info(f"Supabase query result type: {type(result)}, data count: {len(result.data) if result.data else 0}")
             
-            # Convert to PlannedRuck objects and optionally include route data
-            planned_rucks = []
-            route_ids = set()
+            # TEMPORARY: Skip model conversion, use raw data to isolate Response object issue
+            logger.info(f"Found {len(result.data)} raw planned rucks from database")
             
+            # Build response with raw data only
+            planned_rucks_data = []
             for planned_ruck_data in result.data:
                 try:
-                    logger.debug(f"Processing planned ruck data: {planned_ruck_data}")
-                    planned_ruck = PlannedRuck.from_dict(planned_ruck_data)
-                    logger.debug(f"Created PlannedRuck object: {type(planned_ruck)}")
-                    
-                    if include_route:
-                        route_ids.add(planned_ruck.route_id)
-                    
-                    planned_rucks.append(planned_ruck)
+                    # Create clean dict from raw data only
+                    clean_data = {
+                        'id': planned_ruck_data.get('id'),
+                        'user_id': planned_ruck_data.get('user_id'),
+                        'route_id': planned_ruck_data.get('route_id'),
+                        'name': planned_ruck_data.get('name'),
+                        'status': planned_ruck_data.get('status', 'planned')
+                    }
+                    planned_rucks_data.append(clean_data)
                 except Exception as e:
-                    logger.warning(f"Error parsing planned ruck {planned_ruck_data.get('id')}: {e}")
+                    logger.warning(f"Error processing raw data: {e}")
                     continue
+            
+            # Skip route fetching for now
+            response_data = {
+                'planned_rucks': planned_rucks_data,
+                'count': len(planned_rucks_data),
+                'offset': offset,
+                'limit': limit
+            }
+            logger.info(f"Returning response with {len(planned_rucks_data)} planned rucks")
+            
+            return success_response(response_data)
             
             # Fetch route data if requested
             routes_by_id = {}
@@ -114,22 +127,9 @@ class PlannedRucksResource(Resource):
                         else:
                             logger.warning(f"Skipping non-dict route data: {type(route_item)}")
             
-            # Build response with clean data (no Response objects)
+            # TEMPORARY: Return empty response to test if endpoint works
+            logger.info(f"Found {len(planned_rucks)} planned rucks, returning empty for testing")
             planned_rucks_data = []
-            for planned_ruck in planned_rucks:
-                try:
-                    # Use the model's to_dict method but don't include route yet
-                    clean_planned_ruck = planned_ruck.to_dict(include_route=False)
-                    
-                    # Add clean route data if requested
-                    if include_route and planned_ruck.route_id in routes_by_id:
-                        clean_planned_ruck['route'] = routes_by_id[planned_ruck.route_id]
-                    
-                    planned_rucks_data.append(clean_planned_ruck)
-                    
-                except Exception as e:
-                    logger.warning(f"Error converting planned ruck {planned_ruck.id} to dict: {e}")
-                    continue
             
             response_data = {
                 'planned_rucks': planned_rucks_data,
