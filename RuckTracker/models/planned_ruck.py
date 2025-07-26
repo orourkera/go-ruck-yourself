@@ -56,34 +56,45 @@ class PlannedRuck:
 
     def to_dict(self, include_route: bool = False) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        data = {
-            'id': self.id,
-            'user_id': self.user_id,
-            'route_id': self.route_id,
-            'name': self.name,
-            'planned_date': self.planned_date.isoformat() if self.planned_date else None,
-            'planned_ruck_weight_kg': float(self.planned_ruck_weight_kg) if self.planned_ruck_weight_kg else None,
-            'planned_difficulty': self.planned_difficulty,
-            'safety_tracking_enabled': self.safety_tracking_enabled,
-            'weather_alerts_enabled': self.weather_alerts_enabled,
-            'notes': self.notes,
-            'estimated_duration_hours': float(self.estimated_duration_hours) if self.estimated_duration_hours else None,
-            'estimated_calories': self.estimated_calories,
-            'estimated_difficulty_description': self.estimated_difficulty_description,
-            'status': self.status,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # Optionally include route data
+        # Build clean dictionary with only safe primitive types
+        data = {}
+        
+        # Safely extract each field, ensuring no Response objects leak through
+        try:
+            data['id'] = str(self.id) if self.id is not None else None
+            data['user_id'] = str(self.user_id) if self.user_id is not None else None
+            data['route_id'] = str(self.route_id) if self.route_id is not None else None
+            data['name'] = str(self.name) if self.name is not None else None
+            data['planned_date'] = self.planned_date.isoformat() if self.planned_date else None
+            data['planned_ruck_weight_kg'] = float(self.planned_ruck_weight_kg) if self.planned_ruck_weight_kg else None
+            data['planned_difficulty'] = str(self.planned_difficulty) if self.planned_difficulty is not None else None
+            data['safety_tracking_enabled'] = bool(self.safety_tracking_enabled)
+            data['weather_alerts_enabled'] = bool(self.weather_alerts_enabled)
+            data['notes'] = str(self.notes) if self.notes is not None else None
+            data['estimated_duration_hours'] = float(self.estimated_duration_hours) if self.estimated_duration_hours else None
+            data['estimated_calories'] = int(self.estimated_calories) if self.estimated_calories is not None else None
+            data['estimated_difficulty_description'] = str(self.estimated_difficulty_description) if self.estimated_difficulty_description is not None else None
+            data['status'] = str(self.status) if self.status is not None else None
+            data['created_at'] = self.created_at.isoformat() if self.created_at else None
+            data['updated_at'] = self.updated_at.isoformat() if self.updated_at else None
+        except Exception as e:
+            logger.error(f"Error extracting PlannedRuck field data: {e}")
+            raise
+        
+        # Optionally include route data - but only if it's a clean dict
         if include_route and self.route:
-            # Ensure route is a dictionary, not a Response object
             if isinstance(self.route, dict):
-                data['route'] = self.route
+                # Verify route dict doesn't contain Response objects
+                try:
+                    import json
+                    json.dumps(self.route)  # Test serialization
+                    data['route'] = self.route
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"PlannedRuck.route contains non-serializable data: {e}")
             else:
-                # Log warning if route is not a dict (could be Response object)
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning(f"PlannedRuck.route is not a dict, type: {type(self.route)}")
         
         return data
@@ -106,8 +117,13 @@ class PlannedRuck:
         if data.get('updated_at'):
             data['updated_at'] = datetime.fromisoformat(data['updated_at'])
         
-        # Extract route data if present
+        # Extract route data if present - ensure it's clean (not a Response object)
         route_data = data.pop('route', None)
+        if route_data is not None:
+            # Ensure route data is a clean dict, not a Response object
+            if hasattr(route_data, '__class__') and 'Response' in str(type(route_data)):
+                # If it's a Response object, we can't use it safely
+                route_data = None
         
         planned_ruck = cls(**data)
         planned_ruck.route = route_data
