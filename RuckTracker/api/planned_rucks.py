@@ -112,15 +112,15 @@ class PlannedRucksResource(Resource):
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return ({"success": False, "error": "Authentication required", "status": 401})
+                return {"success": False, "error": "Authentication required"}, 401
             
             data = request.get_json()
             if not data:
-                return ({"success": False, "error": "Request body required", "status": 400})
+                return {"success": False, "error": "Request body required"}, 400
             
             # Validate required fields
             if not data.get('route_id'):
-                return ({"success": False, "error": "route_id is required", "status": 400})
+                return {"success": False, "error": "route_id is required"}, 400
             
             # Set user as owner
             data['user_id'] = user_id
@@ -137,11 +137,11 @@ class PlannedRucksResource(Resource):
             route_result = supabase.table('routes').select('id, name, distance_km, elevation_gain_m, is_public, created_by_user_id').eq('id', planned_ruck.route_id).execute()
             
             if not route_result.data:
-                return ({"success": False, "error": "Route not found", "status": 404})
+                return {"success": False, "error": "Route not found", "status": 404}
             
             route_data = route_result.data[0]
             if not route_data['is_public'] and route_data['created_by_user_id'] != user_id:
-                return ({"success": False, "error": "Route not found", "status": 404})
+                return {"success": False, "error": "Route not found", "status": 404}
             
             # Calculate projections if user profile data is available
             try:
@@ -153,7 +153,7 @@ class PlannedRucksResource(Resource):
             result = supabase.table('planned_ruck').insert(planned_ruck.to_dict()).execute()
             
             if not result.data:
-                return ({"success": False, "error": "Failed to create planned ruck", "status": 500})
+                return {"success": False, "error": "Failed to create planned ruck", "status": 500}
             
             created_planned_ruck = PlannedRuck.from_dict(result.data[0])
             
@@ -170,7 +170,7 @@ class PlannedRucksResource(Resource):
             return ({"success": False, "error": f"Validation error: {e}", "status": 400})
         except Exception as e:
             logger.error(f"Error creating planned ruck: {e}")
-            return ({"success": False, "error": "Failed to create planned ruck", "status": 500})
+            return {"success": False, "error": "Failed to create planned ruck", "status": 500}
             
     def _calculate_projections(self, planned_ruck: PlannedRuck, route_data: Dict[str, Any], user_id: str, supabase):
         """Calculate estimated duration, calories, and difficulty for planned ruck."""
@@ -208,7 +208,7 @@ class PlannedRuckResource(Resource):
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return ({"success": False, "error": "Authentication required", "status": 401})
+                return {"success": False, "error": "Authentication required"}, 401
             
             supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
             
@@ -216,7 +216,7 @@ class PlannedRuckResource(Resource):
             result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
             
             if not result.data:
-                return ({"success": False, "error": "Planned ruck not found", "status": 404})
+                return {"success": False, "error": "Planned ruck not found", "status": 404}
             
             planned_ruck = PlannedRuck.from_dict(result.data[0])
             
@@ -232,18 +232,18 @@ class PlannedRuckResource(Resource):
             
         except Exception as e:
             logger.error(f"Error fetching planned ruck {planned_ruck_id}: {e}")
-            return ({"success": False, "error": "Failed to fetch planned ruck", "status": 500})
+            return {"success": False, "error": "Failed to fetch planned ruck", "status": 500}
     
     def put(self, planned_ruck_id: str):
         """Update a planned ruck."""
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return ({"success": False, "error": "Authentication required", "status": 401})
+                return {"success": False, "error": "Authentication required"}, 401
             
             data = request.get_json()
             if not data:
-                return ({"success": False, "error": "Request body required", "status": 400})
+                return {"success": False, "error": "Request body required"}, 400
             
             supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
             
@@ -251,13 +251,13 @@ class PlannedRuckResource(Resource):
             existing_result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
             
             if not existing_result.data:
-                return ({"success": False, "error": "Planned ruck not found", "status": 404})
+                return {"success": False, "error": "Planned ruck not found", "status": 404}
             
             existing_planned_ruck = PlannedRuck.from_dict(existing_result.data[0])
             
             # Only allow updates if status is 'planned'
             if existing_planned_ruck.status != 'planned':
-                return ({"success": False, "error": "Cannot modify planned ruck that is not in 'planned' status", "status": 400})
+                return {"success": False, "error": "Cannot modify planned ruck that is not in 'planned' status", "status": 400}
             
             # Remove fields that shouldn't be updated
             data.pop('id', None)
@@ -291,7 +291,7 @@ class PlannedRuckResource(Resource):
             result = supabase.table('planned_ruck').update(data).eq('id', planned_ruck_id).execute()
             
             if not result.data:
-                return ({"success": False, "error": "Failed to update planned ruck", "status": 500})
+                return {"success": False, "error": "Failed to update planned ruck", "status": 500}
             
             updated_planned_ruck = PlannedRuck.from_dict(result.data[0])
             
@@ -301,14 +301,14 @@ class PlannedRuckResource(Resource):
             return ({"success": False, "error": f"Validation error: {e}", "status": 400})
         except Exception as e:
             logger.error(f"Error updating planned ruck {planned_ruck_id}: {e}")
-            return ({"success": False, "error": "Failed to update planned ruck", "status": 500})
+            return {"success": False, "error": "Failed to update planned ruck", "status": 500}
     
     def delete(self, planned_ruck_id: str):
         """Delete (cancel) a planned ruck."""
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return ({"success": False, "error": "Authentication required", "status": 401})
+                return {"success": False, "error": "Authentication required"}, 401
             
             supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
             
@@ -316,7 +316,7 @@ class PlannedRuckResource(Resource):
             existing_result = supabase.table('planned_ruck').select('status, route_id').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
             
             if not existing_result.data:
-                return ({"success": False, "error": "Planned ruck not found", "status": 404})
+                return {"success": False, "error": "Planned ruck not found", "status": 404}
             
             existing_data = existing_result.data[0]
             
@@ -329,7 +329,7 @@ class PlannedRuckResource(Resource):
             result = supabase.table('planned_ruck').update(update_data).eq('id', planned_ruck_id).execute()
             
             if not result.data:
-                return ({"success": False, "error": "Failed to cancel planned ruck", "status": 500})
+                return {"success": False, "error": "Failed to cancel planned ruck", "status": 500}
             
             # Record analytics event if it was previously planned
             if existing_data['status'] == 'planned':
@@ -343,7 +343,7 @@ class PlannedRuckResource(Resource):
             
         except Exception as e:
             logger.error(f"Error cancelling planned ruck {planned_ruck_id}: {e}")
-            return ({"success": False, "error": "Failed to cancel planned ruck", "status": 500})
+            return {"success": False, "error": "Failed to cancel planned ruck", "status": 500}
 
 class PlannedRuckActionsResource(Resource):
     """Handle planned ruck actions like starting a session."""
@@ -353,7 +353,7 @@ class PlannedRuckActionsResource(Resource):
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return ({"success": False, "error": "Authentication required", "status": 401})
+                return {"success": False, "error": "Authentication required"}, 401
             
             supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
             
@@ -361,7 +361,7 @@ class PlannedRuckActionsResource(Resource):
             planned_ruck_result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
             
             if not planned_ruck_result.data:
-                return ({"success": False, "error": "Planned ruck not found", "status": 404})
+                return {"success": False, "error": "Planned ruck not found", "status": 404}
             
             planned_ruck = PlannedRuck.from_dict(planned_ruck_result.data[0])
             
@@ -379,7 +379,7 @@ class PlannedRuckActionsResource(Resource):
     def _start_planned_ruck(self, planned_ruck: PlannedRuck, supabase) -> Dict[str, Any]:
         """Start a planned ruck session."""
         if not planned_ruck.can_be_started():
-            return ({"success": False, "error": "Planned ruck cannot be started", "status": 400})
+            return {"success": False, "error": "Planned ruck cannot be started", "status": 400}
         
         # Mark as in progress
         planned_ruck.mark_as_started()
@@ -393,7 +393,7 @@ class PlannedRuckActionsResource(Resource):
         result = supabase.table('planned_ruck').update(update_data).eq('id', planned_ruck.id).execute()
         
         if not result.data:
-            return ({"success": False, "error": "Failed to start planned ruck", "status": 500})
+            return {"success": False, "error": "Failed to start planned ruck", "status": 500}
         
         # Record analytics event
         try:
@@ -407,7 +407,7 @@ class PlannedRuckActionsResource(Resource):
     def _complete_planned_ruck(self, planned_ruck: PlannedRuck, supabase) -> Dict[str, Any]:
         """Mark a planned ruck as completed."""
         if planned_ruck.status != 'in_progress':
-            return ({"success": False, "error": "Planned ruck must be in progress to complete", "status": 400})
+            return {"success": False, "error": "Planned ruck must be in progress to complete", "status": 400}
         
         data = request.get_json() or {}
         
@@ -423,7 +423,7 @@ class PlannedRuckActionsResource(Resource):
         result = supabase.table('planned_ruck').update(update_data).eq('id', planned_ruck.id).execute()
         
         if not result.data:
-            return ({"success": False, "error": "Failed to complete planned ruck", "status": 500})
+            return {"success": False, "error": "Failed to complete planned ruck", "status": 500}
         
         # Record analytics event with optional feedback
         try:
@@ -457,7 +457,7 @@ class TodayPlannedRucksResource(Resource):
         try:
             user_id = get_current_user_id()
             if not user_id:
-                return ({"success": False, "error": "Authentication required", "status": 401})
+                return {"success": False, "error": "Authentication required"}, 401
             
             # Get today's date range
             today = datetime.now().date()
@@ -495,4 +495,4 @@ class TodayPlannedRucksResource(Resource):
             
         except Exception as e:
             logger.error(f"Error fetching today's planned rucks: {e}")
-            return ({"success": False, "error": "Failed to fetch today's planned rucks", "status": 500})
+            return {"success": False, "error": "Failed to fetch today's planned rucks", "status": 500}

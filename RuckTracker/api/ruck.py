@@ -14,6 +14,14 @@ from RuckTracker.utils.api_response import check_auth_and_respond
 
 logger = logging.getLogger(__name__)
 
+def validate_ruck_id(ruck_id):
+    """Convert string ruck_id to integer for database operations"""
+    try:
+        return int(ruck_id)
+    except (ValueError, TypeError):
+        logger.error(f"Invalid ruck_id format: {ruck_id}")
+        return None
+
 def haversine_distance(lat1, lon1, lat2, lon2):
     """
     Calculate the great circle distance between two points 
@@ -344,6 +352,10 @@ class RuckSessionListResource(Resource):
 class RuckSessionResource(Resource):
     def get(self, ruck_id):
         try:
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -460,6 +472,10 @@ class RuckSessionResource(Resource):
     def patch(self, ruck_id):
         """Allow updating notes, rating, perceived_exertion, and tags on any session."""
         try:
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             data = request.get_json()
@@ -528,6 +544,10 @@ class RuckSessionResource(Resource):
     def delete(self, ruck_id):
         """Hard delete a ruck session and all associated location_point records for the authenticated user."""
         try:
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -553,6 +573,10 @@ class RuckSessionResource(Resource):
 class RuckSessionStartResource(Resource):
     def post(self, ruck_id):
         try:
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -585,6 +609,10 @@ class RuckSessionStartResource(Resource):
 class RuckSessionPauseResource(Resource):
     def post(self, ruck_id):
         try:
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -616,6 +644,10 @@ class RuckSessionPauseResource(Resource):
 class RuckSessionResumeResource(Resource):
     def post(self, ruck_id):
         try:
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -648,6 +680,11 @@ class RuckSessionCompleteResource(Resource):
     def post(self, ruck_id):
         """Complete a ruck session"""
         try:
+            # Convert string ruck_id to integer for database operations
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
+            
             # Check authentication with proper token expiry detection
             user_id = get_current_user_id()
             auth_response = check_auth_and_respond(user_id)
