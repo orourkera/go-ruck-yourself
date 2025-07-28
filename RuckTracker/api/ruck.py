@@ -1326,3 +1326,124 @@ class HeartRateSampleUploadResource(Resource):
             return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
         except Exception as e:
             return {'message': f'Error uploading heart rate samples: {str(e)}'}, 500
+
+
+class RuckSessionRouteChunkResource(Resource):
+    def post(self, ruck_id):
+        """Upload route data chunk for completed session (POST /api/rucks/<ruck_id>/route-chunk)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            data = request.get_json()
+            if not data or 'route_points' not in data or not isinstance(data['route_points'], list):
+                return {'message': 'Missing or invalid route_points'}, 400
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Check if session exists, belongs to user, and is completed
+            session_resp = supabase.table('ruck_session') \
+                .select('id,status') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            
+            if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            if session_data['status'] != 'completed':
+                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
+                return {'message': f"Session not completed (status: {session_data['status']}). Route chunks can only be uploaded to completed sessions."}, 400
+            
+            # Insert location points
+            location_rows = []
+            for point in data['route_points']:
+                if 'timestamp' not in point or 'lat' not in point or 'lng' not in point:
+                    continue
+                location_rows.append({
+                    'session_id': ruck_id,
+                    'timestamp': point['timestamp'],
+                    'latitude': point['lat'],
+                    'longitude': point['lng'],
+                    'altitude': point.get('altitude'),
+                    'accuracy': point.get('accuracy'),
+                    'speed': point.get('speed'),
+                    'heading': point.get('heading')
+                })
+            
+            if not location_rows:
+                return {'message': 'No valid location points in chunk'}, 400
+            
+            insert_resp = supabase.table('location_point').insert(location_rows).execute()
+            if not insert_resp.data:
+                return {'message': 'Failed to insert location points'}, 500
+            
+            # Clear cache for this user's sessions
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            logger.info(f"Successfully uploaded route chunk for session {ruck_id}: {len(insert_resp.data)} points")
+            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+            
+        except Exception as e:
+            logger.error(f"Error uploading route chunk for session {ruck_id}: {e}")
+            return {'message': f'Error uploading route chunk: {str(e)}'}, 500
+
+
+class RuckSessionHeartRateChunkResource(Resource):
+    def post(self, ruck_id):
+        """Upload heart rate data chunk for completed session (POST /api/rucks/<ruck_id>/heart-rate-chunk)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            data = request.get_json()
+            if not data or 'heart_rate_samples' not in data or not isinstance(data['heart_rate_samples'], list):
+                return {'message': 'Missing or invalid heart_rate_samples'}, 400
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Check if session exists, belongs to user, and is completed
+            session_resp = supabase.table('ruck_session') \
+                .select('id,status') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            
+            if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            if session_data['status'] != 'completed':
+                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
+                return {'message': f"Session not completed (status: {session_data['status']}). Heart rate chunks can only be uploaded to completed sessions."}, 400
+            
+            # Insert heart rate samples
+            heart_rate_rows = []
+            for sample in data['heart_rate_samples']:
+                if 'timestamp' not in sample or 'bpm' not in sample:
+                    continue
+                heart_rate_rows.append({
+                    'session_id': ruck_id,
+                    'timestamp': sample['timestamp'],
+                    'bpm': sample['bpm']
+                })
+            
+            if not heart_rate_rows:
+                return {'message': 'No valid heart rate samples in chunk'}, 400
+            
+            insert_resp = supabase.table('heart_rate_sample').insert(heart_rate_rows).execute()
+            if not insert_resp.data:
+                return {'message': 'Failed to insert heart rate samples'}, 500
+            
+            # Clear cache for this user's sessions
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            logger.info(f"Successfully uploaded heart rate chunk for session {ruck_id}: {len(insert_resp.data)} samples")
+            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+            
+        except Exception as e:
+            logger.error(f"Error uploading heart rate chunk for session {ruck_id}: {e}")
+            return {'message': f'Error uploading heart rate chunk: {str(e)}'}, 500
