@@ -759,6 +759,104 @@ class RuckSessionCompleteResource(Resource):
             # Log the sharing decision for debugging
             logger.info(f"Session {ruck_id} completion: user_allows_sharing={user_allows_sharing}, is_public={update_data['is_public']}")
         
+            # SERVER-SIDE METRIC CALCULATION FALLBACK
+            # If key metrics are missing or zero, calculate them from GPS data
+            needs_calculation = (
+                not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0 or
+                not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0 or
+                not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0 or
+                not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0
+            )
+        
+            if needs_calculation:
+                logger.info(f"Session {ruck_id}: Missing metrics detected, calculating from GPS data...")
+                try:
+                    # Fetch GPS location points for this session
+                    location_resp = supabase.table('location_point') \
+                        .select('latitude,longitude,altitude,timestamp') \
+                        .eq('session_id', ruck_id) \
+                        .order('timestamp') \
+                        .execute()
+                
+                    if location_resp.data and len(location_resp.data) >= 2:
+                        points = location_resp.data
+                        logger.info(f"Found {len(points)} GPS points for calculation")
+                    
+                        # Calculate distance using haversine formula
+                        total_distance_km = 0
+                        elevation_gain_m = 0
+                        previous_altitude = None
+                    
+                        for i in range(1, len(points)):
+                            prev_point = points[i-1]
+                            curr_point = points[i]
+                        
+                            # Calculate distance between consecutive points
+                            lat1, lon1 = float(prev_point['latitude']), float(prev_point['longitude']) 
+                            lat2, lon2 = float(curr_point['latitude']), float(curr_point['longitude'])
+                        
+                            # Haversine formula
+                            R = 6371  # Earth's radius in km
+                            dlat = math.radians(lat2 - lat1)
+                            dlon = math.radians(lon2 - lon1)
+                            a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+                                 math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * 
+                                 math.sin(dlon/2) * math.sin(dlon/2))
+                            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+                            distance_km = R * c
+                            total_distance_km += distance_km
+                        
+                            # Calculate elevation gain
+                            if curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
+                                alt_diff = float(curr_point['altitude']) - float(prev_point['altitude'])
+                                if alt_diff > 0:  # Only count positive elevation changes
+                                    elevation_gain_m += alt_diff
+                    
+                        # Calculate missing metrics
+                        if not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0:
+                            update_data['distance_km'] = round(total_distance_km, 3)
+                            logger.info(f"Calculated distance: {total_distance_km:.3f} km")
+                    
+                        if not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0:
+                            update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
+                            logger.info(f"Calculated elevation gain: {elevation_gain_m:.1f} m")
+                    
+                        # Calculate average pace if we have distance and duration
+                        final_distance = update_data.get('distance_km', 0)
+                        if final_distance > 0 and duration_seconds > 0:
+                            if not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0:
+                                calculated_pace = duration_seconds / final_distance  # seconds per km
+                                update_data['average_pace'] = round(calculated_pace, 2)
+                                logger.info(f"Calculated pace: {calculated_pace:.2f} sec/km")
+                    
+                        # Calculate calories if missing (basic estimation)
+                        if not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0:
+                            # Basic calorie estimation: assume 80kg user, ~400 cal/hour base + elevation
+                            weight_kg = update_data.get('weight_kg', 80)  # Default 80kg if not provided
+                            ruck_weight_kg = update_data.get('ruck_weight_kg', 0)
+                            total_weight_kg = weight_kg + ruck_weight_kg
+                        
+                            # Base metabolic rate (calories per hour)
+                            base_cal_per_hour = 4.5 * total_weight_kg  # METs calculation for rucking
+                            duration_hours = duration_seconds / 3600
+                            base_calories = base_cal_per_hour * duration_hours
+                        
+                            # Add elevation bonus (1 cal per 10m elevation gain per kg body weight)
+                            elevation_calories = (elevation_gain_m / 10) * weight_kg
+                        
+                            estimated_calories = round(base_calories + elevation_calories)
+                            update_data['calories_burned'] = estimated_calories
+                            logger.info(f"Estimated calories: {estimated_calories} (base: {base_calories:.0f}, elevation: {elevation_calories:.0f})")
+                    
+                        logger.info(f"Server-calculated metrics for session {ruck_id}: distance={update_data.get('distance_km')}km, pace={update_data.get('average_pace')}s/km, calories={update_data.get('calories_burned')}, elevation={update_data.get('elevation_gain_m')}m")
+                    
+                    else:
+                        logger.warning(f"Session {ruck_id}: Insufficient GPS data for metric calculation ({len(location_resp.data) if location_resp.data else 0} points)")
+                    
+                except Exception as calc_error:
+                    logger.error(f"Error calculating server-side metrics for session {ruck_id}: {calc_error}")
+                    # Continue with original data - don't fail the completion
+    
             # Continue with update as before
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \
