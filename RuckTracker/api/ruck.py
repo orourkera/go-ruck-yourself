@@ -319,7 +319,7 @@ class RuckSessionListResource(Resource):
             session_data = {
                 'user_id': g.user.id,
                 'status': 'in_progress',
-                'started_at': datetime.now(tz.tzutc()).isoformat()
+                'start_time': datetime.now(tz.tzutc()).isoformat()
             }
             if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
                 session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
