@@ -84,11 +84,24 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
   bool _sessionInitiated = false;
   bool _isLoading = true;
   bool _preloadComplete = false;
+  Timer? _timeoutTimer; // Add timeout timer
   
   void _startCountdown() {
     // Start session with a small delay 
     if (!_sessionInitiated) {
       _sessionInitiated = true;
+      
+      // Add timeout to prevent infinite hanging
+      _timeoutTimer = Timer(const Duration(seconds: 15), () {
+        AppLogger.warning('[COUNTDOWN] Session start timeout - forcing navigation');
+        if (mounted && _isLoading) {
+          setState(() {
+            _isLoading = false;
+          });
+          _checkAndNavigateIfReady();
+        }
+      });
+      
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           // Initiate session during countdown
@@ -102,6 +115,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
           
           // Listen for session state changes
           _blocSubscription = _sessionBloc.stream.listen((state) {
+            AppLogger.debug('[COUNTDOWN] Received state: ${state.runtimeType}');
             if (state is ActiveSessionRunning) {
               // Session is now running - mark as ready
               AppLogger.debug('[COUNTDOWN] ActiveSessionRunning state received - setting isLoading=false');
@@ -110,6 +124,17 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
                   _isLoading = false;
                 });
               }
+            } else if (state is ActiveSessionFailure) {
+              AppLogger.error('[COUNTDOWN] Session failed: ${state.errorMessage}');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false; // Allow navigation even on failure to prevent infinite hang
+                });
+              }
+            } else if (state is ActiveSessionInitial) {
+              AppLogger.debug('[COUNTDOWN] Still in initial state');
+            } else {
+              AppLogger.debug('[COUNTDOWN] Other state: ${state.runtimeType}');
             }
           });
         }
@@ -186,9 +211,13 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // 2. Preloading has finished
     // 3. Session state is ready
     AppLogger.debug('[COUNTDOWN] Navigation check: countdownComplete=$_countdownComplete, preloadComplete=$_preloadComplete, isLoading=$_isLoading, mounted=$mounted');
+    AppLogger.debug('[COUNTDOWN] Current session bloc state: ${_sessionBloc.state.runtimeType}');
     
     if (_countdownComplete && _preloadComplete && !_isLoading && mounted) {
       AppLogger.debug('[COUNTDOWN] All conditions met - navigating to ActiveSessionPage');
+      
+      // Cancel timeout timer since we're navigating
+      _timeoutTimer?.cancel();
       
       // Start the session timer before navigating
       _sessionBloc.add(TimerStarted());
@@ -222,6 +251,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
   @override
   void dispose() {
     _timer?.cancel();
+    _timeoutTimer?.cancel();
     _controller.dispose();
     // Cancel stream subscription to avoid setState after dispose
     _blocSubscription?.cancel();

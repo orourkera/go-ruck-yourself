@@ -954,17 +954,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
 
   Widget _buildSplitsSection(bool preferMetric) {
-    // Debug logging for splits visibility
-    print('[DEBUG] _buildSplitsSection called');
-    print('[DEBUG] widget.splits is null: ${widget.splits == null}');
-    print('[DEBUG] widget.splits is empty: ${widget.splits?.isEmpty ?? 'null'}');
-    print('[DEBUG] widget.splits length: ${widget.splits?.length ?? 'null'}');
-    
     if (widget.splits == null || widget.splits!.isEmpty) {
-      print('[DEBUG] Not showing splits section - conditions not met');
       return const SizedBox.shrink();
     }
-    print('[DEBUG] Showing splits section with ${widget.splits!.length} splits');
     return SplitsDisplay(splits: widget.splits!, isMetric: preferMetric);
   }
 

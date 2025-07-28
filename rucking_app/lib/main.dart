@@ -96,7 +96,13 @@ Future<void> _runApp() async {
   ]);
   
   // Load environment variables
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+    print('[MAIN] DotEnv loaded successfully, isInitialized: ${dotenv.isInitialized}');
+  } catch (e) {
+    print('[MAIN] Failed to load .env file: $e');
+    // Continue without .env - app should still work with fallback values
+  }
   
   // Initialize Sentry for error monitoring
   await SentryFlutter.init(

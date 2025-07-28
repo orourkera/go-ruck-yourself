@@ -166,17 +166,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionStarted event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    AppLogger.info('[BLOC] *** SESSION STARTED EVENT RECEIVED ***');
     AppLogger.info('Starting session with delegation to coordinator');
     
     try {
       // Create coordinator if it doesn't exist
       if (_coordinator == null) {
+        AppLogger.info('[BLOC] Creating coordinator...');
         _coordinator = _createCoordinator();
         _setupCoordinatorSubscription();
+        AppLogger.info('[BLOC] Coordinator created and subscription setup');
       }
       
       // Delegate to coordinator
+      AppLogger.info('[BLOC] Delegating SessionStarted event to coordinator');
       _coordinator!.add(event);
+      AppLogger.info('[BLOC] Event delegated successfully');
       
     } catch (e) {
       AppLogger.error('Session start failed: $e');

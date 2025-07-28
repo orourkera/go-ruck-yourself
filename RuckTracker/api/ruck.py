@@ -311,10 +311,34 @@ class RuckSessionListResource(Resource):
                 'status': 'in_progress',
                 'started_at': datetime.now(tz.tzutc()).isoformat()
             }
+            
+            # Handle ruck weight (multiple possible keys)
             if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
                 session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
-            if 'weight_kg' in data and data.get('weight_kg') is not None:
+            
+            # Handle user weight (multiple possible keys)
+            if 'user_weight_kg' in data and data.get('user_weight_kg') is not None:
+                session_data['weight_kg'] = data.get('user_weight_kg')  # Map user_weight_kg to weight_kg
+            elif 'weight_kg' in data and data.get('weight_kg') is not None:
                 session_data['weight_kg'] = data.get('weight_kg')
+            
+            # Handle custom session ID if provided
+            if 'id' in data and data.get('id') is not None:
+                session_data['id'] = data.get('id')
+            
+            # Handle notes if provided
+            if 'notes' in data and data.get('notes') is not None:
+                session_data['notes'] = data.get('notes')
+            
+            # Handle custom start time if provided (for crash recovery)
+            if 'start_time' in data and data.get('start_time') is not None:
+                try:
+                    # Parse and use the provided start time (frontend sends start_time, backend uses started_at)
+                    start_time = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+                    session_data['started_at'] = start_time.isoformat()
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid start_time format, using current time: {e}")
+                    # Fall back to current time if parsing fails
             
             # Add event_id if provided (for event-associated ruck sessions)
             if 'event_id' in data and data.get('event_id') is not None:

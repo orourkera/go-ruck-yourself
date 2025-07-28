@@ -168,7 +168,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Subscribe to lifecycle manager state changes
     _managerSubscriptions.add(
       _lifecycleManager.stateStream.listen((state) {
-        AppLogger.debug('[COORDINATOR] Lifecycle state updated: ${state.isActive}');
+        AppLogger.debug('[COORDINATOR] Lifecycle state updated: isActive=${state.isActive}, sessionId=${state.sessionId}');
         _aggregateAndEmitState();
       }),
     );
@@ -371,33 +371,29 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     final locationState = _locationManager.currentState;
     final heartRateState = _heartRateManager.currentState;
     
-    AppLogger.info('[COORDINATOR] Aggregating state: lifecycle(isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage})');
-    AppLogger.info('[COORDINATOR] Location state: ${locationState.totalDistance}km');
+    // DEBUG: Log the exact conditions
+    AppLogger.debug('[COORDINATOR] State aggregation - isActive: ${lifecycleState.isActive}, sessionId: ${lifecycleState.sessionId}, error: ${lifecycleState.errorMessage}');
     
     // Map manager states to ActiveSessionState
     if (!lifecycleState.isActive && lifecycleState.sessionId == null) {
-      AppLogger.info('[COORDINATOR] Path: Initial state (not active, no session)');
+      AppLogger.debug('[COORDINATOR] → ActiveSessionInitial (not active, no session)');
       _currentAggregatedState = const ActiveSessionInitial();
     } else if (lifecycleState.errorMessage != null) {
-      AppLogger.info('[COORDINATOR] Path: Failure state (error: ${lifecycleState.errorMessage})');
+      AppLogger.debug('[COORDINATOR] → ActiveSessionFailure (error: ${lifecycleState.errorMessage})');
       _currentAggregatedState = ActiveSessionFailure(
         errorMessage: lifecycleState.errorMessage!,
       );
     } else if (!lifecycleState.isActive && lifecycleState.sessionId != null) {
-      AppLogger.info('[COORDINATOR] Path: Completion state (not active, has session)');
+      AppLogger.debug('[COORDINATOR] → ActiveSessionCompleted (not active, has session)');
       // Session has ended – build completed state
       final totalDistance = _locationManager.currentState.totalDistance;
       final route = _locationManager.locationPoints;
       final duration = lifecycleState.duration;
 
-      AppLogger.info('[COORDINATOR] Building completion state: distance=${totalDistance}km, duration=${duration.inSeconds}s, routePoints=${route.length}');
-
       // Get weights from lifecycle state
       final userWeightKg = lifecycleState.userWeightKg;
       final ruckWeightKg = lifecycleState.ruckWeightKg;
       
-      AppLogger.info('[COORDINATOR] Weights: user=${userWeightKg}kg, ruck=${ruckWeightKg}kg');
-
       final calories = _calculateCalories(
         distanceKm: totalDistance,
         duration: duration,
@@ -405,8 +401,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         ruckWeightKg: ruckWeightKg,
       ).round();
       
-      AppLogger.info('[COORDINATOR] Calculated ${calories} calories');
-
       _currentAggregatedState = ActiveSessionCompleted(
         sessionId: lifecycleState.sessionId!,
         finalDistanceKm: totalDistance,
@@ -426,9 +420,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         isOffline: false,
         ruckWeightKg: ruckWeightKg,
       );
-      AppLogger.info('[COORDINATOR] Completion state built successfully');
     } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
-      AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
+      AppLogger.debug('[COORDINATOR] → ActiveSessionRunning (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;
       // Get user and ruck weight from lifecycle state
@@ -440,6 +433,14 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         duration: lifecycleState.duration,
         userWeightKg: userWeightKg,
         ruckWeightKg: ruckWeightKg,
+      );
+      
+      // Update lifecycle manager with current metrics so it has them for completion
+      _lifecycleManager.updateCurrentMetrics(
+        totalDistanceKm: locationState.totalDistance,
+        elevationGain: _locationManager.elevationGain,
+        elevationLoss: _locationManager.elevationLoss,
+        caloriesBurned: calories,
       );
       
       // Update watch with calculated values from coordinator
@@ -476,7 +477,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         terrainSegments: _locationManager.terrainSegments,
       );
     } else {
-      AppLogger.warning('[COORDINATOR] Unmatched state combination: isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
+      AppLogger.warning('[COORDINATOR] → ActiveSessionInitial (UNMATCHED) - isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
       // Default to initial state for unmatched combinations
       _currentAggregatedState = const ActiveSessionInitial();
     }
@@ -580,6 +581,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   ) async {
     AppLogger.info('[COORDINATOR] Session start requested');
     await _routeEventToManagers(event);
+    _aggregateAndEmitState();
     add(const TimerStarted());
   }
   

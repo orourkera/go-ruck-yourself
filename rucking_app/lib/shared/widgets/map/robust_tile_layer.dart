@@ -186,7 +186,7 @@ class SafeTileLayer extends StatelessWidget {
     // Use a simple, stable tile layer to prevent widget tree issues
     try {
       if (!dotenv.isInitialized) {
-        AppLogger.error('DotEnv not initialized - using fallback tiles');
+        // Use fallback tiles without logging repeatedly
         return TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.ruckingapp',

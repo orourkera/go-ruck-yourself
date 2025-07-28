@@ -109,8 +109,12 @@ SELECT
     COUNT(CASE WHEN calories_burned IS NOT NULL THEN 1 END) as has_calories,
     COUNT(CASE WHEN elevation_gain_m IS NOT NULL THEN 1 END) as has_elevation
 FROM ruck_session rs
-INNER JOIN session_calculations sc ON rs.id = sc.session_id
-WHERE rs.status = 'completed';
+WHERE rs.status = 'completed' 
+  AND (rs.distance_km IS NULL OR rs.distance_km = 0 
+       OR rs.average_pace IS NULL 
+       OR rs.calories_burned IS NULL 
+       OR rs.elevation_gain_m IS NULL)
+  AND EXISTS (SELECT 1 FROM location_point lp WHERE lp.session_id = rs.id);
 
 -- Cleanup
 DROP TABLE session_calculations;

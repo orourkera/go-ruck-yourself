@@ -52,7 +52,6 @@ class SessionControls extends StatelessWidget {
             ),
             onPressed: () {
             HapticFeedback.heavyImpact();
-            debugPrint('[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
             if (onTogglePause != null) onTogglePause!();
           }, 
           ),

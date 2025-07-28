@@ -32,11 +32,6 @@ class SplitTrackingService {
   
   /// Get all recorded splits
   List<Map<String, dynamic>> getSplits() {
-    print('[DEBUG] SplitTrackingService.getSplits() called');
-    print('[DEBUG] Current splits count: ${_splits.length}');
-    if (_splits.isNotEmpty) {
-      print('[DEBUG] Splits data: $_splits');
-    }
     return _splits;
   }
   

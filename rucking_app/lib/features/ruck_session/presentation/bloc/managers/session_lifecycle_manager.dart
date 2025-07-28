@@ -112,6 +112,7 @@ class SessionLifecycleManager implements SessionManager {
 
   Future<void> _onSessionStartRequested(manager_events.SessionStartRequested event) async {
     try {
+      AppLogger.info('[LIFECYCLE] *** SESSION START REQUESTED ***');
       AppLogger.info('Starting new ruck session with weight: ${event.ruckWeightKg}kg');
       
       // Optimistically mark session as active before backend confirmation
@@ -161,6 +162,8 @@ class SessionLifecycleManager implements SessionManager {
       ));
       
       AppLogger.debug('Session lifecycle started successfully: $finalSessionId');
+      AppLogger.debug('[LIFECYCLE] State after session start: isActive=${_currentState.isActive}, sessionId=${_currentState.sessionId}');
+      AppLogger.debug('[LIFECYCLE] Broadcasting state update to coordinator...');
       
     } catch (e, stackTrace) {
       AppLogger.error('Error starting session: $e\n$stackTrace');
@@ -206,11 +209,47 @@ class SessionLifecycleManager implements SessionManager {
       // CRITICAL: Call completion API with retry and persistence
       bool completionSuccessful = false;
       String? completionError;
+      
+      // Get calculated metrics from the active session state
+      final completionData = <String, dynamic>{
+        'duration_seconds': finalDuration.inSeconds,
+      };
+      
+      // Add metrics from current state if available
+      if (_currentState.totalDistanceKm != null) {
+        completionData['distance_km'] = _currentState.totalDistanceKm;
+      }
+      if (_currentState.elevationGain != null) {
+        completionData['elevation_gain_m'] = _currentState.elevationGain;
+      }
+      if (_currentState.elevationLoss != null) {
+        completionData['elevation_loss_m'] = _currentState.elevationLoss;
+      }
+      if (_currentState.caloriesBurned != null) {
+        completionData['calories_burned'] = _currentState.caloriesBurned;
+      }
+      
+      // Add user and ruck weights if available
+      if (_currentState.userWeightKg != null) {
+        completionData['weight_kg'] = _currentState.userWeightKg;
+      }
+      if (_currentState.ruckWeightKg != null) {
+        completionData['ruck_weight_kg'] = _currentState.ruckWeightKg;
+      }
+      
+      // Calculate and add pace if we have distance and duration
+      if (_currentState.totalDistanceKm != null && 
+          _currentState.totalDistanceKm! > 0 && 
+          finalDuration.inSeconds > 0) {
+        final paceSecondsPerKm = finalDuration.inSeconds / _currentState.totalDistanceKm!;
+        completionData['average_pace'] = paceSecondsPerKm;
+      }
+      
+      AppLogger.info('[LIFECYCLE] Sending completion data: $completionData');
+      
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
-          await _apiClient.post('/rucks/$_activeSessionId/complete', {
-            'duration_seconds': finalDuration.inSeconds,
-          });
+          await _apiClient.post('/rucks/$_activeSessionId/complete', completionData);
           completionSuccessful = true;
           break;
         } catch (e) {
@@ -965,6 +1004,23 @@ Future<void> clearCrashRecoveryData() async {
   void _checkMemoryUsage() {
     // Monitor memory usage and trigger cleanup if needed
     AppLogger.debug('[LIFECYCLE] Checking memory usage');
+  }
+  
+  /// Update current session metrics from other managers
+  void updateCurrentMetrics({
+    double? totalDistanceKm,
+    double? elevationGain,
+    double? elevationLoss,
+    double? caloriesBurned,
+  }) {
+    if (!_currentState.isActive) return;
+    
+    _updateState(_currentState.copyWith(
+      totalDistanceKm: totalDistanceKm,
+      elevationGain: elevationGain,
+      elevationLoss: elevationLoss,
+      caloriesBurned: caloriesBurned,
+    ));
   }
   
   /// Get timer system statistics
