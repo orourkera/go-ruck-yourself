@@ -200,17 +200,33 @@ class MailjetService:
                 })
             
             # Add signup date from user_metadata if provided, otherwise use current date
-            signup_date = None
+            # Convert to ISO datetime format that Mailjet expects
+            signup_date_iso = None
             if properties and properties.get('signup_date'):
-                signup_date = properties.get('signup_date')  # Should already be in DD/MM/YYYY format
+                signup_date_str = properties.get('signup_date')
+                try:
+                    # Convert DD/MM/YYYY to ISO datetime format
+                    from datetime import datetime
+                    if '/' in signup_date_str:
+                        # Parse DD/MM/YYYY format
+                        dt = datetime.strptime(signup_date_str, '%d/%m/%Y')
+                    else:
+                        # Try to parse other formats (ISO, etc.)
+                        dt = datetime.fromisoformat(signup_date_str.replace('Z', '+00:00'))
+                    
+                    # Convert to ISO format with timezone
+                    signup_date_iso = dt.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not parse signup_date '{signup_date_str}': {e}")
+                    signup_date_iso = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+00:00')
             else:
-                # Fallback to current date in DD/MM/YYYY format
+                # Fallback to current date in ISO format
                 from datetime import datetime
-                signup_date = datetime.now().strftime('%d/%m/%Y')
+                signup_date_iso = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+00:00')
             
             property_data.append({
                 "Name": "signupdate", 
-                "Value": signup_date
+                "Value": signup_date_iso
             })
             
             # Add other properties if provided
