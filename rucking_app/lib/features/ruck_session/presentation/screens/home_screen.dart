@@ -1038,12 +1038,28 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                           // Get calories directly from session map
                           final calories = session['calories_burned']?.toString() ?? '0';
                           
-                          // Pace display (use exact API field name from data model)
-                          final paceRaw = session['average_pace'] ?? 0.0;
-                          final pace = paceRaw is int ? paceRaw.toDouble() : paceRaw;
-                          final paceDisplay = (pace != null && pace > 0)
-                              ? MeasurementUtils.formatPace(pace, metric: preferMetric)
-                              : '--';
+                          // Pace display - Use backend average_pace (authoritative) with fallback
+                          String paceDisplay = '--';
+                          
+                          // PRIORITY 1: Use backend's average_pace (most accurate)
+                          final backendPaceRaw = session['average_pace'];
+                          if (backendPaceRaw != null && backendPaceRaw > 0) {
+                            final backendPace = backendPaceRaw is int ? backendPaceRaw.toDouble() : backendPaceRaw as double;
+                            if (backendPace.isFinite && backendPace > 0) {
+                              paceDisplay = MeasurementUtils.formatPace(backendPace, metric: preferMetric);
+                              print('🔍 DEBUG Using backend average_pace: $backendPace seconds/km -> $paceDisplay');
+                            }
+                          }
+                          
+                          // FALLBACK: Calculate from duration and distance if backend pace unavailable
+                          if (paceDisplay == '--' && distanceKm > 0 && durationSecs > 0) {
+                            final calculatedPaceSecondsPerKm = durationSecs / distanceKm;
+                            // Only show pace if it's reasonable (not too slow)
+                            if (calculatedPaceSecondsPerKm < 5400) { // Less than 90 minutes per km
+                              paceDisplay = MeasurementUtils.formatPace(calculatedPaceSecondsPerKm, metric: preferMetric);
+                              print('🔍 DEBUG Using calculated fallback pace: ${calculatedPaceSecondsPerKm}s/km -> $paceDisplay');
+                            }
+                          }
                           
                           // Elevation display (use exact API field names from data model)
                           final elevationGainRaw = session['elevation_gain_m'] ?? 0.0;

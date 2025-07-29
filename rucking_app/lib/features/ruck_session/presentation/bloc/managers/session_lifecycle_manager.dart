@@ -154,7 +154,9 @@ class SessionLifecycleManager implements SessionManager {
       
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);
       
+      _startTimer();
       _startSophisticatedTimerSystem();
+      _startSessionPersistenceTimer();
       _startConnectivityMonitoring();
       
       _updateState(_currentState.copyWith(
@@ -448,19 +450,48 @@ class SessionLifecycleManager implements SessionManager {
   Future<void> checkForCrashedSession() async {
     try {
       print('[RECOVERY_DEBUG] Starting session recovery check');
+      print('[RECOVERY_DEBUG] Storage service type: ${_storageService.runtimeType}');
+      
+      // Check if storage service is working at all
+      try {
+        await _storageService.setObject('recovery_test', {'test': 'value'});
+        final testRead = await _storageService.getObject('recovery_test');
+        print('[RECOVERY_DEBUG] Storage test - wrote and read: $testRead');
+        await _storageService.remove('recovery_test');
+      } catch (e) {
+        print('[RECOVERY_DEBUG] Storage service not working: $e');
+      }
+      
       Map<String, dynamic>? sessionData;
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
+          print('[RECOVERY_DEBUG] Attempting storage read $attempt for key: active_session_data');
           sessionData = await _storageService.getObject('active_session_data');
           print('[RECOVERY_DEBUG] Raw data on attempt $attempt: $sessionData');
+          print('[RECOVERY_DEBUG] Data type: ${sessionData?.runtimeType}, keys: ${sessionData?.keys}');
           break;
         } catch (e) {
           print('[RECOVERY_DEBUG] Storage read failed on attempt $attempt: $e');
+          print('[RECOVERY_DEBUG] Error type: ${e.runtimeType}');
           await Future.delayed(Duration(seconds: attempt));
         }
       }
+      
+      // Try alternative keys in case there's a mismatch
       if (sessionData == null) {
-        print('[RECOVERY_DEBUG] No data found after 3 attempts');
+        print('[RECOVERY_DEBUG] Trying alternative storage keys...');
+        try {
+          final altData1 = await _storageService.getObject('session_data');
+          print('[RECOVERY_DEBUG] Alternative key session_data: $altData1');
+          final altData2 = await _storageService.getObject('active_session');
+          print('[RECOVERY_DEBUG] Alternative key active_session: $altData2');
+        } catch (e) {
+          print('[RECOVERY_DEBUG] Alternative key check failed: $e');
+        }
+      }
+      
+      if (sessionData == null) {
+        print('[RECOVERY_DEBUG] No data found after 3 attempts and alternative keys');
         return;
       }
 
@@ -485,9 +516,10 @@ class SessionLifecycleManager implements SessionManager {
         return;
       }
 
-      // Check if we're already in an active session - don't override live data
-      if (_currentState.isActive && _currentState.sessionId != null) {
-        AppLogger.info('[RECOVERY] Already in active session ${_currentState.sessionId} - skipping recovery to avoid overriding live data');
+      // Check if we're already running a LIVE active session with different ID - don't override
+      // Only skip if we have an active session AND it's different from the recovered session
+      if (_currentState.isActive && _currentState.sessionId != null && _currentState.sessionId != sessionId && _ticker != null && _ticker!.isActive) {
+        AppLogger.info('[RECOVERY] Already running LIVE session ${_currentState.sessionId}, found recovery for different session ${sessionId} - skipping recovery');
         await _storageService.remove('active_session_data'); // Clean up stale recovery data
         return;
       }
@@ -728,7 +760,7 @@ Future<void> clearCrashRecoveryData() async {
         final savedData = await _storageService.getObject('active_session_data');
         if (savedData != null) {
           saved = true;
-          AppLogger.debug('[LIFECYCLE] Session data persisted successfully');
+          AppLogger.info('[LIFECYCLE] 💾 Session data persisted successfully (${totalDistance.toStringAsFixed(2)}km, ${calories.toInt()}cal)');
           break;
         }
       } catch (e) {

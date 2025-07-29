@@ -699,9 +699,7 @@ class RuckSessionCompleteResource(Resource):
             if 'distance_km' in data and data['distance_km']:
                 distance_km = data['distance_km']
         
-            server_calculated_pace = None
-            if distance_km and distance_km > 0 and duration_seconds > 0:
-                server_calculated_pace = duration_seconds / distance_km  # seconds per km
+            # Pace will be calculated later using processed distance, not client-sent distance
 
             # Update session status to completed with end data
             update_data = {
@@ -733,9 +731,7 @@ class RuckSessionCompleteResource(Resource):
             # Always set completed_at to now (UTC) when completing session
             update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
 
-            # Store server-calculated pace first
-            if server_calculated_pace is not None:
-                update_data['average_pace'] = server_calculated_pace
+            # Pace will be calculated later using processed distance
 
             if 'start_time' in data:
                 update_data['started_at'] = data['start_time']
