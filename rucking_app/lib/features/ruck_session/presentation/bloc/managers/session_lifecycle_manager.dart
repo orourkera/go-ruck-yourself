@@ -41,6 +41,9 @@ class SessionLifecycleManager implements SessionManager {
   // Callback for notifying recovery completion
   Function(Map<String, dynamic>)? _onRecoveryCompleted;
   
+  // Callback for getting completion data from coordinator
+  Map<String, dynamic>? Function()? _getCompletionData;
+  
   DateTime? _sessionStartTime;
   String? _activeSessionId;
   Timer? _ticker;
@@ -87,6 +90,11 @@ class SessionLifecycleManager implements SessionManager {
   /// Set recovery completion callback
   void setRecoveryCallback(Function(Map<String, dynamic>) callback) {
     _onRecoveryCompleted = callback;
+  }
+  
+  /// Set completion data callback
+  void setCompletionDataCallback(Map<String, dynamic>? Function() callback) {
+    _getCompletionData = callback;
   }
 
   @override
@@ -223,79 +231,26 @@ class SessionLifecycleManager implements SessionManager {
         completionData['weight_kg'] = _currentState.userWeightKg;
       }
       
-      // Collect comprehensive metrics from ActiveSessionBloc state
+      // Get comprehensive metrics from coordinator completion data
       try {
-        final blocState = GetIt.I<ActiveSessionBloc>().state;
-        AppLogger.info('[LIFECYCLE] DEBUG: ActiveSessionBloc state type: ${blocState.runtimeType}');
+        final coordinatorData = _getCompletionData?.call();
+        AppLogger.info('[LIFECYCLE] Getting completion data from coordinator: $coordinatorData');
         
-        if (blocState is ActiveSessionRunning) {
-          AppLogger.info('[LIFECYCLE] DEBUG: ActiveSessionRunning state found - distance: ${blocState.distanceKm}, calories: ${blocState.calories}, elevation: ${blocState.elevationGain}');
+        if (coordinatorData != null) {
+          // Merge coordinator data with completion data
+          coordinatorData.forEach((key, value) {
+            if (value != null) {
+              completionData[key] = value;
+            }
+          });
           
-          // Distance data
-          if (blocState.distanceKm > 0.0) {
-            completionData['distance_km'] = blocState.distanceKm;
-            completionData['final_distance_km'] = blocState.distanceKm;
-            completionData['distance_meters'] = blocState.distanceKm * 1000;
-            AppLogger.info('[LIFECYCLE] DEBUG: Added distance data: ${blocState.distanceKm} km');
-          } else {
-            AppLogger.warning('[LIFECYCLE] DEBUG: Distance is 0 or negative: ${blocState.distanceKm}');
-          }
-          
-          // Calories data
-          if (blocState.calories > 0.0) {
-            completionData['calories_burned'] = blocState.calories.round();
-            completionData['final_calories_burned'] = blocState.calories.round();
-            AppLogger.info('[LIFECYCLE] DEBUG: Added calories data: ${blocState.calories.round()} calories');
-          } else {
-            AppLogger.warning('[LIFECYCLE] DEBUG: Calories is 0 or negative: ${blocState.calories}');
-          }
-          
-          // Elevation data
-          if (blocState.elevationGain > 0.0) {
-            completionData['elevation_gain_m'] = blocState.elevationGain;
-            completionData['final_elevation_gain'] = blocState.elevationGain;
-            AppLogger.info('[LIFECYCLE] DEBUG: Added elevation gain: ${blocState.elevationGain} m');
-          } else {
-            AppLogger.warning('[LIFECYCLE] DEBUG: Elevation gain is 0 or negative: ${blocState.elevationGain}');
-          }
-          if (blocState.elevationLoss > 0.0) {
-            completionData['elevation_loss_m'] = blocState.elevationLoss;
-            completionData['final_elevation_loss'] = blocState.elevationLoss;
-            AppLogger.info('[LIFECYCLE] DEBUG: Added elevation loss: ${blocState.elevationLoss} m');
-          } else {
-            AppLogger.warning('[LIFECYCLE] DEBUG: Elevation loss is 0 or negative: ${blocState.elevationLoss}');
-          }
-          
-          // Pace data (calculate average pace)
-          if (blocState.distanceKm > 0.0 && finalDuration.inSeconds > 0) {
-            final averagePaceSeconds = finalDuration.inSeconds / blocState.distanceKm;
-            completionData['average_pace'] = averagePaceSeconds;
-            completionData['final_average_pace'] = averagePaceSeconds;
-          }
-          
-          // User input data
-          if (blocState.perceivedExertion != null) {
-            completionData['perceived_exertion'] = blocState.perceivedExertion;
-          }
-          if (blocState.notes != null && blocState.notes!.isNotEmpty) {
-            completionData['notes'] = blocState.notes;
-          }
-          if (blocState.tags != null && blocState.tags!.isNotEmpty) {
-            completionData['tags'] = blocState.tags;
-          }
-          
-          // Planning data
-          if (blocState.plannedDurationMinutes != null && blocState.plannedDurationMinutes! > 0) {
-            completionData['planned_duration_minutes'] = blocState.plannedDurationMinutes;
-          }
-          
-          AppLogger.info('[LIFECYCLE] Enhanced completion data prepared with ${completionData.keys.length} fields: ${completionData.keys.join(", ")}');
-          AppLogger.info('[LIFECYCLE] DEBUG: Full completion data: $completionData');
+          AppLogger.info('[LIFECYCLE] SUCCESS: Enhanced completion data from coordinator with ${completionData.keys.length} fields');
+          AppLogger.info('[LIFECYCLE] Final completion data: $completionData');
         } else {
-          AppLogger.warning('[LIFECYCLE] ActiveSessionBloc is not in ActiveSessionRunning state - using basic completion data');
+          AppLogger.warning('[LIFECYCLE] No completion data available from coordinator - using basic completion data');
         }
       } catch (e) {
-        AppLogger.warning('[LIFECYCLE] Failed to collect enhanced session metrics: $e - continuing with basic data');
+        AppLogger.warning('[LIFECYCLE] Failed to get completion data from coordinator: $e - continuing with basic data');
       }
 
       // CRITICAL: Call completion API with comprehensive data and retry logic
@@ -530,6 +485,13 @@ class SessionLifecycleManager implements SessionManager {
         return;
       }
 
+      // Check if we're already in an active session - don't override live data
+      if (_currentState.isActive && _currentState.sessionId != null) {
+        AppLogger.info('[RECOVERY] Already in active session ${_currentState.sessionId} - skipping recovery to avoid overriding live data');
+        await _storageService.remove('active_session_data'); // Clean up stale recovery data
+        return;
+      }
+      
       AppLogger.warning('🔥 CRASH RECOVERY: Found active session from ${crashDuration.inMinutes} minutes ago');
 
       // Restore session state
@@ -582,14 +544,21 @@ class SessionLifecycleManager implements SessionManager {
       ));
 
       // Send recovery data to coordinator so it can initialize managers
-      _notifyRecoveryCompleted({
-        'distance_km': recoveredDistance, // Send recovered distance including gap
-        'elevation_gain': elevationGain,
-        'elevation_loss': elevationLoss,
-        'calories': caloriesBurned,
-        'last_location': lastSavedLocation?.toJson(), // Pass last location for potential route reconstruction
-        'gap_distance_km': gapDistance, // Track how much distance was added from gap
-      });
+    // Send recovery data to coordinator - but mark it as recovery data
+    _notifyRecoveryCompleted({
+      'is_crash_recovery': true, // Mark as actual crash recovery
+      'session_id': sessionId,
+      'start_time': startTimeStr,
+      'ruck_weight_kg': ruckWeight,
+      'user_weight_kg': userWeight,
+      'distance_km': recoveredDistance, // Restore accumulated distance
+      'elevation_gain': elevationGain,
+      'elevation_loss': elevationLoss,
+      'calories': caloriesBurned, // Restore accumulated calories
+      'last_location': lastSavedLocation?.toJson(),
+      'gap_distance_km': gapDistance,
+      'recovery_duration_minutes': crashDuration.inMinutes,
+    });
 
       // Restart timers and services
       _startTimer();

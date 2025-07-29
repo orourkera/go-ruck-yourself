@@ -63,6 +63,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   // Aggregated state
   ActiveSessionState _currentAggregatedState = const ActiveSessionInitial();
   
+  // Store completion data to pass to lifecycle manager
+  Map<String, dynamic>? _sessionCompletionData;
+  
   ActiveSessionCoordinator({
     required SessionRepository sessionRepository,
     required LocationService locationService,
@@ -125,6 +128,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     
     // Set recovery callback to handle metric restoration
     _lifecycleManager.setRecoveryCallback(_handleRecoveredMetrics);
+    
+    // Set completion data callback to provide calculated metrics
+    _lifecycleManager.setCompletionDataCallback(getSessionCompletionData);
     
     // Initialize location manager
     _locationManager = LocationTrackingManager(
@@ -385,36 +391,53 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       );
     } else if (!lifecycleState.isActive && lifecycleState.sessionId != null) {
       AppLogger.info('[COORDINATOR] Path: Completion state (not active, has session)');
-      // Session has ended – build completed state
-      final totalDistance = _locationManager.currentState.totalDistance;
+      
+      // Use values from the previous running state instead of recalculating
+      double finalDistance = 0.0;
+      int finalCalories = 0;
+      double finalElevationGain = 0.0;
+      double finalElevationLoss = 0.0;
+      
+      if (_currentAggregatedState is ActiveSessionRunning) {
+        final runningState = _currentAggregatedState as ActiveSessionRunning;
+        finalDistance = runningState.distanceKm;
+        finalCalories = runningState.calories.round();
+        finalElevationGain = runningState.elevationGain;
+        finalElevationLoss = runningState.elevationLoss;
+        AppLogger.info('[COORDINATOR] Using calculated values from running state: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m gain/${finalElevationLoss}m loss');
+      } else {
+        // Fallback to location manager if no running state available
+        finalDistance = _locationManager.currentState.totalDistance;
+        finalElevationGain = _locationManager.elevationGain;
+        finalElevationLoss = _locationManager.elevationLoss;
+        
+        final userWeightKg = lifecycleState.userWeightKg;
+        final ruckWeightKg = lifecycleState.ruckWeightKg;
+        final duration = lifecycleState.duration;
+        
+        finalCalories = _calculateCalories(
+          distanceKm: finalDistance,
+          duration: duration,
+          userWeightKg: userWeightKg,
+          ruckWeightKg: ruckWeightKg,
+        ).round();
+        
+        AppLogger.warning('[COORDINATOR] Using fallback calculation: distance=${finalDistance}km, calories=${finalCalories}');
+      }
+      
       final route = _locationManager.locationPoints;
       final duration = lifecycleState.duration;
-
-      AppLogger.info('[COORDINATOR] Building completion state: distance=${totalDistance}km, duration=${duration.inSeconds}s, routePoints=${route.length}');
-
-      // Get weights from lifecycle state
-      final userWeightKg = lifecycleState.userWeightKg;
-      final ruckWeightKg = lifecycleState.ruckWeightKg;
-      
-      AppLogger.info('[COORDINATOR] Weights: user=${userWeightKg}kg, ruck=${ruckWeightKg}kg');
-
-      final calories = _calculateCalories(
-        distanceKm: totalDistance,
-        duration: duration,
-        userWeightKg: userWeightKg,
-        ruckWeightKg: ruckWeightKg,
-      ).round();
-      
-      AppLogger.info('[COORDINATOR] Calculated ${calories} calories');
+      AppLogger.info('[COORDINATOR] DEBUG: LocationManager state - totalDistance=${_locationManager.currentState.totalDistance}, elevationGain=${_locationManager.elevationGain}, elevationLoss=${_locationManager.elevationLoss}');
+      AppLogger.info('[COORDINATOR] Building completion state: distance=${finalDistance}km, duration=${duration.inSeconds}s, routePoints=${route.length}, calories=${finalCalories}');
 
       _currentAggregatedState = ActiveSessionCompleted(
         sessionId: lifecycleState.sessionId!,
-        finalDistanceKm: totalDistance,
+        finalDistanceKm: finalDistance,
         finalDurationSeconds: duration.inSeconds,
-        finalCalories: calories,
-        elevationGain: _locationManager.elevationGain,
-        elevationLoss: _locationManager.elevationLoss,
-        averagePace: totalDistance > 0 ? duration.inSeconds / totalDistance : null,
+        finalCalories: finalCalories,
+        elevationGain: finalElevationGain,
+        elevationLoss: finalElevationLoss,
+        averagePace: finalDistance > 0 ? duration.inSeconds / finalDistance : null,
         route: route,
         heartRateSamples: _heartRateManager.heartRateSampleObjects,
         averageHeartRate: _heartRateManager.currentState.averageHeartRate.toInt(),
@@ -424,9 +447,25 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         splits: _locationManager.splits,
         completedAt: DateTime.now(),
         isOffline: false,
-        ruckWeightKg: ruckWeightKg,
+        ruckWeightKg: lifecycleState.ruckWeightKg,
       );
       AppLogger.info('[COORDINATOR] Completion state built successfully');
+      
+      // Store completion data for lifecycle manager
+      _sessionCompletionData = {
+        'distance_km': finalDistance,
+        'calories_burned': finalCalories,
+        'elevation_gain_m': finalElevationGain,
+        'elevation_loss_m': finalElevationLoss,
+        'duration_seconds': lifecycleState.duration.inSeconds,
+        'ruck_weight_kg': lifecycleState.ruckWeightKg,
+        'user_weight_kg': lifecycleState.userWeightKg,
+        'session_id': lifecycleState.sessionId,
+        'start_time': lifecycleState.startTime?.toIso8601String(),
+        'completed_at': DateTime.now().toIso8601String(),
+        'average_pace': finalDistance > 0 ? (lifecycleState.duration.inMinutes / finalDistance) : 0.0,
+      };
+      AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
     } else if (lifecycleState.isActive && lifecycleState.sessionId != null) {
       AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
@@ -834,32 +873,47 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     return super.close();
   }
   
-  /// Handle recovered metrics from crash recovery
-  void _handleRecoveredMetrics(Map<String, dynamic> recoveredMetrics) {
-    AppLogger.info('[COORDINATOR] Handling recovered metrics: $recoveredMetrics');
+  /// Handle recovered data from crash recovery
+  void _handleRecoveredMetrics(Map<String, dynamic> recoveredData) {
+    AppLogger.info('[COORDINATOR] Handling recovery data: $recoveredData');
     
     try {
-      final distance = (recoveredMetrics['distance_km'] as num?)?.toDouble() ?? 0.0;
-      final elevationGain = (recoveredMetrics['elevation_gain'] as num?)?.toDouble() ?? 0.0;
-      final elevationLoss = (recoveredMetrics['elevation_loss'] as num?)?.toDouble() ?? 0.0;
-      final calories = (recoveredMetrics['calories'] as num?)?.toDouble() ?? 0.0;
+      final isCrashRecovery = recoveredData['is_crash_recovery'] as bool? ?? false;
       
-      // Initialize location manager with recovered distance and elevation
-      _locationManager.restoreMetricsFromRecovery(
-        totalDistanceKm: distance,
-        elevationGainM: elevationGain,
-        elevationLossM: elevationLoss,
-      );
+      if (isCrashRecovery) {
+        // Actual crash recovery - restore accumulated metrics
+        final distance = (recoveredData['distance_km'] as num?)?.toDouble() ?? 0.0;
+        final elevationGain = (recoveredData['elevation_gain'] as num?)?.toDouble() ?? 0.0;
+        final elevationLoss = (recoveredData['elevation_loss'] as num?)?.toDouble() ?? 0.0;
+        final calories = (recoveredData['calories'] as num?)?.toDouble() ?? 0.0;
+        final recoveryDuration = (recoveredData['recovery_duration_minutes'] as num?)?.toInt() ?? 0;
+        
+        AppLogger.info('[COORDINATOR] CRASH RECOVERY: Restoring ${distance}km, ${elevationGain}m gain, ${calories} cal after ${recoveryDuration} min gap');
+        
+        // Initialize location manager with recovered metrics
+        _locationManager.restoreMetricsFromRecovery(
+          totalDistanceKm: distance,
+          elevationGainM: elevationGain,
+          elevationLossM: elevationLoss,
+        );
+        
+      } else {
+        // Regular recovery callback - don't override live calculations
+        AppLogger.info('[COORDINATOR] Regular recovery callback - letting live calculations continue');
+      }
       
-      AppLogger.info('[COORDINATOR] Metrics restored: ${distance}km, ${elevationGain}m gain, ${elevationLoss}m loss, ${calories} cal');
-      
-      // Force state aggregation after recovery
+      // Force state aggregation
       Timer(const Duration(milliseconds: 500), () {
         _aggregateAndEmitState();
       });
       
     } catch (e) {
-      AppLogger.error('[COORDINATOR] Error handling recovered metrics: $e');
+      AppLogger.error('[COORDINATOR] Error handling recovery data: $e');
     }
+  }
+  
+  /// Get stored completion data for lifecycle manager
+  Map<String, dynamic>? getSessionCompletionData() {
+    return _sessionCompletionData;
   }
 }
