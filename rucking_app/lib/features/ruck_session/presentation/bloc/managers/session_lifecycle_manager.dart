@@ -203,15 +203,110 @@ class SessionLifecycleManager implements SessionManager {
       final finalDuration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
       AppLogger.info('[LIFECYCLE] Final session duration: ${finalDuration.inSeconds}s (${finalDuration.inMinutes}m ${finalDuration.inSeconds % 60}s)');
 
-      // CRITICAL: Call completion API with retry and persistence
+      // ENHANCED: Collect comprehensive session completion data
+      Map<String, dynamic> completionData = {
+        'duration_seconds': finalDuration.inSeconds,
+        'completed_at': DateTime.now().toIso8601String(),
+        'end_time': DateTime.now().toIso8601String(),
+      };
+      
+      // Add start time if available
+      if (_sessionStartTime != null) {
+        completionData['start_time'] = _sessionStartTime!.toIso8601String();
+      }
+      
+      // Add weight data from current state
+      if (_currentState.ruckWeightKg > 0.0) {
+        completionData['ruck_weight_kg'] = _currentState.ruckWeightKg;
+      }
+      if (_currentState.userWeightKg > 0.0) {
+        completionData['weight_kg'] = _currentState.userWeightKg;
+      }
+      
+      // Collect comprehensive metrics from ActiveSessionBloc state
+      try {
+        final blocState = GetIt.I<ActiveSessionBloc>().state;
+        AppLogger.info('[LIFECYCLE] DEBUG: ActiveSessionBloc state type: ${blocState.runtimeType}');
+        
+        if (blocState is ActiveSessionRunning) {
+          AppLogger.info('[LIFECYCLE] DEBUG: ActiveSessionRunning state found - distance: ${blocState.distanceKm}, calories: ${blocState.calories}, elevation: ${blocState.elevationGain}');
+          
+          // Distance data
+          if (blocState.distanceKm > 0.0) {
+            completionData['distance_km'] = blocState.distanceKm;
+            completionData['final_distance_km'] = blocState.distanceKm;
+            completionData['distance_meters'] = blocState.distanceKm * 1000;
+            AppLogger.info('[LIFECYCLE] DEBUG: Added distance data: ${blocState.distanceKm} km');
+          } else {
+            AppLogger.warning('[LIFECYCLE] DEBUG: Distance is 0 or negative: ${blocState.distanceKm}');
+          }
+          
+          // Calories data
+          if (blocState.calories > 0.0) {
+            completionData['calories_burned'] = blocState.calories.round();
+            completionData['final_calories_burned'] = blocState.calories.round();
+            AppLogger.info('[LIFECYCLE] DEBUG: Added calories data: ${blocState.calories.round()} calories');
+          } else {
+            AppLogger.warning('[LIFECYCLE] DEBUG: Calories is 0 or negative: ${blocState.calories}');
+          }
+          
+          // Elevation data
+          if (blocState.elevationGain > 0.0) {
+            completionData['elevation_gain_m'] = blocState.elevationGain;
+            completionData['final_elevation_gain'] = blocState.elevationGain;
+            AppLogger.info('[LIFECYCLE] DEBUG: Added elevation gain: ${blocState.elevationGain} m');
+          } else {
+            AppLogger.warning('[LIFECYCLE] DEBUG: Elevation gain is 0 or negative: ${blocState.elevationGain}');
+          }
+          if (blocState.elevationLoss > 0.0) {
+            completionData['elevation_loss_m'] = blocState.elevationLoss;
+            completionData['final_elevation_loss'] = blocState.elevationLoss;
+            AppLogger.info('[LIFECYCLE] DEBUG: Added elevation loss: ${blocState.elevationLoss} m');
+          } else {
+            AppLogger.warning('[LIFECYCLE] DEBUG: Elevation loss is 0 or negative: ${blocState.elevationLoss}');
+          }
+          
+          // Pace data (calculate average pace)
+          if (blocState.distanceKm > 0.0 && finalDuration.inSeconds > 0) {
+            final averagePaceSeconds = finalDuration.inSeconds / blocState.distanceKm;
+            completionData['average_pace'] = averagePaceSeconds;
+            completionData['final_average_pace'] = averagePaceSeconds;
+          }
+          
+          // User input data
+          if (blocState.perceivedExertion != null) {
+            completionData['perceived_exertion'] = blocState.perceivedExertion;
+          }
+          if (blocState.notes != null && blocState.notes!.isNotEmpty) {
+            completionData['notes'] = blocState.notes;
+          }
+          if (blocState.tags != null && blocState.tags!.isNotEmpty) {
+            completionData['tags'] = blocState.tags;
+          }
+          
+          // Planning data
+          if (blocState.plannedDurationMinutes != null && blocState.plannedDurationMinutes! > 0) {
+            completionData['planned_duration_minutes'] = blocState.plannedDurationMinutes;
+          }
+          
+          AppLogger.info('[LIFECYCLE] Enhanced completion data prepared with ${completionData.keys.length} fields: ${completionData.keys.join(", ")}');
+          AppLogger.info('[LIFECYCLE] DEBUG: Full completion data: $completionData');
+        } else {
+          AppLogger.warning('[LIFECYCLE] ActiveSessionBloc is not in ActiveSessionRunning state - using basic completion data');
+        }
+      } catch (e) {
+        AppLogger.warning('[LIFECYCLE] Failed to collect enhanced session metrics: $e - continuing with basic data');
+      }
+
+      // CRITICAL: Call completion API with comprehensive data and retry logic
       bool completionSuccessful = false;
       String? completionError;
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
-          await _apiClient.post('/rucks/$_activeSessionId/complete', {
-            'duration_seconds': finalDuration.inSeconds,
-          });
+          AppLogger.info('[LIFECYCLE] Sending completion data (attempt $attempt): ${completionData.keys.join(", ")}');
+          await _apiClient.post('/rucks/$_activeSessionId/complete', completionData);
           completionSuccessful = true;
+          AppLogger.info('[LIFECYCLE] Session completion successful with comprehensive data');
           break;
         } catch (e) {
           completionError = e.toString();
@@ -221,11 +316,9 @@ class SessionLifecycleManager implements SessionManager {
       }
 
       if (!completionSuccessful) {
-        // Persist for later retry
-        await _storageService.setObject('pending_completion_$_activeSessionId', {
-          'duration_seconds': finalDuration.inSeconds,
-        });
-        AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted for retry: $completionError');
+        // Persist comprehensive data for later retry
+        await _storageService.setObject('pending_completion_$_activeSessionId', completionData);
+        AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted comprehensive data for retry: $completionError');
       } else {
         // Clear any previous pending
         await _storageService.remove('pending_completion_$_activeSessionId');
