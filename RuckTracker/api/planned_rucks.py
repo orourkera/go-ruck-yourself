@@ -129,7 +129,7 @@ class PlannedRucksResource(Resource):
             # Create PlannedRuck object for validation  
             planned_ruck = PlannedRuck.from_dict(data)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Verify route exists and user can access it
             route_result = supabase.table('routes').select('id, name, distance_km, elevation_gain_m, is_public, created_by_user_id').eq('id', planned_ruck.route_id).execute()

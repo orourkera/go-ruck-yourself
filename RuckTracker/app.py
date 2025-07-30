@@ -387,6 +387,7 @@ def load_user():
             if user_response and user_response.user:
                 g.user = user_response.user
                 g.user_id = user_response.user.id
+                g.access_token = token  # Set the access token for Supabase client
                 if request.path.startswith('/api/gpx/'):
                     logger.info(f"Successfully set g.user_id: {g.user_id}")
                 return
