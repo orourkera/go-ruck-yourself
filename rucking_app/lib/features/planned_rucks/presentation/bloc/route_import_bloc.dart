@@ -319,6 +319,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
   final PlannedRucksRepository _plannedRucksRepository;
   final GpxService _gpxService;
   final AuthService _authService;
+  
+  File? _currentGpxFile; // Store GPX file for import
 
   RouteImportBloc({
     required RoutesRepository routesRepository,
@@ -476,18 +478,18 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         return;
       }
 
-      // Parse the route for preview
+      // Parse the route for preview only - don't import yet
       final gpxContent = await event.gpxFile.readAsString();
       final parsedData = await _gpxService.parseGpxContent(gpxContent);
       
       if (parsedData.trackPoints.isNotEmpty) {
-        // Convert parsed data to Route object
+        // Convert parsed data to Route object for preview
         final route = Route(
           name: parsedData.name,
           description: parsedData.description,
-          source: parsedData.source,
+          source: 'gpx_import',
           externalUrl: parsedData.externalUrl,
-          routePolyline: '',
+          routePolyline: '', // Empty - will be filled during import
           startLatitude: parsedData.trackPoints.first.latitude,
           startLongitude: parsedData.trackPoints.first.longitude,
           endLatitude: parsedData.trackPoints.last.latitude,
@@ -496,6 +498,9 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           elevationGainM: parsedData.elevationGainM,
           elevationLossM: parsedData.elevationLossM,
         );
+        
+        // Store the GPX file path for later import
+        _currentGpxFile = event.gpxFile;
         
         emit(RouteImportValidated(
           route: route,
@@ -612,17 +617,19 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       // Import the route
       Route importedRoute;
       
+      AppLogger.info('ConfirmImport: route.id=${event.route.id}, route.source=${event.route.source}, routePolyline.length=${event.route.routePolyline.length}');
+      
       if (event.route.id != null) {
         // Route already exists in backend, just reference it
+        AppLogger.info('Using existing route with ID: ${event.route.id}');
         importedRoute = event.route;
       } else {
-        // Create new route in backend
-        emit(const RouteImportInProgress(
-          message: 'Saving route...',
-          progress: 0.3,
+        AppLogger.error('Route has no ID - this should not happen for GPX imports after validation!');
+        // This should not happen for GPX imports - they should have been imported during validation
+        emit(RouteImportError.validation(
+          message: 'Internal error: Route missing ID after validation',
         ));
-        
-        importedRoute = await _routesRepository.createRoute(event.route);
+        return;
       }
 
       PlannedRuck? plannedRuck;

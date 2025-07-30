@@ -9,14 +9,16 @@ import 'package:rucking_app/core/models/route_point_of_interest.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:get_it/get_it.dart';
 
 /// Service for parsing and generating GPX files
 /// Handles AllTrails GPX import, route export, and session export
 class GpxService {
-  final http.Client _httpClient;
+  final ApiClient _apiClient;
   
-  GpxService({http.Client? httpClient}) 
-      : _httpClient = httpClient ?? http.Client();
+  GpxService({ApiClient? apiClient}) 
+      : _apiClient = apiClient ?? GetIt.instance<ApiClient>();
 
   /// Parse GPX file and extract route data
   /// 
@@ -84,11 +86,15 @@ class GpxService {
         Uri.parse('${AppConfig.apiBaseUrl}/gpx/import'),
       );
 
-      request.headers.addAll(await _getHeaders());
+      final token = await _apiClient.getToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
       request.fields['make_public'] = makePublic.toString();
       request.files.add(await http.MultipartFile.fromPath('file', gpxFile.path));
 
-      final streamedResponse = await _httpClient.send(request);
+      final streamedResponse = await http.Client().send(request);
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -115,27 +121,17 @@ class GpxService {
   /// Returns validation result with basic route info
   Future<GpxValidationResult> validateGpxFile(File gpxFile) async {
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${AppConfig.apiBaseUrl}/gpx/validate'),
-      );
-
-      request.headers.addAll(await _getHeaders());
-      request.files.add(await http.MultipartFile.fromPath('file', gpxFile.path));
-
-      final streamedResponse = await _httpClient.send(request);
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final result = GpxValidationResult.fromJson(data as Map<String, dynamic>);
-        
-        AppLogger.info('GPX validation successful: ${result.name}');
-        return result;
-      } else {
-        AppLogger.error('GPX validation failed: ${response.statusCode} - ${response.body}');
-        throw Exception('GPX validation failed: ${response.statusCode}');
-      }
+      // Read file content as string
+      final gpxContent = await gpxFile.readAsString();
+      
+      // Send as JSON to match backend expectation
+      final response = await _apiClient.post('/gpx/validate', {
+        'gpx_content': gpxContent,
+      });
+      
+      final result = GpxValidationResult.fromJson(response['data'] as Map<String, dynamic>);
+      AppLogger.info('GPX validation successful: ${result.name}');
+      return result;
     } catch (e) {
       AppLogger.error('Error validating GPX file: $e');
       throw Exception('Error validating GPX file: $e');
@@ -161,21 +157,10 @@ class GpxService {
         'include_pois': includePois.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/routes/$routeId')
-          .replace(queryParameters: queryParams);
-
-      final response = await _httpClient.get(
-        uri,
-        headers: await _getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        AppLogger.info('Successfully exported route $routeId as GPX');
-        return response.body;
-      } else {
-        AppLogger.error('Failed to export route as GPX: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to export route as GPX: ${response.statusCode}');
-      }
+      final response = await _apiClient.get('/gpx/routes/$routeId', queryParams: queryParams);
+    
+    AppLogger.info('Successfully exported route $routeId as GPX');
+    return response['data'] as String;  
     } catch (e) {
       AppLogger.error('Error exporting route $routeId as GPX: $e');
       throw Exception('Error exporting route as GPX: $e');
@@ -198,21 +183,10 @@ class GpxService {
         'include_heart_rate': includeHeartRate.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/ruck-sessions/$sessionId/gpx')
-          .replace(queryParameters: queryParams);
-
-      final response = await _httpClient.get(
-        uri,
-        headers: await _getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        AppLogger.info('Successfully exported session $sessionId as GPX');
-        return response.body;
-      } else {
-        AppLogger.error('Failed to export session as GPX: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to export session as GPX: ${response.statusCode}');
-      }
+      final response = await _apiClient.get('/gpx/sessions/$sessionId', queryParams: queryParams);
+    
+    AppLogger.info('Successfully exported session $sessionId as GPX');
+    return response['data'] as String;  
     } catch (e) {
       AppLogger.error('Error exporting session $sessionId as GPX: $e');
       throw Exception('Error exporting session as GPX: $e');
@@ -565,19 +539,11 @@ class GpxService {
     return routes;
   }
 
-  /// Get common HTTP headers for API requests
-  Future<Map<String, String>> _getHeaders() async {
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      // TODO: Add authorization header when available
-      // 'Authorization': 'Bearer $token',
-    };
-  }
+
 
   /// Dispose of resources
   void dispose() {
-    _httpClient.close();
+    // ApiClient is managed by GetIt, no need to dispose
   }
 }
 
@@ -749,21 +715,23 @@ class GpxValidationResult {
   });
 
   factory GpxValidationResult.fromJson(Map<String, dynamic> json) {
+    final preview = json['route_preview'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    
     return GpxValidationResult(
-      isValid: json['is_valid'] as bool,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      distanceKm: (json['distance_km'] as num).toDouble(),
-      elevationGainM: json['elevation_gain_m'] != null 
-          ? (json['elevation_gain_m'] as num).toDouble() 
+      isValid: json['valid'] as bool? ?? true,
+      name: preview['name'] as String? ?? 'Imported Route',
+      description: preview['description'] as String?,
+      distanceKm: preview['distance_km'] != null 
+          ? (preview['distance_km'] as num).toDouble() 
+          : 0.0,
+      elevationGainM: preview['elevation_gain_m'] != null 
+          ? (preview['elevation_gain_m'] as num).toDouble() 
           : null,
-      elevationLossM: json['elevation_loss_m'] != null 
-          ? (json['elevation_loss_m'] as num).toDouble() 
-          : null,
-      trackPointCount: json['track_point_count'] as int,
-      waypointCount: json['waypoint_count'] as int,
-      errors: (json['errors'] as List<dynamic>).map((e) => e.toString()).toList(),
-      warnings: (json['warnings'] as List<dynamic>).map((e) => e.toString()).toList(),
+      elevationLossM: null, // Not provided in backend response
+      trackPointCount: json['elevation_points_count'] as int? ?? 0,
+      waypointCount: json['pois_count'] as int? ?? 0,
+      errors: (json['errors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? <String>[],
+      warnings: (json['warnings'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? <String>[],
     );
   }
 }
