@@ -1051,7 +1051,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                           
                           // FALLBACK: Calculate from duration and distance if backend pace unavailable
                           if (paceDisplay == '--' && distanceKm > 0 && durationSecs > 0) {
-{{ ... }}
                             final calculatedPaceSecondsPerKm = durationSecs / distanceKm;
                             // Only show pace if it's reasonable (not too slow)
                             if (calculatedPaceSecondsPerKm < 5400) { // Less than 90 minutes per km
