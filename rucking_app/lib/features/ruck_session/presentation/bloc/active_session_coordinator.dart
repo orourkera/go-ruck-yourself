@@ -843,6 +843,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     try {
       // Delegate to lifecycle manager to check for crashed sessions
       await _lifecycleManager.checkForCrashedSession();
+      if (_lifecycleManager.currentState.isRecovered) {
+        add(SessionRecovered());
+      }
       
       AppLogger.info('[COORDINATOR] Crash recovery check completed');
       

@@ -383,3 +383,8 @@ class CheckForCrashedSession extends ActiveSessionEvent {
   @override
   List<Object?> get props => [];
 }
+
+class SessionRecovered extends ActiveSessionEvent {
+  @override
+  List<Object> get props => [];
+}
