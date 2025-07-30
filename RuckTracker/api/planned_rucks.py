@@ -3,7 +3,7 @@ Planned Rucks API endpoints for AllTrails integration.
 Handles CRUD operations for planned ruck sessions.
 """
 
-from flask import request
+from flask import request, g
 from flask_restful import Resource
 import logging
 from typing import Dict, Any, List, Optional
@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from ..supabase_client import get_supabase_client
 from ..models import PlannedRuck
 # Removed unused response helper imports to prevent serialization issues
-from ..utils.auth_helper import get_current_user_id
 from ..services.route_analytics_service import RouteAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -24,13 +23,12 @@ class PlannedRucksResource(Resource):
     def get(self):
         """Get user's planned rucks with optional filtering."""
         try:
-            user_id = get_current_user_id()
-            logger.info(f"Current user_id: {user_id}")
-            logger.info(f"Auth header present: {'Authorization' in request.headers}")
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
-            if not user_id:
-                logger.warning("No user_id found, authentication may have failed")
-                return {"success": False, "error": "Authentication required"}, 401
+            logger.info(f"Current user_id: {g.user.id}")
+            logger.info(f"Auth header present: {'Authorization' in request.headers}")
             
             # Get query parameters
             status = request.args.get('status', 'planned')  # planned, in_progress, completed, cancelled
@@ -41,10 +39,10 @@ class PlannedRucksResource(Resource):
             limit = request.args.get('limit', 50, type=int)
             offset = request.args.get('offset', 0, type=int)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Build query - user can only see their own planned rucks
-            query = supabase.table('planned_ruck').select('*').eq('user_id', user_id)
+            query = supabase.table('planned_ruck').select('*').eq('user_id', g.user.id)
             
             # Apply filters
             if status:
@@ -110,9 +108,9 @@ class PlannedRucksResource(Resource):
     def post(self):
         """Create a new planned ruck."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
-                return {"success": False, "error": "Authentication required"}, 401
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
             data = request.get_json()
             if not data:
@@ -123,7 +121,7 @@ class PlannedRucksResource(Resource):
                 return {"success": False, "error": "route_id is required"}, 400
             
             # Set user as owner
-            data['user_id'] = user_id
+            data['user_id'] = g.user.id
             data['created_at'] = datetime.now().isoformat()
             data['updated_at'] = datetime.now().isoformat()
             data['status'] = 'planned'  # Always start as planned
@@ -140,12 +138,12 @@ class PlannedRucksResource(Resource):
                 return {"success": False, "error": "Route not found", "status": 404}
             
             route_data = route_result.data[0]
-            if not route_data['is_public'] and route_data['created_by_user_id'] != user_id:
+            if not route_data['is_public'] and route_data['created_by_user_id'] != g.user.id:
                 return {"success": False, "error": "Route not found", "status": 404}
             
             # Calculate projections if user profile data is available
             try:
-                self._calculate_projections(planned_ruck, route_data, user_id, supabase)
+                self._calculate_projections(planned_ruck, route_data, g.user.id, supabase)
             except Exception as e:
                 logger.warning(f"Failed to calculate projections: {e}")
             
@@ -160,7 +158,7 @@ class PlannedRucksResource(Resource):
             # Record analytics event
             try:
                 analytics_service = RouteAnalyticsService()
-                analytics_service.record_route_planned(planned_ruck.route_id, user_id)
+                analytics_service.record_route_planned(planned_ruck.route_id, g.user.id)
             except Exception as e:
                 logger.warning(f"Failed to record planned ruck analytics: {e}")
             
