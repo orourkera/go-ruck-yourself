@@ -125,6 +125,7 @@ class PlannedRucksResource(Resource):
             data['created_at'] = datetime.now().isoformat()
             data['updated_at'] = datetime.now().isoformat()
             data['status'] = 'planned'  # Always start as planned
+            data['id'] = None  # New planned ruck has no ID yet
             
             # Create PlannedRuck object for validation  
             planned_ruck = PlannedRuck.from_dict(data)
