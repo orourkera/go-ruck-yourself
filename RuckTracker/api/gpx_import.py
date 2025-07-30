@@ -427,7 +427,11 @@ class GPXImportResource(Resource):
             
             # Get type
             type_elem = wpt.find('.//gpx:type', ns) or wpt.find('.//type')
-            poi_type = type_elem.text if type_elem is not None else 'waypoint'
+            poi_type_raw = type_elem.text if type_elem is not None else 'landmark'
+            
+            # Validate poi_type against allowed values
+            allowed_poi_types = ['water', 'rest', 'viewpoint', 'hazard', 'parking', 'landmark', 'shelter']
+            poi_type = poi_type_raw if poi_type_raw in allowed_poi_types else 'landmark'
             
             poi = {
                 'name': name,
