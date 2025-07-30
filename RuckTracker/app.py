@@ -345,10 +345,16 @@ def load_user():
     g.user_id = None
     g.access_token = None
     
-    # Debug logging for GPX endpoints
+    # Debug logging for GPX and planned-rucks endpoints
     if '/gpx/' in request.path:
         logger.debug(f"GPX endpoint called: {request.method} {request.path}")
         logger.debug(f"Headers: {dict(request.headers)}")
+    
+    if '/planned-rucks' in request.path:
+        logger.info(f"PLANNED-RUCKS DEBUG: {request.method} {request.path}")
+        logger.info(f"PLANNED-RUCKS DEBUG: Auth header present: {bool(auth_header)}")
+        if auth_header:
+            logger.info(f"PLANNED-RUCKS DEBUG: Auth header starts with Bearer: {auth_header.startswith('Bearer ')}")
     
     auth_header = request.headers.get('Authorization')
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
@@ -390,6 +396,9 @@ def load_user():
                 g.access_token = token  # Set the access token for Supabase client
                 if request.path.startswith('/api/gpx/'):
                     logger.info(f"Successfully set g.user_id: {g.user_id}")
+                if '/planned-rucks' in request.path:
+                    logger.info(f"PLANNED-RUCKS DEBUG: Successfully authenticated user {g.user_id}")
+                    logger.info(f"PLANNED-RUCKS DEBUG: g.access_token set: {bool(g.access_token)}")
                 return
             else:
                 if request.path.startswith('/api/gpx/'):
@@ -412,6 +421,10 @@ def load_user():
         )
         g.user_id = "dev-user-id"
         g.access_token = None
+    
+    # Final state logging for planned-rucks debugging
+    if '/planned-rucks' in request.path:
+        logger.info(f"PLANNED-RUCKS DEBUG: Final auth state - g.user: {bool(getattr(g, 'user', None))}, g.access_token: {bool(getattr(g, 'access_token', None))}")
 
 # Force HTTPS redirect in production
 @app.before_request
