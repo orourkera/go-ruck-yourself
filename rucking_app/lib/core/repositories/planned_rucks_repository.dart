@@ -1,16 +1,15 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:get_it/get_it.dart';
 
 /// Repository for managing planned ruck sessions
 /// Provides methods to create, manage, and track planned rucks
 class PlannedRucksRepository {
-  final http.Client _httpClient;
+  final ApiClient _apiClient;
   
-  PlannedRucksRepository({http.Client? httpClient}) 
-      : _httpClient = httpClient ?? http.Client();
+  PlannedRucksRepository({ApiClient? apiClient}) 
+      : _apiClient = apiClient ?? GetIt.instance<ApiClient>();
 
   /// Get all planned rucks for the current user
   /// 
@@ -40,26 +39,14 @@ class PlannedRucksRepository {
       if (fromDate != null) queryParams['from_date'] = fromDate.toIso8601String();
       if (toDate != null) queryParams['to_date'] = toDate.toIso8601String();
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks')
-          .replace(queryParameters: queryParams);
-
-      final response = await _httpClient.get(
-        uri,
-        headers: await _getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final plannedRucks = (data['planned_rucks'] as List)
-            .map((plannedRuckJson) => PlannedRuck.fromJson(plannedRuckJson as Map<String, dynamic>))
-            .toList();
-        
-        AppLogger.info('Retrieved ${plannedRucks.length} planned rucks');
-        return plannedRucks;
-      } else {
-        AppLogger.error('Failed to get planned rucks: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to get planned rucks: ${response.statusCode}');
-      }
+      final response = await _apiClient.get('/planned-rucks', queryParams: queryParams);
+      
+      final plannedRucks = (response['data']['planned_rucks'] as List)
+          .map((plannedRuckJson) => PlannedRuck.fromJson(plannedRuckJson as Map<String, dynamic>))
+          .toList();
+      
+      AppLogger.info('Retrieved ${plannedRucks.length} planned rucks');
+      return plannedRucks;
     } catch (e) {
       AppLogger.error('Error getting planned rucks: $e');
       throw Exception('Error getting planned rucks: $e');
@@ -80,26 +67,11 @@ class PlannedRucksRepository {
         'include_route': includeRoute.toString(),
       };
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId')
-          .replace(queryParameters: queryParams);
-
-      final response = await _httpClient.get(
-        uri,
-        headers: await _getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final plannedRuck = PlannedRuck.fromJson(data as Map<String, dynamic>);
-        AppLogger.info('Retrieved planned ruck: ${plannedRuck.id}');
-        return plannedRuck;
-      } else if (response.statusCode == 404) {
-        AppLogger.warning('Planned ruck not found: $plannedRuckId');
-        return null;
-      } else {
-        AppLogger.error('Failed to get planned ruck: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to get planned ruck: ${response.statusCode}');
-      }
+      final response = await _apiClient.get('/planned-rucks/$plannedRuckId', queryParams: queryParams);
+      
+      final plannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      AppLogger.info('Retrieved planned ruck: ${plannedRuck.id}');
+      return plannedRuck;
     } catch (e) {
       AppLogger.error('Error getting planned ruck $plannedRuckId: $e');
       throw Exception('Error getting planned ruck: $e');
@@ -112,21 +84,11 @@ class PlannedRucksRepository {
   /// - [plannedRuck]: Planned ruck data to create
   Future<PlannedRuck> createPlannedRuck(PlannedRuck plannedRuck) async {
     try {
-      final response = await _httpClient.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks'),
-        headers: await _getHeaders(),
-        body: json.encode(plannedRuck.toJson()),
-      );
-
-      if (response.statusCode == 201) {
-        final data = json.decode(response.body);
-        final createdPlannedRuck = PlannedRuck.fromJson(data as Map<String, dynamic>);
-        AppLogger.info('Created planned ruck: ${createdPlannedRuck.id}');
-        return createdPlannedRuck;
-      } else {
-        AppLogger.error('Failed to create planned ruck: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to create planned ruck: ${response.statusCode}');
-      }
+      final response = await _apiClient.post('/planned-rucks', plannedRuck.toJson());
+      
+      final createdPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      AppLogger.info('Created planned ruck: ${createdPlannedRuck.id}');
+      return createdPlannedRuck;
     } catch (e) {
       AppLogger.error('Error creating planned ruck: $e');
       throw Exception('Error creating planned ruck: $e');
@@ -140,21 +102,11 @@ class PlannedRucksRepository {
   /// - [plannedRuck]: Updated planned ruck data
   Future<PlannedRuck> updatePlannedRuck(String plannedRuckId, PlannedRuck plannedRuck) async {
     try {
-      final response = await _httpClient.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId'),
-        headers: await _getHeaders(),
-        body: json.encode(plannedRuck.toJson()),
-      );
+      final response = await _apiClient.put('/planned-rucks/$plannedRuckId', plannedRuck.toJson());
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final updatedPlannedRuck = PlannedRuck.fromJson(data as Map<String, dynamic>);
-        AppLogger.info('Updated planned ruck: ${updatedPlannedRuck.id}');
-        return updatedPlannedRuck;
-      } else {
-        AppLogger.error('Failed to update planned ruck: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to update planned ruck: ${response.statusCode}');
-      }
+      final updatedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      AppLogger.info('Updated planned ruck: ${updatedPlannedRuck.id}');
+      return updatedPlannedRuck;
     } catch (e) {
       AppLogger.error('Error updating planned ruck $plannedRuckId: $e');
       throw Exception('Error updating planned ruck: $e');
@@ -167,18 +119,10 @@ class PlannedRucksRepository {
   /// - [plannedRuckId]: ID of the planned ruck to delete
   Future<bool> deletePlannedRuck(String plannedRuckId) async {
     try {
-      final response = await _httpClient.delete(
-        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId'),
-        headers: await _getHeaders(),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        AppLogger.info('Deleted planned ruck: $plannedRuckId');
-        return true;
-      } else {
-        AppLogger.error('Failed to delete planned ruck: ${response.statusCode} - ${response.body}');
-        return false;
-      }
+      await _apiClient.delete('/planned-rucks/$plannedRuckId');
+      
+      AppLogger.info('Deleted planned ruck: $plannedRuckId');
+      return true;
     } catch (e) {
       AppLogger.error('Error deleting planned ruck $plannedRuckId: $e');
       return false;
@@ -191,20 +135,11 @@ class PlannedRucksRepository {
   /// - [plannedRuckId]: ID of the planned ruck to start
   Future<PlannedRuck?> startPlannedRuck(String plannedRuckId) async {
     try {
-      final response = await _httpClient.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId/start'),
-        headers: await _getHeaders(),
-      );
+      final response = await _apiClient.post('/planned-rucks/$plannedRuckId/start', {});
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final updatedPlannedRuck = PlannedRuck.fromJson(data as Map<String, dynamic>);
-        AppLogger.info('Started planned ruck: $plannedRuckId');
-        return updatedPlannedRuck;
-      } else {
-        AppLogger.error('Failed to start planned ruck: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to start planned ruck: ${response.statusCode}');
-      }
+      final startedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      AppLogger.info('Started planned ruck: ${startedPlannedRuck.id}');
+      return startedPlannedRuck;
     } catch (e) {
       AppLogger.error('Error starting planned ruck $plannedRuckId: $e');
       throw Exception('Error starting planned ruck: $e');
@@ -222,21 +157,11 @@ class PlannedRucksRepository {
         'session_id': sessionId,
       };
 
-      final response = await _httpClient.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId/complete'),
-        headers: await _getHeaders(),
-        body: json.encode(requestBody),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final updatedPlannedRuck = PlannedRuck.fromJson(data as Map<String, dynamic>);
-        AppLogger.info('Completed planned ruck: $plannedRuckId');
-        return updatedPlannedRuck;
-      } else {
-        AppLogger.error('Failed to complete planned ruck: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to complete planned ruck: ${response.statusCode}');
-      }
+      final response = await _apiClient.post('/planned-rucks/$plannedRuckId/complete', requestBody);
+      
+      final updatedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      AppLogger.info('Completed planned ruck: $plannedRuckId');
+      return updatedPlannedRuck;
     } catch (e) {
       AppLogger.error('Error completing planned ruck $plannedRuckId: $e');
       throw Exception('Error completing planned ruck: $e');
@@ -255,21 +180,11 @@ class PlannedRucksRepository {
         requestBody['reason'] = reason;
       }
 
-      final response = await _httpClient.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/planned-rucks/$plannedRuckId/cancel'),
-        headers: await _getHeaders(),
-        body: requestBody.isNotEmpty ? json.encode(requestBody) : null,
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final updatedPlannedRuck = PlannedRuck.fromJson(data as Map<String, dynamic>);
-        AppLogger.info('Cancelled planned ruck: $plannedRuckId');
-        return updatedPlannedRuck;
-      } else {
-        AppLogger.error('Failed to cancel planned ruck: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to cancel planned ruck: ${response.statusCode}');
-      }
+      final response = await _apiClient.post('/planned-rucks/$plannedRuckId/cancel', requestBody);
+      
+      final updatedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      AppLogger.info('Cancelled planned ruck: $plannedRuckId');
+      return updatedPlannedRuck;
     } catch (e) {
       AppLogger.error('Error cancelling planned ruck $plannedRuckId: $e');
       throw Exception('Error cancelling planned ruck: $e');
@@ -375,20 +290,10 @@ class PlannedRucksRepository {
     }
   }
 
-  /// Get common HTTP headers for API requests
-  Future<Map<String, String>> _getHeaders() async {
-    // This would typically include authentication headers
-    // For now, using basic headers - will be updated when auth is integrated
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      // TODO: Add authorization header when available
-      // 'Authorization': 'Bearer $token',
-    };
-  }
+
 
   /// Dispose of resources
   void dispose() {
-    _httpClient.close();
+    // ApiClient is managed by GetIt, no need to dispose
   }
 }

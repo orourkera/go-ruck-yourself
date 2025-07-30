@@ -346,23 +346,9 @@ def load_user():
     g.access_token = None
     
     # Debug logging for GPX and planned-rucks endpoints
-    if '/gpx/' in request.path:
-        logger.debug(f"GPX endpoint called: {request.method} {request.path}")
-        logger.debug(f"Headers: {dict(request.headers)}")
-    
-    if '/planned-rucks' in request.path:
-        logger.info(f"PLANNED-RUCKS DEBUG: {request.method} {request.path}")
-        logger.info(f"PLANNED-RUCKS DEBUG: Auth header present: {bool(auth_header)}")
-        if auth_header:
-            logger.info(f"PLANNED-RUCKS DEBUG: Auth header starts with Bearer: {auth_header.startswith('Bearer ')}")
-    
     auth_header = request.headers.get('Authorization')
-    is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
     
-    if '/gpx/' in request.path:
-        logger.debug(f"Auth header present: {bool(auth_header)}")
-        if auth_header:
-            logger.debug(f"Auth header: {auth_header[:20]}...")
+    is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
     
     if request.path.startswith('/api/gpx/'):
         logger.info(f"GPX endpoint request: {request.path}")
