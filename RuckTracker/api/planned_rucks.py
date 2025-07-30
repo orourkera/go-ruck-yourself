@@ -204,14 +204,14 @@ class PlannedRuckResource(Resource):
     def get(self, planned_ruck_id: str):
         """Get a specific planned ruck."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
-                return {"success": False, "error": "Authentication required"}, 401
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get planned ruck (user can only access their own)
-            result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
+            result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', g.user.id).execute()
             
             if not result.data:
                 return {"success": False, "error": "Planned ruck not found", "status": 404}
@@ -235,18 +235,18 @@ class PlannedRuckResource(Resource):
     def put(self, planned_ruck_id: str):
         """Update a planned ruck."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
-                return {"success": False, "error": "Authentication required"}, 401
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
             data = request.get_json()
             if not data:
                 return {"success": False, "error": "Request body required"}, 400
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if planned ruck exists and user owns it
-            existing_result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
+            existing_result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', g.user.id).execute()
             
             if not existing_result.data:
                 return {"success": False, "error": "Planned ruck not found", "status": 404}
@@ -276,7 +276,7 @@ class PlannedRuckResource(Resource):
                     updated_planned_ruck = PlannedRuck.from_dict(updated_data)
                     
                     try:
-                        self._calculate_projections(updated_planned_ruck, route_data, user_id, supabase)
+                        self._calculate_projections(updated_planned_ruck, route_data, g.user.id, supabase)
                         
                         # Update data with new projections
                         data['estimated_duration_hours'] = float(updated_planned_ruck.estimated_duration_hours) if updated_planned_ruck.estimated_duration_hours else None
@@ -304,14 +304,14 @@ class PlannedRuckResource(Resource):
     def delete(self, planned_ruck_id: str):
         """Delete (cancel) a planned ruck."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
-                return {"success": False, "error": "Authentication required"}, 401
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if planned ruck exists and user owns it
-            existing_result = supabase.table('planned_ruck').select('status, route_id').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
+            existing_result = supabase.table('planned_ruck').select('status, route_id').eq('id', planned_ruck_id).eq('user_id', g.user.id).execute()
             
             if not existing_result.data:
                 return {"success": False, "error": "Planned ruck not found", "status": 404}
@@ -333,7 +333,7 @@ class PlannedRuckResource(Resource):
             if existing_data['status'] == 'planned':
                 try:
                     analytics_service = RouteAnalyticsService()
-                    analytics_service.record_route_cancelled(existing_data['route_id'], user_id)
+                    analytics_service.record_route_cancelled(existing_data['route_id'], g.user.id)
                 except Exception as e:
                     logger.warning(f"Failed to record cancellation analytics: {e}")
             
@@ -349,14 +349,14 @@ class PlannedRuckActionsResource(Resource):
     def post(self, planned_ruck_id: str, action: str):
         """Perform actions on planned rucks (start, complete, etc.)."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
-                return {"success": False, "error": "Authentication required"}, 401
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get planned ruck
-            planned_ruck_result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', user_id).execute()
+            planned_ruck_result = supabase.table('planned_ruck').select('*').eq('id', planned_ruck_id).eq('user_id', g.user.id).execute()
             
             if not planned_ruck_result.data:
                 return {"success": False, "error": "Planned ruck not found", "status": 404}
@@ -453,19 +453,19 @@ class TodayPlannedRucksResource(Resource):
     def get(self):
         """Get planned rucks scheduled for today."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
-                return {"success": False, "error": "Authentication required"}, 401
+            # Use same authentication pattern as working endpoints
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
             
             # Get today's date range
             today = datetime.now().date()
             today_start = today.isoformat()
             today_end = (today + timedelta(days=1)).isoformat()
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get today's planned rucks
-            result = supabase.table('planned_ruck').select('*').eq('user_id', user_id).eq('status', 'planned').gte('planned_date', today_start).lt('planned_date', today_end).order('planned_date').execute()
+            result = supabase.table('planned_ruck').select('*').eq('user_id', g.user.id).eq('status', 'planned').gte('planned_date', today_start).lt('planned_date', today_end).order('planned_date').execute()
             
             planned_rucks = []
             route_ids = set()
