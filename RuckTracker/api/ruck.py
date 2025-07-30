@@ -808,10 +808,12 @@ class RuckSessionCompleteResource(Resource):
                                 if alt_diff > 0:  # Only count positive elevation changes
                                     elevation_gain_m += alt_diff
                     
-                        # Calculate missing metrics
-                        if not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0:
+                        # Calculate missing metrics - use threshold to avoid overwriting small but valid distances
+                        if not update_data.get('distance_km') or update_data.get('distance_km', 0) <= 0.001:  # Only override if truly zero or negligible
                             update_data['distance_km'] = round(total_distance_km, 3)
-                            logger.info(f"Calculated distance: {total_distance_km:.3f} km")
+                            logger.info(f"[DISTANCE_DEBUG] Overriding client distance with GPS calculation: {total_distance_km:.3f} km")
+                        else:
+                            logger.info(f"[DISTANCE_DEBUG] Using client-provided distance: {update_data.get('distance_km')} km")
                     
                         if not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0:
                             update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
@@ -819,11 +821,12 @@ class RuckSessionCompleteResource(Resource):
                     
                         # Calculate average pace if we have distance and duration
                         final_distance = update_data.get('distance_km', 0)
+                        logger.info(f"[PACE_DEBUG] Backend pace calculation inputs: duration_seconds={duration_seconds}, final_distance={final_distance}km")
                         if final_distance > 0 and duration_seconds > 0:
                             if not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0:
                                 calculated_pace = duration_seconds / final_distance  # seconds per km
                                 update_data['average_pace'] = round(calculated_pace, 2)
-                                logger.info(f"Calculated pace: {calculated_pace:.2f} sec/km")
+                                logger.info(f"[PACE_DEBUG] Calculated pace: {duration_seconds}s ÷ {final_distance}km = {calculated_pace:.2f} sec/km")
                     
                         # Calculate calories if missing (basic estimation)
                         if not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0:

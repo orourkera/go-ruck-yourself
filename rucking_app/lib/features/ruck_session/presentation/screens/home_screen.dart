@@ -1040,19 +1040,18 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                           
                           // Pace display - Use backend average_pace (authoritative) with fallback
                           String paceDisplay = '--';
-                          
-                          // PRIORITY 1: Use backend's average_pace (most accurate)
-                          final backendPaceRaw = session['average_pace'];
-                          if (backendPaceRaw != null && backendPaceRaw > 0) {
-                            final backendPace = backendPaceRaw is int ? backendPaceRaw.toDouble() : backendPaceRaw as double;
-                            if (backendPace.isFinite && backendPace > 0) {
-                              paceDisplay = MeasurementUtils.formatPace(backendPace, metric: preferMetric);
-                              print('🔍 DEBUG Using backend average_pace: $backendPace seconds/km -> $paceDisplay');
+                           // PRIORITY 1: Use backend's average_pace (most accurate)
+                           final backendPaceRaw = session['average_pace'];
+                           if (backendPaceRaw != null && backendPaceRaw > 0) {
+                             final backendPace = backendPaceRaw is int ? backendPaceRaw.toDouble() : backendPaceRaw as double;
+                             if (backendPace.isFinite && backendPace > 0) {
+                               paceDisplay = MeasurementUtils.formatPace(backendPace, metric: preferMetric);
                             }
                           }
                           
                           // FALLBACK: Calculate from duration and distance if backend pace unavailable
                           if (paceDisplay == '--' && distanceKm > 0 && durationSecs > 0) {
+{{ ... }}
                             final calculatedPaceSecondsPerKm = durationSecs / distanceKm;
                             // Only show pace if it's reasonable (not too slow)
                             if (calculatedPaceSecondsPerKm < 5400) { // Less than 90 minutes per km
