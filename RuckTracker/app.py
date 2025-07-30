@@ -436,11 +436,11 @@ app.logger.info(f"Setting RuckSessionListResource rate limit to: 18000 per hour 
 # Allow up to 300 requests per minute (18000 per hour) per user/IP - very generous for home screen
 RuckSessionListResource.get = conditional_rate_limit("300 per minute", key_func=get_user_id)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
-api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
+api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/start')
-api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
-api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
-api.add_resource(RuckSessionCompleteResource, '/api/rucks/<string:ruck_id>/complete')
+api.add_resource(RuckSessionPauseResource, '/api/rucks/<int:ruck_id>/pause')
+api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
+api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
 # Apply high rate limit to location data endpoint
 app.logger.info(f"Setting RuckSessionLocationResource rate limit to: 3600 per hour")
 # Directly patch the RuckSessionLocationResource methods with only the post method (no get method)
@@ -452,15 +452,15 @@ except AttributeError as e:
     # Fall back to a global rate limit approach for this resource
 
 # Now register the resource with modified methods
-api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
-api.add_resource(RuckSessionEditResource, '/api/rucks/<string:ruck_id>/edit')
+api.add_resource(RuckSessionLocationResource, '/api/rucks/<int:ruck_id>/location')
+api.add_resource(RuckSessionEditResource, '/api/rucks/<int:ruck_id>/edit')
 
 # Chunked upload endpoints for session completion (no rate limits - only used post-completion)
 api.add_resource(RuckSessionRouteChunkResource, '/api/rucks/<int:ruck_id>/route-chunk')
 api.add_resource(RuckSessionHeartRateChunkResource, '/api/rucks/<int:ruck_id>/heart-rate-chunk')
 
 # Heart rate sample upload resource
-api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<string:ruck_id>/heartrate') # Ensure this is correctly placed if not already
+api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<int:ruck_id>/heartrate') # Ensure this is correctly placed if not already
 
 # Stats Endpoints with rate limits (or disabled in load testing mode)
 if LOAD_TESTING_MODE:
@@ -509,7 +509,7 @@ RuckCommentsResource.put = conditional_rate_limit("500 per minute")(RuckComments
 RuckCommentsResource.delete = conditional_rate_limit("500 per minute")(RuckCommentsResource.delete)
 
 # Now register the resource with modified methods
-api.add_resource(RuckCommentsResource, '/api/rucks/<string:ruck_id>/comments')
+api.add_resource(RuckCommentsResource, '/api/rucks/<int:ruck_id>/comments')
 
 # Register notification resources with higher rate limits
 app.logger.info(f"Setting NotificationsResource rate limit to: 4000 per hour")
