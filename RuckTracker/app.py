@@ -268,6 +268,8 @@ from .api.ruck import (
     RuckSessionCompleteResource,
     RuckSessionLocationResource,
     RuckSessionEditResource,
+    RuckSessionRouteChunkResource,
+    RuckSessionHeartRateChunkResource,
     # RuckSessionDetailResource # Commented out - not found in api.ruck.py
 )
     
@@ -487,6 +489,10 @@ except AttributeError as e:
 # Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
 api.add_resource(RuckSessionEditResource, '/api/rucks/<string:ruck_id>/edit')
+
+# Chunked upload endpoints for session completion (no rate limits - only used post-completion)
+api.add_resource(RuckSessionRouteChunkResource, '/api/rucks/<int:ruck_id>/route-chunk')
+api.add_resource(RuckSessionHeartRateChunkResource, '/api/rucks/<int:ruck_id>/heart-rate-chunk')
 
 # Heart rate sample upload resource
 api.add_resource(HeartRateSampleUploadResource, '/api/rucks/<string:ruck_id>/heartrate') # Ensure this is correctly placed if not already

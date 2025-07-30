@@ -42,6 +42,9 @@ class SessionLifecycleManager implements SessionManager {
   // Callback for notifying recovery completion
   Function(Map<String, dynamic>)? _onRecoveryCompleted;
   
+  // Callback for getting completion data from coordinator
+  Map<String, dynamic>? Function()? _getCompletionData;
+  
   DateTime? _sessionStartTime;
   String? _activeSessionId;
   Timer? _ticker;
@@ -88,6 +91,11 @@ class SessionLifecycleManager implements SessionManager {
   /// Set recovery completion callback
   void setRecoveryCallback(Function(Map<String, dynamic>) callback) {
     _onRecoveryCompleted = callback;
+  }
+  
+  /// Set completion data callback
+  void setCompletionDataCallback(Map<String, dynamic>? Function() callback) {
+    _getCompletionData = callback;
   }
 
   @override
@@ -147,7 +155,9 @@ class SessionLifecycleManager implements SessionManager {
       
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);
       
+      _startTimer();
       _startSophisticatedTimerSystem();
+      _startSessionPersistenceTimer();
       _startConnectivityMonitoring();
       
       _updateState(_currentState.copyWith(
@@ -204,41 +214,72 @@ class SessionLifecycleManager implements SessionManager {
       final finalDuration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
       AppLogger.info('[LIFECYCLE] Final session duration: ${finalDuration.inSeconds}s (${finalDuration.inMinutes}m ${finalDuration.inSeconds % 60}s)');
 
+      // ENHANCED: Collect comprehensive session completion data
+      Map<String, dynamic> completionData = {
+        'duration_seconds': finalDuration.inSeconds,
+        'completed_at': DateTime.now().toIso8601String(),
+        'end_time': DateTime.now().toIso8601String(),
+      };
+      
+      // Add start time if available
+      if (_sessionStartTime != null) {
+        completionData['start_time'] = _sessionStartTime!.toIso8601String();
+      }
+      
+      // Add weight data from current state
+      if (_currentState.ruckWeightKg > 0.0) {
+        completionData['ruck_weight_kg'] = _currentState.ruckWeightKg;
+      }
+      if (_currentState.userWeightKg > 0.0) {
+        completionData['weight_kg'] = _currentState.userWeightKg;
+      }
+      
+      // Get comprehensive metrics from coordinator completion data
       try {
-        bool completionSuccessful = false;
-        String? completionError;
-        for (int attempt = 1; attempt <= 3; attempt++) {
-          try {
-            await _apiClient.post('/rucks/$_activeSessionId/complete', {
-              'duration_seconds': finalDuration.inSeconds,
-            });
-            completionSuccessful = true;
-            break;
-          } catch (e) {
-            completionError = e.toString();
-            AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
-            await Future.delayed(Duration(seconds: attempt * 2)); // Backoff
-          }
-        }
-
-        if (!completionSuccessful) {
-          // Persist for later retry
-          await _storageService.setObject('pending_completion_$_activeSessionId', {
-            'duration_seconds': finalDuration.inSeconds,
+        final coordinatorData = _getCompletionData?.call();
+        AppLogger.info('[LIFECYCLE] Getting completion data from coordinator: $coordinatorData');
+        
+        if (coordinatorData != null) {
+          // Merge coordinator data with completion data
+          coordinatorData.forEach((key, value) {
+            if (value != null) {
+              completionData[key] = value;
+            }
           });
-          AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted for retry: $completionError');
+          
+          AppLogger.info('[LIFECYCLE] SUCCESS: Enhanced completion data from coordinator with ${completionData.keys.length} fields');
+          AppLogger.info('[LIFECYCLE] Final completion data: $completionData');
         } else {
-          // Clear any previous pending
-          await _storageService.remove('pending_completion_$_activeSessionId');
+          AppLogger.warning('[LIFECYCLE] No completion data available from coordinator - using basic completion data');
         }
       } catch (e) {
-        AppLogger.error('Session complete failed: $e');
-        Sentry.captureException(e, stackTrace: StackTrace.current, withScope: (scope) {
-          scope.level = SentryLevel.warning;
-          scope.setTag('session_id', _activeSessionId ?? 'unknown');
-          scope.setExtra('duration', finalDuration.inSeconds);
-        });
-        // Existing persistence...
+        AppLogger.warning('[LIFECYCLE] Failed to get completion data from coordinator: $e - continuing with basic data');
+      }
+
+      // CRITICAL: Call completion API with comprehensive data and retry logic
+      bool completionSuccessful = false;
+      String? completionError;
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        try {
+          AppLogger.info('[LIFECYCLE] Sending completion data (attempt $attempt): ${completionData.keys.join(", ")}');
+          await _apiClient.post('/rucks/$_activeSessionId/complete', completionData);
+          completionSuccessful = true;
+          AppLogger.info('[LIFECYCLE] Session completion successful with comprehensive data');
+          break;
+        } catch (e) {
+          completionError = e.toString();
+          AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
+          await Future.delayed(Duration(seconds: attempt * 2)); // Backoff
+        }
+      }
+
+      if (!completionSuccessful) {
+        // Persist comprehensive data for later retry
+        await _storageService.setObject('pending_completion_$_activeSessionId', completionData);
+        AppLogger.error('[LIFECYCLE] All completion attempts failed, persisted comprehensive data for retry: $completionError');
+      } else {
+        // Clear any previous pending
+        await _storageService.remove('pending_completion_$_activeSessionId');
       }
 
       final newState = _currentState.copyWith(
@@ -410,19 +451,48 @@ class SessionLifecycleManager implements SessionManager {
   Future<void> checkForCrashedSession() async {
     try {
       print('[RECOVERY_DEBUG] Starting session recovery check');
+      print('[RECOVERY_DEBUG] Storage service type: ${_storageService.runtimeType}');
+      
+      // Check if storage service is working at all
+      try {
+        await _storageService.setObject('recovery_test', {'test': 'value'});
+        final testRead = await _storageService.getObject('recovery_test');
+        print('[RECOVERY_DEBUG] Storage test - wrote and read: $testRead');
+        await _storageService.remove('recovery_test');
+      } catch (e) {
+        print('[RECOVERY_DEBUG] Storage service not working: $e');
+      }
+      
       Map<String, dynamic>? sessionData;
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
+          print('[RECOVERY_DEBUG] Attempting storage read $attempt for key: active_session_data');
           sessionData = await _storageService.getObject('active_session_data');
           print('[RECOVERY_DEBUG] Raw data on attempt $attempt: $sessionData');
+          print('[RECOVERY_DEBUG] Data type: ${sessionData?.runtimeType}, keys: ${sessionData?.keys}');
           break;
         } catch (e) {
           print('[RECOVERY_DEBUG] Storage read failed on attempt $attempt: $e');
+          print('[RECOVERY_DEBUG] Error type: ${e.runtimeType}');
           await Future.delayed(Duration(seconds: attempt));
         }
       }
+      
+      // Try alternative keys in case there's a mismatch
       if (sessionData == null) {
-        print('[RECOVERY_DEBUG] No data found after 3 attempts');
+        print('[RECOVERY_DEBUG] Trying alternative storage keys...');
+        try {
+          final altData1 = await _storageService.getObject('session_data');
+          print('[RECOVERY_DEBUG] Alternative key session_data: $altData1');
+          final altData2 = await _storageService.getObject('active_session');
+          print('[RECOVERY_DEBUG] Alternative key active_session: $altData2');
+        } catch (e) {
+          print('[RECOVERY_DEBUG] Alternative key check failed: $e');
+        }
+      }
+      
+      if (sessionData == null) {
+        print('[RECOVERY_DEBUG] No data found after 3 attempts and alternative keys');
         return;
       }
 
@@ -447,6 +517,14 @@ class SessionLifecycleManager implements SessionManager {
         return;
       }
 
+      // Check if we're already running a LIVE active session with different ID - don't override
+      // Only skip if we have an active session AND it's different from the recovered session
+      if (_currentState.isActive && _currentState.sessionId != null && _currentState.sessionId != sessionId && _ticker != null && _ticker!.isActive) {
+        AppLogger.info('[RECOVERY] Already running LIVE session ${_currentState.sessionId}, found recovery for different session ${sessionId} - skipping recovery');
+        await _storageService.remove('active_session_data'); // Clean up stale recovery data
+        return;
+      }
+      
       AppLogger.warning('🔥 CRASH RECOVERY: Found active session from ${crashDuration.inMinutes} minutes ago');
 
       // Restore session state
@@ -499,14 +577,21 @@ class SessionLifecycleManager implements SessionManager {
       ));
 
       // Send recovery data to coordinator so it can initialize managers
-      _notifyRecoveryCompleted({
-        'distance_km': recoveredDistance, // Send recovered distance including gap
-        'elevation_gain': elevationGain,
-        'elevation_loss': elevationLoss,
-        'calories': caloriesBurned,
-        'last_location': lastSavedLocation?.toJson(), // Pass last location for potential route reconstruction
-        'gap_distance_km': gapDistance, // Track how much distance was added from gap
-      });
+    // Send recovery data to coordinator - but mark it as recovery data
+    _notifyRecoveryCompleted({
+      'is_crash_recovery': true, // Mark as actual crash recovery
+      'session_id': sessionId,
+      'start_time': startTimeStr,
+      'ruck_weight_kg': ruckWeight,
+      'user_weight_kg': userWeight,
+      'distance_km': recoveredDistance, // Restore accumulated distance
+      'elevation_gain': elevationGain,
+      'elevation_loss': elevationLoss,
+      'calories': caloriesBurned, // Restore accumulated calories
+      'last_location': lastSavedLocation?.toJson(),
+      'gap_distance_km': gapDistance,
+      'recovery_duration_minutes': crashDuration.inMinutes,
+    });
 
       // Restart timers and services
       _startTimer();
@@ -676,7 +761,7 @@ Future<void> clearCrashRecoveryData() async {
         final savedData = await _storageService.getObject('active_session_data');
         if (savedData != null) {
           saved = true;
-          AppLogger.debug('[LIFECYCLE] Session data persisted successfully');
+          AppLogger.info('[LIFECYCLE] 💾 Session data persisted successfully (${totalDistance.toStringAsFixed(2)}km, ${calories.toInt()}cal)');
           break;
         }
       } catch (e) {

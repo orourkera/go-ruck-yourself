@@ -160,6 +160,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<MemoryPressureDetected>(_onMemoryPressureDetected);
     on<CheckForCrashedSession>(_onCheckForCrashedSession);
     on<_CoordinatorStateForwarded>(_onCoordinatorStateForwarded);
+    on<SessionRecovered>(_onSessionRecovered);
   }
 
   Future<void> _onSessionStarted(
@@ -924,6 +925,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.error('Error during crash recovery check: $e');
       // Continue gracefully - not critical for app startup
     }
+  }
+  
+  Future<void> _onSessionRecovered(SessionRecovered event, Emitter<ActiveSessionState> emit) async {
+    // Just emit current state - coordinator handles the actual recovery
+    emit(state);
   }
   
   // All diagnostic and memory pressure methods removed - now handled by dedicated managers

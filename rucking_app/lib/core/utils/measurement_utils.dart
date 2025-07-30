@@ -64,10 +64,10 @@ class MeasurementUtils {
     // Also handles if conversion resulted in non-finite or if original pace was too high
     if (!pace.isFinite || pace > 5400) return '--';
     
-    // Format pace as minutes:seconds
-    final minutes = (pace / 60).floor();
+    // Format pace as minutes:seconds (always MM:SS, never HH:MM)
+    final totalMinutes = (pace / 60).floor();
     final seconds = (pace % 60).floor().toString().padLeft(2, '0');
-    return '$minutes:$seconds/${metric ? 'km' : 'mi'}';
+    return '$totalMinutes:$seconds/${metric ? 'km' : 'mi'}';
   }
 
   /// Elevation gain/loss formatted to 0 decimals (+X m/ft).

@@ -691,7 +691,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
                       
                       if (state is ActiveSessionCompleted) {
-                        print('[UI] ActiveSessionCompleted state received: distance=${state.finalDistanceKm}km, duration=${state.finalDurationSeconds}s');
+                        print('[UI] ActiveSessionCompleted state received: distance=${state.finalDistanceKm}km, duration=${state.finalDurationSeconds}s, calories=${state.finalCalories}, elevation=${state.elevationGain}m gain/${state.elevationLoss}m loss');
                         
                         // Navigate to SessionCompleteScreen with full session data
                         WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -101,6 +101,7 @@ class ActiveSessionRunning extends ActiveSessionState {
   
   // Terrain tracking
   final List<TerrainSegment> terrainSegments;
+  final bool isRecovered;
 
   static const _unset = Object();
 
@@ -148,6 +149,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.validationMessage,
     this.isGpsReady = false, // Default to false
     this.hasGpsAccess = false, // Default to false
+    this.isRecovered = false,
   });
   
   @override
@@ -194,6 +196,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     splits,
     terrainSegments, // Add to props
     eventId, // Add eventId to props
+    isRecovered,
   ];
   
   ActiveSessionRunning copyWith({
@@ -243,6 +246,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isGpsReady, // Add to copyWith parameters
     bool? hasGpsAccess, // Add to copyWith parameters
     String? eventId, // Add eventId to copyWith parameters
+    bool? isRecovered,
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -286,6 +290,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
       hasGpsAccess: hasGpsAccess ?? this.hasGpsAccess, // Use in copyWith
       eventId: eventId ?? this.eventId, // Use eventId in copyWith
+      isRecovered: isRecovered ?? this.isRecovered,
     );
   }
 }

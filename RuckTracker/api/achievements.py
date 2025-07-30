@@ -317,8 +317,15 @@ class CheckSessionAchievementsResource(Resource):
             return {'error': 'Failed to check session achievements'}, 500
     
     def _validateSessionForAchievements(self, session: Dict) -> bool:
-        distance_km = session.get('distance_km', 0)
-        duration_seconds = session.get('duration_seconds', 0)
+        distance_km = session.get('distance_km', 0) or 0
+        duration_seconds = session.get('duration_seconds', 0) or 0
+        
+        # Handle None values that could come from database
+        if distance_km is None:
+            distance_km = 0
+        if duration_seconds is None:
+            duration_seconds = 0
+            
         return duration_seconds >= 300 and distance_km >= 0.5
 
     def _check_achievement_criteria(self, supabase, user_id: str, session: Dict, achievement: Dict, user_stats: Dict = None) -> bool:

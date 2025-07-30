@@ -94,7 +94,7 @@ class WatchService {
   /// Handle method calls from the watch session channel
   Future<dynamic> _handleWatchSessionMethod(MethodCall call) async {
     // Silent method call processing
-    debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod received call: ${call.method} with arguments: ${call.arguments}');
+
     switch (call.method) {
       case 'onWatchSessionUpdated':
         // Safely handle the arguments map with proper type casting
@@ -119,16 +119,12 @@ class WatchService {
         final command = data['command'] as String?;
         
         if (command == 'startSession') {
-          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> startSession command received from watch');
           await _handleSessionStartedFromWatch(data);
         } else if (command == 'pauseSession') {
-          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> pauseSession command received from watch');
           await pauseSessionFromWatchCallback();
         } else if (command == 'resumeSession') {
-          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> resumeSession command received from watch');
           await resumeSessionFromWatchCallback();
         } else if (command == 'endSession') {
-          debugPrint('[PAUSE_DEBUG] WatchService: _handleWatchSessionMethod -> endSession command received from watch');
           await _handleSessionEndedFromWatch(data);
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
@@ -217,7 +213,6 @@ class WatchService {
 
   /// Start a new rucking session on the watch
   Future<void> startSessionOnWatch(double ruckWeight, {bool isMetric = true}) async {
-    debugPrint('[PAUSE_DEBUG] WatchService: startSessionOnWatch called with ruckWeight: $ruckWeight, isMetric: $isMetric. Setting _isSessionActive = true.');
     AppLogger.info('[WATCH_SERVICE] startSessionOnWatch - sending isMetric: $isMetric to watch');
     _isSessionActive = true;
     _isPaused = false;
@@ -427,7 +422,6 @@ class WatchService {
     
     // Send via WatchConnectivity which is the channel that's working reliably
     try {
-      debugPrint('[PAUSE_DEBUG] WatchService: updateSessionOnWatch called. isPaused: $isPaused, distance: $distance, duration: $duration, pace: $pace');
       _currentDistance = distance;
       _currentDuration = duration;
       // Use the enhanced updateMetricsOnWatch that includes both elevation gain and loss
@@ -471,22 +465,18 @@ class WatchService {
   /// Pause the session on the watch
   Future<bool> pauseSessionOnWatch() async {
     // If a session is active, pause it
-    debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch called. Current _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
     if (_isSessionActive && !_isPaused) {
       _isPaused = true;
       AppLogger.info('[WATCH] Sending pause command to watch');
       try {
         await _watchSessionChannel.invokeMethod('pauseSession');
-        debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch -> invokeMethod(\'pauseSession\') successful.');
         return true;
       } catch (e) {
         AppLogger.error('[WATCH] Error sending pause command to watch: $e');
-        debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch -> invokeMethod(\'pauseSession\') FAILED: $e');
         _isPaused = false; // Revert optimistic update
         return false;
       }
     } else {
-      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionOnWatch -> NO-OP. Session not active or already paused. _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
       // Return true if already paused, false if not active, to indicate desired state might be met or not applicable
       return _isPaused; 
     }
@@ -495,22 +485,18 @@ class WatchService {
   /// Resume the session on the watch
   Future<bool> resumeSessionOnWatch() async {
     // If a session is active and paused, resume it
-    debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch called. Current _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
     if (_isSessionActive && _isPaused) {
       _isPaused = false;
       AppLogger.info('[WATCH] Sending resume command to watch');
       try {
         await _watchSessionChannel.invokeMethod('resumeSession');
-        debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch -> invokeMethod(\'resumeSession\') successful.');
         return true;
       } catch (e) {
         AppLogger.error('[WATCH] Error sending resume command to watch: $e');
-        debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch -> invokeMethod(\'resumeSession\') FAILED: $e');
         _isPaused = true; // Revert optimistic update
         return false;
       }
     } else {
-      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionOnWatch -> NO-OP. Session not active or already running. _isSessionActive: $_isSessionActive, _isPaused: $_isPaused');
       // Return true if already resumed (not paused), false if not active
       return !_isPaused && _isSessionActive;
     }
@@ -638,21 +624,17 @@ class WatchService {
   /// Callback when session is paused from the watch
   /// This will update the internal state and dispatch the appropriate events to the ActiveSessionBloc
   Future<void> pauseSessionFromWatchCallback() async {
-    debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback triggered.');
     // Regardless of current _isPaused value, forward the pause request – let the
     // ActiveSessionBloc decide if it is a duplicate. This prevents dropped
     // commands when our local flag drifts out-of-sync with the Bloc.
     if (!_isSessionActive) {
-      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback -> NO-OP. Session not active.');
       return;
     }
 
     // Dispatch pause event to ActiveSessionBloc if available
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
-      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback -> Dispatching SessionPaused(source: SessionActionSource.watch) to ActiveSessionBloc.');
       GetIt.I<ActiveSessionBloc>().add(const SessionPaused(source: SessionActionSource.watch));
     } else {
-      debugPrint('[PAUSE_DEBUG] WatchService: pauseSessionFromWatchCallback -> ActiveSessionBloc not registered in GetIt.');
       AppLogger.warning('[WATCH_SERVICE] ActiveSessionBloc not ready in GetIt for pauseSessionFromWatchCallback');
     }
 
@@ -663,18 +645,14 @@ class WatchService {
   /// Callback when session is resumed from the watch
   /// This will update the internal state and dispatch the appropriate events to the ActiveSessionBloc
   Future<void> resumeSessionFromWatchCallback() async {
-    debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback triggered.');
     if (!_isSessionActive) {
-      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback -> NO-OP. Session not active.');
       return;
     }
 
     // Dispatch resume event regardless of local _isPaused – Bloc will ignore if necessary
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
-      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback -> Dispatching SessionResumed(source: SessionActionSource.watch) to ActiveSessionBloc.');
       GetIt.I<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.watch));
     } else {
-      debugPrint('[PAUSE_DEBUG] WatchService: resumeSessionFromWatchCallback -> ActiveSessionBloc not registered in GetIt.');
       AppLogger.warning('[WATCH_SERVICE] ActiveSessionBloc not ready in GetIt for resumeSessionFromWatchCallback');
     }
 

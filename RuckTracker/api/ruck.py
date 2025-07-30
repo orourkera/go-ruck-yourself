@@ -321,10 +321,34 @@ class RuckSessionListResource(Resource):
                 'status': 'in_progress',
                 'start_time': datetime.now(tz.tzutc()).isoformat()
             }
+            
+            # Handle ruck weight (multiple possible keys)
             if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
                 session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
-            if 'weight_kg' in data and data.get('weight_kg') is not None:
+            
+            # Handle user weight (multiple possible keys)
+            if 'user_weight_kg' in data and data.get('user_weight_kg') is not None:
+                session_data['weight_kg'] = data.get('user_weight_kg')  # Map user_weight_kg to weight_kg
+            elif 'weight_kg' in data and data.get('weight_kg') is not None:
                 session_data['weight_kg'] = data.get('weight_kg')
+            
+            # Handle custom session ID if provided
+            if 'id' in data and data.get('id') is not None:
+                session_data['id'] = data.get('id')
+            
+            # Handle notes if provided
+            if 'notes' in data and data.get('notes') is not None:
+                session_data['notes'] = data.get('notes')
+            
+            # Handle custom start time if provided (for crash recovery)
+            if 'start_time' in data and data.get('start_time') is not None:
+                try:
+                    # Parse and use the provided start time (frontend sends start_time, backend uses started_at)
+                    start_time = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+                    session_data['started_at'] = start_time.isoformat()
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid start_time format, using current time: {e}")
+                    # Fall back to current time if parsing fails
             
             # Add event_id if provided (for event-associated ruck sessions)
             if 'event_id' in data and data.get('event_id') is not None:
@@ -742,9 +766,7 @@ class RuckSessionCompleteResource(Resource):
             if 'distance_km' in data and data['distance_km']:
                 distance_km = data['distance_km']
         
-            server_calculated_pace = None
-            if distance_km and distance_km > 0 and duration_seconds > 0:
-                server_calculated_pace = duration_seconds / distance_km  # seconds per km
+            # Pace will be calculated later using processed distance, not client-sent distance
 
             # Update session status to completed with end data
             update_data = {
@@ -776,9 +798,7 @@ class RuckSessionCompleteResource(Resource):
             # Always set completed_at to now (UTC) when completing session
             update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
 
-            # Store server-calculated pace first
-            if server_calculated_pace is not None:
-                update_data['average_pace'] = server_calculated_pace
+            # Pace will be calculated later using processed distance
 
             if 'start_time' in data:
                 update_data['started_at'] = data['start_time']
@@ -802,6 +822,107 @@ class RuckSessionCompleteResource(Resource):
             # Log the sharing decision for debugging
             logger.info(f"Session {ruck_id} completion: user_allows_sharing={user_allows_sharing}, is_public={update_data['is_public']}")
         
+            # SERVER-SIDE METRIC CALCULATION FALLBACK
+            # If key metrics are missing or zero, calculate them from GPS data
+            needs_calculation = (
+                not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0 or
+                not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0 or
+                not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0 or
+                not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0
+            )
+        
+            if needs_calculation:
+                logger.info(f"Session {ruck_id}: Missing metrics detected, calculating from GPS data...")
+                try:
+                    # Fetch GPS location points for this session
+                    location_resp = supabase.table('location_point') \
+                        .select('latitude,longitude,altitude,timestamp') \
+                        .eq('session_id', ruck_id) \
+                        .order('timestamp') \
+                        .execute()
+                
+                    if location_resp.data and len(location_resp.data) >= 2:
+                        points = location_resp.data
+                        logger.info(f"Found {len(points)} GPS points for calculation")
+                    
+                        # Calculate distance using haversine formula
+                        total_distance_km = 0
+                        elevation_gain_m = 0
+                        previous_altitude = None
+                    
+                        for i in range(1, len(points)):
+                            prev_point = points[i-1]
+                            curr_point = points[i]
+                        
+                            # Calculate distance between consecutive points
+                            lat1, lon1 = float(prev_point['latitude']), float(prev_point['longitude']) 
+                            lat2, lon2 = float(curr_point['latitude']), float(curr_point['longitude'])
+                        
+                            # Haversine formula
+                            R = 6371  # Earth's radius in km
+                            dlat = math.radians(lat2 - lat1)
+                            dlon = math.radians(lon2 - lon1)
+                            a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+                                 math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * 
+                                 math.sin(dlon/2) * math.sin(dlon/2))
+                            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+                            distance_km = R * c
+                            total_distance_km += distance_km
+                        
+                            # Calculate elevation gain
+                            if curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
+                                alt_diff = float(curr_point['altitude']) - float(prev_point['altitude'])
+                                if alt_diff > 0:  # Only count positive elevation changes
+                                    elevation_gain_m += alt_diff
+                    
+                        # Calculate missing metrics - use threshold to avoid overwriting small but valid distances
+                        if not update_data.get('distance_km') or update_data.get('distance_km', 0) <= 0.001:  # Only override if truly zero or negligible
+                            update_data['distance_km'] = round(total_distance_km, 3)
+                            logger.info(f"[DISTANCE_DEBUG] Overriding client distance with GPS calculation: {total_distance_km:.3f} km")
+                        else:
+                            logger.info(f"[DISTANCE_DEBUG] Using client-provided distance: {update_data.get('distance_km')} km")
+                    
+                        if not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0:
+                            update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
+                            logger.info(f"Calculated elevation gain: {elevation_gain_m:.1f} m")
+                    
+                        # Calculate average pace if we have distance and duration
+                        final_distance = update_data.get('distance_km', 0)
+                        logger.info(f"[PACE_DEBUG] Backend pace calculation inputs: duration_seconds={duration_seconds}, final_distance={final_distance}km")
+                        if final_distance > 0 and duration_seconds > 0:
+                            if not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0:
+                                calculated_pace = duration_seconds / final_distance  # seconds per km
+                                update_data['average_pace'] = calculated_pace  # Store with full precision like Session 1088
+                                logger.info(f"[PACE_DEBUG] Calculated pace: {duration_seconds}s ÷ {final_distance}km = {calculated_pace} sec/km")
+                    
+                        # Calculate calories if missing (basic estimation)
+                        if not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0:
+                            # Basic calorie estimation: assume 80kg user, ~400 cal/hour base + elevation
+                            weight_kg = update_data.get('weight_kg', 80)  # Default 80kg if not provided
+                            ruck_weight_kg = update_data.get('ruck_weight_kg', 0)
+                            total_weight_kg = weight_kg + ruck_weight_kg
+                        
+                            # Base metabolic rate (calories per hour)
+                            base_cal_per_hour = 4.5 * total_weight_kg  # METs calculation for rucking
+                            duration_hours = duration_seconds / 3600
+                            base_calories = base_cal_per_hour * duration_hours
+                        
+                            # Add elevation bonus (1 cal per 10m elevation gain per kg body weight)
+                            elevation_calories = (elevation_gain_m / 10) * weight_kg
+                        
+                            estimated_calories = round(base_calories + elevation_calories)
+                            update_data['calories_burned'] = estimated_calories
+                            logger.info(f"Estimated calories: {estimated_calories} (base: {base_calories:.0f}, elevation: {elevation_calories:.0f})")
+                    
+                        logger.info(f"Server-calculated metrics for session {ruck_id}: distance={update_data.get('distance_km')}km, pace={update_data.get('average_pace')}s/km, calories={update_data.get('calories_burned')}, elevation={update_data.get('elevation_gain_m')}m")
+                    
+                    else:
+                        logger.warning(f"Session {ruck_id}: Insufficient GPS data for metric calculation ({len(location_resp.data) if location_resp.data else 0} points)")
+                    
+                except Exception as calc_error:
+                    logger.error(f"Error calculating server-side metrics for session {ruck_id}: {calc_error}")
+                    # Continue with original data - don't fail the completion
+    
             # Continue with update as before
             update_resp = supabase.table('ruck_session') \
                 .update(update_data) \
@@ -1369,3 +1490,124 @@ class HeartRateSampleUploadResource(Resource):
             return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
         except Exception as e:
             return {'message': f'Error uploading heart rate samples: {str(e)}'}, 500
+
+
+class RuckSessionRouteChunkResource(Resource):
+    def post(self, ruck_id):
+        """Upload route data chunk for completed session (POST /api/rucks/<ruck_id>/route-chunk)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            data = request.get_json()
+            if not data or 'route_points' not in data or not isinstance(data['route_points'], list):
+                return {'message': 'Missing or invalid route_points'}, 400
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Check if session exists, belongs to user, and is completed
+            session_resp = supabase.table('ruck_session') \
+                .select('id,status') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            
+            if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            if session_data['status'] != 'completed':
+                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
+                return {'message': f"Session not completed (status: {session_data['status']}). Route chunks can only be uploaded to completed sessions."}, 400
+            
+            # Insert location points
+            location_rows = []
+            for point in data['route_points']:
+                if 'timestamp' not in point or 'lat' not in point or 'lng' not in point:
+                    continue
+                location_rows.append({
+                    'session_id': ruck_id,
+                    'timestamp': point['timestamp'],
+                    'latitude': point['lat'],
+                    'longitude': point['lng'],
+                    'altitude': point.get('altitude'),
+                    'accuracy': point.get('accuracy'),
+                    'speed': point.get('speed'),
+                    'heading': point.get('heading')
+                })
+            
+            if not location_rows:
+                return {'message': 'No valid location points in chunk'}, 400
+            
+            insert_resp = supabase.table('location_point').insert(location_rows).execute()
+            if not insert_resp.data:
+                return {'message': 'Failed to insert location points'}, 500
+            
+            # Clear cache for this user's sessions
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            logger.info(f"Successfully uploaded route chunk for session {ruck_id}: {len(insert_resp.data)} points")
+            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+            
+        except Exception as e:
+            logger.error(f"Error uploading route chunk for session {ruck_id}: {e}")
+            return {'message': f'Error uploading route chunk: {str(e)}'}, 500
+
+
+class RuckSessionHeartRateChunkResource(Resource):
+    def post(self, ruck_id):
+        """Upload heart rate data chunk for completed session (POST /api/rucks/<ruck_id>/heart-rate-chunk)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            data = request.get_json()
+            if not data or 'heart_rate_samples' not in data or not isinstance(data['heart_rate_samples'], list):
+                return {'message': 'Missing or invalid heart_rate_samples'}, 400
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Check if session exists, belongs to user, and is completed
+            session_resp = supabase.table('ruck_session') \
+                .select('id,status') \
+                .eq('id', ruck_id) \
+                .eq('user_id', g.user.id) \
+                .execute()
+            
+            if not session_resp.data:
+                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
+                return {'message': 'Session not found or access denied'}, 404
+            
+            session_data = session_resp.data[0]
+            if session_data['status'] != 'completed':
+                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
+                return {'message': f"Session not completed (status: {session_data['status']}). Heart rate chunks can only be uploaded to completed sessions."}, 400
+            
+            # Insert heart rate samples
+            heart_rate_rows = []
+            for sample in data['heart_rate_samples']:
+                if 'timestamp' not in sample or 'bpm' not in sample:
+                    continue
+                heart_rate_rows.append({
+                    'session_id': ruck_id,
+                    'timestamp': sample['timestamp'],
+                    'bpm': sample['bpm']
+                })
+            
+            if not heart_rate_rows:
+                return {'message': 'No valid heart rate samples in chunk'}, 400
+            
+            insert_resp = supabase.table('heart_rate_sample').insert(heart_rate_rows).execute()
+            if not insert_resp.data:
+                return {'message': 'Failed to insert heart rate samples'}, 500
+            
+            # Clear cache for this user's sessions
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            logger.info(f"Successfully uploaded heart rate chunk for session {ruck_id}: {len(insert_resp.data)} samples")
+            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+            
+        except Exception as e:
+            logger.error(f"Error uploading heart rate chunk for session {ruck_id}: {e}")
+            return {'message': f'Error uploading heart rate chunk: {str(e)}'}, 500

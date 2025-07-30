@@ -211,11 +211,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       print('[COMPLETION_DEBUG] Completion data before processing:');
       print('  completionData: $completionData');
       
-      // Calculate and include average pace if distance > 0
-      if (widget.distance > 0) {
-        final paceSecondsPerKm = widget.duration.inSeconds / widget.distance;
-        completionData['average_pace'] = paceSecondsPerKm;
-      }
+      // Let backend calculate pace authoritatively from stored distance_km and duration_seconds
+      // This ensures pace is calculated from the same processed data that gets stored
       
       // Include heart rate data if available
       if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
