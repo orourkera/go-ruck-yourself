@@ -62,18 +62,3 @@ def api_error(message, status_code=400, details=None):
     if details is not None:
         response_body["details"] = details
     return response_body, status_code
-
-
-def check_auth_and_respond(user_id):
-    """
-    Check if a user is authenticated and return error response if not
-    
-    Args:
-        user_id: The user ID to check (should not be None if authenticated)
-        
-    Returns:
-        tuple or None: Error response tuple if not authenticated, None if authenticated
-    """
-    if not user_id:
-        return api_error("Authentication required", status_code=401)
-    return None
