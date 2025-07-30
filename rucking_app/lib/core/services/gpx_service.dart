@@ -90,7 +90,7 @@ class GpxService {
         'make_public': makePublic,
       });
       
-      final route = Route.fromJson(response['route'] as Map<String, dynamic>);
+      final route = Route.fromJson(response['data']['route'] as Map<String, dynamic>);
       AppLogger.info('Successfully imported GPX file: ${route.name}');
       return route;
     } catch (e) {
