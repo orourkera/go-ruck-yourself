@@ -14,7 +14,7 @@ import re
 
 from ..supabase_client import get_supabase_client
 from ..models import Route, RouteElevationPoint, RoutePointOfInterest
-from ..utils.auth_helper import get_current_user_id
+
 from ..services.route_analytics_service import RouteAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,7 @@ class GPXImportResource(Resource):
     def post(self):
         """Import a GPX file and create route records."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
+            if not hasattr(g, 'user') or g.user is None:
                 return {
                     "success": False,
                     "message": "Authentication required"
@@ -52,7 +51,7 @@ class GPXImportResource(Resource):
             
             # Parse GPX content
             try:
-                route_data = self._parse_gpx_content(gpx_content, user_id, source_url, custom_name)
+                route_data = self._parse_gpx_content(gpx_content, g.user.id, source_url, custom_name)
             except Exception as e:
                 logger.error(f"GPX parsing error: {e}")
                 return {
@@ -60,7 +59,7 @@ class GPXImportResource(Resource):
                     "message": f"Invalid GPX format: {str(e)}"
                 }, 400
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Create route record
             route_result = supabase.table('routes').insert(route_data['route']).execute()
@@ -95,7 +94,7 @@ class GPXImportResource(Resource):
             # Record analytics
             try:
                 analytics_service = RouteAnalyticsService()
-                analytics_service.record_route_created(route_id, user_id)
+                analytics_service.record_route_created(route_id, g.user.id)
             except Exception as e:
                 logger.warning(f"Failed to record import analytics: {e}")
             
@@ -449,15 +448,7 @@ class GPXValidateResource(Resource):
     def post(self):
         """Validate GPX content and return parsed metadata."""
         try:
-            logger.debug(f"GPX validation called. g.user_id exists: {hasattr(g, 'user_id')}")
-            if hasattr(g, 'user_id'):
-                logger.debug(f"g.user_id value: {g.user_id}")
-            
-            user_id = get_current_user_id()
-            logger.debug(f"get_current_user_id() returned: {user_id}")
-            
-            if not user_id:
-                logger.warning("GPX validation failed: no user_id found")
+            if not hasattr(g, 'user') or g.user is None:
                 return {
                     "success": False,
                     "message": "Authentication required"
@@ -476,7 +467,7 @@ class GPXValidateResource(Resource):
             import_resource = GPXImportResource()
             
             try:
-                parsed_data = import_resource._parse_gpx_content(gpx_content, user_id)
+                parsed_data = import_resource._parse_gpx_content(gpx_content, g.user.id)
                 
                 # Return validation results
                 route_data = parsed_data['route']

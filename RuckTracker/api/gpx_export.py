@@ -3,7 +3,7 @@ GPX Export API endpoints for generating GPX files from routes and ruck sessions.
 Handles converting route data and completed sessions to standard GPX format.
 """
 
-from flask import request, jsonify, make_response
+from flask import request, jsonify, make_response, g
 from flask_restful import Resource
 import logging
 from typing import Dict, Any, List, Optional
@@ -14,7 +14,7 @@ from xml.dom import minidom
 
 from ..supabase_client import get_supabase_client
 from ..utils.response_helper import success_response, error_response
-from ..utils.auth_helper import get_current_user_id
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +24,10 @@ class RouteGPXExportResource(Resource):
     def get(self, route_id: str):
         """Export a route as GPX file."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
+            if not hasattr(g, 'user') or g.user is None:
                 return error_response("Authentication required", 401)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get route data
             route_result = supabase.table('routes').select('*').eq('id', route_id).execute()
@@ -39,7 +38,7 @@ class RouteGPXExportResource(Resource):
             route_data = route_result.data[0]
             
             # Check if user can access this route
-            if not route_data['is_public'] and route_data['created_by_user_id'] != user_id:
+            if not route_data['is_public'] and route_data['created_by_user_id'] != g.user.id:
                 return error_response("Route not found", 404)
             
             # Get elevation points
@@ -174,17 +173,16 @@ class SessionGPXExportResource(Resource):
     def get(self, session_id: int):
         """Export a ruck session as GPX file."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
+            if not hasattr(g, 'user') or g.user is None:
                 return error_response("Authentication required", 401)
-            
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+        
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get session data
             session_result = supabase.table('ruck_session').select(
                 'id, name, start_time, end_time, total_distance_km, ruck_weight_kg, '
                 'user_id, route_id, is_guided_session'
-            ).eq('id', session_id).eq('user_id', user_id).execute()
+            ).eq('id', session_id).eq('user_id', g.user.id).execute()
             
             if not session_result.data:
                 return error_response("Session not found", 404)
@@ -305,8 +303,7 @@ class GPXExportBatchResource(Resource):
     def post(self):
         """Export multiple items as a batch GPX file."""
         try:
-            user_id = get_current_user_id()
-            if not user_id:
+            if not hasattr(g, 'user') or g.user is None:
                 return error_response("Authentication required", 401)
             
             data = request.get_json()
@@ -320,7 +317,7 @@ class GPXExportBatchResource(Resource):
             if not session_ids and not route_ids:
                 return error_response("At least one session_id or route_id is required", 400)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Create root GPX element
             gpx = ET.Element('gpx')
@@ -345,14 +342,14 @@ class GPXExportBatchResource(Resource):
             # Export sessions
             for session_id in session_ids:
                 try:
-                    self._add_session_to_gpx(gpx, session_id, user_id, supabase)
+                    self._add_session_to_gpx(gpx, session_id, g.user.id, supabase)
                 except Exception as e:
                     logger.warning(f"Failed to add session {session_id} to batch GPX: {e}")
             
             # Export routes
             for route_id in route_ids:
                 try:
-                    self._add_route_to_gpx(gpx, route_id, user_id, supabase)
+                    self._add_route_to_gpx(gpx, route_id, g.user.id, supabase)
                 except Exception as e:
                     logger.warning(f"Failed to add route {route_id} to batch GPX: {e}")
             
