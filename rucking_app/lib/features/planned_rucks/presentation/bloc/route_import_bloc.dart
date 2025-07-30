@@ -608,6 +608,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
     ConfirmImport event,
     Emitter<RouteImportState> emit,
   ) async {
+    print('🔥 _onConfirmImport CALLED!');
     try {
       emit(const RouteImportInProgress(
         message: 'Importing route...',
@@ -617,19 +618,33 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       // Import the route
       Route importedRoute;
       
-      AppLogger.info('ConfirmImport: route.id=${event.route.id}, route.source=${event.route.source}, routePolyline.length=${event.route.routePolyline.length}');
+      print('🔍 ConfirmImport: route.id=${event.route.id}, route.source=${event.route.source}, routePolyline.length=${event.route.routePolyline.length}');
+      print('🔍 ConfirmImport: _currentGpxFile=${_currentGpxFile?.path}');
       
       if (event.route.id != null) {
         // Route already exists in backend, just reference it
-        AppLogger.info('Using existing route with ID: ${event.route.id}');
+        print('🔍 BRANCH 1: Using existing route with ID: ${event.route.id}');
         importedRoute = event.route;
-      } else {
-        AppLogger.error('Route has no ID - this should not happen for GPX imports after validation!');
-        // This should not happen for GPX imports - they should have been imported during validation
-        emit(RouteImportError.validation(
-          message: 'Internal error: Route missing ID after validation',
+      } else if (event.route.source == 'gpx_import' && _currentGpxFile != null) {
+        // This is a GPX import - actually import the GPX file now
+        print('🔍 BRANCH 2: Importing GPX file: ${_currentGpxFile!.path}');
+        emit(const RouteImportInProgress(
+          message: 'Importing GPX route...',
+          progress: 0.3,
         ));
-        return;
+        
+        importedRoute = await _gpxService.importGpxFile(_currentGpxFile!);
+        print('🔍 GPX imported successfully with ID: ${importedRoute.id}');
+      } else {
+        // Create new route using the routes repository
+        print('🔍 BRANCH 3: Creating new route via routes repository');
+        emit(const RouteImportInProgress(
+          message: 'Creating route...',
+          progress: 0.3,
+        ));
+        
+        importedRoute = await _routesRepository.createRoute(event.route);
+        print('🔍 Route created successfully with ID: ${importedRoute.id}');
       }
 
       PlannedRuck? plannedRuck;

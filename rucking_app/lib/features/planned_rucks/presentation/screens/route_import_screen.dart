@@ -212,11 +212,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           else
             GpxFilePicker(
               onFileSelected: (file) {
-                context.read<RouteImportBloc>().add(ImportGpxFile(
+                context.read<RouteImportBloc>().add(ValidateGpxFile(
                   gpxFile: file,
-                  createPlannedRuck: _createPlannedRuck,
-                  plannedDate: _plannedDate,
-                  notes: _notes,
                 ));
               },
             ),

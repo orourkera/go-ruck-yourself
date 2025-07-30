@@ -14,7 +14,7 @@ import re
 
 from ..supabase_client import get_supabase_client
 from ..models import Route, RouteElevationPoint, RoutePointOfInterest
-
+from ..utils.auth_helper import get_current_user_id
 from ..services.route_analytics_service import RouteAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class GPXImportResource(Resource):
                     "message": "Authentication required"
                 }, 401
             
-            # Get GPX data from request
+            # Get GPX data from JSON payload (same as validation endpoint)
             data = request.get_json()
             if not data:
                 return {
@@ -42,6 +42,7 @@ class GPXImportResource(Resource):
             gpx_content = data.get('gpx_content')
             source_url = data.get('source_url')  # Optional AllTrails URL
             custom_name = data.get('name')  # Optional custom name override
+            make_public = data.get('make_public', False)
             
             if not gpx_content:
                 return {
@@ -145,7 +146,7 @@ class GPXImportResource(Resource):
             bounds = self._calculate_bounds(main_track['points'])
             
             # Determine source
-            source = 'alltrails' if source_url and 'alltrails.com' in source_url else 'gpx_import'
+            source = 'alltrails' if source_url and 'alltrails.com' in source_url else 'manual'
             
             # Build route data
             route_data = {
@@ -163,8 +164,8 @@ class GPXImportResource(Resource):
                 'elevation_gain_m': main_track['elevation_gain_m'],
                 'elevation_loss_m': main_track['elevation_loss_m'],
                 'trail_difficulty': self._estimate_difficulty(main_track['distance_km'], main_track['elevation_gain_m']),
-                'trail_type': 'mixed',  # Default for GPX imports
-                'surface_type': 'varied',  # Default for GPX imports
+                'trail_type': 'out_and_back',  # Default for GPX imports
+                'surface_type': 'mixed',  # Default for GPX imports
                 'is_public': False,  # User-imported routes are private by default
                 'is_verified': source == 'alltrails',  # AllTrails routes are considered verified
                 'created_at': datetime.now().isoformat(),

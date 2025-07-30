@@ -268,10 +268,10 @@ Future<void> setupServiceLocator() async {
   
   // AllTrails BLoCs
   print('🔧 [ServiceLocator] Registering AllTrails BLoCs...');
-  getIt.registerFactory<PlannedRuckBloc>(() => PlannedRuckBloc(
+  getIt.registerLazySingleton<PlannedRuckBloc>(() => PlannedRuckBloc(
     plannedRucksRepository: getIt<PlannedRucksRepository>(),
   ));
-  getIt.registerFactory<RouteImportBloc>(() => RouteImportBloc(
+  getIt.registerLazySingleton<RouteImportBloc>(() => RouteImportBloc(
     routesRepository: getIt<RoutesRepository>(),
     plannedRucksRepository: getIt<PlannedRucksRepository>(),
     gpxService: getIt<GpxService>(),

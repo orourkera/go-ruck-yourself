@@ -81,32 +81,18 @@ class GpxService {
   /// Returns created route or throws exception on error
   Future<Route> importGpxFile(File gpxFile, {bool makePublic = false}) async {
     try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${AppConfig.apiBaseUrl}/gpx/import'),
-      );
-
-      final token = await _apiClient.getToken();
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-      request.headers['Accept'] = 'application/json';
-      request.fields['make_public'] = makePublic.toString();
-      request.files.add(await http.MultipartFile.fromPath('file', gpxFile.path));
-
-      final streamedResponse = await http.Client().send(request);
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(response.body);
-        final route = Route.fromJson(data['route'] as Map<String, dynamic>);
-        
-        AppLogger.info('Successfully imported GPX file: ${route.name}');
-        return route;
-      } else {
-        AppLogger.error('Failed to import GPX file: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to import GPX file: ${response.statusCode}');
-      }
+      // Read file content as string (same as validation)
+      final gpxContent = await gpxFile.readAsString();
+      
+      // Send as JSON to match backend expectation (same pattern as validation)
+      final response = await _apiClient.post('/gpx/import', {
+        'gpx_content': gpxContent,
+        'make_public': makePublic,
+      });
+      
+      final route = Route.fromJson(response['route'] as Map<String, dynamic>);
+      AppLogger.info('Successfully imported GPX file: ${route.name}');
+      return route;
     } catch (e) {
       AppLogger.error('Error importing GPX file: $e');
       throw Exception('Error importing GPX file: $e');
