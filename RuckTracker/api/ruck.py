@@ -709,16 +709,15 @@ class RuckSessionCompleteResource(Resource):
             if ruck_id is None:
                 return {'message': 'Invalid ruck session ID format'}, 400
             
-            # Check authentication with proper token expiry detection
-            user_id = get_current_user_id()
-            auth_response = check_auth_and_respond(user_id)
-            if auth_response:
-                logger.warning(f"Session completion failed for ruck {ruck_id}: Authentication failed - {auth_response[0].get('error')}")
-                return auth_response
+            # Check authentication (use same pattern as location endpoint)
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            user_id = g.user.id
             data = request.get_json()
             if not data:
                 return {'message': 'No data provided'}, 400
-            supabase = get_supabase_client()
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             # Check if session exists
             session_check = supabase.table('ruck_session') \
                 .select('id,status,started_at') \
