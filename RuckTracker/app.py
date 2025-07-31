@@ -18,23 +18,27 @@ from .services.redis_cache_service import get_cache_service # Add Redis cache se
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure logging - default to WARNING to suppress info/debug noise.
-# Set VERBOSE_LOGS=true env var to restore INFO level in staging/dev.
-log_level = logging.WARNING
+# Configure logging - always show ERROR and CRITICAL, but allow INFO/DEBUG control
+# Set VERBOSE_LOGS=true env var to show INFO level in staging/dev.
+log_level = logging.ERROR  # Always show errors
 if os.environ.get("VERBOSE_LOGS") == "true":
     log_level = logging.INFO
 elif os.environ.get("FLASK_ENV") == "development":
     log_level = logging.DEBUG
 
-# Configure logging to ensure all errors are captured
+# Configure logging to ensure all errors are captured with better formatting
 logging.basicConfig(
     level=log_level,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
         logging.StreamHandler(sys.stderr)  # Also log to stderr for errors
     ]
 )
+
+# Force ERROR level for our application loggers to always show errors
+logging.getLogger('RuckTracker').setLevel(logging.ERROR)
+logging.getLogger(__name__).setLevel(logging.ERROR)
 
 # Set specific logger levels to reduce log volume
 logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Reduce werkzeug verbosity
