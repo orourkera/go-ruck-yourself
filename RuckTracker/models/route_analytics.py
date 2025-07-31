@@ -13,10 +13,10 @@ class RouteAnalytics:
     """Analytics record for route usage and user interactions."""
     
     # Core identification
-    id: Optional[str]
     route_id: str
     user_id: str
     event_type: str  # planned, started, completed, cancelled, viewed
+    id: Optional[str] = None
     
     # Session-specific data (when applicable)
     actual_duration_hours: Optional[Decimal] = None
@@ -94,7 +94,6 @@ class RouteAnalytics:
     def create_view_event(cls, route_id: str, user_id: str) -> 'RouteAnalytics':
         """Create a route view analytics event."""
         return cls(
-            id=None,
             route_id=route_id,
             user_id=user_id,
             event_type='viewed',
@@ -105,7 +104,6 @@ class RouteAnalytics:
     def create_planned_event(cls, route_id: str, user_id: str) -> 'RouteAnalytics':
         """Create a route planned analytics event."""
         return cls(
-            id=None,
             route_id=route_id,
             user_id=user_id,
             event_type='planned',
@@ -116,7 +114,6 @@ class RouteAnalytics:
     def create_started_event(cls, route_id: str, user_id: str, ruck_weight_kg: Optional[Decimal] = None) -> 'RouteAnalytics':
         """Create a route started analytics event."""
         return cls(
-            id=None,
             route_id=route_id,
             user_id=user_id,
             event_type='started',
@@ -136,7 +133,6 @@ class RouteAnalytics:
     ) -> 'RouteAnalytics':
         """Create a route completed analytics event with session data."""
         return cls(
-            id=None,
             route_id=route_id,
             user_id=user_id,
             event_type='completed',
@@ -151,7 +147,6 @@ class RouteAnalytics:
     def create_cancelled_event(cls, route_id: str, user_id: str, reason: Optional[str] = None) -> 'RouteAnalytics':
         """Create a route cancelled analytics event."""
         return cls(
-            id=None,
             route_id=route_id,
             user_id=user_id,
             event_type='cancelled',
