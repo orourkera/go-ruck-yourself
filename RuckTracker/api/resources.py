@@ -6,7 +6,7 @@ from flask_restful import Resource
 from sqlalchemy import func, extract
 
 from ..extensions import db
-from ..models import User, RuckSession, LocationPoint, SessionReview
+from ..models import RuckSession, LocationPoint, SessionReview
 from .schemas import (
     UserSchema, SessionSchema, LocationPointSchema, 
     SessionReviewSchema, StatisticsSchema, 
@@ -197,30 +197,11 @@ class UserResource(Resource):
             logger.error(f"Error deleting user {user_id} from Supabase: {str(e)}", exc_info=True)
             return {'message': f'Error deleting user from Supabase: {str(e)}'}, 500
 
-        # Delete from local DB (SQLAlchemy ORM)
-        logger.debug(f"Attempting to find user {user_id} in local DB for deletion.")
-        user = User.query.filter_by(id=user_id).first()
-        if not user:
-            logger.warning(f"User {user_id} not found in local DB.")
-            # Since Supabase deletion was successful, we can still return success
-            return {"message": "User deleted successfully from Supabase, but not found in local DB"}, 200
-        try:
-            # Merge the user object into the current session to avoid session conflicts
-            user = db.session.merge(user)
-            db.session.delete(user)
-            db.session.commit()
-            logger.info(f"User {user_id} deleted successfully from local DB.")
-            return {"message": "User and all associated data deleted successfully"}, 200
-        except RuntimeError as re:
-            logger.error(f"Flask-SQLAlchemy initialization error for user {user_id}: {str(re)}")
-            logger.error(f"Rolling back local DB session for user {user_id} due to error.")
-            # Since Supabase deletion was successful, return success despite local DB issue
-            return {"message": "User deleted successfully from Supabase, but local DB deletion failed due to configuration issue"}, 200
-        except Exception as e:
-            logger.error(f"Rolling back local DB session for user {user_id} due to error.")
-            db.session.rollback()
-            logger.error(f"Error during user deletion process for {user_id}: {str(e)}", exc_info=True)
-            return {'message': 'An error occurred during deletion'}, 500
+        # Note: This app uses Supabase for user management, no local User model
+        # The main user deletion (Supabase auth) was successful above
+        # Any user-related data cleanup should be handled by Supabase triggers or RLS policies
+        logger.info(f"User {user_id} deletion completed - Supabase auth user removed.")
+        return {"message": "User deleted successfully from Supabase"}, 200
 
 
 class UserListResource(Resource):
