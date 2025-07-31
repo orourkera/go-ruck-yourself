@@ -352,8 +352,20 @@ class RuckSessionListResource(Resource):
             
             # Add event_id if provided (for event-associated ruck sessions)
             if 'event_id' in data and data.get('event_id') is not None:
-                session_data['event_id'] = data.get('event_id')
-                logger.info(f"Creating session for event {data.get('event_id')}")
+                event_id_raw = data.get('event_id')
+                
+                # Handle manual ruck sessions - these shouldn't have an event_id
+                if isinstance(event_id_raw, str) and event_id_raw.startswith('manual_'):
+                    logger.info(f"Manual ruck session detected, ignoring event_id: {event_id_raw}")
+                    # Don't set event_id for manual sessions
+                else:
+                    # For actual events, ensure event_id is an integer
+                    try:
+                        event_id = int(event_id_raw)
+                        session_data['event_id'] = event_id
+                        logger.info(f"Creating session for event {event_id}")
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid event_id format: {event_id_raw}, ignoring")
             else:
                 logger.info("No event_id provided - creating regular session")
             

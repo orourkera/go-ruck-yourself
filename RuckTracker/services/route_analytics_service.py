@@ -101,7 +101,6 @@ class RouteAnalyticsService:
         try:
             # Use 'viewed' event type since 'created' is not in valid event types
             analytics_event = RouteAnalytics(
-                id=None,
                 route_id=route_id,
                 user_id=user_id,
                 event_type='viewed',  # Use 'viewed' as closest valid event type

@@ -127,9 +127,11 @@ class PlannedRucksResource(Resource):
             data['status'] = 'planned'  # Always start as planned
             data['id'] = None  # New planned ruck has no ID yet
             
-            # Set default ruck weight if not provided (database constraint requires it)
+            # Set defaults if not provided
             if not data.get('planned_ruck_weight_kg'):
                 data['planned_ruck_weight_kg'] = 15.0  # Default 15kg ruck weight
+            if not data.get('planned_difficulty'):
+                data['planned_difficulty'] = 'moderate'  # Default moderate difficulty
             
             # Create PlannedRuck object for validation  
             planned_ruck = PlannedRuck.from_dict(data)
