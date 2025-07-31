@@ -44,8 +44,7 @@ class RouteAnalytics:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
-            'id': self.id,
+        result = {
             'route_id': self.route_id,
             'user_id': self.user_id,
             'event_type': self.event_type,
@@ -55,6 +54,12 @@ class RouteAnalytics:
             'user_feedback': self.user_feedback,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+        
+        # Only include id if it's not None (let database auto-generate UUID if None)
+        if self.id is not None:
+            result['id'] = self.id
+            
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'RouteAnalytics':
