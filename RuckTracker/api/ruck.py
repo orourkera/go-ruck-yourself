@@ -334,7 +334,20 @@ class RuckSessionListResource(Resource):
             
             # Handle custom session ID if provided
             if 'id' in data and data.get('id') is not None:
-                session_data['id'] = data.get('id')
+                session_id_raw = data.get('id')
+                
+                # Handle manual sessions - these should get database auto-generated ID
+                if isinstance(session_id_raw, str) and session_id_raw.startswith('manual_'):
+                    logger.info(f"Manual session detected, letting database auto-generate ID instead of: {session_id_raw}")
+                    # Don't set id for manual sessions - let database auto-generate
+                else:
+                    # For regular sessions, use the provided ID
+                    try:
+                        session_id = int(session_id_raw)
+                        session_data['id'] = session_id
+                        logger.info(f"Using provided session ID: {session_id}")
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid session ID format: {session_id_raw}, letting database auto-generate")
             
             # Handle notes if provided
             if 'notes' in data and data.get('notes') is not None:
