@@ -90,16 +90,23 @@ class PlannedRuck extends Equatable {
       plannedStartTime: json['planned_start_time'] != null 
           ? DateTime.parse(json['planned_start_time'] as String) 
           : null,
-      targetWeight: json['target_weight'] != null 
+      // Map backend field names to model fields
+      targetWeight: json['planned_ruck_weight_kg'] != null 
+          ? (json['planned_ruck_weight_kg'] as num).toDouble() 
+          : json['target_weight'] != null 
           ? (json['target_weight'] as num).toDouble() 
           : null,
       targetPace: json['target_pace'] != null 
           ? (json['target_pace'] as num).toDouble() 
           : null,
       notes: json['notes'] as String?,
-      projectedDurationMinutes: json['projected_duration_minutes'] as int?,
-      projectedCalories: json['projected_calories'] as int?,
-      projectedIntensity: json['projected_intensity'] as String?,
+      // Convert hours to minutes for duration
+      projectedDurationMinutes: json['estimated_duration_hours'] != null 
+          ? ((json['estimated_duration_hours'] as num) * 60).round() 
+          : json['projected_duration_minutes'] as int?,
+      projectedCalories: json['estimated_calories'] as int? ?? json['projected_calories'] as int?,
+      // Map planned_difficulty to projected_intensity
+      projectedIntensity: json['planned_difficulty'] as String? ?? json['projected_intensity'] as String?,
       status: PlannedRuckStatus.fromString(json['status'] as String? ?? 'planned'),
       actualSessionId: json['actual_session_id'] as String?,
       completedAt: json['completed_at'] != null 
