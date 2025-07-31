@@ -319,7 +319,7 @@ class RuckSessionListResource(Resource):
             session_data = {
                 'user_id': g.user.id,
                 'status': 'in_progress',
-                'start_time': datetime.now(tz.tzutc()).isoformat()
+                'started_at': datetime.now(tz.tzutc()).isoformat()
             }
             
             # Handle ruck weight (multiple possible keys)

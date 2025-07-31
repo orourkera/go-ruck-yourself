@@ -148,8 +148,10 @@ class PlannedRucksResource(Resource):
             except Exception as e:
                 logger.warning(f"Failed to calculate projections: {e}")
             
-            # Insert planned ruck
-            result = supabase.table('planned_ruck').insert(planned_ruck.to_dict()).execute()
+            # Insert planned ruck (exclude id field so database can auto-generate it)
+            insert_data = planned_ruck.to_dict()
+            insert_data.pop('id', None)  # Remove id field for database insert
+            result = supabase.table('planned_ruck').insert(insert_data).execute()
             
             if not result.data:
                 return {"success": False, "error": "Failed to create planned ruck", "status": 500}
