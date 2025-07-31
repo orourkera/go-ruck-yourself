@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 class RouteAnalyticsService:
     """Service for recording and retrieving route analytics."""
     
-    def __init__(self):
-        self.supabase = get_supabase_client()
+    def __init__(self, user_jwt=None):
+        # Use authenticated client if JWT provided, otherwise fallback to regular client
+        self.supabase = get_supabase_client(user_jwt=user_jwt)
+        self.user_jwt = user_jwt
     
     def record_route_viewed(self, route_id: str, user_id: str) -> bool:
         """Record when a user views a route."""
@@ -111,7 +113,12 @@ class RouteAnalyticsService:
             return bool(result.data)
             
         except Exception as e:
-            logger.error(f"Failed to record route creation: {e}")
+            # Check if it's an RLS policy violation (non-critical error)
+            error_str = str(e)
+            if 'row-level security policy' in error_str or '42501' in error_str:
+                logger.warning(f"Route analytics RLS policy violation - route: {route_id}, user: {user_id}. This is non-critical.")
+            else:
+                logger.error(f"Failed to record route creation analytics - route: {route_id}, user: {user_id}: {e}")
             return False
     
     def get_route_popularity_stats(self, route_id: str) -> Optional[RoutePopularityStats]:

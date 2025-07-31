@@ -13,7 +13,7 @@ from datetime import datetime
 from ..supabase_client import get_supabase_client
 from ..models import Route, RouteElevationPoint, RoutePointOfInterest
 from ..utils.api_response import success_response, error_response
-from ..utils.auth_helper import get_current_user_id
+from ..utils.auth_helper import get_current_user_id, get_current_user_jwt
 from ..services.route_analytics_service import RouteAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -134,9 +134,10 @@ class RoutesResource(Resource):
             
             created_route = Route.from_dict(result.data[0])
             
-            # Record analytics event
+            # Record analytics event with authenticated client
             try:
-                analytics_service = RouteAnalyticsService()
+                user_jwt = get_current_user_jwt()
+                analytics_service = RouteAnalyticsService(user_jwt=user_jwt)
                 analytics_service.record_route_created(created_route.id, user_id)
             except Exception as e:
                 logger.warning(f"Failed to record route creation analytics: {e}")

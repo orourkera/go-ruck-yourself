@@ -14,7 +14,7 @@ import re
 
 from ..supabase_client import get_supabase_client
 from ..models import Route, RouteElevationPoint, RoutePointOfInterest
-from ..utils.auth_helper import get_current_user_id
+from ..utils.auth_helper import get_current_user_id, get_current_user_jwt
 from ..services.route_analytics_service import RouteAnalyticsService
 
 logger = logging.getLogger(__name__)
@@ -92,9 +92,10 @@ class GPXImportResource(Resource):
                 poi_result = supabase.table('route_point_of_interest').insert(route_data['points_of_interest']).execute()
                 pois_created = len(poi_result.data) if poi_result.data else 0
             
-            # Record analytics
+            # Record analytics with authenticated client
             try:
-                analytics_service = RouteAnalyticsService()
+                user_jwt = get_current_user_jwt()
+                analytics_service = RouteAnalyticsService(user_jwt=user_jwt)
                 analytics_service.record_route_created(route_id, g.user.id)
             except Exception as e:
                 logger.warning(f"Failed to record import analytics: {e}")

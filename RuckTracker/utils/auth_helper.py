@@ -28,6 +28,28 @@ def get_current_user_id() -> Optional[str]:
     return None
 
 
+def get_current_user_jwt() -> Optional[str]:
+    """
+    Extract the current user's JWT token from the request
+    
+    This function uses the Flask g object that is set by the app's 
+    @app.before_request middleware which handles Supabase authentication.
+    
+    Returns:
+        JWT token as string if authenticated, None otherwise
+    """
+    # Check if access_token is set in Flask's g object by the middleware
+    if hasattr(g, 'access_token') and g.access_token:
+        return g.access_token
+    
+    # Fallback: try to extract from Authorization header
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        return auth_header.split("Bearer ")[1].strip()
+    
+    return None
+
+
 def _extract_user_from_supabase_auth(auth_header: str) -> Optional[str]:
     """
     Extract user ID from Supabase authentication header
