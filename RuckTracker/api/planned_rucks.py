@@ -127,6 +127,10 @@ class PlannedRucksResource(Resource):
             data['status'] = 'planned'  # Always start as planned
             data['id'] = None  # New planned ruck has no ID yet
             
+            # Set default ruck weight if not provided (database constraint requires it)
+            if not data.get('planned_ruck_weight_kg'):
+                data['planned_ruck_weight_kg'] = 15.0  # Default 15kg ruck weight
+            
             # Create PlannedRuck object for validation  
             planned_ruck = PlannedRuck.from_dict(data)
             
@@ -177,14 +181,14 @@ class PlannedRucksResource(Resource):
         """Calculate estimated duration, calories, and difficulty for planned ruck."""
         try:
             # Get user profile for calculations
-            user_result = supabase.table('user').select('weight_kg, fitness_level').eq('id', user_id).execute()
+            user_result = supabase.table('user').select('weight_kg').eq('id', user_id).execute()
             
             if not user_result.data:
                 return
             
             user_data = user_result.data[0]
-            user_weight_kg = Decimal(str(user_data.get('weight_kg', 70)))  # Default 70kg
-            fitness_level = user_data.get('fitness_level', 'moderate')  # Default moderate
+            user_weight_kg = user_data.get('weight_kg', 70)  # Default 70kg
+            fitness_level = 'moderate'  # Default moderate (fitness_level column doesn't exist)
             
             route_distance_km = Decimal(str(route_data['distance_km']))
             route_elevation_gain_m = Decimal(str(route_data.get('elevation_gain_m', 0)))

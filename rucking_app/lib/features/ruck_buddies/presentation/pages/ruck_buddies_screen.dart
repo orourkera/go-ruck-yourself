@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/ruck_buddies/data/repositories/ruck_buddies_repository_impl.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/bloc/ruck_buddies_bloc.dart';
@@ -42,6 +44,30 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
         context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent(limit: 10));
       }
     });
+  }
+  
+  /// Handle pull-to-refresh action
+  Future<void> _onRefresh() async {
+    debugPrint('🔄 [_RuckBuddiesScreenState._onRefresh] Pull-to-refresh triggered');
+    
+    // Clear the cache to force fresh data
+    RuckBuddiesRepositoryImpl.clearRuckBuddiesCache();
+    
+    // Fetch fresh data
+    context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent(limit: 10));
+    
+    // Wait for the data to load
+    final completer = Completer<void>();
+    late StreamSubscription subscription;
+    
+    subscription = context.read<RuckBuddiesBloc>().stream.listen((state) {
+      if (state is RuckBuddiesLoaded || state is RuckBuddiesError) {
+        subscription.cancel();
+        completer.complete();
+      }
+    });
+    
+    return completer.future;
   }
   
   void _preloadDemoImages() {
@@ -151,9 +177,11 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
             
             const SizedBox(height: 8),
             
-            // Main content area
+            // Main content area with pull-to-refresh
             Expanded(
-              child: BlocConsumer<RuckBuddiesBloc, RuckBuddiesState>(
+              child: RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: BlocConsumer<RuckBuddiesBloc, RuckBuddiesState>(
                 listenWhen: (previous, current) {
                   // Only trigger batch check when new data is loaded (not on loading states)
                   return (current is RuckBuddiesLoaded && 
@@ -231,6 +259,7 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                   );
                 },
               ),
+            ),
             ),
           ],
         ),

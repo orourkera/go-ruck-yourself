@@ -97,12 +97,12 @@ class RouteAnalyticsService:
     def record_route_created(self, route_id: str, user_id: str) -> bool:
         """Record when a user creates a new route."""
         try:
-            # Use a special analytics event for route creation
+            # Use 'viewed' event type since 'created' is not in valid event types
             analytics_event = RouteAnalytics(
                 id=None,
                 route_id=route_id,
                 user_id=user_id,
-                event_type='created',  # Special event type not in standard enum
+                event_type='viewed',  # Use 'viewed' as closest valid event type
                 created_at=datetime.now()
             )
             
