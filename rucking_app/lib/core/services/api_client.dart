@@ -299,9 +299,13 @@ class ApiClient {
         receiveTimeout: const Duration(seconds: 45),
       );
       
+      String fullEndpoint = endpoint;
+      if (AppConfig.useRustAchievements && endpoint.startsWith('/achievements')) {
+        fullEndpoint = 'http://localhost:8080$endpoint'; // Or deployed Rust URL
+      }
       // Make API call
       final response = await _dio.get(
-        endpoint,
+        fullEndpoint,
         queryParameters: queryParams,
         options: options,
       );
@@ -352,8 +356,12 @@ class ApiClient {
         options.headers?.remove('Authorization');
       }
       
+      String fullEndpoint = endpoint;
+      if (AppConfig.useRustAchievements && endpoint.startsWith('/achievements')) {
+        fullEndpoint = 'http://localhost:8080$endpoint';
+      }
       final response = await _dio.post(
-        endpoint,
+        fullEndpoint,
         data: body,
         options: options,
       );

@@ -25,6 +25,7 @@ class AppConfig {
   // Feature flags
   static const bool enableHealthSync = true;
   static const bool enableOfflineMode = true;
+  static const bool useRustAchievements = false; // Feature flag for Rust backend
   
   // Notification channels
   static const String ruckSessionChannel = 'ruck_session_channel';

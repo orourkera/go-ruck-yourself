@@ -774,12 +774,18 @@ class RuckSessionCompleteResource(Resource):
         
             user_allows_sharing = user_resp.data.get('allow_ruck_sharing', False) if user_resp.data else False
         
-            # Calculate duration
-            if started_at_str:
+            # Calculate duration - prioritize manually provided duration over calculated duration
+            if 'duration_seconds' in data and data['duration_seconds'] is not None:
+                # Use manually provided duration (for manual sessions)
+                duration_seconds = int(data['duration_seconds'])
+                logger.info(f"Using manually provided duration: {duration_seconds} seconds")
+            elif started_at_str:
+                # Calculate duration from timestamps (for live sessions)
                 try:
                     started_at = datetime.fromisoformat(started_at_str.replace('Z', '+00:00'))
                     ended_at = datetime.now(tz.tzutc())
                     duration_seconds = int((ended_at - started_at).total_seconds())
+                    logger.info(f"Calculated duration from timestamps: {duration_seconds} seconds")
                 except Exception as e:
                     logger.error(f"Error calculating duration for session {ruck_id}: {e}")
                     duration_seconds = 0
