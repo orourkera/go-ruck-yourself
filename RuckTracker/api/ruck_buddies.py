@@ -289,7 +289,8 @@ def get_ruck_buddies():
         ) \
         .eq('is_public', True) \
         .neq('user_id', g.user.id) \
-        .gt('duration_seconds', 180)
+        .gt('duration_seconds', 180) \
+        .gte('distance_km', 0.5)
     
     # If following_only is true, filter to only show rucks from users the current user follows
     if following_only:
