@@ -11,6 +11,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 
 from ..supabase_client import get_supabase_client
+
 from ..models import PlannedRuck
 # Removed unused response helper imports to prevent serialization issues
 from ..services.route_analytics_service import RouteAnalyticsService
@@ -166,7 +167,7 @@ class PlannedRucksResource(Resource):
             
             # Record analytics event
             try:
-                analytics_service = RouteAnalyticsService()
+                analytics_service = RouteAnalyticsService(user_jwt=getattr(g, 'access_token', None))
                 analytics_service.record_route_planned(planned_ruck.route_id, g.user.id)
             except Exception as e:
                 logger.warning(f"Failed to record planned ruck analytics: {e}")
@@ -341,7 +342,7 @@ class PlannedRuckResource(Resource):
             # Record analytics event if it was previously planned
             if existing_data['status'] == 'planned':
                 try:
-                    analytics_service = RouteAnalyticsService()
+                    analytics_service = RouteAnalyticsService(user_jwt=getattr(g, 'access_token', None))
                     analytics_service.record_route_cancelled(existing_data['route_id'], g.user.id)
                 except Exception as e:
                     logger.warning(f"Failed to record cancellation analytics: {e}")
@@ -404,7 +405,7 @@ class PlannedRuckActionsResource(Resource):
         
         # Record analytics event
         try:
-            analytics_service = RouteAnalyticsService()
+            analytics_service = RouteAnalyticsService(user_jwt=getattr(g, 'access_token', None))
             analytics_service.record_route_started(planned_ruck.route_id, planned_ruck.user_id, planned_ruck.planned_ruck_weight_kg)
         except Exception as e:
             logger.warning(f"Failed to record start analytics: {e}")
@@ -434,7 +435,7 @@ class PlannedRuckActionsResource(Resource):
         
         # Record analytics event with optional feedback
         try:
-            analytics_service = RouteAnalyticsService()
+            analytics_service = RouteAnalyticsService(user_jwt=getattr(g, 'access_token', None))
             
             duration_hours = data.get('duration_hours')
             rating = data.get('rating')
