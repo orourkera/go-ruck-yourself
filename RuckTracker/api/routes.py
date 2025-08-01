@@ -30,6 +30,7 @@ class RoutesResource(Resource):
             min_distance = request.args.get('min_distance', type=float)
             max_distance = request.args.get('max_distance', type=float)
             search = request.args.get('search')  # Search in name/description
+            created_by_me = request.args.get('created_by_me', 'false').lower() == 'true'
             limit = request.args.get('limit', 20, type=int)
             offset = request.args.get('offset', 0, type=int)
             
@@ -67,8 +68,13 @@ class RoutesResource(Resource):
                 # Search in name and description
                 query = query.or_(f'name.ilike.%{search}%,description.ilike.%{search}%')
             
-            # Only public routes or user's own routes
-            query = query.or_('is_public.eq.true,created_by_user_id.eq.' + user_id)
+            # Handle created_by_me filter
+            if created_by_me:
+                # Only routes created by the current user
+                query = query.eq('created_by_user_id', user_id)
+            else:
+                # Only public routes or user's own routes
+                query = query.or_('is_public.eq.true,created_by_user_id.eq.' + user_id)
             
             # Order by popularity and apply pagination
             query = query.order('total_completed_count', desc=True)
