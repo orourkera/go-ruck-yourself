@@ -7,6 +7,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_event.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
 
 /// Preview widget for planned rucks on the home screen
 class PlannedRucksPreview extends StatelessWidget {
@@ -177,16 +178,18 @@ class PlannedRucksPreview extends StatelessWidget {
   }
 
   Widget _buildPlannedRuckPreviewItem(BuildContext context, PlannedRuck ruck) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.greyLight,
-          width: 0.5,
+    return GestureDetector(
+      onTap: () => _navigateToPlannedRuckDetail(context, ruck),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppColors.greyLight,
+            width: 0.5,
+          ),
         ),
-      ),
       child: Row(
         children: [
           // Status indicator
@@ -243,6 +246,7 @@ class PlannedRucksPreview extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -269,6 +273,22 @@ class PlannedRucksPreview extends StatelessWidget {
         return 'Done';
       case PlannedRuckStatus.cancelled:
         return 'Cancelled';
+    }
+  }
+
+  void _navigateToPlannedRuckDetail(BuildContext context, PlannedRuck ruck) {
+    try {
+      if (context.mounted && ruck.id != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PlannedRuckDetailScreen(plannedRuckId: ruck.id!),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+      // Could show a snackbar here if needed
     }
   }
 
