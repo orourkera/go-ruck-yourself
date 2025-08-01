@@ -70,13 +70,20 @@ class RoutesResource(Resource):
             
             # Handle created_by_me filter
             logger.info(f"Routes filter - user_id: {user_id}, created_by_me: {created_by_me}")
+            
+            # Test what data exists in routes table (this will be filtered by RLS)
+            test_query = supabase.table('routes').select('id,created_by_user_id,name').limit(5)
+            test_result = test_query.execute()
+            logger.info(f"Sample routes accessible to user (via RLS): {test_result.data}")
+            
             if created_by_me:
-                # Only routes created by the current user
-                logger.info(f"Filtering routes by created_by_user_id: {user_id}")
-                query = query.eq('created_by_user_id', user_id)
+                # RLS already filters to user's own routes, no additional filter needed
+                logger.info(f"RLS will automatically filter to user's routes (auth.uid = created_by_user_id)")
+                pass
             else:
-                # Only public routes or user's own routes
-                query = query.or_('is_public.eq.true,created_by_user_id.eq.' + user_id)
+                # Include public routes in addition to user's own routes (RLS handles user's routes)
+                logger.info(f"Including public routes in addition to user's own routes")
+                query = query.eq('is_public', True)
             
             # Order by popularity and apply pagination
             query = query.order('total_completed_count', desc=True)
