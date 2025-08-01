@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
-import 'package:rucking_app/shared/theme/app_text_styles.dart';
+
 
 /// Reusable widget showing Pause/Resume and End Session buttons.
 ///
@@ -14,7 +14,7 @@ class SessionControls extends StatelessWidget {
   final VoidCallback? onEndSession;
   final bool isPaused;
 
-  SessionControls({
+  const SessionControls({
     super.key,
     this.onTogglePause,
     this.onEndSession,
@@ -36,46 +36,58 @@ class SessionControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: <Widget>[
-        Expanded(
-          child: ElevatedButton.icon(
-            icon: Icon(isPaused ? Icons.play_arrow : Icons.pause, color: AppColors.white, size: 20),
-            label: Text(isPaused ? 'RESUME' : 'PAUSE', style: AppTextStyles.labelLarge.copyWith(color: Colors.white)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _getLadyModeColor(context), 
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0), // Match the padding of stats widgets
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: <Widget>[
+          // Pause/Resume button
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _getLadyModeColor(context),
+                shape: const CircleBorder(),
+                padding: EdgeInsets.zero,
+                elevation: 2,
+              ),
+              onPressed: () {
+                HapticFeedback.heavyImpact();
+                debugPrint('[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
+                if (onTogglePause != null) onTogglePause!();
+              },
+              child: Icon(
+                isPaused ? Icons.play_arrow : Icons.pause,
+                color: Colors.white,
+                size: 28,
               ),
             ),
-            onPressed: () {
-            HapticFeedback.heavyImpact();
-            debugPrint('[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
-            if (onTogglePause != null) onTogglePause!();
-          }, 
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: ElevatedButton.icon(
-            icon: Icon(Icons.stop, color: AppColors.white, size: 20),
-            label: Text('STOP', style: AppTextStyles.labelLarge.copyWith(color: Colors.white)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error, 
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          // Stop button
+          SizedBox(
+            width: 60,
+            height: 60,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                shape: const CircleBorder(),
+                padding: EdgeInsets.zero,
+                elevation: 2,
+              ),
+              onPressed: () {
+                HapticFeedback.heavyImpact();
+                if (onEndSession != null) onEndSession!();
+              },
+              child: const Icon(
+                Icons.stop,
+                color: Colors.white,
+                size: 28,
               ),
             ),
-            onPressed: () {
-            HapticFeedback.heavyImpact();
-            if (onEndSession != null) onEndSession!();
-          }, 
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

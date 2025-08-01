@@ -33,6 +33,9 @@ class _RouteImportScreenState extends State<RouteImportScreen>
   late TabController _tabController;
   final PageController _pageController = PageController();
   
+  // Route name editing
+  final TextEditingController _routeNameController = TextEditingController();
+  
   // Import options
   bool _createPlannedRuck = true;
   DateTime? _plannedDate;
@@ -67,6 +70,7 @@ class _RouteImportScreenState extends State<RouteImportScreen>
   void dispose() {
     _tabController.dispose();
     _pageController.dispose();
+    _routeNameController.dispose();
     super.dispose();
   }
 
@@ -133,6 +137,16 @@ class _RouteImportScreenState extends State<RouteImportScreen>
             _showSuccessDialog(state);
           } else if (state is RouteImportError) {
             _showErrorSnackBar(state);
+          } else if (state is RouteImportValidated) {
+            // Pre-populate the route name from GPX metadata
+            if (_routeNameController.text.isEmpty && state.route.name.isNotEmpty) {
+              _routeNameController.text = state.route.name;
+            }
+          } else if (state is RouteImportPreview) {
+            // Pre-populate the route name from preview data
+            if (_routeNameController.text.isEmpty && state.route.name.isNotEmpty) {
+              _routeNameController.text = state.route.name;
+            }
           }
         },
         builder: (context, state) {
@@ -460,6 +474,21 @@ class _RouteImportScreenState extends State<RouteImportScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Route name field - always visible when we have a route to import
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: TextField(
+            controller: _routeNameController,
+            decoration: const InputDecoration(
+              labelText: 'Route Name',
+              hintText: 'Enter a name for this route...',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.route),
+            ),
+            textInputAction: TextInputAction.next,
+          ),
+        ),
+        const SizedBox(height: 16),
         SwitchListTile(
           title: Text('Create planned ruck'),
           value: _createPlannedRuck,
@@ -660,8 +689,14 @@ class _RouteImportScreenState extends State<RouteImportScreen>
     }
 
     if (route != null) {
+      // Use custom route name if provided, otherwise use the original name
+      final customName = _routeNameController.text.trim();
+      final updatedRoute = route.copyWith(
+        name: customName.isNotEmpty ? customName : route.name,
+      );
+      
       context.read<RouteImportBloc>().add(ConfirmImport(
-        route: route,
+        route: updatedRoute,
         createPlannedRuck: _createPlannedRuck,
         plannedDate: _plannedDate,
         notes: _notes,
