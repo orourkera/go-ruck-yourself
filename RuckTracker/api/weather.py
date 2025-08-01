@@ -68,10 +68,13 @@ class WeatherResource(Resource):
             # Generate WeatherKit JWT token
             token = self._generate_jwt_token()
             if not token:
+                logger.error("JWT token generation failed - check WeatherKit configuration")
                 return {
                     "success": False,
                     "message": "Failed to generate authentication token"
                 }, 500
+            
+            logger.info(f"Successfully generated JWT token, proceeding with WeatherKit API calls")
             
             # Make WeatherKit API requests
             weather_data = {}
@@ -93,6 +96,19 @@ class WeatherResource(Resource):
                 daily = self._get_daily_forecast(token, latitude, longitude, target_date)
                 if daily:
                     weather_data['dailyForecast'] = daily
+            
+            # Log final weather data before returning
+            logger.info(f"Final weather data being returned: {weather_data}")
+            logger.info(f"Weather data keys: {list(weather_data.keys())}")
+            
+            # Return error if no data was retrieved
+            if not weather_data:
+                logger.warning("No weather data retrieved from any dataset")
+                return {
+                    "success": False,
+                    "message": "No weather data available",
+                    "debug": "All WeatherKit API calls returned empty data"
+                }, 200
             
             return weather_data, 200
             
