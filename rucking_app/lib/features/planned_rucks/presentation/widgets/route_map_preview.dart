@@ -674,7 +674,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
 
   double _getOptimalZoom() {
     final points = _getRoutePoints();
-    if (points.length < 2) return 14.0;
+    if (points.length < 2) return 13.0;
     
     // Calculate bounds and determine appropriate zoom level
     double minLat = points.first.latitude;
@@ -693,10 +693,11 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     final lngDiff = maxLng - minLng;
     final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
     
-    if (maxDiff > 0.1) return 10.0;
-    if (maxDiff > 0.05) return 12.0;
-    if (maxDiff > 0.01) return 14.0;
-    return 16.0;
+    // Zoom out more to show full route with padding
+    if (maxDiff > 0.1) return 8.0;  // Further reduced for better route visibility
+    if (maxDiff > 0.05) return 10.0; // Further reduced for better route visibility
+    if (maxDiff > 0.01) return 12.0; // Further reduced for better route visibility
+    return 14.0; // Further reduced for better route visibility
   }
 
   String _getMapStyle() {

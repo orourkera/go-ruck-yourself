@@ -244,6 +244,11 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
   }
   
   Widget _buildRouteHeader(BuildContext context, route_model.Route route) {
+    // Initialize controller with route name if it's empty
+    if (_titleController.text.isEmpty && route.name.isNotEmpty) {
+      _titleController.text = route.name;
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -403,13 +408,13 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
                 ? ElevationProfileChart(
                     elevationData: route.elevationPoints,
                     route: route,
-                    height: 200,
+                    height: 250,
                     showDetailedTooltips: true,
                     showGradientAreas: true,
                     isInteractive: true,
                   )
                 : Container(
-                    height: 200,
+                    height: 250,
                     decoration: BoxDecoration(
                       color: AppColors.backgroundLight,
                       borderRadius: BorderRadius.circular(8),

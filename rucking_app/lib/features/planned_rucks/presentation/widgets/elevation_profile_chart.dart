@@ -326,7 +326,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           sideTitles: SideTitles(
             showTitles: true,
             interval: _getHorizontalInterval(),
-            reservedSize: 50,
+            reservedSize: 45,
             getTitlesWidget: (value, meta) {
               return _buildLeftTitle(value);
             },
@@ -510,6 +510,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         '0',
         style: AppTextStyles.bodySmall.copyWith(
           color: AppColors.textDarkSecondary,
+          fontSize: 10,
         ),
       );
     }
@@ -519,6 +520,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         value.toStringAsFixed(1),
         style: AppTextStyles.bodySmall.copyWith(
           color: AppColors.textDarkSecondary,
+          fontSize: 10,
         ),
       );
     }
@@ -530,6 +532,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         value.toStringAsFixed(value < 10 ? 1 : 0),
         style: AppTextStyles.bodySmall.copyWith(
           color: AppColors.textDarkSecondary,
+          fontSize: 10,
         ),
       );
     }
@@ -543,6 +546,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         '${value.toInt()}',
         style: AppTextStyles.bodySmall.copyWith(
           color: AppColors.textDarkSecondary,
+          fontSize: 10,
         ),
       );
     }

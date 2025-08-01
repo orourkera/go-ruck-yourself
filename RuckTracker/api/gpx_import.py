@@ -41,7 +41,8 @@ class GPXImportResource(Resource):
             
             gpx_content = data.get('gpx_content')
             source_url = data.get('source_url')  # Optional AllTrails URL
-            custom_name = data.get('name')  # Optional custom name override
+            custom_name = data.get('custom_name') or data.get('name')  # Optional custom name override
+            custom_description = data.get('custom_description')  # Optional custom description override
             make_public = data.get('make_public', False)
             
             if not gpx_content:
@@ -52,7 +53,7 @@ class GPXImportResource(Resource):
             
             # Parse GPX content
             try:
-                route_data = self._parse_gpx_content(gpx_content, g.user.id, source_url, custom_name)
+                route_data = self._parse_gpx_content(gpx_content, g.user.id, source_url, custom_name, custom_description)
             except Exception as e:
                 logger.error(f"GPX parsing error: {e}")
                 return {
@@ -117,7 +118,7 @@ class GPXImportResource(Resource):
                 "message": "Failed to import GPX file"
             }, 500
     
-    def _parse_gpx_content(self, gpx_content: str, user_id: str, source_url: Optional[str] = None, custom_name: Optional[str] = None) -> Dict[str, Any]:
+    def _parse_gpx_content(self, gpx_content: str, user_id: str, source_url: Optional[str] = None, custom_name: Optional[str] = None, custom_description: Optional[str] = None) -> Dict[str, Any]:
         """Parse GPX XML content and extract route data."""
         try:
             # Parse XML
@@ -152,7 +153,7 @@ class GPXImportResource(Resource):
             # Build route data
             route_data = {
                 'name': custom_name or main_track.get('name') or metadata.get('name') or 'Imported Route',
-                'description': metadata.get('description') or f"Route imported from GPX file",
+                'description': custom_description or metadata.get('description') or f"Route imported from GPX file",
                 'source': source,
                 'external_url': source_url,
                 'created_by_user_id': user_id,

@@ -634,14 +634,14 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         print('🔍 BRANCH 1: Using existing route with ID: ${event.route.id}');
         importedRoute = event.route;
       } else if (event.route.source == 'gpx_import' && _currentGpxFile != null) {
-        // This is a GPX import - actually import the GPX file now
-        print('🔍 BRANCH 2: Importing GPX file: ${_currentGpxFile!.path}');
+        // This is a GPX import - import with the updated route data (including custom name)
+        print('🔍 BRANCH 2: Importing GPX file with custom name: ${event.route.name}');
         emit(const RouteImportInProgress(
           message: 'Importing GPX route...',
           progress: 0.3,
         ));
         
-        importedRoute = await _gpxService.importGpxFile(_currentGpxFile!);
+        importedRoute = await _gpxService.importGpxFileWithCustomData(_currentGpxFile!, event.route);
         print('🔍 GPX imported successfully with ID: ${importedRoute.id}');
       } else {
         // Create new route using the routes repository

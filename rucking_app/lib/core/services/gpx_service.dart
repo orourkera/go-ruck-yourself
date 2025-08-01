@@ -99,6 +99,36 @@ class GpxService {
     }
   }
 
+  /// Import GPX file to backend with custom route data (including custom name)
+  /// 
+  /// Parameters:
+  /// - [gpxFile]: GPX file to import
+  /// - [customRoute]: Route data with custom values (e.g., edited name)
+  /// - [makePublic]: Whether to make the imported route public (default: false)
+  /// 
+  /// Returns created route or throws exception on error
+  Future<Route> importGpxFileWithCustomData(File gpxFile, Route customRoute, {bool makePublic = false}) async {
+    try {
+      // Read file content as string
+      final gpxContent = await gpxFile.readAsString();
+      
+      // Send as JSON with custom name override
+      final response = await _apiClient.post('/gpx/import', {
+        'gpx_content': gpxContent,
+        'custom_name': customRoute.name,
+        'custom_description': customRoute.description,
+        'make_public': makePublic,
+      });
+      
+      final route = Route.fromJson(response['data']['route'] as Map<String, dynamic>);
+      AppLogger.info('Successfully imported GPX file with custom name: ${route.name}');
+      return route;
+    } catch (e) {
+      AppLogger.error('Error importing GPX file with custom data: $e');
+      throw Exception('Error importing GPX file with custom data: $e');
+    }
+  }
+
   /// Validate GPX file without importing
   /// 
   /// Parameters:
