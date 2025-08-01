@@ -88,7 +88,7 @@ class PlannedRuck extends Equatable {
       routeId: json['route_id']?.toString() ?? '',
       plannedDate: DateTime.parse(json['planned_date']?.toString() ?? DateTime.now().toIso8601String()),
       plannedStartTime: json['planned_start_time'] != null 
-          ? DateTime.parse(json['planned_start_time'] as String) 
+          ? DateTime.parse(json['planned_start_time']?.toString() ?? '') 
           : null,
       // Map backend field names to model fields
       targetWeight: json['planned_ruck_weight_kg'] != null 
@@ -104,23 +104,23 @@ class PlannedRuck extends Equatable {
       projectedDurationMinutes: json['estimated_duration_hours'] != null 
           ? ((json['estimated_duration_hours'] as num) * 60).round() 
           : json['projected_duration_minutes'] as int?,
-      projectedCalories: json['estimated_calories'] as int? ?? json['projected_calories'] as int?,
+      projectedCalories: (json['estimated_calories'] as int?) ?? (json['projected_calories'] as int?),
       // Map planned_difficulty to projected_intensity
-      projectedIntensity: json['planned_difficulty'] as String? ?? json['projected_intensity'] as String?,
+      projectedIntensity: (json['planned_difficulty'] as String?) ?? (json['projected_intensity'] as String?),
       status: PlannedRuckStatus.fromString(json['status'] as String? ?? 'planned'),
       actualSessionId: json['actual_session_id'] as String?,
       completedAt: json['completed_at'] != null 
-          ? DateTime.parse(json['completed_at'] as String) 
+          ? DateTime.parse(json['completed_at']?.toString() ?? '') 
           : null,
       cancelledAt: json['cancelled_at'] != null 
-          ? DateTime.parse(json['cancelled_at'] as String) 
+          ? DateTime.parse(json['cancelled_at']?.toString() ?? '') 
           : null,
       cancelReason: json['cancel_reason'] as String?,
       createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'] as String) 
+          ? DateTime.parse(json['created_at']?.toString() ?? '') 
           : null,
       updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at'] as String) 
+          ? DateTime.parse(json['updated_at']?.toString() ?? '') 
           : null,
       route: json['route'] != null 
           ? Route.fromJson(json['route'] as Map<String, dynamic>) 
