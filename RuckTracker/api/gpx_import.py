@@ -16,7 +16,6 @@ from xml.etree import ElementTree as ET
 import pytz
 
 from models.route import Route
-from utils.logger import logger
 from ..models import RouteElevationPoint, RoutePointOfInterest
 from ..utils.auth_helper import get_current_user_id, get_current_user_jwt
 from ..services.route_analytics_service import RouteAnalyticsService
