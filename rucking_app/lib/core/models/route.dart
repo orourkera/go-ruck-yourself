@@ -113,14 +113,14 @@ class Route extends Equatable {
   factory Route.fromJson(Map<String, dynamic> json) {
     return Route(
       id: json['id'] as String?,
-      name: json['name'] as String,
+      name: json['name']?.toString() ?? 'Unknown Route',
       description: json['description'] as String?,
-      source: json['source'] as String,
+      source: json['source']?.toString() ?? 'unknown',
       externalId: json['external_id'] as String?,
       externalUrl: json['external_url'] as String?,
-      routePolyline: json['route_polyline'] as String,
-      startLatitude: (json['start_latitude'] as num).toDouble(),
-      startLongitude: (json['start_longitude'] as num).toDouble(),
+      routePolyline: json['route_polyline']?.toString() ?? '',
+      startLatitude: json['start_latitude'] != null ? (json['start_latitude'] as num).toDouble() : 0.0,
+      startLongitude: json['start_longitude'] != null ? (json['start_longitude'] as num).toDouble() : 0.0,
       endLatitude: json['end_latitude'] != null 
           ? (json['end_latitude'] as num).toDouble() 
           : null,
