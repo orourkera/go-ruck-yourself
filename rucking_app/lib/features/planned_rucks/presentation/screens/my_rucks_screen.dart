@@ -6,8 +6,6 @@ import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruc
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/planned_ruck_card.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/my_rucks_app_bar.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/widgets/status_filter_chips.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/widgets/urgent_rucks_banner.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/empty_rucks_state.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
@@ -24,22 +22,19 @@ class MyRucksScreen extends StatefulWidget {
   State<MyRucksScreen> createState() => _MyRucksScreenState();
 }
 
-class _MyRucksScreenState extends State<MyRucksScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MyRucksScreenState extends State<MyRucksScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     
-    // Load initial data
-    context.read<PlannedRuckBloc>().add(const LoadPlannedRucks(forceRefresh: true));
-    context.read<PlannedRuckBloc>().add(const LoadTodaysPlannedRucks());
-    context.read<PlannedRuckBloc>().add(const LoadUpcomingPlannedRucks());
-    context.read<PlannedRuckBloc>().add(const LoadOverduePlannedRucks());
+    // Load all rucks data - no status filter to get ALL rucks regardless of status
+    context.read<PlannedRuckBloc>().add(const LoadPlannedRucks(
+      forceRefresh: true,
+      limit: 100, // Increase limit to show more rucks
+    ));
 
     // Setup infinite scroll
     _scrollController.addListener(_onScroll);
@@ -47,7 +42,6 @@ class _MyRucksScreenState extends State<MyRucksScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -88,69 +82,12 @@ class _MyRucksScreenState extends State<MyRucksScreen>
         builder: (context, state) {
           return RefreshIndicator(
             onRefresh: () async {
-              context.read<PlannedRuckBloc>().add(const RefreshAllPlannedRucks());
+              context.read<PlannedRuckBloc>().add(const LoadPlannedRucks(
+                forceRefresh: true,
+                limit: 100, // Same as initial load
+              ));
             },
-            child: Column(
-              children: [
-                // Urgent rucks banner
-                if (state is PlannedRuckLoaded && state.hasUrgentRucks)
-                  UrgentRucksBanner(
-                    overdueCount: state.overdueRucks.length,
-                    todayCount: state.todaysRucks.where((r) => r.status == PlannedRuckStatus.planned).length,
-                    onTap: () => _tabController.animateTo(0), // Go to Today tab
-                  ),
-
-                // Status filter chips
-                if (state is PlannedRuckLoaded)
-                  StatusFilterChips(
-                    selectedStatus: state.statusFilter,
-                    onStatusSelected: (status) {
-                      context.read<PlannedRuckBloc>().add(
-                        FilterPlannedRucksByStatus(status: status),
-                      );
-                    },
-                  ),
-
-                // Tabs
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textDarkSecondary,
-                    indicatorColor: AppColors.primary,
-                    tabs: const [
-                      Tab(text: 'Today'),
-                      Tab(text: 'Upcoming'),
-                      Tab(text: 'All'),
-                      Tab(text: 'Completed'),
-                    ],
-                  ),
-                ),
-
-                // Tab content
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildTodayTab(state),
-                      _buildUpcomingTab(state),
-                      _buildAllTab(state),
-                      _buildCompletedTab(state),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            child: _buildAllRucksView(state),
           );
         },
       ),
@@ -164,30 +101,15 @@ class _MyRucksScreenState extends State<MyRucksScreen>
     );
   }
 
-  /// Build today's rucks tab
-  Widget _buildTodayTab(PlannedRuckState state) {
-    if (state is PlannedRuckLoading) {
-      return const Center(child: LoadingIndicator());
-    }
-
-    if (state is PlannedRuckError) {
-      return Center(
-        child: AppErrorWidget(
-          message: state.message,
-          onRetry: state.canRetry
-              ? () => context.read<PlannedRuckBloc>().add(const LoadTodaysPlannedRucks())
-              : null,
-        ),
-      );
-    }
-
+  /// Build all rucks view - simplified single view showing all routes
+  Widget _buildAllRucksView(PlannedRuckState state) {
     if (state is PlannedRuckLoaded) {
-      final todaysRucks = state.todaysRucks;
+      final allRucks = state.plannedRucks;
 
-      if (todaysRucks.isEmpty) {
+      if (allRucks.isEmpty) {
         return EmptyRucksState(
-          title: 'No rucks planned for today',
-          subtitle: 'Start planning your next adventure!',
+          title: 'No rucks available',
+          subtitle: 'Import or plan your first ruck to get started!',
           actionText: 'Plan a Ruck',
           onActionPressed: () => _navigateToImport(),
         );
@@ -196,9 +118,9 @@ class _MyRucksScreenState extends State<MyRucksScreen>
       return ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        itemCount: todaysRucks.length,
+        itemCount: allRucks.length,
         itemBuilder: (context, index) {
-          final ruck = todaysRucks[index];
+          final ruck = allRucks[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: PlannedRuckCard(
@@ -213,135 +135,9 @@ class _MyRucksScreenState extends State<MyRucksScreen>
       );
     }
 
-    return const SizedBox.shrink();
-  }
-
-  /// Build upcoming rucks tab
-  Widget _buildUpcomingTab(PlannedRuckState state) {
-    if (state is PlannedRuckLoaded) {
-      final upcomingRucks = state.upcomingRucks;
-
-      if (upcomingRucks.isEmpty) {
-        return EmptyRucksState(
-          title: 'No upcoming rucks',
-          subtitle: 'Plan some rucks for the coming days!',
-          actionText: 'Plan a Ruck',
-          onActionPressed: () => _navigateToImport(),
-        );
-      }
-
-      return ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(16),
-        itemCount: upcomingRucks.length,
-        itemBuilder: (context, index) {
-          final ruck = upcomingRucks[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: PlannedRuckCard(
-              plannedRuck: ruck,
-              onTap: () => _navigateToDetail(ruck),
-              onEditPressed: () => _editRuck(ruck),
-              onDeletePressed: () => _deleteRuck(ruck),
-            ),
-          );
-        },
-      );
-    }
-
     return _buildLoadingOrError(state);
   }
 
-  /// Build all rucks tab
-  Widget _buildAllTab(PlannedRuckState state) {
-    if (state is PlannedRuckLoaded) {
-      final filteredRucks = state.filteredPlannedRucks;
-
-      if (filteredRucks.isEmpty) {
-        if (state.searchQuery?.isNotEmpty == true) {
-          return EmptyRucksState(
-            title: 'No rucks found',
-            subtitle: 'Try adjusting your search or filters',
-            actionText: 'Clear Search',
-            onActionPressed: () {
-              _searchController.clear();
-              context.read<PlannedRuckBloc>().add(const SearchPlannedRucks(query: ''));
-            },
-          );
-        }
-
-        return EmptyRucksState(
-          title: 'No planned rucks',
-          subtitle: 'Import a route or create your first planned ruck!',
-          actionText: 'Plan a Ruck',
-          onActionPressed: () => _navigateToImport(),
-        );
-      }
-
-      return ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(16),
-        itemCount: filteredRucks.length + (state.hasReachedMax ? 0 : 1),
-        itemBuilder: (context, index) {
-          if (index >= filteredRucks.length) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: LoadingIndicator()),
-            );
-          }
-
-          final ruck = filteredRucks[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: PlannedRuckCard(
-              plannedRuck: ruck,
-              onTap: () => _navigateToDetail(ruck),
-              onStartPressed: ruck.canStart ? () => _startRuck(ruck) : null,
-              onEditPressed: () => _editRuck(ruck),
-              onDeletePressed: () => _deleteRuck(ruck),
-            ),
-          );
-        },
-      );
-    }
-
-    return _buildLoadingOrError(state);
-  }
-
-  /// Build completed rucks tab
-  Widget _buildCompletedTab(PlannedRuckState state) {
-    if (state is PlannedRuckLoaded) {
-      final completedRucks = state.completedRucks;
-
-      if (completedRucks.isEmpty) {
-        return EmptyRucksState(
-          title: 'No completed rucks',
-          subtitle: 'Complete some rucks to see them here!',
-          actionText: 'Plan a Ruck',
-          onActionPressed: () => _navigateToImport(),
-        );
-      }
-
-      return ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(16),
-        itemCount: completedRucks.length,
-        itemBuilder: (context, index) {
-          final ruck = completedRucks[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: PlannedRuckCard(
-              plannedRuck: ruck,
-              onTap: () => _navigateToDetail(ruck),
-              isCompleted: true,
-            ),
-          );
-        },
-      );
-    }
-
-    return _buildLoadingOrError(state);
-  }
 
   /// Build loading or error state
   Widget _buildLoadingOrError(PlannedRuckState state) {
@@ -354,7 +150,10 @@ class _MyRucksScreenState extends State<MyRucksScreen>
         child: AppErrorWidget(
           message: state.message,
           onRetry: state.canRetry
-              ? () => context.read<PlannedRuckBloc>().add(const LoadPlannedRucks(forceRefresh: true))
+              ? () => context.read<PlannedRuckBloc>().add(const LoadPlannedRucks(
+                  forceRefresh: true,
+                  limit: 100, // Same as initial load
+                ))
               : null,
         ),
       );

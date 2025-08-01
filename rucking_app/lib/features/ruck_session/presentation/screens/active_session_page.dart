@@ -46,6 +46,7 @@ class ActiveSessionArgs {
   final latlong.LatLng? initialCenter; // Optional initial map center
   final double userWeightKg; // Added user's body weight in kg
   final String? eventId; // Add event ID for event-linked sessions
+  final List<latlong.LatLng>? plannedRoute; // Planned route polyline
 
   ActiveSessionArgs({
     required this.ruckWeight,
@@ -54,6 +55,7 @@ class ActiveSessionArgs {
     this.plannedDuration,
     this.initialCenter,
     this.eventId, // Add eventId parameter
+    this.plannedRoute, // Add planned route parameter
   });
 }
 
@@ -235,35 +237,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     return Scaffold(
       body: Stack(
         children: [
-          // Base UI - Map and Stats
-          Column(
-            children: [
-              // Header fills all the way to the top (behind status bar)
-              Builder(
-                builder: (context) {
-                  final double topPadding = MediaQuery.of(context).padding.top;
-                  return Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.only(top: topPadding, bottom: 18.0),
-                    color: _getLadyModeColor(context),
-                    child: Center(
-                      child: Text(
-                        'ACTIVE SESSION',
-                        style: AppTextStyles.headlineLarge.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              // Rest of content in SafeArea
-              Expanded(
-                child: SafeArea(
-                  top: false,
-                  child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
+          // Base UI - Map and Stats (no header for full bleed)
+          SafeArea(
+            top: false,
+            child: BlocConsumer<ActiveSessionBloc, ActiveSessionState>(
                     buildWhen: (previous, current) {
                       // Always rebuild if the type of state changes (e.g., Loading -> Running)
                       if (previous.runtimeType != current.runtimeType) {
@@ -521,23 +498,20 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         return SingleChildScrollView(
                           child: Column(
                             children: [
-                              // Map with weight chip overlay
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4.0, left: 8.0, right: 8.0),
-                                child: Builder(
-                                  builder: (context) {
-                                    // Defensive wrapper to prevent ParentData crashes
-                                    return Stack(
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(18),
-                                          child: SizedBox(
-                                            height: MediaQuery.of(context).size.height * 0.27,
+                              // Map with weight chip overlay - full bleed
+                              Builder(
+                                builder: (context) {
+                                  // Defensive wrapper to prevent ParentData crashes
+                                  return Stack(
+                                    children: [
+                                      SizedBox(
+                                        height: MediaQuery.of(context).size.height * 0.3,
                                             width: double.infinity,
                                             child: sessionRunning && uiInitialized
                                             ? _RouteMap(
                                                 route: route,
                                                 initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                                plannedRoute: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.plannedRoute),
                                                 onMapReady: () {
                                                   if (!mapReady) {
                                                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -557,10 +531,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                                   child: CircularProgressIndicator(),
                                                 ),
                                               ),
-                                          ),
                                         ),
                                         Positioned(
-                                          top: 12,
+                                          top: 42,
                                           right: 12,
                                           child: _WeightChip(weightKg: state.ruckWeightKg),
                                         ),
@@ -569,10 +542,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                             ignoring: true, // Let touch events pass through
                                             child: _PauseOverlay(),
                                           )),
-                                      ],
-                                    );
-                                  },
-                                ),
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 8.0), // Added for spacing
                               // Stats overlay or spinner
@@ -821,9 +793,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       );
                     },
                   ),
-                ),
-              ),
-            ],
           ),
           // Removed duplicate countdown overlay - now positioned at top of stack
           
@@ -879,10 +848,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
 /// Real map – replace with FlutterMap or GoogleMap.
 class _RouteMap extends StatefulWidget {
   final VoidCallback? onMapReady;
-  const _RouteMap({required this.route, this.initialCenter, this.onMapReady});
+  const _RouteMap({required this.route, this.initialCenter, this.onMapReady, this.plannedRoute});
 
   final List<latlong.LatLng> route;
   final latlong.LatLng? initialCenter;
+  final List<latlong.LatLng>? plannedRoute;
 
   @override
   State<_RouteMap> createState() => _RouteMapState();
@@ -1197,6 +1167,18 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
                     AppLogger.warning('Map tile loading error in active session');
                   },
                 ),
+                // Planned route polyline (gray background)
+                if (widget.plannedRoute != null && widget.plannedRoute!.isNotEmpty)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: widget.plannedRoute!,
+                        strokeWidth: 3.0,
+                        color: Colors.grey.withOpacity(0.6), // Gray planned route
+                      ),
+                    ],
+                  ),
+                // Actual route polyline (orange foreground)
                 if (widget.route.isNotEmpty || widget.initialCenter != null)
                   PolylineLayer(
                     polylines: [

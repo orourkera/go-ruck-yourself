@@ -32,7 +32,7 @@ class PlannedRucksResource(Resource):
             logger.info(f"Auth header present: {'Authorization' in request.headers}")
             
             # Get query parameters
-            status = request.args.get('status', 'planned')  # planned, in_progress, completed, cancelled
+            status = request.args.get('status')  # planned, in_progress, completed, cancelled - no default
             date_from = request.args.get('date_from')  # ISO date string
             date_to = request.args.get('date_to')  # ISO date string
             route_id = request.args.get('route_id')

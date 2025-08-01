@@ -590,8 +590,34 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   // Helper methods
 
   List<LatLng> _getRoutePoints() {
-    // Create basic route points from start/end coordinates
-    // In a full implementation, this would decode the routePolyline
+    // First try to decode the route polyline if available
+    if (widget.route.routePolyline?.isNotEmpty == true) {
+      try {
+        final polylinePoints = <LatLng>[];
+        final coordinates = widget.route.routePolyline!.split(';');
+        
+        for (final coord in coordinates) {
+          final parts = coord.trim().split(',');
+          if (parts.length == 2) {
+            final lat = double.tryParse(parts[0]);
+            final lng = double.tryParse(parts[1]);
+            if (lat != null && lng != null) {
+              polylinePoints.add(LatLng(lat, lng));
+            }
+          }
+        }
+        
+        if (polylinePoints.isNotEmpty) {
+          return polylinePoints;
+        }
+      } catch (e) {
+        // If polyline parsing fails, fall back to basic points
+        // Log the error but don't crash
+        debugPrint('Error parsing route polyline: $e');
+      }
+    }
+    
+    // Fallback: Create basic route points from start/end coordinates
     final points = <LatLng>[
       LatLng(widget.route.startLatitude, widget.route.startLongitude),
     ];
