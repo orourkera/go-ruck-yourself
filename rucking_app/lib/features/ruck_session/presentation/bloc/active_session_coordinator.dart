@@ -389,7 +389,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       _currentAggregatedState = ActiveSessionFailure(
         errorMessage: lifecycleState.errorMessage!,
       );
-    } else if (!lifecycleState.isActive && lifecycleState.sessionId != null && !_lifecycleManager.isPaused) {
+    } else if (!lifecycleState.isActive && lifecycleState.sessionId != null && (!_lifecycleManager.isPaused || lifecycleState.isSaving)) {
       AppLogger.info('[COORDINATOR] Path: Completion state (not active, has session)');
       
       // Use values from the previous running state instead of recalculating
@@ -466,7 +466,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'average_pace': finalDistance > 0 ? (lifecycleState.duration.inMinutes / finalDistance) : 0.0,
       };
       AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
-    } else if (lifecycleState.sessionId != null && (lifecycleState.isActive || _lifecycleManager.isPaused)) {
+    } else if (lifecycleState.sessionId != null && (lifecycleState.isActive || (_lifecycleManager.isPaused && !lifecycleState.isSaving))) {
       AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;

@@ -1,11 +1,9 @@
 """
-WeatherKit API integration for weather forecasts.
-Provides current weather and forecasts using Apple's WeatherKit service.
+OpenWeatherMap API integration for weather forecasts.
+Provides current weather and forecasts using OpenWeatherMap service.
 """
 
 import os
-import jwt
-import time
 import requests
 from datetime import datetime, timedelta
 from flask import request, jsonify, g
@@ -17,24 +15,17 @@ from ..utils.auth_helper import get_current_user_id
 logger = logging.getLogger(__name__)
 
 class WeatherResource(Resource):
-    """Handle weather forecast requests using WeatherKit."""
+    """Handle weather forecast requests using OpenWeatherMap."""
     
     def __init__(self):
-        # WeatherKit configuration
-        self.team_id = os.getenv('APPLE_TEAM_ID')
-        self.service_id = os.getenv('APPLE_SERVICE_ID') 
-        self.key_id = os.getenv('APPLE_KEY_ID')
-        self.private_key = os.getenv('APPLE_PRIVATE_KEY', '').replace('\\n', '\n')
-        self.base_url = "https://weatherkit.apple.com/api/v2"
+        # OpenWeatherMap configuration
+        self.api_key = os.getenv('OPENWEATHER_API_KEY')
+        self.base_url = "https://api.openweathermap.org/data/2.5"
         
-        if not all([self.team_id, self.service_id, self.key_id, self.private_key]):
-            logger.error("Missing WeatherKit configuration")
-            logger.error(f"team_id: {'SET' if self.team_id else 'MISSING'}")
-            logger.error(f"service_id: {'SET' if self.service_id else 'MISSING'}")
-            logger.error(f"key_id: {'SET' if self.key_id else 'MISSING'}")
-            logger.error(f"private_key: {'SET' if self.private_key else 'MISSING'}")
+        if not self.api_key:
+            logger.error("Missing OpenWeatherMap API key (OPENWEATHER_API_KEY)")
         else:
-            logger.info("WeatherKit configuration appears complete")
+            logger.info("OpenWeatherMap configuration complete")
     
     def get(self):
         """Get weather forecast for a location and date."""
@@ -45,10 +36,15 @@ class WeatherResource(Resource):
                     "message": "Authentication required"
                 }, 401
             
+            if not self.api_key:
+                return {
+                    "success": False,
+                    "message": "OpenWeatherMap API key not configured"
+                }, 500
+            
             # Get query parameters
             latitude = request.args.get('latitude', type=float)
             longitude = request.args.get('longitude', type=float)
-            date_str = request.args.get('date')
             datasets = request.args.get('datasets', 'currentWeather,hourlyForecast,dailyForecast').split(',')
             
             if latitude is None or longitude is None:
@@ -57,49 +53,31 @@ class WeatherResource(Resource):
                     "message": "latitude and longitude parameters are required"
                 }, 400
             
-            # Parse target date
-            target_date = datetime.now()
-            if date_str:
-                try:
-                    target_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                except ValueError:
-                    logger.warning(f"Invalid date format: {date_str}")
+            logger.info(f"Fetching weather for coordinates: {latitude}, {longitude}")
             
-            # Generate WeatherKit JWT token
-            token = self._generate_jwt_token()
-            if not token:
-                logger.error("JWT token generation failed - check WeatherKit configuration")
-                return {
-                    "success": False,
-                    "message": "Failed to generate authentication token"
-                }, 500
-            
-            logger.info(f"Successfully generated JWT token, proceeding with WeatherKit API calls")
-            
-            # Make WeatherKit API requests
+            # Make OpenWeatherMap API requests
             weather_data = {}
             
             # Get current weather if requested
             if 'currentWeather' in datasets:
-                current = self._get_current_weather(token, latitude, longitude)
+                current = self._get_current_weather(latitude, longitude)
                 if current:
                     weather_data['currentWeather'] = current
             
             # Get hourly forecast if requested
             if 'hourlyForecast' in datasets:
-                hourly = self._get_hourly_forecast(token, latitude, longitude, target_date)
+                hourly = self._get_hourly_forecast(latitude, longitude)
                 if hourly:
                     weather_data['hourlyForecast'] = hourly
             
             # Get daily forecast if requested  
             if 'dailyForecast' in datasets:
-                daily = self._get_daily_forecast(token, latitude, longitude, target_date)
+                daily = self._get_daily_forecast(latitude, longitude)
                 if daily:
                     weather_data['dailyForecast'] = daily
             
             # Log final weather data before returning
-            logger.info(f"Final weather data being returned: {weather_data}")
-            logger.info(f"Weather data keys: {list(weather_data.keys())}")
+            logger.info(f"Final weather data keys: {list(weather_data.keys())}")
             
             # Return error if no data was retrieved
             if not weather_data:
@@ -107,7 +85,7 @@ class WeatherResource(Resource):
                 return {
                     "success": False,
                     "message": "No weather data available",
-                    "debug": "All WeatherKit API calls returned empty data"
+                    "debug": "All OpenWeatherMap API calls returned empty data"
                 }, 200
             
             return weather_data, 200
@@ -119,70 +97,27 @@ class WeatherResource(Resource):
                 "message": "Failed to fetch weather data"
             }, 500
     
-    def _generate_jwt_token(self):
-        """Generate JWT token for WeatherKit API authentication."""
+    def _get_current_weather(self, latitude, longitude):
+        """Get current weather conditions from OpenWeatherMap."""
         try:
-            logger.info(f"Generating JWT token with team_id: {self.team_id}, service_id: {self.service_id}, key_id: {self.key_id}")
-            
-            # Current time
-            now = int(time.time())
-            
-            # JWT payload
-            payload = {
-                'iss': self.team_id,
-                'iat': now,
-                'exp': now + 3600,  # Token expires in 1 hour
-                'sub': self.service_id,
-            }
-            
-            # JWT headers
-            headers = {
-                'alg': 'ES256',
-                'kid': self.key_id,
-                'id': f"{self.team_id}.{self.service_id}"
-            }
-            
-            logger.info(f"JWT payload: {payload}")
-            logger.info(f"JWT headers: {headers}")
-            
-            # Generate token
-            token = jwt.encode(payload, self.private_key, algorithm='ES256', headers=headers)
-            logger.info(f"Generated JWT token (first 50 chars): {token[:50]}...")
-            return token
-            
-        except Exception as e:
-            logger.error(f"Failed to generate JWT token: {e}")
-            return None
-    
-    def _get_current_weather(self, token, latitude, longitude):
-        """Get current weather conditions."""
-        try:
-            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}"
-            
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'Content-Type': 'application/json'
-            }
+            url = f"{self.base_url}/weather"
             
             params = {
-                'dataSets': 'currentWeather'
+                'lat': latitude,
+                'lon': longitude,
+                'appid': self.api_key,
+                'units': 'metric'  # Celsius, m/s for wind
             }
             
-            logger.info(f"Making WeatherKit request to: {url} with params: {params}")
-            response = requests.get(url, headers=headers, params=params, timeout=30)
+            logger.info(f"Making OpenWeatherMap current weather request")
+            response = requests.get(url, params=params, timeout=30)
             
-            logger.info(f"WeatherKit response status: {response.status_code}")
-            logger.info(f"WeatherKit response headers: {dict(response.headers)}")
-            logger.info(f"WeatherKit response body: {response.text}")
+            logger.info(f"OpenWeatherMap response status: {response.status_code}")
             
             if response.status_code == 200:
-                if not response.text.strip():
-                    logger.error("WeatherKit returned empty response body")
-                    return None
-                    
                 data = response.json()
-                # WeatherKit v2 returns data under 'currentWeather' key
-                return data.get('currentWeather')
+                logger.info(f"Current weather data retrieved successfully")
+                return self._format_current_weather(data)
             else:
                 logger.warning(f"Current weather API returned {response.status_code}: {response.text}")
                 return None
@@ -191,38 +126,27 @@ class WeatherResource(Resource):
             logger.error(f"Error fetching current weather: {e}")
             return None
     
-    def _get_hourly_forecast(self, token, latitude, longitude, target_date):
-        """Get hourly weather forecast."""
+    def _get_hourly_forecast(self, latitude, longitude):
+        """Get hourly weather forecast from OpenWeatherMap."""
         try:
-            # Get hourly forecast for next 24 hours from target date
-            end_date = target_date + timedelta(hours=24)
-            
-            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}"
-            
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'Content-Type': 'application/json'
-            }
+            url = f"{self.base_url}/forecast"
             
             params = {
-                'dataSets': 'forecastHourly',
-                'hourlyStart': target_date.isoformat(),
-                'hourlyEnd': end_date.isoformat(),
+                'lat': latitude,
+                'lon': longitude,
+                'appid': self.api_key,
+                'units': 'metric'
             }
             
-            logger.info(f"Making WeatherKit hourly request to: {url} with params: {params}")
-            response = requests.get(url, headers=headers, params=params, timeout=30)
+            logger.info(f"Making OpenWeatherMap hourly forecast request")
+            response = requests.get(url, params=params, timeout=30)
             
-            logger.info(f"WeatherKit hourly response status: {response.status_code}")
-            logger.info(f"WeatherKit hourly response body: {response.text}")
+            logger.info(f"OpenWeatherMap hourly response status: {response.status_code}")
             
             if response.status_code == 200:
-                if not response.text.strip():
-                    logger.error("WeatherKit returned empty hourly response body")
-                    return None
-                    
                 data = response.json()
-                return data.get('forecastHourly', {}).get('hours', [])
+                logger.info(f"Hourly forecast data retrieved successfully")
+                return self._format_hourly_forecast(data)
             else:
                 logger.warning(f"Hourly forecast API returned {response.status_code}: {response.text}")
                 return None
@@ -231,38 +155,29 @@ class WeatherResource(Resource):
             logger.error(f"Error fetching hourly forecast: {e}")
             return None
     
-    def _get_daily_forecast(self, token, latitude, longitude, target_date):
-        """Get daily weather forecast."""
+    def _get_daily_forecast(self, latitude, longitude):
+        """Get daily weather forecast from OpenWeatherMap."""
         try:
-            # Get daily forecast for next 3 days from target date
-            end_date = target_date + timedelta(days=3)
-            
-            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}"
-            
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'Content-Type': 'application/json'
-            }
+            # Use One Call API for daily forecast (requires subscription for 3.0, using 2.5)
+            url = f"{self.base_url}/forecast/daily"
             
             params = {
-                'dataSets': 'forecastDaily',
-                'dailyStart': target_date.date().isoformat(),
-                'dailyEnd': end_date.date().isoformat(),
+                'lat': latitude,
+                'lon': longitude,
+                'appid': self.api_key,
+                'units': 'metric',
+                'cnt': 3  # Next 3 days
             }
             
-            logger.info(f"Making WeatherKit daily request to: {url} with params: {params}")
-            response = requests.get(url, headers=headers, params=params, timeout=30)
+            logger.info(f"Making OpenWeatherMap daily forecast request")
+            response = requests.get(url, params=params, timeout=30)
             
-            logger.info(f"WeatherKit daily response status: {response.status_code}")
-            logger.info(f"WeatherKit daily response body: {response.text}")
+            logger.info(f"OpenWeatherMap daily response status: {response.status_code}")
             
             if response.status_code == 200:
-                if not response.text.strip():
-                    logger.error("WeatherKit returned empty daily response body")
-                    return None
-                    
                 data = response.json()
-                return data.get('forecastDaily', {}).get('days', [])
+                logger.info(f"Daily forecast data retrieved successfully")
+                return self._format_daily_forecast(data)
             else:
                 logger.warning(f"Daily forecast API returned {response.status_code}: {response.text}")
                 return None
@@ -271,7 +186,70 @@ class WeatherResource(Resource):
             logger.error(f"Error fetching daily forecast: {e}")
             return None
     
-    def get_language(self):
-        """Get language code for API requests."""
-        # Default to English, could be made configurable
-        return 'en'
+    def _format_current_weather(self, data):
+        """Format OpenWeatherMap current weather data to match our expected structure."""
+        try:
+            return {
+                'temperature': data['main']['temp'],
+                'humidity': data['main']['humidity'],
+                'pressure': data['main']['pressure'],
+                'windSpeed': data['wind']['speed'],
+                'windDirection': data['wind'].get('deg', 0),
+                'cloudCover': data['clouds']['all'] / 100.0,  # Convert percentage to decimal
+                'visibility': data.get('visibility', 10000) / 1000.0,  # Convert m to km
+                'conditionCode': data['weather'][0]['id'],
+                'condition': data['weather'][0]['description'].title(),
+                'uvIndex': data.get('uvi', 0),  # May not be available in basic plan
+                'precipitationIntensity': 0,  # Not available in current weather
+                'precipitationChance': 0
+            }
+        except Exception as e:
+            logger.error(f"Error formatting current weather data: {e}")
+            return None
+    
+    def _format_hourly_forecast(self, data):
+        """Format OpenWeatherMap hourly forecast data."""
+        try:
+            hours = []
+            for item in data['list'][:24]:  # Next 24 hours
+                hours.append({
+                    'forecastStart': datetime.fromtimestamp(item['dt']).isoformat(),
+                    'temperature': item['main']['temp'],
+                    'humidity': item['main']['humidity'],
+                    'pressure': item['main']['pressure'],
+                    'windSpeed': item['wind']['speed'],
+                    'windDirection': item['wind'].get('deg', 0),
+                    'cloudCover': item['clouds']['all'] / 100.0,
+                    'conditionCode': item['weather'][0]['id'],
+                    'condition': item['weather'][0]['description'].title(),
+                    'precipitationChance': item.get('pop', 0) * 100,  # Probability of precipitation
+                    'precipitationIntensity': item.get('rain', {}).get('3h', 0) / 3.0  # mm/h
+                })
+            return {'hours': hours}
+        except Exception as e:
+            logger.error(f"Error formatting hourly forecast data: {e}")
+            return None
+    
+    def _format_daily_forecast(self, data):
+        """Format OpenWeatherMap daily forecast data."""
+        try:
+            days = []
+            for item in data.get('list', []):
+                days.append({
+                    'forecastStart': datetime.fromtimestamp(item['dt']).isoformat(),
+                    'temperatureMax': item['temp']['max'],
+                    'temperatureMin': item['temp']['min'],
+                    'humidity': item['humidity'],
+                    'pressure': item['pressure'],
+                    'windSpeed': item['speed'],
+                    'windDirection': item.get('deg', 0),
+                    'cloudCover': item['clouds'] / 100.0,
+                    'conditionCode': item['weather'][0]['id'],
+                    'condition': item['weather'][0]['description'].title(),
+                    'precipitationChance': item.get('pop', 0) * 100,
+                    'precipitationIntensity': item.get('rain', 0)
+                })
+            return {'days': days}
+        except Exception as e:
+            logger.error(f"Error formatting daily forecast data: {e}")
+            return None
