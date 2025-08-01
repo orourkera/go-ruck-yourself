@@ -933,25 +933,7 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
     );
   }
   
-  /// Calculate appropriate zoom level and center for combined bounds
-  MapFitOptions _calculateMapFit() {
-    final bounds = _calculateCombinedBounds();
-    if (bounds == null) {
-      // Fallback to current behavior if no bounds available
-      return MapFitOptions(
-        bounds: LatLngBounds(
-          widget.initialCenter ?? latlong.LatLng(48.8566, 2.3522),
-          widget.initialCenter ?? latlong.LatLng(48.8566, 2.3522),
-        ),
-        padding: const EdgeInsets.all(50),
-      );
-    }
-    
-    return MapFitOptions(
-      bounds: bounds,
-      padding: const EdgeInsets.all(50), // Add padding around the bounds
-    );
-  }
+
   
   void _signalMapReady() {
     if (!_mapReadyCalled && widget.onMapReady != null) {

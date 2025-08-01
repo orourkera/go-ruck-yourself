@@ -634,6 +634,11 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               builder: (context) => CreateSessionScreen(
                 routeId: widget.route.id,
                 routeName: widget.route.name,
+                routeData: {
+                  'route_polyline': widget.route.routePolyline,
+                  'distance_km': widget.route.distanceKm,
+                  'estimated_duration_minutes': widget.route.estimatedDurationMinutes,
+                },
                 // Don't pass plannedRuckId for route-only views since they use fake planned ruck objects
                 plannedRuckId: widget.route != null ? null : _plannedRuck!.id,
               ),

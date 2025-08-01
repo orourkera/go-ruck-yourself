@@ -170,7 +170,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
                 // Elevation Profile - only show if elevation data exists
                 if (route.elevationPoints.isNotEmpty && 
                     route.elevationGainM != null && 
-                    route.elevationGainM! > 0) ..[
+                    route.elevationGainM! > 0) ...[
                   _buildElevationProfile(context, route),
                   const SizedBox(height: 24),
                 ],

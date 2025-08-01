@@ -147,48 +147,25 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     final stats = _calculateElevationStats();
     
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(12),
-        ),
-      ),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: _buildStatItem(
-              'Min Elevation',
-              '${stats.minElevation.toInt()} ft',
-              Icons.trending_down,
-              AppColors.info,
+          // Title
+          Text(
+            'ELEVATION PROFILE',
+            style: AppTextStyles.titleSmall.copyWith(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+              color: AppColors.textDarkSecondary,
             ),
           ),
+          const SizedBox(height: 4),
+          // Divider line
           Container(
-            width: 1,
-            height: 40,
+            height: 1,
             color: AppColors.greyLight,
-          ),
-          Expanded(
-            child: _buildStatItem(
-              'Max Elevation',
-              '${stats.maxElevation.toInt()} ft',
-              Icons.trending_up,
-              AppColors.success,
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 40,
-            color: AppColors.greyLight,
-          ),
-          Expanded(
-            child: _buildStatItem(
-              'Total Gain',
-              '${stats.totalGain.toInt()} ft',
-              Icons.moving,
-              AppColors.warning,
-            ),
           ),
         ],
       ),
@@ -291,16 +268,14 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         verticalInterval: _getVerticalInterval(),
         getDrawingHorizontalLine: (value) {
           return FlLine(
-            color: AppColors.greyLight.withOpacity(0.3),
-            strokeWidth: 1,
-            dashArray: [5, 5],
+            color: Colors.transparent, // Hide horizontal lines for cleaner look
+            strokeWidth: 0,
           );
         },
         getDrawingVerticalLine: (value) {
           return FlLine(
-            color: AppColors.greyLight.withOpacity(0.2),
+            color: AppColors.greyLight.withOpacity(0.4),
             strokeWidth: 1,
-            dashArray: [3, 3],
           );
         },
       ),
@@ -359,9 +334,9 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
             );
           }).toList(),
           isCurved: true,
-          curveSmoothness: 0.3,
-          color: AppColors.primary,
-          barWidth: 3,
+          curveSmoothness: 0.4,
+          color: const Color(0xFF4CAF50), // Green color like reference
+          barWidth: 3.5,
           isStrokeCapRound: true,
           dotData: FlDotData(
             show: _selectedIndex != null,

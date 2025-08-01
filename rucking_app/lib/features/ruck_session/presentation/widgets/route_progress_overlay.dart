@@ -19,8 +19,8 @@ class RouteProgressOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Only show if we have planned route data
-    if (plannedRouteDistance == null || plannedRouteDuration == null) {
+    // Show if we have at least planned route distance
+    if (plannedRouteDistance == null) {
       return const SizedBox.shrink();
     }
 
