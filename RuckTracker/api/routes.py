@@ -110,11 +110,15 @@ class RoutesResource(Resource):
             
             # Convert to Route objects
             routes = []
-            for route_data in result.data:
+            print(f"🔍 ROUTES DEBUG - Converting {len(result.data)} routes to Route objects")
+            for i, route_data in enumerate(result.data):
                 try:
+                    print(f"🔍 ROUTES DEBUG - Converting route {i+1}: {route_data.get('id', 'no-id')}")
                     route = Route.from_dict(route_data)
                     routes.append(route.to_dict())
+                    print(f"🔍 ROUTES DEBUG - Successfully converted route {i+1}")
                 except Exception as e:
+                    print(f"🔍 ROUTES DEBUG - ERROR converting route {route_data.get('id')}: {e}")
                     logger.warning(f"Error parsing route {route_data.get('id')}: {e}")
                     continue
             
