@@ -831,7 +831,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 ],
                 
                 // Route banner if creating session for a route
-                if (widget.routeName != null) ..[
+                if (widget.routeName != null) ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),

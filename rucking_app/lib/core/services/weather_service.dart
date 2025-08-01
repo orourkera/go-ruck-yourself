@@ -1,17 +1,14 @@
-import 'dart:convert';
-import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/weather.dart';
 import '../utils/app_logger.dart';
+import 'api_client.dart';
+import 'service_locator.dart';
 
 /// Service for fetching weather data from backend/WeatherKit
 class WeatherService {
-  final Dio _dio;
-  final String _baseUrl;
+  final ApiClient _apiClient;
 
-  WeatherService({Dio? dio})
-      : _dio = dio ?? Dio(),
-        _baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://getrucky.com/api';
+  WeatherService({ApiClient? apiClient})
+      : _apiClient = apiClient ?? getIt<ApiClient>();
 
   /// Get weather forecast for a location on a specific date
   /// 
@@ -43,46 +40,14 @@ class WeatherService {
         'Fetching weather for location: $latitude, $longitude on ${targetDate.toIso8601String()}',
       );
 
-      final response = await _dio.get(
-        '$_baseUrl/weather',
-        queryParameters: queryParams,
-        options: Options(
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          sendTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final weatherData = Weather.fromJson(response.data as Map<String, dynamic>);
-        AppLogger.info('Successfully fetched weather data');
-        return weatherData;
-      } else {
-        AppLogger.warning('Weather API returned status: ${response.statusCode}');
-        return null;
-      }
-    } on DioException catch (e) {
-      AppLogger.error(
-        'Network error fetching weather data',
-        exception: e,
-        stackTrace: e.stackTrace,
-      );
+      final responseData = await _apiClient.get('/weather', queryParams: queryParams);
       
-      // Check for specific error types
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout) {
-        AppLogger.warning('Weather request timed out');
-      } else if (e.type == DioExceptionType.connectionError) {
-        AppLogger.warning('Weather service connection failed');
-      }
-      
-      return null;
+      final weatherData = Weather.fromJson(responseData as Map<String, dynamic>);
+      AppLogger.info('Successfully fetched weather data');
+      return weatherData;
     } catch (e, stackTrace) {
       AppLogger.error(
-        'Unexpected error fetching weather data',
+        'Error fetching weather data',
         exception: e,
         stackTrace: stackTrace,
       );

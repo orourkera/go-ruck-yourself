@@ -25,10 +25,16 @@ class WeatherResource(Resource):
         self.service_id = os.getenv('APPLE_SERVICE_ID') 
         self.key_id = os.getenv('APPLE_KEY_ID')
         self.private_key = os.getenv('APPLE_PRIVATE_KEY', '').replace('\\n', '\n')
-        self.base_url = "https://weatherkit.apple.com/api/v1"
+        self.base_url = "https://weatherkit.apple.com/api/v2"
         
         if not all([self.team_id, self.service_id, self.key_id, self.private_key]):
             logger.error("Missing WeatherKit configuration")
+            logger.error(f"team_id: {'SET' if self.team_id else 'MISSING'}")
+            logger.error(f"service_id: {'SET' if self.service_id else 'MISSING'}")
+            logger.error(f"key_id: {'SET' if self.key_id else 'MISSING'}")
+            logger.error(f"private_key: {'SET' if self.private_key else 'MISSING'}")
+        else:
+            logger.info("WeatherKit configuration appears complete")
     
     def get(self):
         """Get weather forecast for a location and date."""
@@ -100,6 +106,8 @@ class WeatherResource(Resource):
     def _generate_jwt_token(self):
         """Generate JWT token for WeatherKit API authentication."""
         try:
+            logger.info(f"Generating JWT token with team_id: {self.team_id}, service_id: {self.service_id}, key_id: {self.key_id}")
+            
             # Current time
             now = int(time.time())
             
@@ -118,8 +126,12 @@ class WeatherResource(Resource):
                 'id': f"{self.team_id}.{self.service_id}"
             }
             
+            logger.info(f"JWT payload: {payload}")
+            logger.info(f"JWT headers: {headers}")
+            
             # Generate token
             token = jwt.encode(payload, self.private_key, algorithm='ES256', headers=headers)
+            logger.info(f"Generated JWT token (first 50 chars): {token[:50]}...")
             return token
             
         except Exception as e:
@@ -129,17 +141,32 @@ class WeatherResource(Resource):
     def _get_current_weather(self, token, latitude, longitude):
         """Get current weather conditions."""
         try:
-            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}/current"
+            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}"
             
             headers = {
                 'Authorization': f'Bearer {token}',
                 'Content-Type': 'application/json'
             }
             
-            response = requests.get(url, headers=headers, timeout=30)
+            params = {
+                'dataSets': 'currentWeather'
+            }
+            
+            logger.info(f"Making WeatherKit request to: {url} with params: {params}")
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            
+            logger.info(f"WeatherKit response status: {response.status_code}")
+            logger.info(f"WeatherKit response headers: {dict(response.headers)}")
+            logger.info(f"WeatherKit response body: {response.text}")
             
             if response.status_code == 200:
-                return response.json()
+                if not response.text.strip():
+                    logger.error("WeatherKit returned empty response body")
+                    return None
+                    
+                data = response.json()
+                # WeatherKit v2 returns data under 'currentWeather' key
+                return data.get('currentWeather')
             else:
                 logger.warning(f"Current weather API returned {response.status_code}: {response.text}")
                 return None
@@ -154,7 +181,7 @@ class WeatherResource(Resource):
             # Get hourly forecast for next 24 hours from target date
             end_date = target_date + timedelta(hours=24)
             
-            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}/forecast/hourly"
+            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}"
             
             headers = {
                 'Authorization': f'Bearer {token}',
@@ -167,9 +194,17 @@ class WeatherResource(Resource):
                 'hourlyEnd': end_date.isoformat(),
             }
             
+            logger.info(f"Making WeatherKit hourly request to: {url} with params: {params}")
             response = requests.get(url, headers=headers, params=params, timeout=30)
             
+            logger.info(f"WeatherKit hourly response status: {response.status_code}")
+            logger.info(f"WeatherKit hourly response body: {response.text}")
+            
             if response.status_code == 200:
+                if not response.text.strip():
+                    logger.error("WeatherKit returned empty hourly response body")
+                    return None
+                    
                 data = response.json()
                 return data.get('forecastHourly', {}).get('hours', [])
             else:
@@ -186,7 +221,7 @@ class WeatherResource(Resource):
             # Get daily forecast for next 3 days from target date
             end_date = target_date + timedelta(days=3)
             
-            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}/forecast/daily"
+            url = f"{self.base_url}/weather/{self.get_language()}/{latitude}/{longitude}"
             
             headers = {
                 'Authorization': f'Bearer {token}',
@@ -199,9 +234,17 @@ class WeatherResource(Resource):
                 'dailyEnd': end_date.date().isoformat(),
             }
             
+            logger.info(f"Making WeatherKit daily request to: {url} with params: {params}")
             response = requests.get(url, headers=headers, params=params, timeout=30)
             
+            logger.info(f"WeatherKit daily response status: {response.status_code}")
+            logger.info(f"WeatherKit daily response body: {response.text}")
+            
             if response.status_code == 200:
+                if not response.text.strip():
+                    logger.error("WeatherKit returned empty daily response body")
+                    return None
+                    
                 data = response.json()
                 return data.get('forecastDaily', {}).get('days', [])
             else:
