@@ -198,6 +198,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       expandedHeight: 300,
       pinned: true,
       backgroundColor: AppColors.backgroundLight,
+      iconTheme: IconThemeData(color: AppColors.secondary), // Orange back arrow
       title: _showAppBarTitle 
           ? Text(
               route?.name ?? 'Planned Ruck',

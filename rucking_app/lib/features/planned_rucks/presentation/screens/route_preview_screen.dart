@@ -10,16 +10,43 @@ import 'package:rucking_app/features/planned_rucks/presentation/widgets/elevatio
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
+/// String extension for capitalizing first letter
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return this[0].toUpperCase() + substring(1).toLowerCase();
+  }
+}
+
 /// 🗺️ **Route Preview Screen**
 /// 
 /// Detailed preview of a route before importing or planning a ruck
-class RoutePreviewScreen extends StatelessWidget {
+class RoutePreviewScreen extends StatefulWidget {
   final String routeId;
   
   const RoutePreviewScreen({
     Key? key,
     required this.routeId,
   }) : super(key: key);
+
+  @override
+  State<RoutePreviewScreen> createState() => _RoutePreviewScreenState();
+}
+
+class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
+  late TextEditingController _titleController;
+  
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController();
+  }
+  
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -40,16 +67,7 @@ class RoutePreviewScreen extends StatelessWidget {
             ? AppColors.textLight 
             : Colors.white,
         elevation: 2,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () => _shareRoute(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () => _saveRoute(context),
-          ),
-        ],
+        // No actions needed for import preview
       ),
       body: BlocBuilder<RouteImportBloc, RouteImportState>(
         builder: (context, state) {
@@ -114,6 +132,16 @@ class RoutePreviewScreen extends StatelessWidget {
             return const Center(
               child: Text('No route data available'),
             );
+          }
+          
+          // Update the title controller when route data changes
+          if (_titleController.text.isEmpty && route.name.isNotEmpty) {
+            _titleController.text = route.name;
+          }
+          
+          // Update the title controller when route data changes
+          if (_titleController.text.isEmpty && route.name.isNotEmpty) {
+            _titleController.text = route.name;
           }
           
           return SingleChildScrollView(
@@ -219,10 +247,26 @@ class RoutePreviewScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          route.name,
+        TextField(
+          controller: _titleController,
           style: AppTextStyles.headlineMedium.copyWith(
             fontWeight: FontWeight.bold,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Enter route name...',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
         ),
         const SizedBox(height: 8),
@@ -254,17 +298,12 @@ class RoutePreviewScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    'Interactive map will be displayed here\nonce route data is loaded',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.grey),
-                  ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: RouteMapPreview(
+                  route: route,
+                  isInteractive: true,
+                  showOverlay: false,
                 ),
               ),
             ),
@@ -311,7 +350,7 @@ class RoutePreviewScreen extends StatelessWidget {
                   child: _buildStatItem(
                     context,
                     'Difficulty',
-                    '${route.trailDifficulty ?? 'Unknown'}',
+                    route.trailDifficulty?.toString().replaceAll('TrailDifficulty.', '').capitalize() ?? 'Unknown',
                     Icons.bar_chart,
                   ),
                 ),
@@ -394,8 +433,9 @@ class RoutePreviewScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _buildDetailRow(context, 'Source', route.source),
-            _buildDetailRow(context, 'Created', _formatDate(route.createdAt)),
+            _buildDetailRow(context, 'Source', route.source ?? 'GPX Import'),
+            _buildDetailRow(context, 'Created', _formatTodaysDate()),
+            _buildDetailRow(context, 'Difficulty', route.trailDifficulty?.toString().replaceAll('TrailDifficulty.', '').capitalize() ?? 'Unknown'),
             if (route.pointsOfInterest.isNotEmpty)
               _buildDetailRow(context, 'Points of Interest', '${route.pointsOfInterest.length} locations'),
           ],
@@ -431,13 +471,13 @@ class RoutePreviewScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context, route_model.Route route) {
     return Column(
       children: [
-        // Import Route button
+        // Save Route button (primary action)
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _importRoute(context, route),
-            icon: const Icon(Icons.add),
-            label: const Text('Import Route'),
+            onPressed: () => _saveRouteWithCustomName(context, route),
+            icon: const Icon(Icons.save),
+            label: const Text('Save Route'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -445,27 +485,7 @@ class RoutePreviewScreen extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        // Secondary actions
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _downloadGPX(context, route),
-                icon: const Icon(Icons.download),
-                label: const Text('Download GPX'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _shareRoute(context),
-                icon: const Icon(Icons.share),
-                label: const Text('Share Route'),
-              ),
-            ),
-          ],
-        ),
+        // No secondary actions needed for import preview
       ],
     );
   }
@@ -473,6 +493,28 @@ class RoutePreviewScreen extends StatelessWidget {
   String _formatDate(DateTime? date) {
     if (date == null) return 'Unknown';
     return '${date.day}/${date.month}/${date.year}';
+  }
+  
+  String _formatTodaysDate() {
+    final now = DateTime.now();
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    String getDayWithSuffix(int day) {
+      if (day >= 11 && day <= 13) {
+        return '${day}th';
+      }
+      switch (day % 10) {
+        case 1: return '${day}st';
+        case 2: return '${day}nd';
+        case 3: return '${day}rd';
+        default: return '${day}th';
+      }
+    }
+    
+    return '${months[now.month - 1]} ${getDayWithSuffix(now.day)}, ${now.year}';
   }
   
   void _shareRoute(BuildContext context) {
@@ -485,6 +527,22 @@ class RoutePreviewScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Route saved to favorites!')),
     );
+  }
+  
+  void _saveRouteWithCustomName(BuildContext context, route_model.Route route) {
+    // Create updated route with custom name
+    final updatedRoute = route.copyWith(
+      name: _titleController.text.trim().isNotEmpty ? _titleController.text.trim() : route.name,
+    );
+    
+    // Trigger the import action in the bloc
+    context.read<RouteImportBloc>().add(ConfirmImport(
+      route: updatedRoute,
+    ));
+    
+    // Navigate back to routes list
+    Navigator.of(context).pop();
+    Navigator.of(context).pop();
   }
   
   void _importRoute(BuildContext context, route_model.Route route) {

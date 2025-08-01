@@ -238,11 +238,16 @@ class GPXImportResource(Resource):
                     # Get elevation
                     ele_elem = trkpt.find('.//gpx:ele', ns) or trkpt.find('.//ele')
                     if ele_elem is not None:
-                        elevation = float(ele_elem.text)
-                        # Filter out obviously corrupted elevation values
-                        # Valid elevations should be between -500m (below sea level) and 9000m (highest mountains)
-                        if -500 <= elevation <= 9000:
-                            point['elevation'] = elevation
+                        try:
+                            elevation = float(ele_elem.text)
+                            # Filter out obviously corrupted elevation values
+                            # Valid elevations should be between -500m (below sea level) and 9000m (highest mountains)
+                            if -500 <= elevation <= 9000:
+                                point['elevation'] = elevation
+                            else:
+                                logger.warning(f"Skipping invalid elevation value: {elevation}")
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Failed to parse elevation: {ele_elem.text}, error: {e}")
                     
                     # Get time
                     time_elem = trkpt.find('.//gpx:time', ns) or trkpt.find('.//time')
@@ -279,12 +284,14 @@ class GPXImportResource(Resource):
             if 'elevation' in prev_point and 'elevation' in curr_point:
                 elevation_diff = curr_point['elevation'] - prev_point['elevation']
                 # Only count reasonable elevation changes (filter out GPS noise and corrupted data)
-                # Max reasonable elevation change per segment is ~200m for hiking trails
-                if abs(elevation_diff) <= 200:
+                # Max reasonable elevation change per segment is ~10m for normal hiking data
+                if abs(elevation_diff) <= 10:  # Much tighter filtering
                     if elevation_diff > 0:
                         elevation_gain += elevation_diff
                     else:
                         elevation_loss += abs(elevation_diff)
+                elif abs(elevation_diff) > 100:  # Log only very suspicious changes
+                    logger.warning(f"Filtered extreme elevation change: {elevation_diff:.1f}m")
         
         return {
             'distance_km': round(total_distance / 1000, 2),  # Convert to km
