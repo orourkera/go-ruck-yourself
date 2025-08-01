@@ -225,7 +225,7 @@ class WeatherResource(Resource):
                     'precipitationChance': item.get('pop', 0) * 100,  # Probability of precipitation
                     'precipitationIntensity': item.get('rain', {}).get('3h', 0) / 3.0  # mm/h
                 })
-            return {'hours': hours}
+            return hours
         except Exception as e:
             logger.error(f"Error formatting hourly forecast data: {e}")
             return None
@@ -249,7 +249,7 @@ class WeatherResource(Resource):
                     'precipitationChance': item.get('pop', 0) * 100,
                     'precipitationIntensity': item.get('rain', 0)
                 })
-            return {'days': days}
+            return days
         except Exception as e:
             logger.error(f"Error formatting daily forecast data: {e}")
             return None

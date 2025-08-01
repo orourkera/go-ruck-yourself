@@ -23,6 +23,9 @@ class SessionStarted extends ActiveSessionEvent {
   final LocationPoint? initialLocation;
   final double userWeightKg;
   final String? eventId; // Add event ID for event-linked sessions
+  final List<latlong.LatLng>? plannedRoute; // Add planned route for navigation
+  final double? plannedRouteDistance; // Route distance in km
+  final int? plannedRouteDuration; // Route estimated duration in minutes
   
   const SessionStarted({
     required this.ruckWeightKg,
@@ -31,10 +34,13 @@ class SessionStarted extends ActiveSessionEvent {
     this.plannedDuration,
     this.initialLocation,
     this.eventId, // Add eventId parameter
+    this.plannedRoute, // Add plannedRoute parameter
+    this.plannedRouteDistance, // Add route distance parameter
+    this.plannedRouteDuration, // Add route duration parameter
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId, plannedRoute, plannedRouteDistance, plannedRouteDuration];
 }
 
 class SessionRecoveryRequested extends ActiveSessionEvent {

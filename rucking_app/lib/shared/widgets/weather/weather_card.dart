@@ -154,7 +154,7 @@ class WeatherCard extends StatelessWidget {
   }
 
   Widget _buildCurrentWeather(CurrentWeather current) {
-    final conditionCode = current.conditionCode ?? '';
+    final conditionCode = current.conditionCode ?? 800;
     final temperature = current.temperature?.round() ?? 0;
     final feelsLike = current.temperatureApparent?.round() ?? 0;
     
@@ -224,11 +224,11 @@ class WeatherCard extends StatelessWidget {
             label: 'Humidity',
             value: '${(current.humidity! * 100).round()}%',
           ),
-        if (current.wind?.speed != null)
+        if (current.windSpeed != null)
           _buildDetailRow(
             icon: Icons.air,
             label: 'Wind',
-            value: '${current.wind!.speed!.round()} km/h',
+            value: '${current.windSpeed!.round()} km/h',
           ),
         if (current.uvIndex != null)
           _buildDetailRow(
@@ -236,11 +236,11 @@ class WeatherCard extends StatelessWidget {
             label: 'UV Index',
             value: current.uvIndex!.round().toString(),
           ),
-        if (current.visibility?.value != null)
+        if (current.visibility != null)
           _buildDetailRow(
             icon: Icons.visibility,
             label: 'Visibility',
-            value: '${(current.visibility!.value! / 1000).round()} km',
+            value: '${current.visibility!.round()} km',
           ),
       ],
     );
@@ -300,7 +300,7 @@ class WeatherCard extends StatelessWidget {
               final forecast = hourly[index];
               final time = forecast.forecastStart;
               final temp = forecast.temperature?.round() ?? 0;
-              final condition = forecast.conditionCode ?? '';
+              final condition = forecast.conditionCode ?? 800;
               
               return Container(
                 width: 60,
@@ -352,7 +352,7 @@ class WeatherCard extends StatelessWidget {
           final date = forecast.forecastStart;
           final high = forecast.temperatureMax?.round() ?? 0;
           final low = forecast.temperatureMin?.round() ?? 0;
-          final condition = forecast.conditionCode ?? '';
+          final condition = forecast.conditionCode ?? 800;
           
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),

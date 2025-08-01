@@ -33,6 +33,7 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_stats_overlay.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/session_controls.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/terrain_info_widget.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/route_progress_overlay.dart';
 
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
@@ -47,6 +48,8 @@ class ActiveSessionArgs {
   final double userWeightKg; // Added user's body weight in kg
   final String? eventId; // Add event ID for event-linked sessions
   final List<latlong.LatLng>? plannedRoute; // Planned route polyline
+  final double? plannedRouteDistance; // Route distance in km
+  final int? plannedRouteDuration; // Route estimated duration in minutes
 
   ActiveSessionArgs({
     required this.ruckWeight,
@@ -56,6 +59,8 @@ class ActiveSessionArgs {
     this.initialCenter,
     this.eventId, // Add eventId parameter
     this.plannedRoute, // Add planned route parameter
+    this.plannedRouteDistance, // Add route distance parameter
+    this.plannedRouteDuration, // Add route duration parameter
   });
 }
 
@@ -547,6 +552,32 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 },
                               ),
                               const SizedBox(height: 8.0), // Added for spacing
+                              
+                              // Route progress overlay
+                              BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                                bloc: activeSessionBloc,
+                                buildWhen: (prev, curr) {
+                                  if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
+                                    return prev.distanceKm != curr.distanceKm ||
+                                           prev.elapsedSeconds != curr.elapsedSeconds ||
+                                           prev.plannedRouteDistance != curr.plannedRouteDistance ||
+                                           prev.plannedRouteDuration != curr.plannedRouteDuration;
+                                  }
+                                  return true;
+                                },
+                                builder: (context, state) {
+                                  if (state is ActiveSessionRunning) {
+                                    return RouteProgressOverlay(
+                                      plannedRouteDistance: state.plannedRouteDistance,
+                                      plannedRouteDuration: state.plannedRouteDuration,
+                                      currentDistance: state.distanceKm,
+                                      elapsedSeconds: state.elapsedSeconds,
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                              
                               // Stats overlay or spinner
                               Padding(
                                 padding: const EdgeInsets.all(16.0), // This was the padding inside the Expanded

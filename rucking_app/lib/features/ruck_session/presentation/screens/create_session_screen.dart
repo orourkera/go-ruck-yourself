@@ -24,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -369,6 +370,37 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           // Convert planned duration (minutes) to seconds; null means no planned duration
           final int? plannedDuration = _plannedDuration != null ? _plannedDuration! * 60 : null;
           
+          // Parse route data if available
+          List<latlong.LatLng>? plannedRoute;
+          double? plannedRouteDistance;
+          int? plannedRouteDuration;
+          
+          if (widget.routeData != null) {
+            try {
+              // Parse route polyline into LatLng points
+              if (widget.routeData['route_polyline'] != null) {
+                final polylineString = widget.routeData['route_polyline'] as String;
+                plannedRoute = _parsePolylineToLatLng(polylineString);
+                AppLogger.info('Parsed ${plannedRoute.length} route points for session navigation');
+              }
+              
+              // Extract route distance (in km)
+              if (widget.routeData['distance_km'] != null) {
+                plannedRouteDistance = (widget.routeData['distance_km'] as num).toDouble();
+                AppLogger.info('Route distance: ${plannedRouteDistance}km');
+              }
+              
+              // Extract estimated duration (in minutes)
+              if (widget.routeData['estimated_duration_minutes'] != null) {
+                plannedRouteDuration = (widget.routeData['estimated_duration_minutes'] as num).toInt();
+                AppLogger.info('Estimated route duration: ${plannedRouteDuration} minutes');
+              }
+              
+            } catch (e) {
+              AppLogger.warning('Failed to parse route data for session: $e');
+            }
+          }
+          
           // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
           final sessionArgs = ActiveSessionArgs(
             ruckWeight: _ruckWeight,
@@ -376,6 +408,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
             plannedDuration: plannedDuration,
             eventId: _eventId, // Use _eventId from route arguments, not widget.eventId
+            plannedRoute: plannedRoute, // Pass the parsed route points
+            plannedRouteDistance: plannedRouteDistance, // Pass route distance
+            plannedRouteDuration: plannedRouteDuration, // Pass route duration
           );
           
           AppLogger.sessionCompletion('Creating session with event context', context: {
@@ -744,6 +779,34 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   }
 
   @override
+  /// Parse route polyline string into LatLng coordinates
+  List<latlong.LatLng> _parsePolylineToLatLng(String polylineString) {
+    final List<latlong.LatLng> coordinates = [];
+    
+    try {
+      // Expect polyline format: "lat1,lng1;lat2,lng2;lat3,lng3"
+      final points = polylineString.split(';');
+      
+      for (final point in points) {
+        if (point.trim().isEmpty) continue;
+        
+        final coords = point.split(',');
+        if (coords.length == 2) {
+          final lat = double.tryParse(coords[0].trim());
+          final lng = double.tryParse(coords[1].trim());
+          
+          if (lat != null && lng != null) {
+            coordinates.add(latlong.LatLng(lat, lng));
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error parsing polyline: $e');
+    }
+    
+    return coordinates;
+  }
+
   Widget build(BuildContext context) {
     final String weightUnit = _preferMetric ? 'kg' : 'lbs';
     // Determine the correct list for the chips

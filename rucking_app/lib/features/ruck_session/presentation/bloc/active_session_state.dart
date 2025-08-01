@@ -62,6 +62,9 @@ class ActiveSessionRunning extends ActiveSessionState {
   final int? plannedDuration; // in seconds
   final String sessionId;
   final String? eventId; // Event ID for event-linked sessions
+  final List<latlong.LatLng>? plannedRoute; // Planned route for navigation
+  final double? plannedRouteDistance; // Route distance in km
+  final int? plannedRouteDuration; // Route estimated duration in minutes
   final List<LocationPoint> locationPoints;
   final int elapsedSeconds;
   final double distanceKm;
@@ -128,6 +131,9 @@ class ActiveSessionRunning extends ActiveSessionState {
     required this.totalPausedDuration,
     required this.heartRateSamples,
     this.eventId, // Add eventId to constructor
+    this.plannedRoute, // Add plannedRoute to constructor
+    this.plannedRouteDistance, // Add route distance to constructor
+    this.plannedRouteDuration, // Add route duration to constructor
     this.photos = const [],
     this.isPhotosLoading = false,
     this.photosError,
@@ -196,6 +202,9 @@ class ActiveSessionRunning extends ActiveSessionState {
     splits,
     terrainSegments, // Add to props
     eventId, // Add eventId to props
+    plannedRoute, // Add plannedRoute to props
+    plannedRouteDistance, // Add route distance to props
+    plannedRouteDuration, // Add route duration to props
     isRecovered,
   ];
   
@@ -246,6 +255,9 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isGpsReady, // Add to copyWith parameters
     bool? hasGpsAccess, // Add to copyWith parameters
     String? eventId, // Add eventId to copyWith parameters
+    List<latlong.LatLng>? plannedRoute, // Add plannedRoute to copyWith parameters
+    double? plannedRouteDistance, // Add route distance to copyWith parameters
+    int? plannedRouteDuration, // Add route duration to copyWith parameters
     bool? isRecovered,
   }) {
     return ActiveSessionRunning(
@@ -290,6 +302,9 @@ class ActiveSessionRunning extends ActiveSessionState {
       isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
       hasGpsAccess: hasGpsAccess ?? this.hasGpsAccess, // Use in copyWith
       eventId: eventId ?? this.eventId, // Use eventId in copyWith
+      plannedRoute: plannedRoute ?? this.plannedRoute, // Use plannedRoute in copyWith
+      plannedRouteDistance: plannedRouteDistance ?? this.plannedRouteDistance, // Use route distance in copyWith
+      plannedRouteDuration: plannedRouteDuration ?? this.plannedRouteDuration, // Use route duration in copyWith
       isRecovered: isRecovered ?? this.isRecovered,
     );
   }

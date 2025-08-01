@@ -32,12 +32,13 @@ class CurrentWeather extends Equatable {
   final Metadata? metadata;
   final double? temperature;
   final double? temperatureApparent;
-  final String? conditionCode;
+  final int? conditionCode;
   final double? humidity;
-  final Pressure? pressure;
-  final Visibility? visibility;
+  final double? pressure;
+  final double? visibility;
   final double? uvIndex;
-  final Wind? wind;
+  final double? windSpeed;
+  final double? windDirection;
   final double? dewPoint;
   final double? cloudCover;
   final DateTime? asOf;
@@ -53,7 +54,8 @@ class CurrentWeather extends Equatable {
     this.pressure,
     this.visibility,
     this.uvIndex,
-    this.wind,
+    this.windSpeed,
+    this.windDirection,
     this.dewPoint,
     this.cloudCover,
     this.asOf,
@@ -76,7 +78,8 @@ class CurrentWeather extends Equatable {
         pressure,
         visibility,
         uvIndex,
-        wind,
+        windSpeed,
+        windDirection,
         dewPoint,
         cloudCover,
         asOf,
@@ -90,13 +93,14 @@ class HourlyForecast extends Equatable {
   final DateTime? forecastStart;
   final double? temperature;
   final double? temperatureApparent;
-  final String? conditionCode;
+  final int? conditionCode;
   final double? humidity;
   final double? precipitationChance;
   final double? precipitationAmount;
-  final Wind? wind;
+  final double? windSpeed;
+  final double? windDirection;
   final double? uvIndex;
-  final Visibility? visibility;
+  final double? visibility;
 
   const HourlyForecast({
     this.forecastStart,
@@ -106,7 +110,8 @@ class HourlyForecast extends Equatable {
     this.humidity,
     this.precipitationChance,
     this.precipitationAmount,
-    this.wind,
+    this.windSpeed,
+    this.windDirection,
     this.uvIndex,
     this.visibility,
   });
@@ -125,7 +130,8 @@ class HourlyForecast extends Equatable {
         humidity,
         precipitationChance,
         precipitationAmount,
-        wind,
+        windSpeed,
+        windDirection,
         uvIndex,
         visibility,
       ];
@@ -136,12 +142,13 @@ class HourlyForecast extends Equatable {
 class DailyForecast extends Equatable {
   final DateTime? forecastStart;
   final DateTime? forecastEnd;
-  final String? conditionCode;
+  final int? conditionCode;
   final double? temperatureMax;
   final double? temperatureMin;
   final double? precipitationChance;
   final double? precipitationAmount;
-  final Wind? wind;
+  final double? windSpeed;
+  final double? windDirection;
   final double? uvIndex;
   final DateTime? sunrise;
   final DateTime? sunset;
@@ -154,7 +161,8 @@ class DailyForecast extends Equatable {
     this.temperatureMin,
     this.precipitationChance,
     this.precipitationAmount,
-    this.wind,
+    this.windSpeed,
+    this.windDirection,
     this.uvIndex,
     this.sunrise,
     this.sunset,
@@ -174,7 +182,8 @@ class DailyForecast extends Equatable {
         temperatureMin,
         precipitationChance,
         precipitationAmount,
-        wind,
+        windSpeed,
+        windDirection,
         uvIndex,
         sunrise,
         sunset,
@@ -283,76 +292,56 @@ class Visibility extends Equatable {
   List<Object?> get props => [value, unit];
 }
 
-/// Extension to get weather icon based on condition code
-extension WeatherConditionIcon on String {
+/// Extension to get weather icon based on integer condition code
+extension WeatherConditionIcon on int {
   /// Get appropriate weather icon for condition code
   String get weatherIcon {
-    switch (toLowerCase()) {
-      case 'clear':
-      case 'mostlyclear':
-        return '☀️';
-      case 'partlycloudy':
-        return '⛅';
-      case 'cloudy':
-      case 'mostlycloudy':
-        return '☁️';
-      case 'rain':
-      case 'drizzle':
-        return '🌧️';
-      case 'heavyrain':
-        return '🌦️';
-      case 'thunderstorms':
-        return '⛈️';
-      case 'snow':
-      case 'flurries':
-        return '❄️';
-      case 'sleet':
-        return '🌨️';
-      case 'fog':
-      case 'haze':
-        return '🌫️';
-      case 'windy':
-        return '💨';
-      default:
-        return '🌤️';
+    if (this >= 200 && this <= 232) {
+      return '⛈️'; // Thunderstorms
+    } else if (this >= 300 && this <= 321) {
+      return '🌧️'; // Drizzle
+    } else if (this >= 500 && this <= 504) {
+      return '🌧️'; // Light to moderate rain
+    } else if (this >= 511 && this <= 531) {
+      return '🌦️'; // Heavy rain/showers
+    } else if (this >= 600 && this <= 622) {
+      return '❄️'; // Snow
+    } else if (this >= 701 && this <= 781) {
+      return '🌫️'; // Fog, mist, haze
+    } else if (this == 800) {
+      return '☀️'; // Clear sky
+    } else if (this >= 801 && this <= 804) {
+      if (this == 801) return '⛅'; // Few clouds
+      else if (this == 802) return '⛅'; // Scattered clouds
+      else return '☁️'; // Broken/overcast clouds
+    } else {
+      return '🌤️'; // Default
     }
   }
 
   /// Get human-readable description for condition code
   String get description {
-    switch (toLowerCase()) {
-      case 'clear':
-        return 'Clear';
-      case 'mostlyclear':
-        return 'Mostly Clear';
-      case 'partlycloudy':
-        return 'Partly Cloudy';
-      case 'cloudy':
-        return 'Cloudy';
-      case 'mostlycloudy':
-        return 'Mostly Cloudy';
-      case 'rain':
-        return 'Rain';
-      case 'drizzle':
-        return 'Drizzle';
-      case 'heavyrain':
-        return 'Heavy Rain';
-      case 'thunderstorms':
-        return 'Thunderstorms';
-      case 'snow':
-        return 'Snow';
-      case 'flurries':
-        return 'Snow Flurries';
-      case 'sleet':
-        return 'Sleet';
-      case 'fog':
-        return 'Fog';
-      case 'haze':
-        return 'Haze';
-      case 'windy':
-        return 'Windy';
-      default:
-        return 'Unknown';
+    if (this >= 200 && this <= 232) {
+      return 'Thunderstorms';
+    } else if (this >= 300 && this <= 321) {
+      return 'Drizzle';
+    } else if (this >= 500 && this <= 504) {
+      return 'Rain';
+    } else if (this >= 511 && this <= 531) {
+      return 'Heavy Rain';
+    } else if (this >= 600 && this <= 622) {
+      return 'Snow';
+    } else if (this >= 701 && this <= 781) {
+      return 'Fog';
+    } else if (this == 800) {
+      return 'Clear Sky';
+    } else if (this >= 801 && this <= 804) {
+      if (this == 801) return 'Few Clouds';
+      else if (this == 802) return 'Scattered Clouds';
+      else if (this == 803) return 'Broken Clouds';
+      else return 'Overcast';
+    } else {
+      return 'Unknown';
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -65,6 +66,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   
   // Store completion data to pass to lifecycle manager
   Map<String, dynamic>? _sessionCompletionData;
+  
+  // Store planned route for navigation
+  List<latlong.LatLng>? _plannedRoute;
+  double? _plannedRouteDistance;
+  int? _plannedRouteDuration;
   
   ActiveSessionCoordinator({
     required SessionRepository sessionRepository,
@@ -513,6 +519,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         isUploading: _uploadManager.isUploading,
         splits: _locationManager.splits,
         terrainSegments: _locationManager.terrainSegments,
+        plannedRoute: _plannedRoute, // Pass planned route for navigation
+        plannedRouteDistance: _plannedRouteDistance, // Pass route distance
+        plannedRouteDuration: _plannedRouteDuration, // Pass route duration
       );
     } else {
       AppLogger.warning('[COORDINATOR] Unmatched state combination: isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
@@ -618,6 +627,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.info('[COORDINATOR] Session start requested');
+    
+    // Store planned route data for navigation
+    _plannedRoute = event.plannedRoute;
+    _plannedRouteDistance = event.plannedRouteDistance;
+    _plannedRouteDuration = event.plannedRouteDuration;
+    
+    if (_plannedRoute != null) {
+      AppLogger.info('[COORDINATOR] Stored planned route: ${_plannedRoute!.length} points, ${_plannedRouteDistance}km, ${_plannedRouteDuration}min');
+    }
+    
     await _routeEventToManagers(event);
     add(const TimerStarted());
   }

@@ -120,21 +120,19 @@ class WeatherService {
       // Optimal range (15-25°C) keeps score at 1.0
     }
 
-    // Precipitation factor
-    final condition = weather.conditionCode?.toLowerCase() ?? '';
-    if (condition.contains('rain') || condition.contains('storm')) {
-      if (condition.contains('heavy') || condition.contains('thunder')) {
-        score *= 0.2; // Very poor for outdoor activity
-      } else {
-        score *= 0.5; // Poor but manageable
-      }
-    } else if (condition.contains('snow') || condition.contains('sleet')) {
-      score *= 0.4; // Challenging conditions
+    // Precipitation factor based on condition code
+    final conditionCode = weather.conditionCode ?? 800;
+    if (_isStormyWeather(conditionCode)) {
+      score *= 0.2; // Very poor for outdoor activity (thunderstorms, heavy rain)
+    } else if (_isRainyWeather(conditionCode)) {
+      score *= 0.5; // Poor but manageable (light rain, drizzle)
+         } else if (_isSnowyWeather(conditionCode)) {
+        score *= 0.4; // Challenging conditions
     }
 
     // Wind factor
-    if (weather.wind?.speed != null) {
-      final windSpeed = weather.wind!.speed!;
+    if (weather.windSpeed != null) {
+      final windSpeed = weather.windSpeed!;
       if (windSpeed > 50) {
         score *= 0.3; // Very windy
       } else if (windSpeed > 30) {
@@ -151,11 +149,11 @@ class WeatherService {
     }
 
     // Visibility factor
-    if (weather.visibility?.value != null) {
-      final visibility = weather.visibility!.value!;
-      if (visibility < 1000) {
+    if (weather.visibility != null) {
+      final visibility = weather.visibility!;
+      if (visibility < 1.0) { // visibility is now in km, so < 1km is poor
         score *= 0.5; // Poor visibility
-      } else if (visibility < 5000) {
+      } else if (visibility < 5.0) { // < 5km is reduced visibility
         score *= 0.8; // Reduced visibility
       }
     }
@@ -178,5 +176,22 @@ class WeatherService {
     } else {
       return 'Poor conditions - indoor alternative recommended.';
     }
+  }
+
+  /// Check if condition code represents stormy weather (thunderstorms, heavy rain)
+  bool _isStormyWeather(int conditionCode) {
+    return (conditionCode >= 200 && conditionCode <= 232) || // Thunderstorms
+           (conditionCode >= 520 && conditionCode <= 531);   // Heavy rain/showers
+  }
+
+  /// Check if condition code represents rainy weather (light rain, drizzle)
+  bool _isRainyWeather(int conditionCode) {
+    return (conditionCode >= 300 && conditionCode <= 321) || // Drizzle
+           (conditionCode >= 500 && conditionCode <= 519);   // Light to moderate rain
+  }
+
+  /// Check if condition code represents snowy weather
+  bool _isSnowyWeather(int conditionCode) {
+    return (conditionCode >= 600 && conditionCode <= 622);   // Snow and sleet
   }
 }

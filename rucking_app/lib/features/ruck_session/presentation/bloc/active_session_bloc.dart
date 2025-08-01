@@ -44,6 +44,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'active_session_coordinator.dart';
 
 part 'active_session_event.dart';

@@ -33,18 +33,13 @@ CurrentWeather _$CurrentWeatherFromJson(Map<String, dynamic> json) =>
           : Metadata.fromJson(json['metadata'] as Map<String, dynamic>),
       temperature: (json['temperature'] as num?)?.toDouble(),
       temperatureApparent: (json['temperatureApparent'] as num?)?.toDouble(),
-      conditionCode: json['conditionCode'] as String?,
+      conditionCode: (json['conditionCode'] as num?)?.toInt(),
       humidity: (json['humidity'] as num?)?.toDouble(),
-      pressure: json['pressure'] == null
-          ? null
-          : Pressure.fromJson(json['pressure'] as Map<String, dynamic>),
-      visibility: json['visibility'] == null
-          ? null
-          : Visibility.fromJson(json['visibility'] as Map<String, dynamic>),
+      pressure: (json['pressure'] as num?)?.toDouble(),
+      visibility: (json['visibility'] as num?)?.toDouble(),
       uvIndex: (json['uvIndex'] as num?)?.toDouble(),
-      wind: json['wind'] == null
-          ? null
-          : Wind.fromJson(json['wind'] as Map<String, dynamic>),
+      windSpeed: (json['windSpeed'] as num?)?.toDouble(),
+      windDirection: (json['windDirection'] as num?)?.toDouble(),
       dewPoint: (json['dewPoint'] as num?)?.toDouble(),
       cloudCover: (json['cloudCover'] as num?)?.toDouble(),
       asOf:
@@ -65,7 +60,8 @@ Map<String, dynamic> _$CurrentWeatherToJson(CurrentWeather instance) =>
       'pressure': instance.pressure,
       'visibility': instance.visibility,
       'uvIndex': instance.uvIndex,
-      'wind': instance.wind,
+      'windSpeed': instance.windSpeed,
+      'windDirection': instance.windDirection,
       'dewPoint': instance.dewPoint,
       'cloudCover': instance.cloudCover,
       'asOf': instance.asOf?.toIso8601String(),
@@ -79,17 +75,14 @@ HourlyForecast _$HourlyForecastFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['forecastStart'] as String),
       temperature: (json['temperature'] as num?)?.toDouble(),
       temperatureApparent: (json['temperatureApparent'] as num?)?.toDouble(),
-      conditionCode: json['conditionCode'] as String?,
+      conditionCode: (json['conditionCode'] as num?)?.toInt(),
       humidity: (json['humidity'] as num?)?.toDouble(),
       precipitationChance: (json['precipitationChance'] as num?)?.toDouble(),
       precipitationAmount: (json['precipitationAmount'] as num?)?.toDouble(),
-      wind: json['wind'] == null
-          ? null
-          : Wind.fromJson(json['wind'] as Map<String, dynamic>),
+      windSpeed: (json['windSpeed'] as num?)?.toDouble(),
+      windDirection: (json['windDirection'] as num?)?.toDouble(),
       uvIndex: (json['uvIndex'] as num?)?.toDouble(),
-      visibility: json['visibility'] == null
-          ? null
-          : Visibility.fromJson(json['visibility'] as Map<String, dynamic>),
+      visibility: (json['visibility'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$HourlyForecastToJson(HourlyForecast instance) =>
@@ -101,7 +94,8 @@ Map<String, dynamic> _$HourlyForecastToJson(HourlyForecast instance) =>
       'humidity': instance.humidity,
       'precipitationChance': instance.precipitationChance,
       'precipitationAmount': instance.precipitationAmount,
-      'wind': instance.wind,
+      'windSpeed': instance.windSpeed,
+      'windDirection': instance.windDirection,
       'uvIndex': instance.uvIndex,
       'visibility': instance.visibility,
     };
@@ -114,14 +108,13 @@ DailyForecast _$DailyForecastFromJson(Map<String, dynamic> json) =>
       forecastEnd: json['forecastEnd'] == null
           ? null
           : DateTime.parse(json['forecastEnd'] as String),
-      conditionCode: json['conditionCode'] as String?,
+      conditionCode: (json['conditionCode'] as num?)?.toInt(),
       temperatureMax: (json['temperatureMax'] as num?)?.toDouble(),
       temperatureMin: (json['temperatureMin'] as num?)?.toDouble(),
       precipitationChance: (json['precipitationChance'] as num?)?.toDouble(),
       precipitationAmount: (json['precipitationAmount'] as num?)?.toDouble(),
-      wind: json['wind'] == null
-          ? null
-          : Wind.fromJson(json['wind'] as Map<String, dynamic>),
+      windSpeed: (json['windSpeed'] as num?)?.toDouble(),
+      windDirection: (json['windDirection'] as num?)?.toDouble(),
       uvIndex: (json['uvIndex'] as num?)?.toDouble(),
       sunrise: json['sunrise'] == null
           ? null
@@ -140,7 +133,8 @@ Map<String, dynamic> _$DailyForecastToJson(DailyForecast instance) =>
       'temperatureMin': instance.temperatureMin,
       'precipitationChance': instance.precipitationChance,
       'precipitationAmount': instance.precipitationAmount,
-      'wind': instance.wind,
+      'windSpeed': instance.windSpeed,
+      'windDirection': instance.windDirection,
       'uvIndex': instance.uvIndex,
       'sunrise': instance.sunrise?.toIso8601String(),
       'sunset': instance.sunset?.toIso8601String(),

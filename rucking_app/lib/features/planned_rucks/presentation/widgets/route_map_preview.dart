@@ -693,11 +693,11 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     final lngDiff = maxLng - minLng;
     final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
     
-    // Zoom out more to show full route with padding
-    if (maxDiff > 0.1) return 8.0;  // Further reduced for better route visibility
-    if (maxDiff > 0.05) return 10.0; // Further reduced for better route visibility
-    if (maxDiff > 0.01) return 12.0; // Further reduced for better route visibility
-    return 14.0; // Further reduced for better route visibility
+    // Balanced zoom to show full route with good detail
+    if (maxDiff > 0.1) return 9.5;  // Better balance between visibility and detail
+    if (maxDiff > 0.05) return 11.5; // Better balance between visibility and detail
+    if (maxDiff > 0.01) return 13.5; // Better balance between visibility and detail
+    return 15.0; // Better balance for small routes
   }
 
   String _getMapStyle() {
