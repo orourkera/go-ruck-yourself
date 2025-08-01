@@ -3,7 +3,7 @@ Routes API endpoints for AllTrails integration.
 Handles CRUD operations for routes and related data.
 """
 
-from flask import request, jsonify
+from flask import request, jsonify, g
 from flask_restful import Resource
 import logging
 from typing import Dict, Any, List, Optional
@@ -39,7 +39,7 @@ class RoutesResource(Resource):
             if not user_id:
                 return error_response("Authentication required", 401)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Build query
             query = supabase.table('routes').select(
@@ -130,7 +130,7 @@ class RoutesResource(Resource):
             # Create Route object for validation
             route = Route.from_dict(data)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Insert route
             result = supabase.table('routes').insert(route.to_dict()).execute()
@@ -169,7 +169,7 @@ class RouteResource(Resource):
             if not user_id:
                 return error_response("Authentication required", 401)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get route
             result = supabase.table('routes').select('*').eq('id', route_id).execute()
@@ -222,7 +222,7 @@ class RouteResource(Resource):
             if not data:
                 return error_response("Request body required", 400)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if route exists and user owns it
             existing_result = supabase.table('routes').select('created_by_user_id').eq('id', route_id).execute()
@@ -263,7 +263,7 @@ class RouteResource(Resource):
             if not user_id:
                 return error_response("Authentication required", 401)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Check if route exists and user owns it
             existing_result = supabase.table('routes').select('created_by_user_id').eq('id', route_id).execute()
@@ -298,7 +298,7 @@ class RouteElevationResource(Resource):
             if not user_id:
                 return error_response("Authentication required", 401)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Verify route access
             route_result = supabase.table('routes').select('is_public, created_by_user_id').eq('id', route_id).execute()
@@ -361,7 +361,7 @@ class RouteSearchResource(Resource):
             limit = data.get('limit', 20)
             offset = data.get('offset', 0)
             
-            supabase = get_supabase_client(user_jwt=request.headers.get('Authorization'))
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Start with base query
             query = supabase.table('routes').select(
