@@ -84,9 +84,9 @@ class PlannedRuck extends Equatable {
   factory PlannedRuck.fromJson(Map<String, dynamic> json) {
     return PlannedRuck(
       id: json['id'] as String?,
-      userId: json['user_id'] as String,
-      routeId: json['route_id'] as String,
-      plannedDate: DateTime.parse(json['planned_date'] as String),
+      userId: json['user_id']?.toString() ?? '',
+      routeId: json['route_id']?.toString() ?? '',
+      plannedDate: DateTime.parse(json['planned_date']?.toString() ?? DateTime.now().toIso8601String()),
       plannedStartTime: json['planned_start_time'] != null 
           ? DateTime.parse(json['planned_start_time'] as String) 
           : null,
