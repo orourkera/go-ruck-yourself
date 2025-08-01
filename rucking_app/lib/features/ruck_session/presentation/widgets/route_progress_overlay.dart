@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../shared/theme/app_colors.dart';
 import '../../../../shared/theme/app_text_styles.dart';
+import '../../../../core/utils/measurement_utils.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Widget that displays route navigation progress during an active ruck session
 class RouteProgressOverlay extends StatelessWidget {
@@ -19,14 +22,40 @@ class RouteProgressOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Show if we have at least planned route distance
-    if (plannedRouteDistance == null) {
+    // Only show if we have planned route data
+    if (plannedRouteDistance == null || plannedRouteDistance! <= 0) {
       return const SizedBox.shrink();
+    }
+
+    // Get user preferences for units
+    bool preferMetric = true;
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        preferMetric = authState.user.preferMetric ?? true;
+      }
+    } catch (e) {
+      // Default to metric if we can't get user preference
+      preferMetric = true;
     }
 
     final distanceRemaining = (plannedRouteDistance! - currentDistance).clamp(0.0, plannedRouteDistance!);
     final elapsedMinutes = elapsedSeconds / 60;
-    final timeRemaining = (plannedRouteDuration! - elapsedMinutes).clamp(0.0, plannedRouteDuration!.toDouble());
+    
+    // Calculate time remaining (estimate if no planned duration)
+    final double timeRemaining;
+    if (plannedRouteDuration != null) {
+      timeRemaining = (plannedRouteDuration! - elapsedMinutes).clamp(0.0, plannedRouteDuration!.toDouble());
+    } else {
+      // Estimate remaining time based on current pace
+      if (currentDistance > 0 && elapsedMinutes > 0) {
+        final currentPaceMinutesPerKm = elapsedMinutes / currentDistance;
+        timeRemaining = (distanceRemaining / currentPaceMinutesPerKm).clamp(0.0, double.infinity);
+      } else {
+        timeRemaining = 0.0;
+      }
+    }
+
     final progressPercentage = (currentDistance / plannedRouteDistance!).clamp(0.0, 1.0);
 
     return Container(
@@ -85,7 +114,7 @@ class RouteProgressOverlay extends StatelessWidget {
                 child: _buildProgressItem(
                   icon: Icons.straighten,
                   label: 'Remaining',
-                  value: '${distanceRemaining.toStringAsFixed(1)} km',
+                  value: MeasurementUtils.formatDistance(distanceRemaining, preferMetric),
                   color: AppColors.primary,
                 ),
               ),

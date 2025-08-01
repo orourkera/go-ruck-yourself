@@ -377,11 +377,25 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           
           if (widget.routeData != null) {
             try {
+              AppLogger.info('Route data received: ${widget.routeData}');
+              
               // Parse route polyline into LatLng points
               if (widget.routeData['route_polyline'] != null) {
                 final polylineString = widget.routeData['route_polyline'] as String;
+                AppLogger.info('Route polyline string: $polylineString');
+                AppLogger.info('Polyline string length: ${polylineString.length}');
+                
                 plannedRoute = _parsePolylineToLatLng(polylineString);
                 AppLogger.info('Parsed ${plannedRoute.length} route points for session navigation');
+                
+                if (plannedRoute.isNotEmpty) {
+                  AppLogger.info('First route point: ${plannedRoute.first}');
+                  AppLogger.info('Last route point: ${plannedRoute.last}');
+                } else {
+                  AppLogger.warning('No route points parsed from polyline!');
+                }
+              } else {
+                AppLogger.warning('Route polyline is null in routeData!');
               }
               
               // Extract route distance (in km)
@@ -402,6 +416,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           }
           
           // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
+          AppLogger.info('Creating session args:');
+          AppLogger.info('  plannedRoute length: ${plannedRoute?.length ?? 0}');
+          AppLogger.info('  plannedRouteDistance: $plannedRouteDistance');
+          AppLogger.info('  plannedRouteDuration: $plannedRouteDuration');
+          
           final sessionArgs = ActiveSessionArgs(
             ruckWeight: _ruckWeight,
             userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)

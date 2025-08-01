@@ -897,23 +897,39 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
   
   /// Calculate bounds that include both current location and planned route
   LatLngBounds? _calculateCombinedBounds() {
+    debugPrint('=== MAP BOUNDS DEBUG ===');
+    debugPrint('plannedRoute is null: ${widget.plannedRoute == null}');
+    debugPrint('plannedRoute length: ${widget.plannedRoute?.length ?? 0}');
+    debugPrint('initialCenter: ${widget.initialCenter}');
+    debugPrint('actual route length: ${widget.route.length}');
+    
     if (widget.plannedRoute == null || widget.plannedRoute!.isEmpty) {
+      debugPrint('No planned route data - cannot calculate bounds');
       return null;
     }
     
     List<latlong.LatLng> allPoints = List.from(widget.plannedRoute!);
+    debugPrint('Starting with ${allPoints.length} planned route points');
     
-    // Add current location if available
     if (widget.initialCenter != null) {
       allPoints.add(widget.initialCenter!);
+      debugPrint('Added initial center, now ${allPoints.length} points');
     }
-    
-    // Add current route points if different from initial center
     if (widget.route.isNotEmpty) {
       allPoints.addAll(widget.route);
+      debugPrint('Added actual route, now ${allPoints.length} points');
     }
     
-    if (allPoints.isEmpty) return null;
+    if (allPoints.isEmpty) {
+      debugPrint('No points available for bounds calculation');
+      return null;
+    }
+    
+    debugPrint('Final point count for bounds: ${allPoints.length}');
+    if (allPoints.isNotEmpty) {
+      debugPrint('First point: ${allPoints.first}');
+      debugPrint('Last point: ${allPoints.last}');
+    }
     
     double minLat = allPoints.first.latitude;
     double maxLat = allPoints.first.latitude;
@@ -927,10 +943,15 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
       maxLng = math.max(maxLng, point.longitude);
     }
     
-    return LatLngBounds(
+    final bounds = LatLngBounds(
       latlong.LatLng(minLat, minLng),
       latlong.LatLng(maxLat, maxLng),
     );
+    
+    debugPrint('Calculated bounds: SW(${minLat}, ${minLng}) to NE(${maxLat}, ${maxLng})');
+    debugPrint('=== END MAP BOUNDS DEBUG ===');
+    
+    return bounds;
   }
   
 
