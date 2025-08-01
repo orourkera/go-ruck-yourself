@@ -45,7 +45,7 @@ class RoutesResource(Resource):
             query = supabase.table('routes').select(
                 'id, name, description, source, external_id, external_url, '
                 'start_latitude, start_longitude, end_latitude, end_longitude, '
-                'distance_km, elevation_gain_m, elevation_loss_m, '
+                'route_polyline, distance_km, elevation_gain_m, elevation_loss_m, '
                 'trail_difficulty, trail_type, surface_type, '
                 'total_planned_count, total_completed_count, average_rating, '
                 'created_at, updated_at, created_by_user_id, is_verified, is_public'

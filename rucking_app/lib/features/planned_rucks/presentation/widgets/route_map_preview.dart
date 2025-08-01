@@ -595,6 +595,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
       try {
         final polylinePoints = <LatLng>[];
         final coordinates = widget.route.routePolyline!.split(';');
+        debugPrint('Split coordinates count: ${coordinates.length}');
         
         for (final coord in coordinates) {
           final parts = coord.trim().split(',');
@@ -603,11 +604,18 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
             final lng = double.tryParse(parts[1]);
             if (lat != null && lng != null) {
               polylinePoints.add(LatLng(lat, lng));
+            } else {
+              debugPrint('Failed to parse coordinate: $coord -> lat: $lat, lng: $lng');
             }
+          } else {
+            debugPrint('Invalid coordinate format: $coord (parts: ${parts.length})');
           }
         }
         
+        debugPrint('Successfully parsed ${polylinePoints.length} points');
         if (polylinePoints.isNotEmpty) {
+          debugPrint('First point: ${polylinePoints.first}');
+          debugPrint('Last point: ${polylinePoints.last}');
           return polylinePoints;
         }
       } catch (e) {
@@ -615,6 +623,8 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         // Log the error but don't crash
         debugPrint('Error parsing route polyline: $e');
       }
+    } else {
+      debugPrint('No polyline data available, using fallback');
     }
     
     // Fallback: Create basic route points from start/end coordinates

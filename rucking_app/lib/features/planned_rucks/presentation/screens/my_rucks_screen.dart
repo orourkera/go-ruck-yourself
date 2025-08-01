@@ -5,7 +5,6 @@ import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/my_rucks_app_bar.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
-import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/core/widgets/error_widget.dart';
 import 'package:rucking_app/shared/widgets/loading_indicator.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -92,13 +91,6 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
       body: RefreshIndicator(
         onRefresh: _loadRoutes,
         child: _buildBody(),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _navigateToImport(),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Import Route'),
       ),
     );
   }
@@ -203,22 +195,16 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _startRuck(route),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('START RUCK'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                    ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: () => _navigateToRouteDetail(route),
+                  icon: const Icon(Icons.info_outline),
+                  label: const Text('Details'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
                   ),
-                ),
-                const SizedBox(width: 12),
-                TextButton.icon(
-                  onPressed: () => _deleteRoute(route),
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  label: const Text('DELETE', style: TextStyle(color: Colors.red)),
                 ),
               ],
             ),
@@ -254,71 +240,12 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
   }
 
   void _navigateToRouteDetail(route_model.Route route) {
-    // For now, use route.id as plannedRuckId - this needs to be updated
-    // when PlannedRuckDetailScreen is modified to handle routes directly
-    if (route.id != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => PlannedRuckDetailScreen(plannedRuckId: route.id!),
-        ),
-      );
-    }
-  }
-
-  void _startRuck(route_model.Route route) {
-    // Navigate to create session screen with the route data
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const CreateSessionScreen(),
+        builder: (context) => PlannedRuckDetailScreen(route: route),
       ),
     );
   }
 
-  void _deleteRoute(route_model.Route route) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Route'),
-        content: Text('Are you sure you want to delete "${route.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              try {
-                if (route.id != null) {
-                  await _routesRepository.deleteRoute(route.id!);
-                  _loadRoutes(); // Reload routes after deletion
-                } else {
-                  throw Exception('Route ID is null');
-                }
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('"${route.name}" deleted successfully'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to delete route: $e'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
+
 }

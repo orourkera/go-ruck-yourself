@@ -17,13 +17,13 @@ import 'package:rucking_app/shared/widgets/weather/weather_card.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 
-/// Detailed view screen for a planned ruck
+/// Detailed view screen for a planned ruck or route
 class PlannedRuckDetailScreen extends StatefulWidget {
-  final String plannedRuckId;
+  final route_model.Route route;
 
   const PlannedRuckDetailScreen({
     super.key,
-    required this.plannedRuckId,
+    required this.route,
   });
 
   @override
@@ -46,10 +46,12 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     _scrollController = ScrollController();
     _weatherService = WeatherService();
     
-    // Load the planned ruck using the ID
-    context.read<PlannedRuckBloc>().add(
-      LoadPlannedRuckById(plannedRuckId: widget.plannedRuckId),
-    );
+    // Load the planned ruck using the ID if provided
+    // if (widget.plannedRuckId != null) {
+    //   context.read<PlannedRuckBloc>().add(
+    //     LoadPlannedRuckById(plannedRuckId: widget.plannedRuckId!),
+    //   );
+    // }
     
     _scrollController.addListener(() {
       final shouldShow = _scrollController.offset > 200;
@@ -69,7 +71,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   /// Load weather data for the planned ruck
   Future<void> _loadWeatherData() async {
-    if (_plannedRuck?.route == null || _plannedRuck?.plannedDate == null) {
+    if (widget.route.startLatitude == null || widget.route.startLongitude == null) {
       return;
     }
 
@@ -80,9 +82,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
     try {
       final weather = await _weatherService.getWeatherForPlannedRuck(
-        startLatitude: _plannedRuck!.route!.startLatitude,
-        startLongitude: _plannedRuck!.route!.startLongitude,
-        plannedDate: _plannedRuck!.plannedDate!,
+        startLatitude: widget.route.startLatitude!,
+        startLongitude: widget.route.startLongitude!,
+        plannedDate: DateTime.now(), // Use current date as default
       );
 
       if (mounted) {
@@ -103,6 +105,31 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // If we have a route directly, create a mock planned ruck for display
+    if (_plannedRuck == null) {
+      _plannedRuck = PlannedRuck(
+        id: widget.route.id ?? 'route-preview', 
+        userId: 'current-user',
+        routeId: widget.route.id ?? 'route-preview',
+        route: widget.route,
+        plannedDate: DateTime.now(), // Use current date as default
+        targetWeight: null, // No target weight for route-only view
+        notes: null,
+        status: PlannedRuckStatus.planned,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      // Load weather data for the route if coordinates are available
+      if (widget.route.startLatitude != null && widget.route.startLongitude != null) {
+        // We can't load weather without a planned date, so skip weather loading
+      }
+    }
+
+    // For route-only view, bypass BlocConsumer
+    if (widget.route != null) {
+      return _buildScaffold();
+    }
+
     return BlocConsumer<PlannedRuckBloc, PlannedRuckState>(
       listener: (context, state) {
         if (state is PlannedRuckLoading) {
@@ -118,7 +145,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
           // Use the selectedRuck from the state (loaded by LoadPlannedRuckById)
           final plannedRuck = state.selectedRuck ?? 
               state.plannedRucks
-                  .where((ruck) => ruck.id == widget.plannedRuckId)
+                  .where((ruck) => ruck.id == widget.route.id)
                   .firstOrNull;
           
           if (plannedRuck != null) {
@@ -143,26 +170,26 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
         }
       },
       builder: (context, state) {
-        return Scaffold(
-          backgroundColor: AppColors.backgroundLight,
-          body: CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              // App bar with hero image
-              _buildSliverAppBar(_plannedRuck?.route),
-              
-              // Content
-              SliverFillRemaining(
-                child: _buildOverviewTab(),
-              ),
-            ],
-          ),
-          
-          // Floating action buttons
-          floatingActionButton: _buildFloatingActions(),
-          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        );
+        return _buildScaffold();
       },
+    );
+  }
+
+  Widget _buildScaffold() {
+    return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // App bar with hero image
+          _buildSliverAppBar(widget.route),
+          
+          // Content
+          SliverFillRemaining(
+            child: _buildOverviewTab(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -202,94 +229,31 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               Positioned.fill(
                 child: RouteMapPreview(
                   route: route,
-                  isHeroImage: true,
-                  showOverlay: true,
+                  isInteractive: true,
+                  showOverlay: false,
                 ),
               ),
             
-            // Overlay content
+            // Title overlay positioned at bottom left
             Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Route name
-                  Text(
-                    route?.name ?? 'Unnamed Route',
-                    style: AppTextStyles.headlineMedium.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          color: Colors.grey.shade600.withAlpha(128),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Text(
+                route?.name ?? 'Unnamed Route',
+                style: AppTextStyles.headlineLarge.copyWith(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.7),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Status and badges
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withAlpha(26),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _plannedRuck?.status.name.toLowerCase() ?? '',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (route?.trailDifficulty != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withAlpha(26),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            route?.trailDifficulty ?? 'Unknown',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Quick stats
-                  if (route != null)
-                    Row(
-                      children: [
-                        _buildQuickStat(Icons.straighten, route.formattedDistance),
-                        if (route.elevationGainM != null) ...[
-                          const SizedBox(width: 16),
-                          _buildQuickStat(Icons.trending_up, route.formattedElevationGain),
-                        ],
-                        if (route.estimatedDurationMinutes != null) ...[
-                          const SizedBox(width: 16),
-                          _buildQuickStat(Icons.access_time, route.formattedEstimatedDuration),
-                        ],
-                      ],
-                    ),
-                ],
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -327,29 +291,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
   }
 
   Widget _buildOverviewTab() {
-    final route = _plannedRuck?.route;
+    final route = widget.route;
     
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Planned ruck info card
-          _buildInfoCard(
-            'Planned Ruck Details',
-            Icons.calendar_today,
-            [
-              _buildInfoRow('Planned Date', _plannedRuck?.formattedPlannedDate ?? ''),
-              _buildInfoRow('Status', _plannedRuck?.status.value ?? ''),
-              if (_plannedRuck?.notes?.isNotEmpty == true)
-                _buildInfoRow('Notes', _plannedRuck?.notes ?? ''),
-              if (_plannedRuck?.completedAt != null)
-                _buildInfoRow('Completed', '${_plannedRuck?.completedAt?.day ?? 0}/${_plannedRuck?.completedAt?.month ?? 0}/${_plannedRuck?.completedAt?.year ?? 0}'),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
           // Route overview
           if (route != null) ...[
             _buildInfoCard(
@@ -394,6 +342,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
           
           // Weather info (placeholder)
           _buildWeatherCard(),
+          
+          const SizedBox(height: 24),
+          
+          // Bottom action buttons
+          _buildBottomActions(),
+          
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -600,29 +555,40 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     );
   }
 
-  Widget _buildFloatingActions() {
+  Widget _buildBottomActions() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
         // Share button
-        FloatingActionButton(
-          heroTag: 'share',
-          onPressed: _shareRoute,
-          backgroundColor: AppColors.backgroundLight,
-          foregroundColor: AppColors.primary,
-          child: const Icon(Icons.share),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _shareRoute,
+            icon: const Icon(Icons.share),
+            label: const Text('Share Route'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(color: AppColors.primary),
+              foregroundColor: AppColors.primary,
+            ),
+          ),
         ),
         
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         
         // Primary action button
-        FloatingActionButton.extended(
-          heroTag: 'primary',
-          onPressed: _performPrimaryAction,
-          backgroundColor: _getPrimaryActionColor(),
-          foregroundColor: Colors.white,
-          icon: Icon(_getPrimaryActionIcon()),
-          label: Text(_getPrimaryActionLabel()),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _performPrimaryAction,
+            icon: Icon(_getPrimaryActionIcon()),
+            label: Text(_getPrimaryActionLabel()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _getPrimaryActionColor(),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              elevation: 2,
+            ),
+          ),
         ),
       ],
     );
@@ -740,9 +706,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   /// Check distance to route start and potentially show warning
   Future<void> _checkLocationAndNavigate() async {
-    if (_plannedRuck?.route == null) return;
+    if (widget.route.startLatitude == null || widget.route.startLongitude == null) return;
 
-    final route = _plannedRuck!.route!;
+    final route = widget.route;
     
     // Create initial center from route start coordinates
     latlong.LatLng? routeStart;
@@ -813,9 +779,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
   }
 
   void _navigateToActiveSession() {
-    if (_plannedRuck?.route == null) return;
+    if (widget.route.startLatitude == null || widget.route.startLongitude == null) return;
 
-    final route = _plannedRuck!.route!;
+    final route = widget.route;
     
     // Create initial center from route start coordinates
     latlong.LatLng? initialCenter;
@@ -852,9 +818,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       MaterialPageRoute(
         builder: (context) => ActiveSessionPage(
           args: ActiveSessionArgs(
-            ruckWeight: _plannedRuck!.targetWeight ?? 0.0,
+            ruckWeight: _plannedRuck?.targetWeight ?? 0.0,
             userWeightKg: 70.0, // TODO: Get actual user weight from user profile
-            notes: _plannedRuck!.notes,
+            notes: _plannedRuck?.notes,
             plannedDuration: route.estimatedDurationMinutes * 60,
             initialCenter: initialCenter,
             plannedRoute: plannedRoutePoints, // Pass the planned route

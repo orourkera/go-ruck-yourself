@@ -6,7 +6,7 @@ import 'package:rucking_app/features/planned_rucks/presentation/widgets/url_impo
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_search_widget.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_preview_card.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/import_progress_indicator.dart';
-import 'package:rucking_app/features/planned_rucks/presentation/screens/route_preview_screen.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
 import 'package:rucking_app/shared/widgets/loading_indicator.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -136,9 +136,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => BlocProvider.value(
-                  value: context.read<RouteImportBloc>(),
-                  child: const RoutePreviewScreen(routeId: 'import_preview'),
+                builder: (context) => PlannedRuckDetailScreen(
+                  route: state.route,
                 ),
               ),
             );
@@ -147,9 +146,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => BlocProvider.value(
-                  value: context.read<RouteImportBloc>(),
-                  child: const RoutePreviewScreen(routeId: 'import_preview'),
+                builder: (context) => PlannedRuckDetailScreen(
+                  route: state.route,
                 ),
               ),
             );

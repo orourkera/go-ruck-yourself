@@ -30,8 +30,6 @@ class DeepLinkHandler {
       // Handle different types of links
       if (_isRouteShareLink(uri)) {
         await _handleRouteShareLink(context, uri);
-      } else if (_isPlannedRuckLink(uri)) {
-        await _handlePlannedRuckLink(context, uri);
       } else if (_isSessionLink(uri)) {
         await _handleSessionLink(context, uri);
       } else if (_isAllTrailsLink(uri)) {
@@ -240,12 +238,6 @@ class DeepLinkHandler {
            uri.queryParameters['type'] == 'route';
   }
 
-  static bool _isPlannedRuckLink(Uri uri) {
-    return uri.pathSegments.isNotEmpty && 
-           uri.pathSegments[0] == 'ruck' &&
-           uri.queryParameters['type'] == 'planned_ruck';
-  }
-
   static bool _isSessionLink(Uri uri) {
     return uri.pathSegments.isNotEmpty && 
            uri.pathSegments[0] == 'session';
@@ -279,15 +271,6 @@ class DeepLinkHandler {
         Navigator.of(context).pop();
         _showErrorDialog(context, 'Failed to load route');
       }
-    }
-  }
-
-  static Future<void> _handlePlannedRuckLink(BuildContext context, Uri uri) async {
-    final ruckId = uri.pathSegments.isNotEmpty ? uri.pathSegments[1] : null;
-    
-    if (ruckId != null) {
-      // Navigate to planned ruck detail
-      AllTrailsRouter.handlePlannedRuckShare(context, ruckId);
     }
   }
 

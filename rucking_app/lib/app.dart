@@ -805,19 +805,6 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                             platform: args?['platform'] as String?,
                           ),
                         );
-                      case '/planned_ruck_detail':
-                        final args = settings.arguments;
-                        if (args is String) {
-                          return MaterialPageRoute(
-                            builder: (_) => PlannedRuckDetailScreen(plannedRuckId: args),
-                          );
-                        }
-                        return MaterialPageRoute(
-                          builder: (_) => Scaffold(
-                            appBar: AppBar(title: const Text('Error')),
-                            body: const Center(child: Text('Missing planned ruck ID')),
-                          ),
-                        );
                       case '/route_preview':
                         final args = settings.arguments;
                         if (args is String) {

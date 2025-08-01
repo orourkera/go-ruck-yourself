@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'route_elevation_point.dart';
 import 'route_point_of_interest.dart';
 

@@ -278,11 +278,11 @@ class PlannedRucksPreview extends StatelessWidget {
 
   void _navigateToPlannedRuckDetail(BuildContext context, PlannedRuck ruck) {
     try {
-      if (context.mounted && ruck.id != null) {
+      if (context.mounted && ruck.route != null) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => PlannedRuckDetailScreen(plannedRuckId: ruck.id!),
+            builder: (context) => PlannedRuckDetailScreen(route: ruck.route!),
           ),
         );
       }

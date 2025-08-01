@@ -57,27 +57,6 @@ class AllTrailsRouter {
           ),
         ),
         
-        // Planned Ruck Detail Screen
-        GoRoute(
-          path: '/detail/:ruckId',
-          name: 'planned-ruck-detail',
-          pageBuilder: (context, state) {
-            final ruckId = state.pathParameters['ruckId']!;
-            final extra = state.extra as PlannedRuck?;
-            
-            return CustomTransitionPage<void>(
-              key: state.pageKey,
-              child: BlocProvider.value(
-                value: context.read<PlannedRuckBloc>(),
-                child: PlannedRuckDetailScreen(
-                  plannedRuckId: ruckId,
-                ),
-              ),
-              transitionsBuilder: _slideFromRightTransition,
-            );
-          },
-        ),
-        
         // Active Session Screen
         GoRoute(
           path: '/session/:sessionId',
@@ -220,17 +199,6 @@ class AllTrailsRouter {
     context.go(uri.toString());
   }
 
-  static void navigateToPlannedRuckDetail(
-    BuildContext context,
-    PlannedRuck plannedRuck,
-  ) {
-    context.goNamed(
-      'planned-ruck-detail',
-      pathParameters: {'ruckId': plannedRuck.id!},
-      extra: plannedRuck,
-    );
-  }
-
   static void navigateToActiveSession(
     BuildContext context,
     String sessionId, {
@@ -286,14 +254,6 @@ class AllTrailsRouter {
       // Generic route preview
       navigateToRouteImport(context, initialUrl: url);
     }
-  }
-
-  static void handlePlannedRuckShare(BuildContext context, String ruckId) {
-    // This would typically fetch the ruck details first
-    context.goNamed(
-      'planned-ruck-detail',
-      pathParameters: {'ruckId': ruckId},
-    );
   }
 
   /// Custom transition builders

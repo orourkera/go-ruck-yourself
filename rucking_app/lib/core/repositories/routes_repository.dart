@@ -229,11 +229,27 @@ class RoutesRepository {
       };
 
       final response = await _apiClient.get('/routes', queryParams: queryParams);
-      final data = response['data'] ?? response; // Handle both nested and flat structures
-      final routesList = data['routes'] as List? ?? [];
-      final routes = routesList
-          .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
-          .toList();
+    
+    // Debug: Print raw API response
+    AppLogger.info('=== API Response Debug ===');
+    AppLogger.info('Response keys: ${response.keys.toList()}');
+    
+    final data = response['data'] ?? response; // Handle both nested and flat structures
+    AppLogger.info('Data keys: ${data.keys.toList()}');
+    
+    final routesList = data['routes'] as List? ?? [];
+    AppLogger.info('Routes list length: ${routesList.length}');
+    
+    if (routesList.isNotEmpty) {
+      final firstRoute = routesList.first as Map<String, dynamic>;
+      AppLogger.info('First route keys: ${firstRoute.keys.toList()}');
+      AppLogger.info('First route polyline: "${firstRoute['route_polyline']}"');
+      AppLogger.info('First route polyline type: ${firstRoute['route_polyline'].runtimeType}');
+    }
+    
+    final routes = routesList
+        .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
+        .toList();
       
       AppLogger.info('Retrieved ${routes.length} user routes');
       return routes;
