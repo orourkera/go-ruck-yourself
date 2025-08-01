@@ -487,8 +487,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: state is RouteImportInProgress ? null : () {
-                _confirmImport(originalRoute);
+              onPressed: state is RouteImportInProgress || originalRoute == null ? null : () {
+                _confirmImport(originalRoute!);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,

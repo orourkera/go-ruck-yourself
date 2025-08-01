@@ -70,7 +70,7 @@ class Route:
     id: Optional[str]
     name: str
     description: Optional[str]
-    source: str  # alltrails, custom, community
+    source: str  # alltrails, custom, community, manual
     external_id: Optional[str] = None  # AllTrails trail ID, etc.
     external_url: Optional[str] = None  # Link back to original source
     
@@ -111,7 +111,7 @@ class Route:
 
     def __post_init__(self):
         """Validate route data after initialization."""
-        if self.source not in ['alltrails', 'custom', 'community']:
+        if self.source not in ['alltrails', 'custom', 'community', 'manual']:
             raise ValueError(f"Invalid source: {self.source}")
         
         if self.trail_difficulty and self.trail_difficulty not in ['easy', 'moderate', 'hard', 'extreme']:
