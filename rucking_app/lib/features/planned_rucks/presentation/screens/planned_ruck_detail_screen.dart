@@ -72,10 +72,11 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             ),
           );
         } else if (state is PlannedRuckLoaded) {
-          // Find the specific planned ruck from the loaded state
-          final plannedRuck = state.plannedRucks
-              .where((ruck) => ruck.id == widget.plannedRuckId)
-              .firstOrNull;
+          // Use the selectedRuck from the state (loaded by LoadPlannedRuckById)
+          final plannedRuck = state.selectedRuck ?? 
+              state.plannedRucks
+                  .where((ruck) => ruck.id == widget.plannedRuckId)
+                  .firstOrNull;
           
           if (plannedRuck != null) {
             setState(() {

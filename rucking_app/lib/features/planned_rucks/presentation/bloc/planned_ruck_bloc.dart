@@ -231,8 +231,16 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
           _allPlannedRucks[index] = plannedRuck;
         }
 
+        // Always emit a loaded state with the selected ruck
         if (state is PlannedRuckLoaded) {
           emit((state as PlannedRuckLoaded).copyWith(
+            plannedRucks: List.from(_allPlannedRucks),
+            selectedRuck: plannedRuck,
+            lastUpdated: DateTime.now(),
+          ));
+        } else {
+          // First time loading or initial state - emit new loaded state
+          emit(PlannedRuckLoaded(
             plannedRucks: List.from(_allPlannedRucks),
             selectedRuck: plannedRuck,
             lastUpdated: DateTime.now(),
