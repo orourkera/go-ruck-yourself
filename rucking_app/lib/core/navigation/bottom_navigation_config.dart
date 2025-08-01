@@ -31,7 +31,7 @@ class BottomNavigationConfig {
         index: myRucksIndex,
         icon: Icons.route_outlined,
         activeIcon: Icons.route,
-        label: 'My Rucks',
+        label: 'My Routes',
         route: AllTrailsRouter.myRucks,
         badgeCount: context != null ? _getPlannedRucksBadgeCount(context) : null,
       ),

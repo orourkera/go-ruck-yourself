@@ -72,12 +72,13 @@ class RoutesResource(Resource):
             if created_by_me:
                 # Filter to user's own routes
                 query = query.eq('created_by_user_id', user_id)
+                # For user's own routes, sort by creation date (newest first)
+                query = query.order('created_at', desc=True)
             else:
                 # Include public routes in addition to user's own routes (RLS handles user's routes)
                 query = query.eq('is_public', True)
-            
-            # Order by popularity and apply pagination
-            query = query.order('total_completed_count', desc=True)
+                # For public routes, order by popularity
+                query = query.order('total_completed_count', desc=True)
             query = query.range(offset, offset + limit - 1)
             
             result = query.execute()
@@ -287,6 +288,61 @@ class RouteResource(Resource):
         except Exception as e:
             logger.error(f"Error deleting route {route_id}: {e}")
             return error_response("Failed to delete route", 500)
+    
+    def patch(self, route_id: str):
+        """Update specific route fields (like visibility)."""
+        try:
+            # Get current user
+            user_id = get_current_user_id()
+            if not user_id:
+                return error_response("Authentication required", 401)
+            
+            # Get request data
+            data = request.get_json()
+            if not data:
+                return error_response("Request body is required", 400)
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # First check if route exists and user owns it
+            existing_result = supabase.table('routes').select('id, created_by_user_id, name').eq('id', route_id).execute()
+            
+            if not existing_result.data:
+                return error_response("Route not found", 404)
+            
+            route_data = existing_result.data[0]
+            if route_data['created_by_user_id'] != user_id:
+                return error_response("Permission denied - you can only update your own routes", 403)
+            
+            # Build update payload
+            update_data = {'updated_at': datetime.utcnow().isoformat()}
+            
+            # Handle visibility update
+            if 'is_public' in data:
+                is_public = data['is_public']
+                if not isinstance(is_public, bool):
+                    return error_response("is_public must be a boolean", 400)
+                update_data['is_public'] = is_public
+            
+            # Update route
+            update_result = supabase.table('routes').update(update_data).eq('id', route_id).execute()
+            
+            if not update_result.data:
+                return error_response("Failed to update route", 500)
+            
+            # Get the updated route data
+            updated_route_data = update_result.data[0]
+            route = Route.from_dict(updated_route_data)
+            
+            logger.info(f"Updated route: {route.name}")
+            return success_response({
+                'route': route.to_dict(),
+                'message': "Route updated successfully"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error updating route {route_id}: {e}")
+            return error_response("Failed to update route", 500)
 
 class RouteElevationResource(Resource):
     """Handle route elevation points."""

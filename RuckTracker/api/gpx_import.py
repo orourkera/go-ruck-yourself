@@ -5,15 +5,19 @@ Handles parsing GPX data and creating route records.
 
 from flask import request, jsonify, g
 from flask_restful import Resource
-import logging
-import xml.etree.ElementTree as ET
-from typing import Dict, Any, List, Optional
-from decimal import Decimal
-from datetime import datetime
+import json
 import re
+import logging
+import requests
+from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
+from xml.etree import ElementTree as ET
 
-from ..supabase_client import get_supabase_client
-from ..models import Route, RouteElevationPoint, RoutePointOfInterest
+import pytz
+
+from models.route import Route
+from utils.logger import logger
+from ..models import RouteElevationPoint, RoutePointOfInterest
 from ..utils.auth_helper import get_current_user_id, get_current_user_jwt
 from ..services.route_analytics_service import RouteAnalyticsService
 
@@ -257,8 +261,12 @@ class GPXImportResource(Resource):
                     
                     track_data['points'].append(point)
             
-            # Calculate distance and elevation
+            # Calculate missing elevations before metrics calculation
             if track_data['points']:
+                # Always calculate elevations for points that don't have them
+                track_data['points'] = self._calculate_missing_elevations(track_data['points'])
+                
+                # Calculate distance and elevation metrics
                 track_data.update(self._calculate_track_metrics(track_data['points']))
                 tracks.append(track_data)
         
@@ -462,6 +470,207 @@ class GPXImportResource(Resource):
             pois.append(poi)
         
         return pois
+    
+    def _calculate_missing_elevations(self, points: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Calculate elevation for points that don't have elevation data."""
+        points_needing_elevation = []
+        indices_needing_elevation = []
+        
+        # Find points missing elevation data
+        for i, point in enumerate(points):
+            if 'elevation' not in point or point['elevation'] is None:
+                points_needing_elevation.append({'latitude': point['lat'], 'longitude': point['lon']})
+                indices_needing_elevation.append(i)
+        
+        if not points_needing_elevation:
+            logger.info("All points already have elevation data")
+            return points
+        
+        # Optimize by sampling points if there are too many (reduces API calls)
+        if len(points_needing_elevation) > 200:
+            # Sample every nth point and interpolate between them
+            step = len(points_needing_elevation) // 200
+            sampled_points = []
+            sampled_indices = []
+            
+            for i in range(0, len(points_needing_elevation), step):
+                sampled_points.append(points_needing_elevation[i])
+                sampled_indices.append(indices_needing_elevation[i])
+            
+            logger.info(f"Sampling {len(sampled_points)} points from {len(points_needing_elevation)} for elevation calculation")
+            points_to_calculate = sampled_points
+            indices_to_update = sampled_indices
+        else:
+            points_to_calculate = points_needing_elevation
+            indices_to_update = indices_needing_elevation
+            logger.info(f"Calculating elevation for {len(points_to_calculate)} points")
+        
+        # Get elevations from external service
+        elevations = self._fetch_elevations_batch(points_to_calculate)
+        
+        if elevations:
+            # Update points with calculated elevations
+            for i, elevation in enumerate(elevations):
+                if elevation is not None:
+                    point_index = indices_to_update[i]
+                    points[point_index]['elevation'] = elevation
+                    logger.debug(f"Added elevation {elevation}m to point {point_index}")
+            
+            # If we sampled points, interpolate elevation for the remaining points
+            if len(points_to_calculate) < len(points_needing_elevation):
+                points = self._interpolate_missing_elevations(points, indices_needing_elevation, indices_to_update)
+        
+        return points
+    
+    def _interpolate_missing_elevations(self, points: List[Dict[str, Any]], 
+                                       all_missing_indices: List[int], 
+                                       calculated_indices: List[int]) -> List[Dict[str, Any]]:
+        """Interpolate elevation values for points between calculated points."""
+        logger.info(f"Interpolating elevation for {len(all_missing_indices) - len(calculated_indices)} points")
+        
+        # Create a mapping of calculated elevations
+        calculated_elevations = {}
+        for idx in calculated_indices:
+            if 'elevation' in points[idx]:
+                calculated_elevations[idx] = points[idx]['elevation']
+        
+        if len(calculated_elevations) < 2:
+            logger.warning("Not enough calculated elevations for interpolation")
+            return points
+        
+        # Sort calculated points by index
+        sorted_calc_indices = sorted(calculated_elevations.keys())
+        
+        # Interpolate for each missing point
+        for missing_idx in all_missing_indices:
+            if missing_idx in calculated_elevations:
+                continue  # Already calculated
+            
+            # Find surrounding calculated points
+            before_idx = None
+            after_idx = None
+            
+            for calc_idx in sorted_calc_indices:
+                if calc_idx < missing_idx:
+                    before_idx = calc_idx
+                elif calc_idx > missing_idx and after_idx is None:
+                    after_idx = calc_idx
+                    break
+            
+            # Interpolate elevation
+            if before_idx is not None and after_idx is not None:
+                # Linear interpolation
+                before_elev = calculated_elevations[before_idx]
+                after_elev = calculated_elevations[after_idx]
+                ratio = (missing_idx - before_idx) / (after_idx - before_idx)
+                interpolated_elev = before_elev + (after_elev - before_elev) * ratio
+                points[missing_idx]['elevation'] = round(interpolated_elev, 1)
+                logger.debug(f"Interpolated elevation {interpolated_elev:.1f}m for point {missing_idx}")
+            elif before_idx is not None:
+                # Use the last known elevation
+                points[missing_idx]['elevation'] = calculated_elevations[before_idx]
+            elif after_idx is not None:
+                # Use the next known elevation
+                points[missing_idx]['elevation'] = calculated_elevations[after_idx]
+        
+        return points
+    
+    def _fetch_elevations_batch(self, locations: List[Dict[str, float]]) -> List[Optional[float]]:
+        """Fetch elevations for multiple locations using Open Elevation API."""
+        if not locations:
+            return []
+        
+        # Batch locations (Open Elevation API can handle multiple points)
+        batch_size = 100  # Process in batches to avoid large requests
+        all_elevations = []
+        
+        for i in range(0, len(locations), batch_size):
+            batch = locations[i:i + batch_size]
+            elevations = self._fetch_elevation_batch_open_elevation(batch)
+            
+            # If Open Elevation fails, try Google as fallback
+            if not elevations or all(e is None for e in elevations):
+                logger.warning("Open Elevation failed, trying Google Elevation API")
+                elevations = self._fetch_elevation_batch_google(batch)
+            
+            all_elevations.extend(elevations or [None] * len(batch))
+        
+        return all_elevations
+    
+    def _fetch_elevation_batch_open_elevation(self, locations: List[Dict[str, float]]) -> List[Optional[float]]:
+        """Fetch elevations using Open Elevation API (free, no API key)."""
+        try:
+            # Prepare locations for Open Elevation format
+            locations_param = '|'.join([f"{loc['latitude']},{loc['longitude']}" for loc in locations])
+            
+            url = "https://api.open-elevation.com/api/v1/lookup"
+            payload = {
+                "locations": [
+                    {"latitude": loc['latitude'], "longitude": loc['longitude']}
+                    for loc in locations
+                ]
+            }
+            
+            response = requests.post(url, json=payload, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            elevations = []
+            
+            for result in data.get('results', []):
+                elevation = result.get('elevation')
+                if elevation is not None:
+                    elevations.append(float(elevation))
+                else:
+                    elevations.append(None)
+            
+            logger.info(f"Successfully fetched {len(elevations)} elevations from Open Elevation")
+            return elevations
+            
+        except Exception as e:
+            logger.error(f"Error fetching elevations from Open Elevation: {e}")
+            return [None] * len(locations)
+    
+    def _fetch_elevation_batch_google(self, locations: List[Dict[str, float]]) -> List[Optional[float]]:
+        """Fetch elevations using Google Elevation API (requires API key)."""
+        try:
+            # This would require a Google API key - for now, return None
+            # In a production app, you'd get the API key from environment variables
+            google_api_key = None  # os.getenv('GOOGLE_ELEVATION_API_KEY')
+            
+            if not google_api_key:
+                logger.warning("Google Elevation API key not configured")
+                return [None] * len(locations)
+            
+            # Prepare locations for Google API format
+            locations_param = '|'.join([f"{loc['latitude']},{loc['longitude']}" for loc in locations])
+            
+            url = "https://maps.googleapis.com/maps/api/elevation/json"
+            params = {
+                'locations': locations_param,
+                'key': google_api_key
+            }
+            
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            elevations = []
+            
+            if data.get('status') == 'OK':
+                for result in data.get('results', []):
+                    elevation = result.get('elevation')
+                    if elevation is not None:
+                        elevations.append(float(elevation))
+                    else:
+                        elevations.append(None)
+            
+            logger.info(f"Successfully fetched {len(elevations)} elevations from Google")
+            return elevations
+            
+        except Exception as e:
+            logger.error(f"Error fetching elevations from Google: {e}")
+            return [None] * len(locations)
 
 class GPXValidateResource(Resource):
     """Validate GPX file content without importing."""
@@ -488,6 +697,7 @@ class GPXValidateResource(Resource):
             import_resource = GPXImportResource()
             
             try:
+                # Parse with elevation calculation for accurate preview
                 parsed_data = import_resource._parse_gpx_content(gpx_content, g.user.id)
                 
                 # Return validation results

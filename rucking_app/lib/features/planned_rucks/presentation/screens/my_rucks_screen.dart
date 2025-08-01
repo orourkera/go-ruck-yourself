@@ -11,7 +11,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 
-/// Main screen for displaying and managing routes (simplified from planned rucks)
+/// Main screen for displaying and managing routes
 class MyRucksScreen extends StatefulWidget {
   const MyRucksScreen({super.key});
 
@@ -19,7 +19,7 @@ class MyRucksScreen extends StatefulWidget {
   State<MyRucksScreen> createState() => _MyRucksScreenState();
 }
 
-class _MyRucksScreenState extends State<MyRucksScreen> {
+class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final RoutesRepository _routesRepository = GetIt.instance<RoutesRepository>();
@@ -32,11 +32,36 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadRoutes();
+  }
+  
+  @override
+  void didUpdateWidget(MyRucksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh routes when widget updates
+    _loadRoutes();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Refresh when app comes back to foreground
+    if (state == AppLifecycleState.resumed && mounted) {
+      _loadRoutes();
+    }
+  }
+  
+  /// Refresh routes when returning from other screens
+  void _onScreenResumed() {
+    if (mounted) {
+      _loadRoutes();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -185,9 +210,12 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
               children: [
                 _buildChip('${route.distanceKm.toStringAsFixed(1)} km'),
                 const SizedBox(width: 8),
-                _buildChip('${route.elevationGainM?.round() ?? 0}m elevation'),
-                if (route.trailDifficulty != null) ...[
+                // Only show elevation if it exists and is greater than 0
+                if (route.elevationGainM != null && route.elevationGainM! > 0) ...[
+                  _buildChip('${route.elevationGainM!.round()}m elevation'),
                   const SizedBox(width: 8),
+                ],
+                if (route.trailDifficulty != null) ...[
                   _buildChip(route.trailDifficulty!.toUpperCase()),
                 ],
               ],
@@ -231,20 +259,28 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
 
   // Navigation and Action methods
 
-  void _navigateToImport() {
-    Navigator.of(context).push(
+  void _navigateToImport() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const RouteImportScreen(),
       ),
     );
+    // Refresh routes when returning from import screen
+    if (mounted) {
+      _loadRoutes();
+    }
   }
 
-  void _navigateToRouteDetail(route_model.Route route) {
-    Navigator.of(context).push(
+  void _navigateToRouteDetail(route_model.Route route) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => PlannedRuckDetailScreen(route: route),
       ),
     );
+    // ֿRefresh routes when returning from detail screen
+    if (mounted) {
+      _loadRoutes();
+    }
   }
 
 

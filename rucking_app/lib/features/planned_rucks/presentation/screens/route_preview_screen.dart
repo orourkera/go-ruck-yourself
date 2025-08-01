@@ -167,9 +167,13 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
                 _buildRouteStats(context, route),
                 const SizedBox(height: 24),
                 
-                // Elevation Profile
-                _buildElevationProfile(context, route),
-                const SizedBox(height: 24),
+                // Elevation Profile - only show if elevation data exists
+                if (route.elevationPoints.isNotEmpty && 
+                    route.elevationGainM != null && 
+                    route.elevationGainM! > 0) ..[
+                  _buildElevationProfile(context, route),
+                  const SizedBox(height: 24),
+                ],
                 
                 // Route Details
                 _buildRouteDetails(context, route),
@@ -343,14 +347,16 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
                     Icons.straighten,
                   ),
                 ),
-                Expanded(
-                  child: _buildStatItem(
-                    context,
-                    'Ascent',
-                    '+${route.elevationGainM?.toStringAsFixed(0) ?? '0'}m',
-                    Icons.trending_up,
+                // Only show elevation gain if it exists and is greater than 0
+                if (route.elevationGainM != null && route.elevationGainM! > 0)
+                  Expanded(
+                    child: _buildStatItem(
+                      context,
+                      'Ascent',
+                      '+${route.elevationGainM!.toStringAsFixed(0)}m',
+                      Icons.trending_up,
+                    ),
                   ),
-                ),
                 Expanded(
                   child: _buildStatItem(
                     context,

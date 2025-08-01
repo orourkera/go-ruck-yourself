@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
-/// Custom app bar for My Rucks screen with search functionality
+/// Custom app bar for My Routes screen with search functionality
 class MyRucksAppBar extends StatefulWidget implements PreferredSizeWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
@@ -144,7 +144,7 @@ class SimpleMyRucksAppBar extends StatelessWidget implements PreferredSizeWidget
 
   const SimpleMyRucksAppBar({
     super.key,
-    this.title = 'My Rucks',
+    this.title = 'My Routes',
     this.actions,
   });
 
@@ -183,7 +183,7 @@ class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget 
 
   const MyRucksStatsAppBar({
     super.key,
-    this.title = 'My Rucks',
+    this.title = 'My Routes',
     required this.totalRucks,
     required this.completedRucks,
     required this.overdueRucks,

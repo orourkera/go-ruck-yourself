@@ -963,17 +963,16 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
                   
-                  // My Rucks navigation link
+                  // My Routes navigation link
                   Center(
                     child: TextButton(
                       onPressed: () {
-                        // Navigate to My Rucks page
+                        // Navigate to My Routes page
                         Navigator.of(context).pushNamed('/my_rucks');
                       },
                       child: Text(
-                        'My Rucks',
+                        'My Routes',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey,

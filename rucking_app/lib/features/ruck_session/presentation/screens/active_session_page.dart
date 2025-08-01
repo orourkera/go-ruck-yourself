@@ -895,6 +895,64 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
   Timer? _fallbackTimer;
   final MapController _controller = MapController();
   
+  /// Calculate bounds that include both current location and planned route
+  LatLngBounds? _calculateCombinedBounds() {
+    if (widget.plannedRoute == null || widget.plannedRoute!.isEmpty) {
+      return null;
+    }
+    
+    List<latlong.LatLng> allPoints = List.from(widget.plannedRoute!);
+    
+    // Add current location if available
+    if (widget.initialCenter != null) {
+      allPoints.add(widget.initialCenter!);
+    }
+    
+    // Add current route points if different from initial center
+    if (widget.route.isNotEmpty) {
+      allPoints.addAll(widget.route);
+    }
+    
+    if (allPoints.isEmpty) return null;
+    
+    double minLat = allPoints.first.latitude;
+    double maxLat = allPoints.first.latitude;
+    double minLng = allPoints.first.longitude;
+    double maxLng = allPoints.first.longitude;
+    
+    for (final point in allPoints) {
+      minLat = math.min(minLat, point.latitude);
+      maxLat = math.max(maxLat, point.latitude);
+      minLng = math.min(minLng, point.longitude);
+      maxLng = math.max(maxLng, point.longitude);
+    }
+    
+    return LatLngBounds(
+      latlong.LatLng(minLat, minLng),
+      latlong.LatLng(maxLat, maxLng),
+    );
+  }
+  
+  /// Calculate appropriate zoom level and center for combined bounds
+  MapFitOptions _calculateMapFit() {
+    final bounds = _calculateCombinedBounds();
+    if (bounds == null) {
+      // Fallback to current behavior if no bounds available
+      return MapFitOptions(
+        bounds: LatLngBounds(
+          widget.initialCenter ?? latlong.LatLng(48.8566, 2.3522),
+          widget.initialCenter ?? latlong.LatLng(48.8566, 2.3522),
+        ),
+        padding: const EdgeInsets.all(50),
+      );
+    }
+    
+    return MapFitOptions(
+      bounds: bounds,
+      padding: const EdgeInsets.all(50), // Add padding around the bounds
+    );
+  }
+  
   void _signalMapReady() {
     if (!_mapReadyCalled && widget.onMapReady != null) {
       _mapReadyCalled = true;
@@ -921,8 +979,27 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
           setState(() {
             _tilesLoaded = true;
           });
+          
+          // Fit bounds to show both user location and planned route
+          _fitMapToBounds();
         }
       });
+    }
+  }
+  
+  void _fitMapToBounds() {
+    final bounds = _calculateCombinedBounds();
+    if (bounds != null && _controller.camera != null) {
+      try {
+        _controller.fitCamera(
+          CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.all(50),
+          ),
+        );
+      } catch (e) {
+        print('Error fitting map bounds: $e');
+      }
     }
   }
 
@@ -1145,14 +1222,33 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Determine initial center for when the map is first built or route is empty.
+    // Determine initial center and zoom based on whether we have a planned route
     final latlong.LatLng initialMapCenter;
-    if (widget.initialCenter != null) {
-      initialMapCenter = widget.initialCenter!;
-    } else if (widget.route.isNotEmpty) {
-      initialMapCenter = widget.route.last;
+    final double initialZoom;
+    
+    if (widget.plannedRoute != null && widget.plannedRoute!.isNotEmpty) {
+      // When we have a planned route, start with a lower zoom so we can see more
+      // The _fitMapToBounds() will adjust this properly once tiles load
+      if (widget.initialCenter != null) {
+        initialMapCenter = widget.initialCenter!;
+      } else if (widget.plannedRoute!.isNotEmpty) {
+        // Center on middle of planned route
+        final midIndex = widget.plannedRoute!.length ~/ 2;
+        initialMapCenter = widget.plannedRoute![midIndex];
+      } else {
+        initialMapCenter = latlong.LatLng(48.8566, 2.3522);
+      }
+      initialZoom = 12.0; // Lower zoom to accommodate route + user location
     } else {
-      initialMapCenter = latlong.LatLng(48.8566, 2.3522);
+      // No planned route, use current behavior
+      if (widget.initialCenter != null) {
+        initialMapCenter = widget.initialCenter!;
+      } else if (widget.route.isNotEmpty) {
+        initialMapCenter = widget.route.last;
+      } else {
+        initialMapCenter = latlong.LatLng(48.8566, 2.3522);
+      }
+      initialZoom = 16.5; // Higher zoom for user location only
     }
 
     return ClipRRect(
@@ -1177,7 +1273,7 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
               options: MapOptions(
                 backgroundColor: const Color(0xFFE8E0D8), // Match Stadia Maps terrain style
                 initialCenter: initialMapCenter,
-                initialZoom: 16.5,
+                initialZoom: initialZoom,
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
                 ),

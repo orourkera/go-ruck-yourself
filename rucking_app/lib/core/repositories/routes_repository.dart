@@ -131,6 +131,25 @@ class RoutesRepository {
     }
   }
 
+  /// Update route visibility
+  /// 
+  /// Parameters:
+  /// - [routeId]: ID of the route to update
+  /// - [isPublic]: Whether the route should be public
+  Future<Route> updateRouteVisibility(String routeId, bool isPublic) async {
+    try {
+      final data = await _apiClient.patch('/routes/$routeId', {
+        'is_public': isPublic,
+      });
+      final updatedRoute = Route.fromJson(data['route'] as Map<String, dynamic>);
+      AppLogger.info('Updated route visibility: ${updatedRoute.name} -> ${isPublic ? "public" : "private"}');
+      return updatedRoute;
+    } catch (e) {
+      AppLogger.error('Error updating route visibility $routeId: $e');
+      throw Exception('Error updating route visibility: $e');
+    }
+  }
+
   /// Delete a route
   /// 
   /// Parameters:

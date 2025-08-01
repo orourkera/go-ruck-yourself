@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/models/route.dart' as route_model;
+import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_bloc.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_event.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/bloc/planned_ruck_state.dart';
@@ -34,11 +35,13 @@ class PlannedRuckDetailScreen extends StatefulWidget {
 class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
   late ScrollController _scrollController;
   late WeatherService _weatherService;
+  late RoutesRepository _routesRepository;
   bool _showAppBarTitle = false;
   PlannedRuck? _plannedRuck;
   Weather? _weather;
   bool _isLoadingWeather = false;
   String? _weatherError;
+  late bool _isRoutePublic; // Track route visibility state
 
   @override
   void initState() {
@@ -46,6 +49,10 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     // Removed tab controller since we only have overview content
     _scrollController = ScrollController();
     _weatherService = WeatherService();
+    _routesRepository = RoutesRepository();
+    
+    // Initialize route visibility state
+    _isRoutePublic = widget.route.isPublic;
     
     // Load the planned ruck using the ID if provided
     // if (widget.plannedRuckId != null) {
@@ -307,11 +314,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               Icons.route,
               [
                 _buildInfoRow('Location', '${route.startLatitude.toStringAsFixed(4)}, ${route.startLongitude.toStringAsFixed(4)}'),
-                _buildInfoRow('Distance', route.formattedDistance),
-                if (route.elevationGainM != null)
-                  _buildInfoRow('Elevation Gain', route.formattedElevationGain),
+                _buildInfoRow('Distance', '${route.distanceKm.toStringAsFixed(1)} km'),
+                if (route.elevationGainM != null && route.elevationGainM! > 0)
+                  _buildInfoRow('Elevation Gain', '${route.elevationGainM!.toStringAsFixed(0)} m'),
+                if (route.elevationLossM != null && route.elevationLossM! > 0)
+                  _buildInfoRow('Elevation Loss', '${route.elevationLossM!.toStringAsFixed(0)} m'),
                 if (route.estimatedDurationMinutes != null)
-                  _buildInfoRow('Estimated Duration', route.formattedEstimatedDuration),
+                  _buildInfoRow('Est. Duration', route.formattedEstimatedDuration),
                 if (route.routeType != null)
                   _buildInfoRow('Route Type', _getRouteTypeLabel(route.routeType!)),
               ],
@@ -319,25 +328,15 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             
             const SizedBox(height: 16),
           ],
-          
-          // Route description
-          if (route?.description?.isNotEmpty == true) ...[
-            _buildInfoCard(
-              'Description',
-              Icons.description,
-              [
-                Text(
-                  route?.description ?? '',
-                  style: AppTextStyles.bodyLarge,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-          ],
+
           
           // Weather info (placeholder)
           _buildWeatherCard(),
+          
+          const SizedBox(height: 16),
+          
+          // Route visibility toggle
+          _buildVisibilityToggle(),
           
           const SizedBox(height: 24),
           
@@ -486,26 +485,56 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     );
   }
 
+  Widget _buildVisibilityToggle() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              Icons.visibility,
+              size: 20,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Route Visibility',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.route.isPublic ? 'Public - visible to other users' : 'Private - only visible to you',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textDarkSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: _isRoutePublic,
+              onChanged: _toggleRouteVisibility,
+              activeColor: AppColors.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomActions() {
     return Column(
       children: [
-        // Share button
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _shareRoute,
-            icon: const Icon(Icons.share),
-            label: const Text('Share Route'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              side: BorderSide(color: AppColors.primary),
-              foregroundColor: AppColors.primary,
-            ),
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
         // Primary action button
         SizedBox(
           width: double.infinity,
@@ -599,12 +628,14 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       case PlannedRuckStatus.planned:
         if (_plannedRuck!.canStart) {
           // Navigate to session setup with route data
+          // Only pass plannedRuckId if this is from an actual planned ruck (not a route preview)
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => CreateSessionScreen(
                 routeId: widget.route.id,
                 routeName: widget.route.name,
-                plannedRuckId: _plannedRuck!.id,
+                // Don't pass plannedRuckId for route-only views since they use fake planned ruck objects
+                plannedRuckId: widget.route != null ? null : _plannedRuck!.id,
               ),
             ),
           );
@@ -619,11 +650,47 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     }
   }
 
-  void _shareRoute() {
-    // TODO: Implement route sharing
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sharing functionality coming soon!')),
-    );
+  void _toggleRouteVisibility(bool isPublic) async {
+    try {
+      // Check if route has an ID
+      final routeId = widget.route.id;
+      if (routeId == null) {
+        throw Exception('Route ID is required to update visibility');
+      }
+      
+      // Call API to update route visibility
+      await _routesRepository.updateRouteVisibility(routeId, isPublic);
+      
+      // Update local state first
+      setState(() {
+        _isRoutePublic = isPublic;
+      });
+      
+      // Show success feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPublic 
+                ? 'Route is now public and visible to other users'
+                : 'Route is now private and only visible to you',
+          ),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+      
+    } catch (e) {
+      // Revert the switch state on error
+      setState(() {
+        _isRoutePublic = !isPublic;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update route visibility: $e'),
+          backgroundColor: AppColors.accent,
+        ),
+      );
+    }
   }
 
   /// Calculate distance between two coordinates in meters
