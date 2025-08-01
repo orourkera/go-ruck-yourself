@@ -309,7 +309,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               _buildInfoRow('Planned Date', _plannedRuck?.formattedPlannedDate ?? ''),
               _buildInfoRow('Status', _plannedRuck?.status.value ?? ''),
               if (_plannedRuck?.notes?.isNotEmpty == true)
-                _buildInfoRow('Notes', _plannedRuck!.notes!),
+                _buildInfoRow('Notes', _plannedRuck?.notes ?? ''),
               if (_plannedRuck?.completedAt != null)
                 _buildInfoRow('Completed', '${_plannedRuck!.completedAt!.day}/${_plannedRuck!.completedAt!.month}/${_plannedRuck!.completedAt!.year}'),
             ],
@@ -344,7 +344,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               Icons.description,
               [
                 Text(
-                  route!.description!,
+                  route?.description ?? '',
                   style: AppTextStyles.bodyLarge,
                 ),
               ],
@@ -470,9 +470,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               if (_plannedRuck?.createdAt != null)
                 _buildInfoRow('Created', '${_plannedRuck!.createdAt!.day}/${_plannedRuck!.createdAt!.month}/${_plannedRuck!.createdAt!.year}'),
               if (route?.source?.isNotEmpty == true)
-                _buildInfoRow('Route Source', route!.source!),
+                _buildInfoRow('Route Source', route?.source ?? ''),
               if (route?.id != null)
-                _buildInfoRow('Route ID', route!.id!),
+                _buildInfoRow('Route ID', route?.id ?? ''),
             ],
           ),
         ],
