@@ -69,8 +69,10 @@ class RoutesResource(Resource):
                 query = query.or_(f'name.ilike.%{search}%,description.ilike.%{search}%')
             
             # Handle created_by_me filter
+            logger.info(f"Routes filter - user_id: {user_id}, created_by_me: {created_by_me}")
             if created_by_me:
                 # Only routes created by the current user
+                logger.info(f"Filtering routes by created_by_user_id: {user_id}")
                 query = query.eq('created_by_user_id', user_id)
             else:
                 # Only public routes or user's own routes
@@ -81,6 +83,7 @@ class RoutesResource(Resource):
             query = query.range(offset, offset + limit - 1)
             
             result = query.execute()
+            logger.info(f"Query returned {len(result.data)} routes")
             
             # Convert to Route objects
             routes = []
