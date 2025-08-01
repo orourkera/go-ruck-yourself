@@ -228,8 +228,10 @@ class RoutesRepository {
         'created_by_me': 'true',
       };
 
-      final data = await _apiClient.get('/routes', queryParams: queryParams);
-      final routes = (data['routes'] as List)
+      final response = await _apiClient.get('/routes', queryParams: queryParams);
+      final data = response['data'] ?? response; // Handle both nested and flat structures
+      final routesList = data['routes'] as List? ?? [];
+      final routes = routesList
           .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
           .toList();
       

@@ -69,19 +69,34 @@ class RoutesResource(Resource):
                 query = query.or_(f'name.ilike.%{search}%,description.ilike.%{search}%')
             
             # Handle created_by_me filter
+            print(f"🔍 ROUTES DEBUG - user_id: {user_id}, created_by_me: {created_by_me}")
             logger.info(f"Routes filter - user_id: {user_id}, created_by_me: {created_by_me}")
             
             # Test what data exists in routes table (this will be filtered by RLS)
             test_query = supabase.table('routes').select('id,created_by_user_id,name').limit(5)
             test_result = test_query.execute()
+            print(f"🔍 ROUTES DEBUG - Sample routes accessible via RLS: {test_result.data}")
             logger.info(f"Sample routes accessible to user (via RLS): {test_result.data}")
+            
+            # Also check total count without RLS (admin query)
+            try:
+                admin_supabase = get_supabase_client()  # No user JWT = service role
+                admin_query = admin_supabase.table('routes').select('id', count='exact').limit(1)
+                admin_result = admin_query.execute()
+                print(f"🔍 ROUTES DEBUG - Total routes in database: {admin_result.count}")
+            except Exception as e:
+                print(f"🔍 ROUTES DEBUG - Could not check admin count: {e}")
             
             if created_by_me:
                 # RLS already filters to user's own routes, no additional filter needed
+                print(f"🔍 ROUTES DEBUG - Using RLS only for user's routes")
                 logger.info(f"RLS will automatically filter to user's routes (auth.uid = created_by_user_id)")
-                pass
+                # Let's also try an explicit filter to see if RLS is working
+                query = query.eq('created_by_user_id', user_id)
+                print(f"🔍 ROUTES DEBUG - Added explicit created_by_user_id filter: {user_id}")
             else:
                 # Include public routes in addition to user's own routes (RLS handles user's routes)
+                print(f"🔍 ROUTES DEBUG - Including public routes")
                 logger.info(f"Including public routes in addition to user's own routes")
                 query = query.eq('is_public', True)
             
@@ -90,6 +105,7 @@ class RoutesResource(Resource):
             query = query.range(offset, offset + limit - 1)
             
             result = query.execute()
+            print(f"🔍 ROUTES DEBUG - Query returned {len(result.data)} routes")
             logger.info(f"Query returned {len(result.data)} routes")
             
             # Convert to Route objects

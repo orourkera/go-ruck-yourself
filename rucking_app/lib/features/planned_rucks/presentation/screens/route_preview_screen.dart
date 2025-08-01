@@ -431,18 +431,22 @@ class RoutePreviewScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context, route_model.Route route) {
     return Column(
       children: [
+        // Import Route button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => _planRuckWithRoute(context, route),
-            icon: const Icon(Icons.add_task),
-            label: const Text('Plan Ruck with This Route'),
+            onPressed: () => _importRoute(context, route),
+            icon: const Icon(Icons.add),
+            label: const Text('Import Route'),
             style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.all(16),
             ),
           ),
         ),
         const SizedBox(height: 12),
+        // Secondary actions
         Row(
           children: [
             Expanded(
@@ -481,6 +485,17 @@ class RoutePreviewScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Route saved to favorites!')),
     );
+  }
+  
+  void _importRoute(BuildContext context, route_model.Route route) {
+    // Trigger the import action in the bloc
+    context.read<RouteImportBloc>().add(ConfirmImport(
+      route: route,
+    ));
+    
+    // Navigate back to routes list
+    Navigator.of(context).pop();
+    Navigator.of(context).pop();
   }
   
   void _planRuckWithRoute(BuildContext context, route_model.Route route) {

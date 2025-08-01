@@ -36,16 +36,10 @@ class _RouteImportScreenState extends State<RouteImportScreen>
   // Route name editing
   final TextEditingController _routeNameController = TextEditingController();
   
-  // Import options
-  bool _createPlannedRuck = true;
-  DateTime? _plannedDate;
-  String? _notes;
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _plannedDate = DateTime.now().add(const Duration(days: 1));
     
     // If we have an initial URL from a deep link, switch to URL tab and start import
     if (widget.initialUrl != null && widget.importType == 'url') {
@@ -159,31 +153,22 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                   progress: state.progress,
                 ),
 
-              // Main content
+              // Main content - show either tabs or route preview
               Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    _tabController.animateTo(index);
-                  },
-                  children: [
-                    _buildGpxFileTab(state),
-                    _buildUrlTab(state),
-                    _buildRouteSearchTab(state),
-                  ],
-                ),
+                child: (state is RouteImportValidated || state is RouteImportPreview)
+                    ? _buildRoutePreview(state)
+                    : PageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          _tabController.animateTo(index);
+                        },
+                        children: [
+                          _buildGpxFileTab(state),
+                          _buildUrlTab(state),
+                          _buildRouteSearchTab(state),
+                        ],
+                      ),
               ),
-
-              // Route preview (if validation successful)
-              if (state is RouteImportPreview || state is RouteImportValidated)
-                _buildRoutePreview(state),
-
-              // Planned ruck creation form
-              if (_shouldShowPlannedRuckForm(state))
-                _buildPlannedRuckForm(),
-
-              // Action buttons
-              _buildActionButtons(state),
             ],
           );
         },
@@ -271,9 +256,6 @@ class _RouteImportScreenState extends State<RouteImportScreen>
             onSubmit: (url) {
               context.read<RouteImportBloc>().add(ImportGpxFromUrl(
                 url: url,
-                createPlannedRuck: _createPlannedRuck,
-                plannedDate: _plannedDate,
-                notes: _notes,
               ));
             },
             isLoading: state is RouteImportInProgress,
@@ -390,9 +372,6 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                 if (route.id != null) {
                   context.read<RouteImportBloc>().add(ImportAllTrailsRoute(
                     routeId: route.id!,
-                    createPlannedRuck: _createPlannedRuck,
-                    plannedDate: _plannedDate,
-                    notes: _notes,
                   ));
                 }
               },
@@ -434,50 +413,52 @@ class _RouteImportScreenState extends State<RouteImportScreen>
 
   /// Build route preview section
   Widget _buildRoutePreview(RouteImportState state) {
-    route_model.Route? route;
+    route_model.Route? originalRoute;
     List<String> warnings = [];
 
     if (state is RouteImportPreview) {
-      route = state.route;
+      originalRoute = state.route;
       warnings = state.warnings;
     } else if (state is RouteImportValidated) {
-      route = state.route;
+      originalRoute = state.route;
       warnings = state.warnings;
     }
 
-    if (route == null) return const SizedBox.shrink();
+    if (originalRoute == null) return const SizedBox.shrink();
 
-    return Container(
-      margin: const EdgeInsets.all(16),
+    // Create updated route with current name from text field
+    final currentName = _routeNameController.text.trim();
+    final displayRoute = originalRoute.copyWith(
+      name: currentName.isNotEmpty ? currentName : originalRoute.name,
+    );
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Route Preview',
-            style: AppTextStyles.titleMedium.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          // Back button
+          Row(
+            children: [
+              IconButton(
+                onPressed: () {
+                  context.read<RouteImportBloc>().add(const ClearImportState());
+                },
+                icon: const Icon(Icons.arrow_back),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Route Preview',
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          RoutePreviewCard(
-            route: route,
-            warnings: warnings,
-            showImportButton: false,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Build planned ruck creation form
-  Widget _buildPlannedRuckForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Route name field - always visible when we have a route to import
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: TextField(
+          const SizedBox(height: 16),
+          
+          // Route name field
+          TextField(
             controller: _routeNameController,
             decoration: const InputDecoration(
               labelText: 'Route Name',
@@ -486,109 +467,44 @@ class _RouteImportScreenState extends State<RouteImportScreen>
               prefixIcon: Icon(Icons.route),
             ),
             textInputAction: TextInputAction.next,
-          ),
-        ),
-        const SizedBox(height: 16),
-        SwitchListTile(
-          title: Text('Create planned ruck'),
-          value: _createPlannedRuck,
-          onChanged: (value) {
-            setState(() {
-              _createPlannedRuck = value;
-            });
-          },
-        ),
-        if (_createPlannedRuck) ...[
-          const SizedBox(height: 16),
-          ListTile(
-            title: Text('Planned Date'),
-            subtitle: Text(_plannedDate?.toString().split(' ')[0] ?? 'Select date'),
-            trailing: Icon(Icons.calendar_today),
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: _plannedDate ?? DateTime.now().add(Duration(days: 1)),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(Duration(days: 365)),
-              );
-              if (date != null) {
-                setState(() {
-                  _plannedDate = date;
-                });
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            decoration: const InputDecoration(
-              labelText: 'Notes',
-              hintText: 'Add notes for this planned ruck...',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
             onChanged: (value) {
-              setState(() {
-                _notes = value.isEmpty ? null : value;
-              });
+              // Trigger rebuild to update the route preview card
+              setState(() {});
             },
           ),
-        ],
-      ],
-    );
-  }
-
-  /// Build action buttons
-  Widget _buildActionButtons(RouteImportState state) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
+          const SizedBox(height: 24),
+          
+          // Route map and details
+          RoutePreviewCard(
+            route: displayRoute,
+            warnings: warnings,
+            showImportButton: false,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Cancel button
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () {
-                if (state is RouteImportPreview || state is RouteImportValidated) {
-                  context.read<RouteImportBloc>().add(const CancelImport());
-                } else {
-                  Navigator.of(context).pop();
-                }
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.getSecondaryTextColor(context),
-                side: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? AppColors.dividerDark : AppColors.dividerLight),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: Text(
-                (state is RouteImportPreview || state is RouteImportValidated) 
-                    ? 'Back' 
-                    : 'Cancel',
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
+          
+          const SizedBox(height: 24),
+          
           // Import button
-          Expanded(
+          SizedBox(
+            width: double.infinity,
             child: ElevatedButton(
-              onPressed: _canImport(state) ? () => _confirmImport(state) : null,
+              onPressed: state is RouteImportInProgress ? null : () {
+                _confirmImport(originalRoute);
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                disabledBackgroundColor: AppColors.getSecondaryTextColor(context).withOpacity(0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: Text(_getImportButtonText(state)),
+              child: Text(
+                state is RouteImportInProgress ? 'Importing...' : 'Import Route',
+                style: AppTextStyles.titleMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ],
@@ -663,45 +579,16 @@ class _RouteImportScreenState extends State<RouteImportScreen>
     return state is RouteImportPreview || state is RouteImportValidated;
   }
 
-  bool _canImport(RouteImportState state) {
-    return state is RouteImportPreview || state is RouteImportValidated;
-  }
-
-  String _getImportButtonText(RouteImportState state) {
-    if (state is RouteImportInProgress) {
-      return 'Importing...';
-    }
+  void _confirmImport(route_model.Route route) {
+    // Use custom route name if provided, otherwise use the original name
+    final customName = _routeNameController.text.trim();
+    final updatedRoute = route.copyWith(
+      name: customName.isNotEmpty ? customName : route.name,
+    );
     
-    if (state is RouteImportPreview || state is RouteImportValidated) {
-      return _createPlannedRuck ? 'Import & Plan Ruck' : 'Import Route';
-    }
-    
-    return 'Import';
-  }
-
-  void _confirmImport(RouteImportState state) {
-    route_model.Route? route;
-    
-    if (state is RouteImportPreview) {
-      route = state.route;
-    } else if (state is RouteImportValidated) {
-      route = state.route;
-    }
-
-    if (route != null) {
-      // Use custom route name if provided, otherwise use the original name
-      final customName = _routeNameController.text.trim();
-      final updatedRoute = route.copyWith(
-        name: customName.isNotEmpty ? customName : route.name,
-      );
-      
-      context.read<RouteImportBloc>().add(ConfirmImport(
-        route: updatedRoute,
-        createPlannedRuck: _createPlannedRuck,
-        plannedDate: _plannedDate,
-        notes: _notes,
-      ));
-    }
+    context.read<RouteImportBloc>().add(ConfirmImport(
+      route: updatedRoute,
+    ));
   }
 
   void _showSuccessDialog(RouteImportSuccess state) {
