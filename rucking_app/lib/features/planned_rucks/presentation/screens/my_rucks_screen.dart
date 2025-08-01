@@ -4,6 +4,7 @@ import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/my_rucks_app_bar.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/screens/route_import_screen.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/planned_ruck_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:rucking_app/core/widgets/error_widget.dart';
 import 'package:rucking_app/shared/widgets/loading_indicator.dart';
@@ -162,8 +163,11 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
   Widget _buildRouteCard(route_model.Route route) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: InkWell(
+        onTap: () => _navigateToRouteDetail(route),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -220,6 +224,7 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -246,6 +251,18 @@ class _MyRucksScreenState extends State<MyRucksScreen> {
         builder: (context) => const RouteImportScreen(),
       ),
     );
+  }
+
+  void _navigateToRouteDetail(route_model.Route route) {
+    // For now, use route.id as plannedRuckId - this needs to be updated
+    // when PlannedRuckDetailScreen is modified to handle routes directly
+    if (route.id != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => PlannedRuckDetailScreen(plannedRuckId: route.id!),
+        ),
+      );
+    }
   }
 
   void _startRuck(route_model.Route route) {

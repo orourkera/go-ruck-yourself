@@ -7,6 +7,7 @@ import 'package:rucking_app/features/planned_rucks/presentation/widgets/url_impo
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_search_widget.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/route_preview_card.dart';
 import 'package:rucking_app/features/planned_rucks/presentation/widgets/import_progress_indicator.dart';
+import 'package:rucking_app/features/planned_rucks/presentation/screens/route_preview_screen.dart';
 import 'package:rucking_app/shared/widgets/loading_indicator.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -132,15 +133,27 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           } else if (state is RouteImportError) {
             _showErrorSnackBar(state);
           } else if (state is RouteImportValidated) {
-            // Pre-populate the route name from GPX metadata
-            if (_routeNameController.text.isEmpty && state.route.name.isNotEmpty) {
-              _routeNameController.text = state.route.name;
-            }
+            // Navigate to route preview screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BlocProvider.value(
+                  value: context.read<RouteImportBloc>(),
+                  child: const RoutePreviewScreen(routeId: 'import_preview'),
+                ),
+              ),
+            );
           } else if (state is RouteImportPreview) {
-            // Pre-populate the route name from preview data
-            if (_routeNameController.text.isEmpty && state.route.name.isNotEmpty) {
-              _routeNameController.text = state.route.name;
-            }
+            // Navigate to route preview screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BlocProvider.value(
+                  value: context.read<RouteImportBloc>(),
+                  child: const RoutePreviewScreen(routeId: 'import_preview'),
+                ),
+              ),
+            );
           }
         },
         builder: (context, state) {
@@ -153,21 +166,19 @@ class _RouteImportScreenState extends State<RouteImportScreen>
                   progress: state.progress,
                 ),
 
-              // Main content - show either tabs or route preview
+              // Main content - import tabs
               Expanded(
-                child: (state is RouteImportValidated || state is RouteImportPreview)
-                    ? _buildRoutePreview(state)
-                    : PageView(
-                        controller: _pageController,
-                        onPageChanged: (index) {
-                          _tabController.animateTo(index);
-                        },
-                        children: [
-                          _buildGpxFileTab(state),
-                          _buildUrlTab(state),
-                          _buildRouteSearchTab(state),
-                        ],
-                      ),
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    _tabController.animateTo(index);
+                  },
+                  children: [
+                    _buildGpxFileTab(state),
+                    _buildUrlTab(state),
+                    _buildRouteSearchTab(state),
+                  ],
+                ),
               ),
             ],
           );
@@ -487,8 +498,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: state is RouteImportInProgress || originalRoute == null ? null : () {
-                _confirmImport(originalRoute!);
+              onPressed: state is RouteImportInProgress ? null : () {
+                _confirmImport(originalRoute);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
