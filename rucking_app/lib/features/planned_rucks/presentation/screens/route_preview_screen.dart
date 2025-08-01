@@ -398,20 +398,43 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: AppColors.backgroundLight,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  'Elevation chart will be displayed here\nonce route elevation data is loaded',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.grey),
-                ),
-              ),
-            ),
+            // Show elevation chart if we have elevation data, otherwise show placeholder
+            route.elevationPoints.isNotEmpty
+                ? ElevationProfileChart(
+                    elevationData: route.elevationPoints,
+                    route: route,
+                    height: 200,
+                    showDetailedTooltips: true,
+                    showGradientAreas: true,
+                    isInteractive: true,
+                  )
+                : Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.show_chart,
+                            size: 48,
+                            color: AppColors.getSecondaryTextColor(context),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No elevation data available',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.getSecondaryTextColor(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
           ],
         ),
       ),
@@ -435,7 +458,6 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
             const SizedBox(height: 16),
             _buildDetailRow(context, 'Source', route.source ?? 'GPX Import'),
             _buildDetailRow(context, 'Created', _formatTodaysDate()),
-            _buildDetailRow(context, 'Difficulty', route.trailDifficulty?.toString().replaceAll('TrailDifficulty.', '').capitalize() ?? 'Unknown'),
             if (route.pointsOfInterest.isNotEmpty)
               _buildDetailRow(context, 'Points of Interest', '${route.pointsOfInterest.length} locations'),
           ],

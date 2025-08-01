@@ -382,6 +382,35 @@ class RuckSessionListResource(Resource):
             else:
                 logger.info("No event_id provided - creating regular session")
             
+            # Add route_id if provided (for route-associated ruck sessions)
+            if 'route_id' in data and data.get('route_id') is not None:
+                route_id_raw = data.get('route_id')
+                
+                # Handle manual ruck sessions - these shouldn't have a route_id
+                if isinstance(route_id_raw, str) and route_id_raw.startswith('manual_'):
+                    logger.info(f"Manual ruck session detected, ignoring route_id: {route_id_raw}")
+                    # Don't set route_id for manual sessions
+                else:
+                    # For actual routes, store the route_id
+                    try:
+                        route_id = str(route_id_raw)  # Keep as string since route IDs are UUIDs
+                        session_data['route_id'] = route_id
+                        logger.info(f"Creating session for route {route_id}")
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid route_id format: {route_id_raw}, ignoring")
+            else:
+                logger.info("No route_id provided - creating regular session")
+            
+            # Add planned_ruck_id if provided (linking to planned ruck)
+            if 'planned_ruck_id' in data and data.get('planned_ruck_id') is not None:
+                planned_ruck_id_raw = data.get('planned_ruck_id')
+                try:
+                    planned_ruck_id = str(planned_ruck_id_raw)  # Keep as string since planned_ruck IDs are UUIDs
+                    session_data['planned_ruck_id'] = planned_ruck_id
+                    logger.info(f"Creating session for planned ruck {planned_ruck_id}")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid planned_ruck_id format: {planned_ruck_id_raw}, ignoring")
+            
             logger.info(f"Final session_data before insert: {session_data}")
             
             insert_resp = supabase.table('ruck_session') \

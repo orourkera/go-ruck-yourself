@@ -29,11 +29,19 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 class CreateSessionScreen extends StatefulWidget {
   final String? eventId;
   final String? eventTitle;
+  final String? routeId;
+  final String? routeName;
+  final dynamic routeData;
+  final String? plannedRuckId;
   
   const CreateSessionScreen({
     Key? key,
     this.eventId,
     this.eventTitle,
+    this.routeId,
+    this.routeName,
+    this.routeData,
+    this.plannedRuckId,
   }) : super(key: key);
 
   @override
@@ -280,6 +288,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             createRequestData['session_type'] = 'event_ruck';
           }
           
+          // Add route context if creating session from a planned route
+          if (widget.routeId != null) {
+            createRequestData['route_id'] = widget.routeId;
+            createRequestData['session_type'] = 'route_ruck';
+            if (widget.plannedRuckId != null) {
+              createRequestData['planned_ruck_id'] = widget.plannedRuckId;
+            }
+          }
+          
           // Add user's weight (required)
           final userWeightRaw = _userWeightController.text;
           if (userWeightRaw.isEmpty) {
@@ -487,13 +504,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     _loadDefaults();
     _selectedRuckWeight = _ruckWeight; // initialize with default selected weight
     
-    // Extract event context from constructor parameters
+    // Extract event and route context from constructor parameters
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Use constructor parameters instead of route arguments
       final eventId = widget.eventId;
       final eventTitle = widget.eventTitle;
+      final routeId = widget.routeId;
+      final routeName = widget.routeName;
       
-      print('📋 Create session screen received constructor args: eventId=$eventId, eventTitle=$eventTitle');
+      print('📋 Create session screen received constructor args: eventId=$eventId, eventTitle=$eventTitle, routeId=$routeId, routeName=$routeName');
       
       if (eventId != null && eventTitle != null) {
         setState(() {
@@ -501,8 +520,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           _eventTitle = eventTitle;
         });
         print('📋 Set event context: _eventId = $_eventId, _eventTitle = $_eventTitle');
+      } else if (routeId != null && routeName != null) {
+        print('📋 Set route context: routeId = $routeId, routeName = $routeName');
       } else {
-        print('📋 No event arguments provided');
+        print('📋 No event or route arguments provided');
       }
     });
     
@@ -752,7 +773,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(_eventTitle != null ? 'Start Event Ruck' : 'New Ruck Session'),
+        title: Text(_eventTitle != null ? 'Start Event Ruck' : widget.routeName != null ? 'Start Route Ruck' : 'New Ruck Session'),
         centerTitle: true,
       ),
       body: KeyboardActions(
@@ -797,6 +818,51 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 _eventTitle!,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                // Route banner if creating session for a route
+                if (widget.routeName != null) ..[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.route,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Route Ruck Session',
+                                style: AppTextStyles.titleSmall.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.routeName!,
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.textDark,
                                 ),

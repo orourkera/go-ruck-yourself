@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/models/route_elevation_point.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/core/repositories/planned_rucks_repository.dart';
@@ -379,7 +381,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         description: parsedData.description,
         source: parsedData.source,
         externalUrl: parsedData.externalUrl,
-        routePolyline: '',
+        routePolyline: _encodePolyline(parsedData.trackPoints),
         startLatitude: parsedData.trackPoints.first.latitude,
         startLongitude: parsedData.trackPoints.first.longitude,
         endLatitude: parsedData.trackPoints.last.latitude,
@@ -387,6 +389,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         distanceKm: parsedData.totalDistanceKm,
         elevationGainM: parsedData.elevationGainM,
         elevationLossM: parsedData.elevationLossM,
+        trailDifficulty: _calculateDifficulty(parsedData.totalDistanceKm, parsedData.elevationGainM),
+        elevationPoints: _createElevationPoints(parsedData.trackPoints, parsedData.totalDistanceKm),
       );
 
       // Show preview
@@ -434,7 +438,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         description: parsedData.description,
         source: parsedData.source,
         externalUrl: event.url,
-        routePolyline: '',
+        routePolyline: _encodePolyline(parsedData.trackPoints),
         startLatitude: parsedData.trackPoints.first.latitude,
         startLongitude: parsedData.trackPoints.first.longitude,
         endLatitude: parsedData.trackPoints.last.latitude,
@@ -442,6 +446,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         distanceKm: parsedData.totalDistanceKm,
         elevationGainM: parsedData.elevationGainM,
         elevationLossM: parsedData.elevationLossM,
+        trailDifficulty: _calculateDifficulty(parsedData.totalDistanceKm, parsedData.elevationGainM),
+        elevationPoints: _createElevationPoints(parsedData.trackPoints, parsedData.totalDistanceKm),
       );
 
       // Show preview
@@ -489,7 +495,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           description: parsedData.description,
           source: 'gpx_import',
           externalUrl: parsedData.externalUrl,
-          routePolyline: '', // Empty - will be filled during import
+          routePolyline: _encodePolyline(parsedData.trackPoints), // Use the same polyline encoding
           startLatitude: parsedData.trackPoints.first.latitude,
           startLongitude: parsedData.trackPoints.first.longitude,
           endLatitude: parsedData.trackPoints.last.latitude,
@@ -497,6 +503,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           distanceKm: parsedData.totalDistanceKm,
           elevationGainM: parsedData.elevationGainM,
           elevationLossM: parsedData.elevationLossM,
+          trailDifficulty: _calculateDifficulty(parsedData.totalDistanceKm, parsedData.elevationGainM),
+          elevationPoints: _createElevationPoints(parsedData.trackPoints, parsedData.totalDistanceKm),
         );
         
         // Store the GPX file path for later import
@@ -722,5 +730,96 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
     _routesRepository.dispose();
     _plannedRucksRepository.dispose();
     return super.close();
+  }
+
+  /// Encode track points as a simple coordinate string polyline
+  String _encodePolyline(List<GpxTrackPoint> trackPoints) {
+    if (trackPoints.isEmpty) return '';
+    
+    // Create a simple coordinate string format: "lat1,lng1;lat2,lng2;..."
+    return trackPoints
+        .map((point) => '${point.latitude.toStringAsFixed(6)},${point.longitude.toStringAsFixed(6)}')
+        .join(';');
+  }
+
+  /// Calculate trail difficulty based on distance and elevation gain
+  String _calculateDifficulty(double distanceKm, double? elevationGainM) {
+    final elevation = elevationGainM ?? 0.0;
+    
+    // Filter out obviously bad elevation data (negative values or extremely high values)
+    // Reasonable elevation gain should be between 0 and 3000m for most routes
+    final cleanElevation = (elevation < 0 || elevation > 3000) ? 0.0 : elevation;
+    
+    // Calculate difficulty based on distance and elevation gain per km
+    final elevationPerKm = distanceKm > 0 ? cleanElevation / distanceKm : 0.0;
+    
+    // More reasonable difficulty thresholds
+    if (distanceKm < 2.0 && cleanElevation < 50) {
+      return 'easy';
+    } else if (distanceKm < 5.0 && elevationPerKm < 50) {
+      return 'easy';
+    } else if (distanceKm < 10.0 && elevationPerKm < 100) {
+      return 'moderate';
+    } else if (elevationPerKm < 150 || (distanceKm > 15 && elevationPerKm < 200)) {
+      return 'hard';
+    } else {
+      return 'extreme';
+    }
+  }
+
+  /// Create elevation points from track points and total distance
+  List<RouteElevationPoint> _createElevationPoints(List<GpxTrackPoint> trackPoints, double totalDistanceKm) {
+    if (trackPoints.isEmpty) return [];
+
+    final List<RouteElevationPoint> elevationPoints = [];
+    double currentDistance = 0.0;
+
+    for (int i = 0; i < trackPoints.length - 1; i++) {
+      final point1 = trackPoints[i];
+      final point2 = trackPoints[i + 1];
+
+      final distanceBetweenPoints = _haversineDistance(point1.latitude, point1.longitude, point2.latitude, point2.longitude);
+      currentDistance += distanceBetweenPoints;
+
+      // Skip points with invalid elevation data
+      if (point1.elevation == null || point1.elevation! < -500 || point1.elevation! > 9000) {
+        continue;
+      }
+
+      elevationPoints.add(RouteElevationPoint(
+        routeId: 'temp-route-id', // Temporary ID for preview
+        distanceKm: currentDistance,
+        elevationM: point1.elevation!,
+        latitude: point1.latitude,
+        longitude: point1.longitude,
+      ));
+    }
+
+    // Add the last point if it has valid elevation
+    final lastPoint = trackPoints.last;
+    if (lastPoint.elevation != null && lastPoint.elevation! >= -500 && lastPoint.elevation! <= 9000) {
+      elevationPoints.add(RouteElevationPoint(
+        routeId: 'temp-route-id', // Temporary ID for preview
+        distanceKm: totalDistanceKm,
+        elevationM: lastPoint.elevation!,
+        latitude: lastPoint.latitude,
+        longitude: lastPoint.longitude,
+      ));
+    }
+
+    return elevationPoints;
+  }
+
+  /// Calculate distance between two GPS coordinates using the Haversine formula
+  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double R = 6371.0; // Radius of Earth in km
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLon = (lon2 - lon1) * math.pi / 180.0;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) * math.cos(lat2 * math.pi / 180.0) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    final distance = R * c; // Distance in km
+    return distance;
   }
 }

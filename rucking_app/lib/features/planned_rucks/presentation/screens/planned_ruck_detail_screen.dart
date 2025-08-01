@@ -15,6 +15,7 @@ import 'package:rucking_app/core/models/weather.dart';
 import 'package:rucking_app/core/services/weather_service.dart';
 import 'package:rucking_app/shared/widgets/weather/weather_card.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 
 /// Detailed view screen for a planned ruck or route
@@ -121,7 +122,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       );
       // Load weather data for the route if coordinates are available
       if (widget.route.startLatitude != null && widget.route.startLongitude != null) {
-        // We can't load weather without a planned date, so skip weather loading
+        _loadWeatherData();
       }
     }
 
@@ -202,7 +203,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       title: _showAppBarTitle 
           ? Text(
               route?.name ?? 'Planned Ruck',
-              style: AppTextStyles.titleLarge.copyWith(
+              style: AppTextStyles.headlineMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             )
@@ -242,7 +243,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               right: 16,
               child: Text(
                 route?.name ?? 'Unnamed Route',
-                style: AppTextStyles.headlineLarge.copyWith(
+                style: AppTextStyles.displaySmall.copyWith(
                   color: AppColors.secondary,
                   fontWeight: FontWeight.bold,
                   shadows: [
@@ -597,8 +598,15 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         if (_plannedRuck!.canStart) {
-          context.read<PlannedRuckBloc>().add(
-            StartPlannedRuck(plannedRuckId: _plannedRuck!.id ?? ''),
+          // Navigate to session setup with route data
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => CreateSessionScreen(
+                routeId: widget.route.id,
+                routeName: widget.route.name,
+                plannedRuckId: _plannedRuck!.id,
+              ),
+            ),
           );
         }
         break;

@@ -577,9 +577,16 @@ class ParsedGpxData {
       final currElevation = trackPoints[i].elevation;
       
       if (prevElevation != null && currElevation != null) {
-        final change = currElevation - prevElevation;
-        if (change > 0) {
-          gain += change;
+        // Filter out obviously bad elevation data (negative or extremely high/low values)
+        // Reasonable elevations should be between -500m (Death Valley) and 9000m (Everest)
+        final cleanPrevElevation = (prevElevation < -500 || prevElevation > 9000) ? null : prevElevation;
+        final cleanCurrElevation = (currElevation < -500 || currElevation > 9000) ? null : currElevation;
+        
+        if (cleanPrevElevation != null && cleanCurrElevation != null) {
+          final change = cleanCurrElevation - cleanPrevElevation;
+          if (change > 0) {
+            gain += change;
+          }
         }
       }
     }
@@ -597,9 +604,16 @@ class ParsedGpxData {
       final currElevation = trackPoints[i].elevation;
       
       if (prevElevation != null && currElevation != null) {
-        final change = currElevation - prevElevation;
-        if (change < 0) {
-          loss += change.abs();
+        // Filter out obviously bad elevation data (negative or extremely high/low values)
+        // Reasonable elevations should be between -500m (Death Valley) and 9000m (Everest)
+        final cleanPrevElevation = (prevElevation < -500 || prevElevation > 9000) ? null : prevElevation;
+        final cleanCurrElevation = (currElevation < -500 || currElevation > 9000) ? null : currElevation;
+        
+        if (cleanPrevElevation != null && cleanCurrElevation != null) {
+          final change = cleanCurrElevation - cleanPrevElevation;
+          if (change < 0) {
+            loss += change.abs();
+          }
         }
       }
     }
