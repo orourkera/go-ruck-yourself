@@ -311,7 +311,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
               if (_plannedRuck?.notes?.isNotEmpty == true)
                 _buildInfoRow('Notes', _plannedRuck?.notes ?? ''),
               if (_plannedRuck?.completedAt != null)
-                _buildInfoRow('Completed', '${_plannedRuck!.completedAt!.day}/${_plannedRuck!.completedAt!.month}/${_plannedRuck!.completedAt!.year}'),
+                _buildInfoRow('Completed', '${_plannedRuck?.completedAt?.day ?? 0}/${_plannedRuck?.completedAt?.month ?? 0}/${_plannedRuck?.completedAt?.year ?? 0}'),
             ],
           ),
           
@@ -468,7 +468,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
             Icons.info,
             [
               if (_plannedRuck?.createdAt != null)
-                _buildInfoRow('Created', '${_plannedRuck!.createdAt!.day}/${_plannedRuck!.createdAt!.month}/${_plannedRuck!.createdAt!.year}'),
+                _buildInfoRow('Created', '${_plannedRuck?.createdAt?.day ?? 0}/${_plannedRuck?.createdAt?.month ?? 0}/${_plannedRuck?.createdAt?.year ?? 0}'),
               if (route?.source?.isNotEmpty == true)
                 _buildInfoRow('Route Source', route?.source ?? ''),
               if (route?.id != null)
@@ -765,6 +765,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   Color _getPrimaryActionColor() {
+    if (_plannedRuck == null) return AppColors.textDarkSecondary;
+    
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         return _plannedRuck!.canStart ? AppColors.primary : AppColors.textDarkSecondary;
@@ -776,6 +778,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   IconData _getPrimaryActionIcon() {
+    if (_plannedRuck == null) return Icons.edit;
+    
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         return Icons.play_arrow;
@@ -787,6 +791,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   String _getPrimaryActionLabel() {
+    if (_plannedRuck == null) return 'Edit';
+    
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         return _plannedRuck!.canStart ? 'Start Ruck' : 'Edit';
@@ -798,11 +804,13 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen>
   }
 
   void _performPrimaryAction() {
+    if (_plannedRuck == null) return;
+    
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         if (_plannedRuck!.canStart) {
           context.read<PlannedRuckBloc>().add(
-            StartPlannedRuck(plannedRuckId: _plannedRuck!.id!),
+            StartPlannedRuck(plannedRuckId: _plannedRuck!.id ?? ''),
           );
         }
         break;
