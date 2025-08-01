@@ -238,7 +238,11 @@ class GPXImportResource(Resource):
                     # Get elevation
                     ele_elem = trkpt.find('.//gpx:ele', ns) or trkpt.find('.//ele')
                     if ele_elem is not None:
-                        point['elevation'] = float(ele_elem.text)
+                        elevation = float(ele_elem.text)
+                        # Filter out obviously corrupted elevation values
+                        # Valid elevations should be between -500m (below sea level) and 9000m (highest mountains)
+                        if -500 <= elevation <= 9000:
+                            point['elevation'] = elevation
                     
                     # Get time
                     time_elem = trkpt.find('.//gpx:time', ns) or trkpt.find('.//time')
@@ -274,10 +278,13 @@ class GPXImportResource(Resource):
             # Calculate elevation changes
             if 'elevation' in prev_point and 'elevation' in curr_point:
                 elevation_diff = curr_point['elevation'] - prev_point['elevation']
-                if elevation_diff > 0:
-                    elevation_gain += elevation_diff
-                else:
-                    elevation_loss += abs(elevation_diff)
+                # Only count reasonable elevation changes (filter out GPS noise and corrupted data)
+                # Max reasonable elevation change per segment is ~200m for hiking trails
+                if abs(elevation_diff) <= 200:
+                    if elevation_diff > 0:
+                        elevation_gain += elevation_diff
+                    else:
+                        elevation_loss += abs(elevation_diff)
         
         return {
             'distance_km': round(total_distance / 1000, 2),  # Convert to km
