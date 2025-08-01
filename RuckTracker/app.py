@@ -329,6 +329,7 @@ from .api.gpx_export import (
     SessionGPXExportResource,
     GPXExportBatchResource
 )
+from .api.weather import WeatherResource
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
@@ -576,6 +577,9 @@ api.add_resource(GPXValidateResource, '/api/gpx/validate')
 api.add_resource(RouteGPXExportResource, '/api/routes/<string:route_id>/gpx')
 api.add_resource(SessionGPXExportResource, '/api/sessions/<int:session_id>/gpx')
 api.add_resource(GPXExportBatchResource, '/api/gpx/export-batch')
+
+# Weather Endpoints
+api.add_resource(WeatherResource, '/api/weather')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource

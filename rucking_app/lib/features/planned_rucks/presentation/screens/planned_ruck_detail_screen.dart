@@ -334,12 +334,6 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             const SizedBox(height: 16),
           ],
           
-          // Ratings and reviews
-          if (route?.averageRating != null || route?.totalCompletedCount != null) ...[
-            _buildRatingsCard(route!),
-            const SizedBox(height: 16),
-          ],
-          
           // Weather info (placeholder)
           _buildWeatherCard(),
           
@@ -408,71 +402,6 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRatingsCard(route_model.Route route) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.star, size: 20, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Ratings & Reviews',
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            Row(
-              children: [
-                // Star rating
-                Row(
-                  children: List.generate(5, (index) {
-                    final rating = route.averageRating ?? 0.0;
-                    return Icon(
-                      index < rating.floor()
-                          ? Icons.star
-                          : index < rating
-                              ? Icons.star_half
-                              : Icons.star_border,
-                      color: Colors.amber,
-                      size: 20,
-                    );
-                  }),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  (route.averageRating ?? 0.0).toStringAsFixed(1),
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (route.totalCompletedCount != null) ...[
-                  Text(
-                    ' (${route.totalCompletedCount} reviews)',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textDarkSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
