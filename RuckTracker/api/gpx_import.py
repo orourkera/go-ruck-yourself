@@ -408,9 +408,12 @@ class GPXImportResource(Resource):
                     points[i-1]['lat'], points[i-1]['lon'],
                     point['lat'], point['lon']
                 )
-                if distance_m > 0:
+                # Only calculate grade if distance is reasonable (at least 5m to avoid extreme values)
+                if distance_m >= 5.0:
                     elevation_diff = point['elevation'] - points[i-1]['elevation']
-                    grade_percent = (elevation_diff / distance_m) * 100
+                    calculated_grade = (elevation_diff / distance_m) * 100
+                    # Cap grade at reasonable bounds: -100% to +100% (45-degree slopes)
+                    grade_percent = max(-100.0, min(100.0, calculated_grade))
             
             elevation_point = {
                 'distance_km': round(cumulative_distance / 1000, 3),

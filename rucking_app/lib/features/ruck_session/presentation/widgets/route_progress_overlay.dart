@@ -114,7 +114,7 @@ class RouteProgressOverlay extends StatelessWidget {
                 child: _buildProgressItem(
                   icon: Icons.straighten,
                   label: 'Remaining',
-                  value: MeasurementUtils.formatDistance(distanceRemaining, preferMetric),
+                  value: MeasurementUtils.formatDistance(distanceRemaining, metric: preferMetric),
                   color: AppColors.primary,
                 ),
               ),
