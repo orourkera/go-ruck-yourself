@@ -16,10 +16,32 @@ class ClubDeeplinkResource(Resource):
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ruck Club</title>
+    <title>Join This Ruck Club</title>
     <meta name="apple-itunes-app" content="app-id=6744974620">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://getrucky.com/clubs/{{ club_id }}">
+    <meta property="og:title" content="Join This Ruck Club">
+    <meta property="og:description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
+    <meta property="og:image" content="https://getrucky.com/static/images/og_preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ruck Club - Join the Community">
+    
+    <!-- General Meta -->
+    <meta name="description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
+    <meta name="author" content="Ruck App">
+    <meta name="robots" content="index, follow">
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://getrucky.com/clubs/{{ club_id }}">
+    <meta property="twitter:title" content="Join This Ruck Club">
+    <meta property="twitter:description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
+    <meta property="twitter:image" content="https://getrucky.com/static/images/og_preview.png">
     <style>
         body { 
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
@@ -126,10 +148,32 @@ class EventDeeplinkResource(Resource):
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ruck Event</title>
+    <title>Join This Ruck Event</title>
     <meta name="apple-itunes-app" content="app-id=6744974620">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="event">
+    <meta property="og:url" content="https://getrucky.com/events/{{ event_id }}">
+    <meta property="og:title" content="Join This Ruck Event">
+    <meta property="og:description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
+    <meta property="og:image" content="https://getrucky.com/static/images/og_preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Ruck Event - Join the Challenge">
+    
+    <!-- General Meta -->
+    <meta name="description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
+    <meta name="author" content="Ruck App">
+    <meta name="robots" content="index, follow">
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://getrucky.com/events/{{ event_id }}">
+    <meta property="twitter:title" content="Join This Ruck Event">
+    <meta property="twitter:description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
+    <meta property="twitter:image" content="https://getrucky.com/static/images/og_preview.png">
     <style>
         body { 
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
