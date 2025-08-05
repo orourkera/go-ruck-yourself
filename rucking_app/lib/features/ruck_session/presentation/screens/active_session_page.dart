@@ -512,11 +512,30 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       SizedBox(
                                         height: MediaQuery.of(context).size.height * 0.3,
                                             width: double.infinity,
-                                            child: sessionRunning && uiInitialized
-                                            ? _RouteMap(
-                                                route: route,
-                                                initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                                                plannedRoute: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.plannedRoute),
+                                             child: sessionRunning && uiInitialized
+                                             ? _RouteMap(
+                                                 route: route,
+                                                 initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                                 plannedRoute: () {
+                                                   final activeSessionPage = context.findAncestorWidgetOfExactType<ActiveSessionPage>();
+                                                   final plannedRoute = activeSessionPage?.args.plannedRoute;
+                                                    print('🎯🎯🎯 [ACTIVE_SESSION_PAGE] Debug planned route flow:');
+                                                    print('🎯🎯🎯   ActiveSessionPage found: ${activeSessionPage != null}');
+                                                    print('🎯🎯🎯   args.plannedRoute is null: ${plannedRoute == null}');
+                                                    print('🎯🎯🎯   args.plannedRoute length: ${plannedRoute?.length ?? 0}');
+                                                    if (plannedRoute != null && plannedRoute.isNotEmpty) {
+                                                      print('🎯🎯🎯   First planned route point: ${plannedRoute.first}');
+                                                    }
+                                                    
+                                                    debugPrint('[ACTIVE_SESSION_PAGE] Debug planned route flow:');
+                                                    debugPrint('  ActiveSessionPage found: ${activeSessionPage != null}');
+                                                    debugPrint('  args.plannedRoute is null: ${plannedRoute == null}');
+                                                    debugPrint('  args.plannedRoute length: ${plannedRoute?.length ?? 0}');
+                                                    if (plannedRoute != null && plannedRoute.isNotEmpty) {
+                                                      debugPrint('  First planned route point: ${plannedRoute.first}');
+                                                    }
+                                                   return plannedRoute;
+                                                 }(),
                                                 onMapReady: () {
                                                   if (!mapReady) {
                                                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1303,8 +1322,8 @@ class _RouteMapState extends State<_RouteMap> with WidgetsBindingObserver {
                     polylines: [
                       Polyline(
                         points: widget.plannedRoute!,
-                        strokeWidth: 3.0,
-                        color: Colors.grey.withOpacity(0.6), // Gray planned route
+                        strokeWidth: 6.0,
+                        color: Colors.blue.withOpacity(0.8), // Blue planned route - more visible
                       ),
                     ],
                   ),

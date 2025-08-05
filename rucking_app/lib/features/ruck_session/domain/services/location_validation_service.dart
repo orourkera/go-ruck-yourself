@@ -6,14 +6,14 @@ import 'package:rucking_app/core/models/location_point.dart';
 class LocationValidationService {
   // Thresholds
   static const double minInitialDistanceMeters = 50.0; // 50 meters threshold before starting distance tracking
-  static const double maxSpeedKmh = 10.0; // 10 km/h max speed (walking/light jogging) - restored v2.5/v2.6 threshold
-  static const Duration maxSpeedDuration = Duration(minutes: 1); // 1 minute max over speed
-  static const double minMovingSpeedKmh = 0.5; // 0.5 km/h min speed to be considered moving
-  static const Duration idleDuration = Duration(minutes: 1); // 1 minute without movement to auto-pause
-  static const Duration longIdleDuration = Duration(minutes: 2); // 2 minutes idle to suggest ending session
-  static const double maxPositionJumpMeters = 20.0; // 20 meters max jump in position (throw out points greater than this)
-  static const Duration maxPositionJumpDuration = Duration(seconds: 5); // 5 seconds between location points
-  static const double minGpsAccuracyMeters = 20.0; // 20 meters minimum GPS accuracy
+  static const double maxSpeedKmh = 15.0; // 15 km/h max speed for rucking (more realistic threshold)
+  static const Duration maxSpeedDuration = Duration(seconds: 10); // 10 seconds max over speed (strict)
+  static const double minMovingSpeedKmh = 0.3; // 0.3 km/h min speed to be considered moving (more lenient)
+  static const Duration idleDuration = Duration(minutes: 3); // 3 minutes without movement to auto-pause
+  static const Duration longIdleDuration = Duration(minutes: 5); // 5 minutes idle to suggest ending session
+  static const double maxPositionJumpMeters = 100.0; // 100 meters max jump in position (prevent GPS jumps like 5.8km)
+  static const Duration maxPositionJumpDuration = Duration(seconds: 2); // 2 seconds minimum between location points (prevent microsecond noise)
+  static const double minGpsAccuracyMeters = 30.0; // 30 meters minimum GPS accuracy (more tolerant)
   static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour
   static const double maxCaloriesPerHour = 800.0; // 800 calories maximum per hour
   static const Duration lowGpsWarningDelay = Duration(seconds: 30); // 30 seconds delay before showing GPS warning
@@ -80,11 +80,19 @@ class LocationValidationService {
       _lowGpsStartTime = null;
     }
 
-    // 2. Position jump check
-    if (distance > maxPositionJumpMeters && duration < maxPositionJumpDuration) {
+    // 2. Position jump check - reject any GPS jump over threshold
+    if (distance > maxPositionJumpMeters) {
       _validationErrorCount++;
       results['isValid'] = false;
-      results['message'] = 'Unrealistic movement detected. Position jumped too far.';
+      results['message'] = 'GPS jump detected: ${distance.toStringAsFixed(0)}m movement. Point rejected.';
+      return results;
+    }
+    
+    // 2a. Time-based validation - reject points too close in time (prevents microsecond noise)
+    if (duration < maxPositionJumpDuration) {
+      _validationErrorCount++;
+      results['isValid'] = false;
+      results['message'] = 'GPS points too close in time: ${duration.inMilliseconds}ms. Point rejected.';
       return results;
     }
 

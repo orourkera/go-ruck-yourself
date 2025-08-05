@@ -221,8 +221,11 @@ class ApiClient {
   /// Ensures the auth token is present for authenticated requests
   /// Returns true if token was set successfully
   Future<bool> _ensureAuthToken() async {
+    debugPrint('[API] 🔑 _ensureAuthToken called - checking current auth state');
+    
     // Check if the token is already set in the Dio instance
     if (_dio.options.headers.containsKey('Authorization')) {
+      debugPrint('[API] 🔑 Found Authorization header in Dio instance');
       // Verify the token format and expiration
       String authHeader = _dio.options.headers['Authorization'] as String;
       if (authHeader.startsWith('Bearer ') && authHeader.length > 10) {
@@ -231,48 +234,81 @@ class ApiClient {
         // Check if token is expired
         try {
           if (Jwt.isExpired(tokenPart)) {
-            debugPrint('[API] Current token is expired, clearing and refreshing');
+            debugPrint('[API] 🔑 Current token is expired, clearing and refreshing');
             _dio.options.headers.remove('Authorization');
           } else {
             // Token is valid and not expired
+            debugPrint('[API] 🔑 Current token is valid and not expired');
             return true;
           }
         } catch (e) {
           // Invalid token format, clear it
-          debugPrint('[API] Invalid JWT token format detected, clearing: $e');
+          debugPrint('[API] 🔑 Invalid JWT token format detected, clearing: $e');
           _dio.options.headers.remove('Authorization');
         }
       } else {
         // Invalid header format, clear it and try again
-        debugPrint('[API] Invalid auth header format detected, clearing');
+        debugPrint('[API] 🔑 Invalid auth header format detected, clearing');
         _dio.options.headers.remove('Authorization');
       }
+    } else {
+      debugPrint('[API] 🔑 No Authorization header found in Dio instance');
     }
     
     // If not set or invalid/expired, try to get it from storage
+    debugPrint('[API] 🔑 Checking token in storage');
     final token = await _storageService.getSecureString(AppConfig.tokenKey);
     if (token != null && token.isNotEmpty) {
+      debugPrint('[API] 🔑 Found token in storage, validating');
       // Validate the token from storage before using it
       try {
         if (!Jwt.isExpired(token)) {
           // Token is valid and not expired, set it
+          debugPrint('[API] 🔑 Stored token is valid, setting as auth token');
           setAuthToken(token);
           return true;
         } else {
-          debugPrint('[API] Stored token is expired, attempting refresh');
+          debugPrint('[API] 🔑 Stored token is expired, attempting refresh');
         }
       } catch (e) {
-        debugPrint('[API] Invalid stored JWT token: $e');
+        debugPrint('[API] 🔑 Invalid stored JWT token: $e');
       }
+    } else {
+      debugPrint('[API] 🔑 No token found in storage');
     }
     
     // No valid token in storage, try to refresh it
+    debugPrint('[API] 🔑 Attempting token refresh via ApiClient.refreshToken()');
     final newToken = await refreshToken();
     if (newToken != null && newToken.isNotEmpty) {
+      debugPrint('[API] 🔑 Token refresh successful');
       return true; // refreshToken already sets the auth header
     }
     
-    debugPrint('[API] No valid auth token available');
+    // If ApiClient refresh failed, try the AuthService refresh callback as a fallback
+    if (_tokenRefreshCallback != null) {
+      debugPrint('[API] 🔑 ApiClient refresh failed, trying AuthService refresh callback');
+      try {
+        await _tokenRefreshCallback!();
+        // Check if the callback successfully set a new token
+        final refreshedToken = await _storageService.getSecureString(AppConfig.tokenKey);
+        if (refreshedToken != null && refreshedToken.isNotEmpty) {
+          try {
+            if (!Jwt.isExpired(refreshedToken)) {
+              debugPrint('[API] 🔑 AuthService refresh successful, setting token');
+              setAuthToken(refreshedToken);
+              return true;
+            }
+          } catch (e) {
+            debugPrint('[API] 🔑 AuthService provided invalid token: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[API] 🔑 AuthService refresh callback failed: $e');
+      }
+    }
+    
+    debugPrint('[API] 🔑 No valid auth token available - AUTHENTICATION WILL FAIL');
     return false;
   }
   

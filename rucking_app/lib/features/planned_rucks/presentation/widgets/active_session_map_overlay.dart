@@ -6,6 +6,7 @@ import 'package:rucking_app/core/models/route.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 
 /// Interactive map overlay for active rucking sessions with real-time tracking
 class ActiveSessionMapOverlay extends StatefulWidget {
@@ -106,11 +107,8 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
           ),
           children: [
             // Base map layer
-            TileLayer(
-              urlTemplate: _getMapTileUrl(),
-              userAgentPackageName: 'com.example.rucking_app',
-              tileSize: 256,
-              maxZoom: 18,
+            SafeTileLayer(
+              style: 'stamen_terrain',
             ),
             
             // Planned route polyline (if available)

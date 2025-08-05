@@ -952,30 +952,34 @@ class _MediaCarouselState extends State<MediaCarousel>
                   }
                 },
               ),
-              // Invisible preload widget positioned safely
-              if (_shouldPreloadRemaining && widget.mediaItems.length > 1)
+              // Invisible preload widget with safety check
+              if (_shouldPreloadRemaining && widget.mediaItems.length > 1 && mounted)
                 Positioned(
                   left: -1000,
                   top: 0,
                   width: 1,
                   height: 1,
-                  child: Stack(
-                    children: widget.mediaItems
-                        .where((item) => item.type == MediaType.photo)
-                        .skip(1) // Skip first photo (already visible), only preload remaining
-                        .map((item) => StableCachedImage(
-                              key: ValueKey('${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
-                              imageUrl: item.photoUrl!,
-                              thumbnailUrl: item.thumbnailUrl,
-                              width: 1,
-                              height: 1,
-                              placeholder: null,
-                              errorWidget: null,
-                              fit: BoxFit.cover,
-                            ))
-                        .toList(),
+                  child: Container(
+                    width: 1,
+                    height: 1,
+                    child: Stack(
+                      children: widget.mediaItems
+                          .where((item) => item.type == MediaType.photo && item.photoUrl != null)
+                          .skip(1) // Skip first photo (already visible), only preload remaining
+                          .map((item) => StableCachedImage(
+                                key: ValueKey('${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
+                                imageUrl: item.photoUrl!,
+                                thumbnailUrl: item.thumbnailUrl,
+                                width: 1,
+                                height: 1,
+                                placeholder: null,
+                                errorWidget: null,
+                                fit: BoxFit.cover,
+                              ))
+                          .toList(),
+                    ),
                   ),
-                ),
+                )
             ],
           ),
         ),
@@ -1110,7 +1114,7 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
     final String weightText = widget.ruckWeightKg != null 
-        ? (widget.ruckWeightKg! == 0 ? 'HIKE' : '${widget.ruckWeightKg!.toStringAsFixed(1)} kg')
+        ? MeasurementUtils.formatWeight(widget.ruckWeightKg!, metric: true) // Always show kg for consistency in social feed
         : '';
 
     if (routePoints.isEmpty) {

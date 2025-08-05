@@ -159,7 +159,8 @@ class _StableCachedImageState extends State<StableCachedImage>
     
     print('[StableCachedImage] Building widget for URL: $_currentUrl (key: ${widget.key})');
     
-    return CachedNetworkImage(
+    try {
+      return CachedNetworkImage(
       key: widget.key ?? ValueKey(_currentUrl), // Use provided key or fallback to URL
       imageUrl: _currentUrl,
       cacheManager: ImageCacheManager.instance,
@@ -177,6 +178,16 @@ class _StableCachedImageState extends State<StableCachedImage>
       // Error handling with fallback to placeholder
       errorWidget: (context, url, error) {
         print('[StableCachedImage] ERROR loading image: $url, error: $error');
+        
+        // Log specific connection errors
+        if (error.toString().contains('Connection closed') ||
+            error.toString().contains('HttpException') ||
+            error.toString().contains('ClientException') ||
+            error.toString().contains('SocketException') ||
+            error.toString().contains('TimeoutException')) {
+          print('[StableCachedImage] Network error detected - showing fallback');
+        }
+        
         return widget.errorWidget ?? Container(
           width: widget.width,
           height: widget.height,
@@ -186,7 +197,7 @@ class _StableCachedImageState extends State<StableCachedImage>
           ),
           child: const Center(
             child: Icon(
-              Icons.error,
+              Icons.error_outline,
               color: Colors.grey,
               size: 32,
             ),
@@ -207,5 +218,27 @@ class _StableCachedImageState extends State<StableCachedImage>
       fadeOutCurve: Curves.easeInOut,
       matchTextDirection: false, // Prevent RTL layout issues
     );
+    } catch (e, stackTrace) {
+      // Catch any uncaught exceptions during image loading
+      print('[StableCachedImage] Build crashed: $e');
+      print('[StableCachedImage] Stack trace: $stackTrace');
+      
+      // Return a safe fallback widget
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            color: Colors.grey,
+            size: 32,
+          ),
+        ),
+      );
+    }
   }
 }

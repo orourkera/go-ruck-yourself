@@ -16,6 +16,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, OAuthProvider, AuthResponse, AuthState, AuthChangeEvent;
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase show User;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:jwt_decode/jwt_decode.dart';
 
 /// Interface for authentication operations
 abstract class AuthService {
@@ -750,6 +751,9 @@ class AuthServiceImpl implements AuthService {
     bool? notificationEvents,
     bool? notificationDuels,
   }) async {
+    AppLogger.info('[AUTH] 🔧 Starting profile update request');
+    AppLogger.info('[AUTH] 🔧 Update fields: preferMetric=$preferMetric, username=$username, weightKg=$weightKg');
+    
     try {
       final data = <String, dynamic>{};
       if (username != null) data['username'] = username;
@@ -766,25 +770,91 @@ class AuthServiceImpl implements AuthService {
       
       // Only send request if there is data to update
       if (data.isEmpty) {
+         AppLogger.warning('[AUTH] 🔧 No profile data to update, fetching current user');
          final currentUser = await getCurrentUser(); // This might hit API again
          if (currentUser != null) return currentUser;
          throw ApiException('No profile data provided for update.');
       }
 
-      final response = await _apiClient.put(
-        '/users/profile', // No /api prefix needed here
-        data,
-      );
+      // Check authentication status before making the request
+      final isAuth = await isAuthenticated();
+      AppLogger.info('[AUTH] 🔧 Authentication status before profile update: $isAuth');
       
+      // Check current token validity
+      final currentToken = await _storageService.getSecureString(AppConfig.tokenKey);
+      if (currentToken != null) {
+        try {
+          final isExpired = Jwt.isExpired(currentToken);
+          AppLogger.info('[AUTH] 🔧 Current token expired: $isExpired');
+        } catch (e) {
+          AppLogger.warning('[AUTH] 🔧 Could not check token expiration: $e');
+        }
+      } else {
+        AppLogger.warning('[AUTH] 🔧 No token found in storage');
+      }
+
+      AppLogger.info('[AUTH] 🔧 Making PUT request to /users/profile');
+      
+      // Retry mechanism to handle token refresh race conditions
+      dynamic response;
+      int maxRetries = 2;
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          AppLogger.info('[AUTH] 🔧 Attempt $attempt/$maxRetries');
+          response = await _apiClient.put(
+            '/users/profile', // No /api prefix needed here
+            data,
+          );
+          break; // Success, exit retry loop
+        } catch (e) {
+          AppLogger.warning('[AUTH] 🔧 Attempt $attempt failed: $e');
+          
+          if (attempt == maxRetries) {
+            // Last attempt failed, rethrow the error
+            rethrow;
+          }
+          
+          // If it's an auth error and we have more attempts, wait briefly and retry
+          if (e.toString().contains('UnauthorizedException') || e.toString().contains('Not authenticated')) {
+            AppLogger.info('[AUTH] 🔧 Auth error detected, waiting before retry...');
+            await Future.delayed(Duration(milliseconds: 500 * attempt)); // 500ms, then 1s
+            
+            // Force a token refresh before retrying
+            try {
+              final refreshedToken = await refreshToken();
+              if (refreshedToken != null) {
+                AppLogger.info('[AUTH] 🔧 Token refreshed before retry');
+              } else {
+                AppLogger.warning('[AUTH] 🔧 Token refresh failed before retry');
+              }
+            } catch (refreshError) {
+              AppLogger.warning('[AUTH] 🔧 Token refresh error before retry: $refreshError');
+            }
+          } else {
+            // Non-auth error, don't retry
+            rethrow;
+          }
+        }
+      }
+      
+      AppLogger.info('[AUTH] 🔧 Profile update successful, parsing response');
       // The response from PUT likely contains the updated profile
       final user = User.fromJson(response);
       
       // Update stored user data
       await _storageService.setObject(AppConfig.userProfileKey, user.toJson());
       
+      AppLogger.info('[AUTH] 🔧 Profile update completed successfully');
       return user;
     } catch (e) {
-      AppLogger.error('Profile update failed', exception: e);
+      AppLogger.error('[AUTH] 🔧 Profile update failed with error: $e');
+      if (e.toString().contains('UnauthorizedException') || e.toString().contains('Not authenticated')) {
+        AppLogger.error('[AUTH] 🔧 AUTHENTICATION ERROR DETECTED - this is the bug we\'re tracking!');
+        // Log additional debugging info
+        final hasToken = await _storageService.getSecureString(AppConfig.tokenKey) != null;
+        final hasRefreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey) != null;
+        AppLogger.error('[AUTH] 🔧 Has token: $hasToken, Has refresh token: $hasRefreshToken');
+      }
       throw _handleAuthError(e);
     }
   }

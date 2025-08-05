@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/models/route.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/widgets/difficulty_badge.dart';
@@ -91,7 +94,7 @@ class PlannedRuckCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      route.formattedDistance,
+                      _formatDistance(context, route.distanceKm),
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textDarkSecondary,
                       ),
@@ -105,7 +108,7 @@ class PlannedRuckCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        route.formattedElevationGain,
+                        _formatElevation(context, route.elevationGainM!),
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.textDarkSecondary,
                         ),
@@ -351,5 +354,19 @@ class PlannedRuckCard extends StatelessWidget {
     }
     
     return AppColors.primary;
+  }
+
+  /// Format distance using user's metric preference
+  String _formatDistance(BuildContext context, double distanceKm) {
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
+  }
+
+  /// Format elevation using user's metric preference
+  String _formatElevation(BuildContext context, double elevationM) {
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
   }
 }

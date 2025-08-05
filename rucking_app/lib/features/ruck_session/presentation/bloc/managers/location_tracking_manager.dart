@@ -89,6 +89,10 @@ class LocationTrackingManager implements SessionManager {
   // Track successful uploads to avoid data loss
   int _lastUploadedLocationIndex = 0;
   int _lastUploadedTerrainIndex = 0;
+  
+  // CRITICAL FIX: Track cumulative distance to prevent loss during memory management
+  double _lastKnownTotalDistance = 0.0;
+  int _lastProcessedLocationIndex = 0;
 
   LocationTrackingManager({
     required LocationService locationService,
@@ -146,6 +150,8 @@ class LocationTrackingManager implements SessionManager {
     _validLocationCount = 0;
     _lastUploadedLocationIndex = 0; // Reset upload tracking
     _lastValidLocation = null; // Reset validation state
+    _lastKnownTotalDistance = 0.0; // Reset cumulative distance
+    _lastProcessedLocationIndex = 0; // Reset processed index
     
     // Reset pace smoothing state (version 2.5)
     _recentPaces.clear();
@@ -498,7 +504,11 @@ class LocationTrackingManager implements SessionManager {
       _locationPoints.removeRange(0, pointsToRemove);
       _lastUploadedLocationIndex -= pointsToRemove;
       
-      AppLogger.info('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Safely trimmed $pointsToRemove uploaded location points (${_locationPoints.length} remaining)');
+      // CRITICAL FIX: Adjust the processed index to maintain distance calculation integrity
+      _lastProcessedLocationIndex = math.max(0, _lastProcessedLocationIndex - pointsToRemove);
+      
+      AppLogger.info('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Safely trimmed $pointsToRemove uploaded location points '
+          '(${_locationPoints.length} remaining, processed index: $_lastProcessedLocationIndex)');
       
       // Force garbage collection after trimming
       _triggerGarbageCollection();
@@ -702,24 +712,45 @@ class LocationTrackingManager implements SessionManager {
   }
 
   double _calculateTotalDistance() {
-  if (_locationPoints.length < 2) return 0.0;
-  
-  double totalDistance = 0.0;
-  for (int i = 1; i < _locationPoints.length; i++) {
-    final distance = Geolocator.distanceBetween(
-      _locationPoints[i - 1].latitude,
-      _locationPoints[i - 1].longitude,
-      _locationPoints[i].latitude,
-      _locationPoints[i].longitude,
-    );
+    // CRITICAL FIX: Use cumulative distance to prevent data loss during memory management
+    if (_locationPoints.length < 2) return _lastKnownTotalDistance;
     
-    // FIXED: Remove aggressive 5-meter filtering - use direct accumulation like v2.5/v2.6
-    // Only filter out completely unrealistic jumps (>50m in <3 seconds)
-    totalDistance += distance;
+    // Start from the last known total distance (in meters)
+    double totalDistance = _lastKnownTotalDistance * 1000;
+    
+    // Only process new points that haven't been calculated yet
+    final startIndex = math.max(1, _lastProcessedLocationIndex + 1);
+    
+    // If we've already processed all points, return the cached value
+    if (startIndex >= _locationPoints.length) {
+      return _lastKnownTotalDistance;
+    }
+    
+    // Calculate distance only for new points
+    for (int i = startIndex; i < _locationPoints.length; i++) {
+      final distance = Geolocator.distanceBetween(
+        _locationPoints[i - 1].latitude,
+        _locationPoints[i - 1].longitude,
+        _locationPoints[i].latitude,
+        _locationPoints[i].longitude,
+      );
+      
+      // Only filter out completely unrealistic jumps (>100m in <1 second)
+      if (distance < 100 || 
+          _locationPoints[i].timestamp.difference(_locationPoints[i - 1].timestamp).inSeconds >= 1) {
+        totalDistance += distance;
+      }
+    }
+    
+    // Update tracking variables
+    _lastProcessedLocationIndex = _locationPoints.length - 1;
+    _lastKnownTotalDistance = totalDistance / 1000; // Convert to km
+    
+    AppLogger.debug('[LOCATION_MANAGER] Distance update: ${_lastKnownTotalDistance.toStringAsFixed(3)}km, '
+        'processed ${_locationPoints.length} points, last index: $_lastProcessedLocationIndex');
+    
+    return _lastKnownTotalDistance;
   }
-  
-  return totalDistance / 1000; // Convert to km
-}
 
 /// Calculate total distance with v2.5/v2.6 compatible logic
 /// Simplified approach that matches the working versions

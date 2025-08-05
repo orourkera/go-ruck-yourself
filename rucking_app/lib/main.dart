@@ -41,6 +41,7 @@ import 'package:sentry/sentry.dart';
 import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:rucking_app/core/services/resilient_http_overrides.dart';
 
 void main() async {
   // 🔥 CRITICAL: Wrap entire app in runZonedGuarded to catch ALL uncaught exceptions
@@ -49,6 +50,9 @@ void main() async {
     () async {
       // Ensure Flutter binding is initialized inside the zone to prevent zone mismatch
       WidgetsFlutterBinding.ensureInitialized();
+      
+      // Set up resilient HTTP overrides to prevent connection crashes
+      HttpOverrides.global = ResilientHttpOverrides();
       
       // Critical: Set binary messenger instance
       _setUpBinaryMessenger();

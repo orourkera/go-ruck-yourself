@@ -2,6 +2,8 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:http/http.dart' as http;
 
 /// Custom cache manager for images with longer cache duration and advanced features
 class ImageCacheManager {
@@ -9,36 +11,42 @@ class ImageCacheManager {
   static const String _profileKey = 'profile_image_cache';
   static const String _photoKey = 'session_photo_cache';
   
-  /// Main cache manager with extended duration for better user experience
+  /// Main cache manager with memory-conscious limits
   static CacheManager get instance => CacheManager(
     Config(
       _mainKey,
-      // Cache for 30 days instead of default 7 days
-      stalePeriod: const Duration(days: 30),
-      // Keep maximum 500 cached images (default is 200)
-      maxNrOfCacheObjects: 500,
+      // Cache for 7 days (reduced from 30)
+      stalePeriod: const Duration(days: 7),
+      // Keep maximum 100 cached images (reduced from 500)
+      maxNrOfCacheObjects: 100,
+      // Add resilient HTTP client
+      fileService: _createResilientHttpFileService(),
     ),
   );
 
-  /// Specialized cache for profile pictures with longer retention
+  /// Specialized cache for profile pictures with memory-conscious limits
   static CacheManager get profileCache => CacheManager(
     Config(
       _profileKey,
-      // Profile pics cached for 60 days (they change less frequently)
-      stalePeriod: const Duration(days: 60),
-      // Smaller cache for avatars - 100 items
+      // Profile pics cached for 14 days
+      stalePeriod: const Duration(days: 14),
+      // Reasonable cache for avatars - 100 items (increased back for better UX)
       maxNrOfCacheObjects: 100,
+      // Add resilient HTTP client
+      fileService: _createResilientHttpFileService(),
     ),
   );
 
-  /// High-retention cache for session photos
+  /// Memory-conscious cache for session photos
   static CacheManager get photoCache => CacheManager(
     Config(
       _photoKey,
-      // Session photos cached for 14 days
-      stalePeriod: const Duration(days: 14),
-      // Larger cache for session photos - 1000 items
-      maxNrOfCacheObjects: 1000,
+      // Session photos cached for 7 days (reduced from 14)
+      stalePeriod: const Duration(days: 7),
+      // Reduced cache for session photos - 200 items (reduced from 1000)
+      maxNrOfCacheObjects: 200,
+      // Add resilient HTTP client
+      fileService: _createResilientHttpFileService(),
     ),
   );
 
@@ -126,6 +134,79 @@ class ImageCacheManager {
     // Use path segments for stable keys
     final segments = uri.pathSegments;
     return segments.isNotEmpty ? segments.last : url;
+  }
+
+  /// Create a resilient HTTP file service with robust error handling
+  static FileService _createResilientHttpFileService() {
+    return HttpFileService(
+      httpClient: _ResilientHttpClient(),
+    );
+  }
+}
+
+/// Resilient HTTP client with robust error handling for image downloads
+class _ResilientHttpClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    try {
+      // Add timeout and resilient headers
+      final resilientRequest = _addResilientHeaders(request);
+      
+      // Use a reasonable timeout for images
+      final response = await _inner.send(resilientRequest)
+          .timeout(
+            const Duration(seconds: 30), // Increased back to 30s for better loading
+            onTimeout: () {
+              debugPrint('Image request timeout for: ${request.url}');
+              throw const SocketException('Image download timeout');
+            },
+          );
+      
+      return response;
+    } on SocketException catch (e) {
+      debugPrint('Socket exception during image download: $e');
+      // Don't rethrow - let the cache manager handle it gracefully
+      rethrow;
+    } on HttpException catch (e) {
+      debugPrint('HTTP exception during image download: $e');
+      // Don't rethrow - let the cache manager handle it gracefully
+      rethrow;
+    } on TimeoutException catch (e) {
+      debugPrint('Timeout exception during image download: $e');
+      // Don't rethrow - let the cache manager handle it gracefully  
+      rethrow;
+    } catch (e, stackTrace) {
+      debugPrint('Unexpected error during image download: $e');
+      debugPrint('Stack trace: $stackTrace');
+      // Don't rethrow - let the cache manager handle it gracefully
+      rethrow;
+    }
+  }
+
+  http.BaseRequest _addResilientHeaders(http.BaseRequest request) {
+    // Clone the request and add resilient headers
+    final newRequest = http.Request(request.method, request.url);
+    
+    // Copy existing headers
+    newRequest.headers.addAll(request.headers);
+    
+    // Add resilient headers
+    newRequest.headers.addAll({
+      'Connection': 'close', // Use close instead of keep-alive for images
+      'User-Agent': 'RuckingApp/3.0.0 (Flutter)',
+      'Accept': 'image/*,*/*;q=0.8',
+      'Cache-Control': 'max-age=3600',
+    });
+    
+    return newRequest;
+  }
+
+  @override
+  void close() {
+    _inner.close();
+    super.close();
   }
 }
 

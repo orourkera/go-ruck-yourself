@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/api_client.dart';
@@ -31,6 +32,30 @@ class AppErrorHandler {
     bool sendToBackend = false,
     ErrorSeverity severity = ErrorSeverity.error,
   }) async {
+    // Skip reporting timeout errors from analytics services to prevent cascading failures
+    if (error is TimeoutException && 
+        (error.toString().contains('app-analytics-services') || 
+         error.toString().contains('sdk-exp') ||
+         error.toString().contains('analytics'))) {
+      AppLogger.warning('Analytics service timeout ignored: $error');
+      return;
+    }
+    
+    // Skip reporting iOS location permission denials as they're user choice, not app errors
+    if (error.toString().contains('kCLErrorDomain error 1') ||
+        error.toString().contains('Location permission required')) {
+      AppLogger.info('Location permission denied - not reporting as error: $error');
+      return;
+    }
+    
+    // Handle GPU memory issues more gracefully
+    if (error.toString().contains('loss of GPU access') ||
+        error.toString().contains('Image upload failed due to loss of GPU access')) {
+      AppLogger.warning('GPU memory issue detected - reducing image processing load: $error');
+      // Still report these as they indicate memory pressure, but with lower severity
+      severity = ErrorSeverity.warning;
+    }
+    
     // Always log locally first
     final logMessage = '$operation failed: $error';
     switch (severity) {

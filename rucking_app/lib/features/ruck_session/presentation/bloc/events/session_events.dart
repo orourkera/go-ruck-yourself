@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:meta/meta.dart';
 
@@ -17,15 +18,21 @@ class SessionStartRequested extends ActiveSessionEvent {
   final String? sessionId;
   final double? ruckWeightKg;
   final double? userWeightKg;
+  final List<latlong.LatLng>? plannedRoute;
+  final double? plannedRouteDistance;
+  final int? plannedRouteDuration;
   
   const SessionStartRequested({
     this.sessionId,
     this.ruckWeightKg,
     this.userWeightKg,
+    this.plannedRoute,
+    this.plannedRouteDistance,
+    this.plannedRouteDuration,
   });
   
   @override
-  List<Object?> get props => [sessionId, ruckWeightKg, userWeightKg];
+  List<Object?> get props => [sessionId, ruckWeightKg, userWeightKg, plannedRoute, plannedRouteDistance, plannedRouteDuration];
 }
 
 class SessionStopRequested extends ActiveSessionEvent {

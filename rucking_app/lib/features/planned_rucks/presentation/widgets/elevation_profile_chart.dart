@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/core/models/route_elevation_point.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
@@ -244,7 +247,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           // End distance marker
           Expanded(
             child: Text(
-              widget.route.formattedDistance,
+              _formatDistance(context, widget.route.distanceKm),
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textDarkSecondary,
               ),
@@ -624,6 +627,13 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         widget.onPointSelected!(null);
       }
     }
+  }
+
+  /// Format distance using user's metric preference
+  String _formatDistance(BuildContext context, double distanceKm) {
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 }
 

@@ -63,6 +63,12 @@ Future<String> _compressPhotoIsolateWork(String originalPhotoPath) async {
   try {
     final File originalPhoto = File(originalPhotoPath);
     final bytes = await originalPhoto.readAsBytes();
+    
+    // Check file size and skip compression for very large files to prevent GPU issues
+    if (bytes.length > 50 * 1024 * 1024) { // 50MB limit
+      print('Photo too large for compression (${(bytes.length / 1024 / 1024).toStringAsFixed(1)}MB), using original');
+      return originalPhotoPath;
+    }
 
     final image = img.decodeImage(bytes);
     if (image == null) return originalPhotoPath;    // Return original path if decoding fails
@@ -749,10 +755,25 @@ class SessionRepository {
     }
   }
 
-  /// Compress photos in parallel to reduce upload time
+  /// Compress photos sequentially to prevent GPU memory exhaustion
   Future<List<File>> _compressPhotosInParallel(List<File> photos) async {
-    final compressionFutures = photos.map((photo) => _compressPhoto(photo)).toList();
-    return await Future.wait(compressionFutures);
+    final List<File> compressedPhotos = [];
+    
+    // Process photos one at a time to prevent GPU memory issues
+    for (final photo in photos) {
+      try {
+        final compressedPhoto = await _compressPhoto(photo);
+        compressedPhotos.add(compressedPhoto);
+        
+        // Small delay to allow GPU memory cleanup
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (e) {
+        AppLogger.error('Failed to compress photo: $e');
+        compressedPhotos.add(photo); // Use original if compression fails
+      }
+    }
+    
+    return compressedPhotos;
   }
 
   /// Compress a single photo for faster upload using a separate isolate.

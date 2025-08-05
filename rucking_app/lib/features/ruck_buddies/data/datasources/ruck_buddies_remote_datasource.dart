@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart'; // Added import for debugPrint
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:get_it/get_it.dart';
 
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.dart';
 
 abstract class RuckBuddiesRemoteDataSource {
@@ -81,9 +84,30 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
         queryParams['longitude'] = longitude.toString();
       }
       
-      final response = await apiClient.get(
-        '/ruck-buddies',  // Removed duplicate '/api/' since it's already in the base URL
-        queryParams: queryParams,
+      // Get current user ID for following filter
+      String? currentUserId;
+      if (followingOnly) {
+        try {
+          final authService = GetIt.instance<AuthService>();
+          final user = await authService.getCurrentUser();
+          currentUserId = user?.userId;
+        } catch (e) {
+          debugPrint('Error getting current user ID for following filter: $e');
+        }
+      }
+
+      // Call Supabase RPC function directly for optimized route data
+      final response = await supabase.Supabase.instance.client.rpc(
+        'get_public_sessions_optimized',
+        params: {
+          'p_page': (offset ~/ limit + 1),
+          'p_per_page': limit,
+          'p_sort_by': sortBy,
+          'p_following_only': followingOnly,
+          'p_latitude': latitude,
+          'p_longitude': longitude,
+          if (currentUserId != null) 'p_user_id': currentUserId,
+        },
       );
       
       // Debug logging to see raw response
@@ -102,44 +126,64 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
         }
       }
 
-      // Process the API response
-      Map<String, dynamic> responseData;
-      if (response is Map) {
-        // Convert Map<dynamic, dynamic> to Map<String, dynamic>
-        responseData = Map<String, dynamic>.from(response.map(
-          (key, value) => MapEntry(key.toString(), value),
-        ));
-      } else if (response is String) {
-        responseData = json.decode(response);
-      } else {
-        throw ServerException(message: 'Unexpected response format');
-      }
-
-      // Check for ruck data
-      final List<dynamic> data;
-      
-      // First check for 'ruck_sessions' key (used by our backend)
-      if (responseData.containsKey('ruck_sessions') && responseData['ruck_sessions'] is List) {
-        data = responseData['ruck_sessions'];
-        debugPrint('Found ${data.length} ruck sessions in response');
-      }
-      // Fall back to 'data' key (used in some API versions)
-      else if (responseData.containsKey('data') && responseData['data'] is List) {
-        data = responseData['data'];
-        debugPrint('Found ${data.length} ruck sessions in data field');
-      }
-      // Handle case where response is directly a List
-      else if (response is List) {
+      // Use the same proven logic as homepage _processSessionResponse
+      List<dynamic> data;
+      if (response == null) {
+        data = [];
+      } else if (response is List) {
         data = response;
-        debugPrint('Response is directly a list with ${data.length} items');
-      }
-      // No recognized data format found
-      else {
-        debugPrint('No ruck sessions found in response: $responseData');
+        debugPrint('Found ${data.length} ruck sessions in RPC response');
+      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+        data = response['data'] as List;
+        debugPrint('Found ${data.length} ruck sessions in data field');
+      } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
+        data = response['sessions'] as List;
+        debugPrint('Found ${data.length} ruck sessions in sessions field');
+      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
+        data = response['items'] as List;
+        debugPrint('Found ${data.length} ruck sessions in items field');
+      } else if (response is Map && response.containsKey('results') && response['results'] is List) {
+        data = response['results'] as List;
+        debugPrint('Found ${data.length} ruck sessions in results field');
+      } else if (response is Map) { 
+        // Search for any List field in response
+        List<dynamic> foundList = [];
+        for (var key in response.keys) {
+          if (response[key] is List) {
+            foundList = response[key] as List;
+            debugPrint('Found ${foundList.length} ruck sessions in $key field');
+            break;
+          }
+        }
+        data = foundList;
+      } else {
+        debugPrint('No ruck sessions found in response: $response');
         data = [];
       }
       
-      return data.map((item) => RuckBuddyModel.fromJson(item)).toList();
+      // Add null safety and type checking for RPC response
+      final processedData = <RuckBuddyModel>[];
+      for (int i = 0; i < data.length; i++) {
+        final item = data[i];
+        if (item == null) {
+          debugPrint('⚠️ Session $i is null, skipping');
+          continue;
+        }
+        if (item is! Map<String, dynamic>) {
+          debugPrint('⚠️ Session $i is not a Map: ${item.runtimeType}, skipping');
+          continue;
+        }
+        try {
+          processedData.add(RuckBuddyModel.fromJson(item));
+        } catch (e) {
+          debugPrint('⚠️ Error parsing session $i: $e');
+          debugPrint('⚠️ Session data: $item');
+          // Continue processing other sessions
+        }
+      }
+      
+      debugPrint('✅ Successfully parsed ${processedData.length}/${data.length} ruck buddy sessions');
+      return processedData;
     } catch (e) {
       throw ServerException(
         message: 'Failed to load ruck buddies data: ${e.toString()}',

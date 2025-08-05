@@ -137,12 +137,25 @@ class SessionLifecycleManager implements SessionManager {
       _sessionStartTime = DateTime.now();
       
       // Ensure backend session is created before other managers start uploading
+      // Convert planned route to backend format if available
+      List<Map<String, double>>? routePoints;
+      if (event.plannedRoute != null && event.plannedRoute!.isNotEmpty) {
+        routePoints = event.plannedRoute!.map((point) => {
+          'latitude': point.latitude,
+          'longitude': point.longitude,
+        }).toList();
+        AppLogger.info('[LIFECYCLE] Converting ${event.plannedRoute!.length} route points for backend');
+      }
+      
       final backendId = await _createInitialSession(
         sessionId: provisionalId,
         ruckWeightKg: event.ruckWeightKg ?? 0.0,
         userWeightKg: event.userWeightKg ?? 70.0, // Default user weight
         notes: null, // Optional field - can be passed in future versions
         eventId: null, // Optional field - can be passed in future versions
+        plannedRoute: routePoints,
+        plannedRouteDistance: event.plannedRouteDistance,
+        plannedRouteDuration: event.plannedRouteDuration,
       );
       
       // Get user metric preference
@@ -374,10 +387,13 @@ class SessionLifecycleManager implements SessionManager {
     required double userWeightKg,
     String? notes,
     String? eventId,
+    List<Map<String, double>>? plannedRoute,
+    double? plannedRouteDistance,
+    int? plannedRouteDuration,
   }) async {
     try {
-      // Create session in backend
-      final result = await _apiClient.post('/rucks', {
+      // Create session payload
+      final payload = {
         'id': sessionId,
         'ruck_weight_kg': ruckWeightKg,
         'user_weight_kg': userWeightKg,
@@ -385,7 +401,19 @@ class SessionLifecycleManager implements SessionManager {
         'event_id': eventId,
         'platform': Platform.isIOS ? 'iOS' : 'Android',
         'start_time': _sessionStartTime!.toIso8601String(),
-      });
+        'is_manual': false, // Explicitly set for active/tracked sessions
+      };
+      
+      // Add route data if available
+      if (plannedRoute != null && plannedRoute.isNotEmpty) {
+        payload['planned_route'] = plannedRoute;
+        payload['planned_route_distance'] = plannedRouteDistance;
+        payload['planned_route_duration'] = plannedRouteDuration;
+        AppLogger.info('[LIFECYCLE] Including route data: ${plannedRoute.length} points, ${plannedRouteDistance?.toStringAsFixed(2)}km');
+      }
+      
+      // Create session in backend
+      final result = await _apiClient.post('/rucks', payload);
       
       String backendId = sessionId;
       if (result is Map && (result['id'] != null || result['ruck_id'] != null)) {
@@ -832,6 +860,7 @@ Future<void> clearCrashRecoveryData() async {
         'ruck_weight_kg': _currentState.ruckWeightKg,
         'user_weight_kg': _currentState.userWeightKg,
         'notes': '', // Empty notes for now
+        'is_manual': false, // This is an active session that was offline
       }).timeout(const Duration(seconds: 5));
       
       final newSessionId = createResponse['id']?.toString();
@@ -925,6 +954,7 @@ Future<void> clearCrashRecoveryData() async {
             'ruck_weight_kg': sessionData['ruckWeightKg'],
             'user_weight_kg': sessionData['userWeightKg'],
             'notes': sessionData['notes'] ?? '',
+            'is_manual': false, // These are active sessions that were offline
           });
 
           final newSessionId = createResponse['id']?.toString();

@@ -1360,7 +1360,9 @@ class _RouteMapState extends State<_RouteMap> {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
-    final String weightText = widget.ruckWeightKg != null ? '${widget.ruckWeightKg!.toStringAsFixed(1)} kg' : '';
+    final String weightText = widget.ruckWeightKg != null 
+        ? MeasurementUtils.formatWeight(widget.ruckWeightKg!, metric: true) // Always show kg for consistency in social feed
+        : '';
     
     // If no route points, show empty state with weight if available
     if (routePoints.isEmpty) {

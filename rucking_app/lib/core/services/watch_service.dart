@@ -156,6 +156,7 @@ class WatchService {
       // Create ruck session
       final response = await GetIt.instance<ApiClient>().post('/rucks', {
         'ruckWeight': ruckWeight,
+        'is_manual': false, // Watch sessions are active/tracked sessions
       });
 
       AppLogger.debug('[WATCH] API response for session creation: $response');

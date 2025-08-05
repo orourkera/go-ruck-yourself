@@ -212,6 +212,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               route?.name ?? 'Planned Ruck',
               style: AppTextStyles.headlineMedium.copyWith(
                 fontWeight: FontWeight.bold,
+                fontSize: AppTextStyles.headlineMedium.fontSize! * 1.5,
               ),
             )
           : null,
@@ -253,6 +254,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
                 style: AppTextStyles.displaySmall.copyWith(
                   color: AppColors.secondary,
                   fontWeight: FontWeight.bold,
+                  fontSize: AppTextStyles.displaySmall.fontSize! * 1.5,
                   shadows: [
                     Shadow(
                       color: Colors.black.withOpacity(0.7),
@@ -550,6 +552,19 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             ),
           ),
         ),
+        
+        // Delete route link
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: _showDeleteRouteConfirmation,
+          child: Text(
+            'Delete Route',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.accent,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -712,6 +727,83 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     double c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
     return earthRadius * c;
+  }
+  
+  /// Show confirmation dialog before deleting route
+  void _showDeleteRouteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Route'),
+        content: Text(
+          'Are you sure you want to delete "${widget.route.name}"?\n\n'
+          'This action cannot be undone and will remove the route permanently.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteRoute();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accent,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Delete the route
+  void _deleteRoute() async {
+    try {
+      final routeId = widget.route.id;
+      if (routeId == null) {
+        throw Exception('Route ID is required to delete route');
+      }
+      
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Deleting route...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // Call API to delete route
+      await _routesRepository.deleteRoute(routeId);
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${widget.route.name}" has been deleted'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+        
+        // Navigate back to previous screen
+        Navigator.of(context).pop();
+      }
+      
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete route: $e'),
+            backgroundColor: AppColors.accent,
+          ),
+        );
+      }
+    }
   }
 
   /// Check distance to route start and potentially show warning

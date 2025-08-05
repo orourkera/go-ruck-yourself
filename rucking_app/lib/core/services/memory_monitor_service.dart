@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 
 /// Service to monitor app memory usage and prevent crashes
 class MemoryMonitorService {
@@ -41,6 +42,9 @@ class MemoryMonitorService {
           'platform': Platform.isIOS ? 'iOS' : 'Android',
         }.toString());
         
+        // Trigger emergency memory cleanup
+        unawaited(forceMemoryCleanup());
+        
         // Send to error handler for tracking - wrapped to prevent secondary errors
         try {
           AppErrorHandler.handleCriticalError(
@@ -58,6 +62,10 @@ class MemoryMonitorService {
         
       } else if (memoryUsageMb > _warningThresholdMb) {
         AppLogger.warning('High memory usage detected: ${memoryUsageMb.toStringAsFixed(1)}MB');
+        
+        // Clear only photo cache at warning level (less aggressive)
+        unawaited(ImageCacheManager.clearPhotoCache());
+        AppLogger.info('🧹 Cleared photo cache due to high memory usage');
       }
       
     } catch (e) {
@@ -87,12 +95,17 @@ class MemoryMonitorService {
   }
   
   /// Force memory cleanup
-  static void forceMemoryCleanup() {
+  static Future<void> forceMemoryCleanup() async {
     try {
       AppLogger.info('🧹 Forcing memory cleanup');
       
-      // Add any global cleanup here
-      // This will be called from various services when memory is high
+      // Clear image caches to free up memory
+      await ImageCacheManager.clearAllCaches();
+      AppLogger.info('🧹 Cleared all image caches');
+      
+      // Note: Dart doesn't provide direct garbage collection control
+      // The cache clearing should be sufficient to reduce memory pressure
+      AppLogger.info('🧹 Memory cleanup completed');
       
     } catch (e) {
       AppLogger.error('Failed to force memory cleanup: $e');

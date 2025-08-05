@@ -38,6 +38,7 @@ class RuckingApiHandler extends RuckingApi {
         'user_id': user.userId, // Ensure user ID is included
         'started_from': 'apple_watch',
         'start_time': DateTime.now().toUtc().toIso8601String(),
+        'is_manual': false, // Watch sessions are active/tracked sessions
       };
       
       final response = await apiClient.post('/rucks', payload);

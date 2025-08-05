@@ -318,6 +318,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         sessionId: null, // Let lifecycle manager generate the session ID
         ruckWeightKg: mainEvent.ruckWeightKg,
         userWeightKg: mainEvent.userWeightKg,
+        plannedRoute: mainEvent.plannedRoute,
+        plannedRouteDistance: mainEvent.plannedRouteDistance,
+        plannedRouteDuration: mainEvent.plannedRouteDuration,
       );
     } else if (mainEvent is SessionCompleted) {
       return const manager_events.SessionStopRequested();

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:rucking_app/core/models/route.dart' as route_model;
 import 'package:rucking_app/core/models/route_point_of_interest.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
@@ -412,7 +415,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        widget.route.formattedDistance,
+                        _formatDistance(context, widget.route.distanceKm),
                         style: AppTextStyles.bodySmall.copyWith(
                           color: Colors.white.withOpacity(0.8),
                         ),
@@ -426,7 +429,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          widget.route.formattedElevationGain,
+                          _formatElevation(context, widget.route.elevationGainM!),
                           style: AppTextStyles.bodySmall.copyWith(
                             color: Colors.white.withOpacity(0.8),
                           ),
@@ -798,6 +801,20 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         ],
       ),
     );
+  }
+
+  /// Format distance using user's metric preference
+  String _formatDistance(BuildContext context, double distanceKm) {
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
+  }
+
+  /// Format elevation using user's metric preference
+  String _formatElevation(BuildContext context, double elevationM) {
+    final authState = context.read<AuthBloc>().state;
+    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
   }
 }
 

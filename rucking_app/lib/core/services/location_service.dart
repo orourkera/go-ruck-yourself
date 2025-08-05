@@ -224,6 +224,15 @@ class LocationServiceImpl implements LocationService {
     try {
       AppLogger.info('📍 Requesting current location with timeout...');
       
+      // Check permissions first to prevent kCLErrorDomain error 1
+      final hasPermission = await hasLocationPermission();
+      if (!hasPermission) {
+        AppLogger.warning('Location permission not granted - cannot get current location');
+        throw PositionUpdateException(
+          'Location permission required. Please enable location services in Settings.'
+        );
+      }
+      
       // 🔥 FIX: Add timeout to prevent app hangs
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -244,6 +253,13 @@ class LocationServiceImpl implements LocationService {
         timestamp: position.timestamp,
       );
     } catch (e) {
+      // Handle specific iOS location permission errors more gracefully
+      if (e is PositionUpdateException && e.toString().contains('kCLErrorDomain error 1')) {
+        AppLogger.warning('iOS location permission denied - user needs to enable location services');
+        // Don't report permission denials as critical errors
+        return null;
+      }
+      
       // Monitor location retrieval failures (critical for fitness tracking) - wrapped to prevent secondary errors
       try {
         await AppErrorHandler.handleError(
@@ -251,6 +267,7 @@ class LocationServiceImpl implements LocationService {
           e,
           context: {
             'platform': Platform.isAndroid ? 'android' : 'ios',
+            'error_type': e.runtimeType.toString(),
           },
         );
       } catch (errorHandlerException) {

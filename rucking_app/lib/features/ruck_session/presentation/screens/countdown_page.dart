@@ -49,6 +49,25 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
   void initState() {
     super.initState();
     
+    // Debug: Log planned route data received from create_session_screen
+    print('⏰⏰⏰ [COUNTDOWN_PAGE] Received args:');
+    print('⏰⏰⏰   plannedRoute is null: ${widget.args.plannedRoute == null}');
+    print('⏰⏰⏰   plannedRoute length: ${widget.args.plannedRoute?.length ?? 0}');
+    print('⏰⏰⏰   plannedRouteDistance: ${widget.args.plannedRouteDistance}');
+    print('⏰⏰⏰   plannedRouteDuration: ${widget.args.plannedRouteDuration}');
+    if (widget.args.plannedRoute != null && widget.args.plannedRoute!.isNotEmpty) {
+      print('⏰⏰⏰   First planned route point: ${widget.args.plannedRoute!.first}');
+    }
+    
+    AppLogger.debug('[COUNTDOWN_PAGE] Received args:');
+    AppLogger.debug('  plannedRoute is null: ${widget.args.plannedRoute == null}');
+    AppLogger.debug('  plannedRoute length: ${widget.args.plannedRoute?.length ?? 0}');
+    AppLogger.debug('  plannedRouteDistance: ${widget.args.plannedRouteDistance}');
+    AppLogger.debug('  plannedRouteDuration: ${widget.args.plannedRouteDuration}');
+    if (widget.args.plannedRoute != null && widget.args.plannedRoute!.isNotEmpty) {
+      AppLogger.debug('  First planned route point: ${widget.args.plannedRoute!.first}');
+    }
+    
     // Animation setup
     _controller = AnimationController(
       vsync: this,
@@ -203,7 +222,26 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         notes: widget.args.notes,
         plannedDuration: widget.args.plannedDuration,
         initialCenter: _initialCenter ?? widget.args.initialCenter,
+        eventId: widget.args.eventId, // Include event ID
+        plannedRoute: widget.args.plannedRoute, // Include planned route
+        plannedRouteDistance: widget.args.plannedRouteDistance, // Include route distance
+        plannedRouteDuration: widget.args.plannedRouteDuration, // Include route duration
       );
+      
+      // Debug: Log the args being passed to ActiveSessionPage
+      print('📼📼📼 [COUNTDOWN_PAGE] Passing args to ActiveSessionPage:');
+      print('📼📼📼   plannedRoute is null: ${argsWithCenter.plannedRoute == null}');
+      print('📼📼📼   plannedRoute length: ${argsWithCenter.plannedRoute?.length ?? 0}');
+      if (argsWithCenter.plannedRoute != null && argsWithCenter.plannedRoute!.isNotEmpty) {
+        print('📼📼📼   First planned route point: ${argsWithCenter.plannedRoute!.first}');
+      }
+      
+      AppLogger.debug('[COUNTDOWN_PAGE] Passing args to ActiveSessionPage:');
+      AppLogger.debug('  plannedRoute is null: ${argsWithCenter.plannedRoute == null}');
+      AppLogger.debug('  plannedRoute length: ${argsWithCenter.plannedRoute?.length ?? 0}');
+      if (argsWithCenter.plannedRoute != null && argsWithCenter.plannedRoute!.isNotEmpty) {
+        AppLogger.debug('  First planned route point: ${argsWithCenter.plannedRoute!.first}');
+      }
 
       // Navigate to the actual session with a brief fade transition
       Navigator.of(context).pushReplacement(

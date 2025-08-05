@@ -170,6 +170,10 @@
 		</dict>
 	</array>
 	
+	<!-- Document Configuration: Required for CFBundleDocumentTypes -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	
 	<!-- App Group for Share Extension -->
 	<key>com.apple.security.application-groups</key>
 	<array>

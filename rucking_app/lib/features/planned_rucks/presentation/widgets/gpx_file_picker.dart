@@ -240,15 +240,36 @@ class _GpxFilePickerState extends State<GpxFilePicker>
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['gpx'],
-        allowMultiple: false,
-      );
+      FilePickerResult? result;
+      
+      // First try with custom type and gpx extension
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['gpx'],
+          allowMultiple: false,
+        );
+      } catch (e) {
+        // If the custom type fails (Android issue), try with any file type
+        debugPrint('Custom file picker failed, trying fallback: $e');
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+        );
+        
+        // Validate that the selected file is a GPX file
+        if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+          final fileName = result.files.single.name?.toLowerCase() ?? '';
+          if (!fileName.endsWith('.gpx')) {
+            _showErrorSnackBar('Please select a GPX file (.gpx extension required)');
+            return;
+          }
+        }
+      }
 
-      if (result != null && result.files.single.path != null) {
+      if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
         setState(() {
-          _selectedFile = File(result.files.single.path!);
+          _selectedFile = File(result!.files.single.path!);
         });
       }
     } catch (e) {
@@ -358,14 +379,35 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['gpx'],
-        allowMultiple: false,
-      );
+      FilePickerResult? result;
+      
+      // First try with custom type and gpx extension
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['gpx'],
+          allowMultiple: false,
+        );
+      } catch (e) {
+        // If the custom type fails (Android issue), try with any file type
+        debugPrint('Custom file picker failed, trying fallback: $e');
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+        );
+        
+        // Validate that the selected file is a GPX file
+        if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+          final fileName = result.files.single.name?.toLowerCase() ?? '';
+          if (!fileName.endsWith('.gpx')) {
+            _showErrorSnackBar('Please select a GPX file (.gpx extension required)');
+            return;
+          }
+        }
+      }
 
-      if (result != null && result.files.single.path != null) {
-        widget.onFileSelected(File(result.files.single.path!));
+      if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+        widget.onFileSelected(File(result!.files.single.path!));
       }
     } catch (e) {
       _showErrorSnackBar('Failed to pick file: $e');
@@ -464,14 +506,36 @@ class CompactGpxFilePicker extends StatelessWidget {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['gpx'],
-        allowMultiple: false,
-      );
+      FilePickerResult? result;
+      
+      // First try with custom type and gpx extension
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['gpx'],
+          allowMultiple: false,
+        );
+      } catch (e) {
+        // If the custom type fails (Android issue), try with any file type
+        debugPrint('Custom file picker failed, trying fallback: $e');
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          allowMultiple: false,
+        );
+        
+        // Validate that the selected file is a GPX file
+        if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+          final fileName = result.files.single.name?.toLowerCase() ?? '';
+          if (!fileName.endsWith('.gpx')) {
+            // For compact picker, we can't show snackbar, so just return
+            debugPrint('Selected file is not a GPX file: $fileName');
+            return;
+          }
+        }
+      }
 
-      if (result != null && result.files.single.path != null) {
-        onFileSelected(File(result.files.single.path!));
+      if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+        onFileSelected(File(result!.files.single.path!));
       }
     } catch (e) {
       // Handle error appropriately

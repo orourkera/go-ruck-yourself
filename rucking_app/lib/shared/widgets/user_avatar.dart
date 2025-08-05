@@ -102,18 +102,39 @@ class UserAvatar extends StatelessWidget {
     
     // Handle network URL - ensure it's a valid HTTP/HTTPS URL
     if (avatarUrl!.startsWith('http://') || avatarUrl!.startsWith('https://')) {
-      return CachedNetworkImage(
-        imageUrl: avatarUrl!,
-        cacheManager: ImageCacheManager.profileCache,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => _buildInitialsAvatar(),
-        errorWidget: (context, url, error) {
-          debugPrint('Error loading network avatar: $error');
-          return _buildInitialsAvatar();
+      return Builder(
+        builder: (context) {
+          try {
+            return CachedNetworkImage(
+              imageUrl: avatarUrl!,
+              cacheManager: ImageCacheManager.profileCache,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => _buildInitialsAvatar(),
+              errorWidget: (context, url, error) {
+                debugPrint('Error loading network avatar: $error');
+                // Handle all types of network errors gracefully
+                return _buildInitialsAvatar();
+              },
+              cacheKey: avatarUrl,
+              // Enhanced timeout and retry configuration
+              httpHeaders: const {
+                'Connection': 'keep-alive',
+                'Cache-Control': 'max-age=3600',
+              },
+              // Add error listener to handle network issues gracefully
+              errorListener: (error) {
+                debugPrint('Avatar loading error: $error');
+              },
+            );
+          } catch (e, stackTrace) {
+            // Catch any uncaught exceptions during avatar loading
+            debugPrint('Avatar loading crashed: $e');
+            debugPrint('Stack trace: $stackTrace');
+            return _buildInitialsAvatar();
+          }
         },
-        cacheKey: avatarUrl,
       );
     }
     

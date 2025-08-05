@@ -10,15 +10,15 @@ RETURNS TABLE (
     session_id INTEGER,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
-    "timestamp" TIMESTAMPTZ
+    "timestamp" TIMESTAMP
 )
 LANGUAGE sql
 AS $$
     WITH numbered_points AS (
         SELECT 
             lp.session_id,
-            lp.latitude,
-            lp.longitude,
+            lp.latitude::DOUBLE PRECISION,
+            lp.longitude::DOUBLE PRECISION,
             lp."timestamp",
             ROW_NUMBER() OVER (ORDER BY lp."timestamp") as row_num,
             COUNT(*) OVER () as total_count

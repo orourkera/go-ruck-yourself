@@ -281,6 +281,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           // Prepare request data for creation
           Map<String, dynamic> createRequestData = {
             'ruck_weight_kg': weightForApiKg,
+            'is_manual': false, // Regular active sessions are not manual
           };
           
           // Add event context if creating session for an event
@@ -416,10 +417,25 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           }
           
           // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
-          AppLogger.info('Creating session args:');
-          AppLogger.info('  plannedRoute length: ${plannedRoute?.length ?? 0}');
-          AppLogger.info('  plannedRouteDistance: $plannedRouteDistance');
-          AppLogger.info('  plannedRouteDuration: $plannedRouteDuration');
+          AppLogger.info('🚀 [CREATE_SESSION] Creating session args:');
+          AppLogger.info('🚀 [CREATE_SESSION]   plannedRoute length: ${plannedRoute?.length ?? 0}');
+          AppLogger.info('🚀 [CREATE_SESSION]   plannedRouteDistance: $plannedRouteDistance');
+          AppLogger.info('🚀 [CREATE_SESSION]   plannedRouteDuration: $plannedRouteDuration');
+          
+          debugPrint('🚀🚀🚀 [CREATE_SESSION DEBUG] About to create ActiveSessionArgs with planned route:');
+          debugPrint('🚀🚀🚀 Route points: ${plannedRoute?.length ?? 0} points');
+          debugPrint('🚀🚀🚀 Route distance: $plannedRouteDistance');
+          debugPrint('🚀🚀🚀 Route duration: $plannedRouteDuration');
+          
+          // Debug: Log first few route points if available
+          if (plannedRoute != null && plannedRoute!.isNotEmpty) {
+            AppLogger.info('  First route point: ${plannedRoute!.first}');
+            if (plannedRoute!.length > 1) {
+              AppLogger.info('  Last route point: ${plannedRoute!.last}');
+            }
+          } else {
+            AppLogger.warning('  No planned route points available!');
+          }
           
           final sessionArgs = ActiveSessionArgs(
             ruckWeight: _ruckWeight,
@@ -431,6 +447,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             plannedRouteDistance: plannedRouteDistance, // Pass route distance
             plannedRouteDuration: plannedRouteDuration, // Pass route duration
           );
+          
+          // CRITICAL DEBUG: Print the actual args being created
+          print('🔥🔥🔥 [CREATE_SESSION] ActiveSessionArgs created with:');
+          print('🔥🔥🔥   plannedRoute: ${sessionArgs.plannedRoute?.length ?? 0} points');
+          print('🔥🔥🔥   plannedRouteDistance: ${sessionArgs.plannedRouteDistance}');
+          print('🔥🔥🔥   plannedRouteDuration: ${sessionArgs.plannedRouteDuration}');
+          if (sessionArgs.plannedRoute != null && sessionArgs.plannedRoute!.isNotEmpty) {
+            print('🔥🔥🔥   First route point: ${sessionArgs.plannedRoute!.first}');
+          }
           
           AppLogger.sessionCompletion('Creating session with event context', context: {
             'event_id': _eventId,

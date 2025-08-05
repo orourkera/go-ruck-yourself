@@ -159,10 +159,10 @@ class RuckBuddyModel extends RuckBuddy {
         createdAt: createdAt ?? DateTime.now(),
         avgHeartRate: _parseToInt(json['avg_heart_rate'] ?? json['heart_rate_avg']),
         user: UserInfo.fromJson({
-          'id': json['user']['id'],
-          'username': json['user']['username'],
-          'avatar_url': json['user']['avatar_url'],
-          'gender': json['user']['gender'] ?? 'male',
+          'id': json['user']?['id'] ?? json['user_id'],
+          'username': json['user']?['username'] ?? json['username'],
+          'avatar_url': json['user']?['avatar_url'] ?? json['avatar_url'],
+          'gender': json['user']?['gender'] ?? 'male',
         }),
         locationPoints: json['location_points'] != null
             ? List<dynamic>.from(json['location_points'] as List)

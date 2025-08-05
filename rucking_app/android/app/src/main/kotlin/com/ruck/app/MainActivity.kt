@@ -25,6 +25,7 @@ class MainActivity : FlutterActivity() {
     
     companion object {
         private const val TAG = "MainActivity"
+        private const val STORAGE_PERMISSION_REQUEST_CODE = 100
     }
     
     // GPX file import receiver
@@ -202,7 +203,11 @@ class MainActivity : FlutterActivity() {
         
         // Register broadcast receiver for GPX imports
         val filter = IntentFilter("com.ruck.app.FILE_IMPORTED")
-        registerReceiver(gpxImportReceiver, filter)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(gpxImportReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(gpxImportReceiver, filter)
+        }
         
         // Handle incoming GPX files or URLs
         handleIncomingIntent(intent)
@@ -313,9 +318,5 @@ class MainActivity : FlutterActivity() {
                 )
             }
         }
-    }
-    
-    companion object {
-        private const val STORAGE_PERMISSION_REQUEST_CODE = 100
     }
 }

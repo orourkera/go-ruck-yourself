@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:rucking_app/features/achievements/presentation/bloc/achievement_bloc.dart';
 import 'package:rucking_app/features/achievements/presentation/widgets/achievement_summary.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -440,8 +441,40 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
     
     try {
       // Combine both API calls into parallel execution for better performance
+      debugPrint('🏠 [HOME] Starting parallel API calls...');
+      
       final futures = await Future.wait([
-        _apiClient!.get('/rucks?limit=20'),
+        () async {
+          debugPrint('🏠 [HOME] Calling get_user_recent_sessions RPC...');
+          try {
+            // Get current user ID from AuthBloc
+            String? currentUserId;
+            try {
+              final authState = context.read<AuthBloc>().state;
+              if (authState is Authenticated) {
+                currentUserId = authState.user.userId;
+              }
+            } catch (e) {
+              debugPrint('Error getting current user ID: $e');
+            }
+            
+            // Call RPC with explicit user ID
+            final result = await supabase.Supabase.instance.client.rpc(
+              'get_user_recent_sessions', 
+              params: {
+                'p_limit': 20,
+                if (currentUserId != null) 'p_user_id': currentUserId,
+              }
+            );
+            debugPrint('🏠 [HOME] RPC Response type: ${result.runtimeType}');
+            debugPrint('🏠 [HOME] RPC Response length: ${result is List ? result.length : 'N/A'}');
+            debugPrint('🏠 [HOME] RPC Response: $result');
+            return result;
+          } catch (e) {
+            debugPrint('❌ [HOME] RPC Error: $e');
+            rethrow;
+          }
+        }(),
         _apiClient!.get('/stats/monthly'),
       ]);
       
