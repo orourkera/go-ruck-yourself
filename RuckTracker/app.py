@@ -1068,12 +1068,16 @@ def system_health():
 
 # Serve favicon and apple-touch-icon from static folder
 @app.route('/favicon.ico')
-def favicon():
+def serve_favicon():
     return app.send_static_file('images/favicon.ico')
 
-@app.route('/apple-touch-icon.png')
-@app.route('/apple-touch-icon-precomposed.png')
-def apple_touch_icon():
+@app.route('/apple-touch-icon.png', endpoint='apple_touch_icon_png')
+def serve_apple_touch_icon_png():
+    # Use app icon as apple touch icon
+    return app.send_static_file('images/app icon.png')
+
+@app.route('/apple-touch-icon-precomposed.png', endpoint='apple_touch_icon_precomposed')
+def serve_apple_touch_icon_precomposed():
     # Use app icon as apple touch icon
     return app.send_static_file('images/app icon.png')
 
