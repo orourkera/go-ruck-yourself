@@ -1066,6 +1066,17 @@ def system_health():
             'timestamp': datetime.now().isoformat()
         }), 500
 
+# Serve favicon and apple-touch-icon from static folder
+@app.route('/favicon.ico')
+def favicon():
+    return app.send_static_file('images/favicon.ico')
+
+@app.route('/apple-touch-icon.png')
+@app.route('/apple-touch-icon-precomposed.png')
+def apple_touch_icon():
+    # Use app icon as apple touch icon
+    return app.send_static_file('images/app icon.png')
+
 logger.info("Error handlers and monitoring configured successfully!")
 
 # Trigger redeploy: Cascade forced comment
