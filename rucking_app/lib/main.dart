@@ -28,6 +28,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
+import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/core/services/session_recovery_service.dart';
 import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
@@ -224,6 +225,16 @@ Future<void> _initializeApp() async {
     // Continue anyway - app can still work in offline mode
   }
   
+  // 🌐 Initialize Firebase Remote Config for feature flags
+  try {
+    AppLogger.info('🌐 Initializing Firebase Remote Config...');
+    await RemoteConfigService.instance.initialize();
+    AppLogger.info('✅ Firebase Remote Config initialized successfully');
+  } catch (e) {
+    AppLogger.warning('⚠️ Failed to initialize Firebase Remote Config (will use defaults): $e');
+    // Continue anyway - feature flags will use hardcoded defaults
+  }
+  
   // Initialize dependency injection after env vars & Supabase are loaded
   try {
     await setupServiceLocator();
@@ -393,7 +404,7 @@ Future<void> _initializeApp() async {
     try {
       AppLogger.info('[Main] App UI loaded, requesting ATT authorization...');
       // Delay to ensure the app is fully visible and interactive
-      await Future.delayed(const Duration(milliseconds: 3000)); // Increased for iOS 18 compatibility
+      await Future.delayed(const Duration(milliseconds: 5000)); // Extended for iOS 18.6 compatibility
       final hasPermission = await TrackingTransparencyService.requestTrackingAuthorization();
       AppLogger.info('[Main] ATT authorization result: $hasPermission');
     } catch (e) {

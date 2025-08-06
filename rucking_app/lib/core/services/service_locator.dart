@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/enhanced_api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_wrapper.dart';
 import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
@@ -101,7 +102,10 @@ Future<void> setupServiceLocator() async {
   final apiClient = ApiClient(getIt<Dio>());
   getIt.registerSingleton<ApiClient>(apiClient);
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
-  getIt.registerSingleton<AuthService>(AuthServiceImpl(getIt<ApiClient>(), getIt<StorageService>()));
+  // 🚩 FEATURE-FLAGGED AUTH SERVICE
+  // This wrapper allows safe switching between legacy auth and simplified Supabase auth
+  // Feature flags control which implementation is used - see feature_flags.dart
+  getIt.registerSingleton<AuthService>(AuthServiceWrapper(getIt<ApiClient>(), getIt<StorageService>()));
   getIt.registerSingleton<EnhancedApiClient>(EnhancedApiClient(apiClient));
   getIt.registerSingleton<AvatarService>(AvatarService(
     authService: getIt<AuthService>(),

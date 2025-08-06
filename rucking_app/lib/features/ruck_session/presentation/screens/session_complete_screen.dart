@@ -13,6 +13,7 @@ import 'package:get_it/get_it.dart';
 // Core imports
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/in_app_review_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
@@ -96,6 +97,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   late final ApiClient _apiClient;
   final _notesController = TextEditingController();
   final _sessionRepo = SessionRepository(apiClient: GetIt.I<ApiClient>());
+  final _inAppReviewService = InAppReviewService();
 
   // Form state
   int _rating = 3;
@@ -206,6 +208,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'duration_seconds': widget.duration.inSeconds,
         'ruck_weight_kg': widget.ruckWeight,
         'completed_at': widget.completedAt.toIso8601String(),
+        'is_manual': widget.isManual,
       };
       
       print('[COMPLETION_DEBUG] Completion data before processing:');
@@ -263,6 +266,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         isManual: widget.isManual, // Set based on your logic, or pass from creation
       );
 
+      // Check for in-app review prompt after successful session completion
+      if (mounted) {
+        await _inAppReviewService.checkAndPromptAfterRuck(
+          distanceKm: widget.distance, // widget.distance is already in km
+          context: context,
+        );
+      }
+      
       if (!localSession.isManual) {
         await _checkAchievementsBeforeNavigation();
       } else {

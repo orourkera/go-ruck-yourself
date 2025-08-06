@@ -567,48 +567,83 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 ),
               ),
 
-              // Map Section
-              if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty && !widget.session.isManual)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  child: _SessionRouteMap(session: widget.session),
-                ),
+              // Map Section - Use BlocBuilder to get updated session data
+              BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                builder: (context, state) {
+                  // Get the most up-to-date session data from BLoC state
+                  RuckSession currentSession = widget.session;
+                  
+                  // Check if we have updated session data in the BLoC state
+                  if (state is ActiveSessionInitial && state.viewedSession?.id == widget.session.id) {
+                    currentSession = state.viewedSession!;
+                    print('[ROUTE_DEBUG] Using updated session from BLoC state with ${state.viewedSession!.locationPoints?.length ?? 0} location points');
+                  }
+                  
+                  // Only show map if we have location data and it's not manual
+                  if (currentSession.locationPoints != null && 
+                      currentSession.locationPoints!.isNotEmpty && 
+                      !currentSession.isManual) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      child: _SessionRouteMap(session: currentSession),
+                    );
+                  }
+                  
+                  return const SizedBox.shrink();
+                },
+              ),
 
-              // Location Display - only show if location data is available and valid
-              if (widget.session.locationPoints != null && widget.session.locationPoints!.isNotEmpty)
-                FutureBuilder<String>(
-                  future: LocationUtils.getLocationName(widget.session.locationPoints),
-                  builder: (context, snapshot) {
-                    // Only show location if we have valid data and it's not "Unknown Location"
-                    if (snapshot.hasData && 
-                        snapshot.data != null && 
-                        snapshot.data!.trim().isNotEmpty && 
-                        snapshot.data!.toLowerCase() != 'unknown location') {
-                      return Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Center(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  snapshot.data!,
-                                  style: AppTextStyles.statValue.copyWith(
-                                    color: Theme.of(context).primaryColor,
+              // Location Display - Use BlocBuilder to get updated session data
+              BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+                builder: (context, state) {
+                  // Get the most up-to-date session data from BLoC state
+                  RuckSession currentSession = widget.session;
+                  
+                  // Check if we have updated session data in the BLoC state
+                  if (state is ActiveSessionInitial && state.viewedSession?.id == widget.session.id) {
+                    currentSession = state.viewedSession!;
+                  }
+                  
+                  // Only show location if we have location data
+                  if (currentSession.locationPoints == null || currentSession.locationPoints!.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  
+                  return FutureBuilder<String>(
+                    future: LocationUtils.getLocationName(currentSession.locationPoints),
+                    builder: (context, snapshot) {
+                      // Only show location if we have valid data and it's not "Unknown Location"
+                      if (snapshot.hasData && 
+                          snapshot.data != null && 
+                          snapshot.data!.trim().isNotEmpty && 
+                          snapshot.data!.toLowerCase() != 'unknown location') {
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Center(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    snapshot.data!,
+                                    style: AppTextStyles.statValue.copyWith(
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      );
-                    }
-                    // Return empty widget if no location data - fail silently
-                    return const SizedBox.shrink();
-                  },
-                ),
+                          ],
+                        );
+                      }
+                      // Return empty widget if no location data - fail silently
+                      return const SizedBox.shrink();
+                    },
+                  );
+                },
+              ),
 
               // Photo Gallery Section - only shown when there are photos
               BlocBuilder<ActiveSessionBloc, ActiveSessionState>(

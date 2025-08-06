@@ -5,7 +5,6 @@ import uuid
 import logging
 import math
 import os
-from dateutil import tz
 
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
@@ -877,18 +876,22 @@ class RuckSessionCompleteResource(Resource):
                 update_data['tags'] = data['tags']
             if 'planned_duration_minutes' in data:
                 update_data['planned_duration_minutes'] = data['planned_duration_minutes']
+            if 'is_manual' in data:
+                update_data['is_manual'] = data['is_manual']
             
             # Log the sharing decision for debugging
             logger.info(f"Session {ruck_id} completion: user_allows_sharing={user_allows_sharing}, is_public={update_data['is_public']}")
         
             # SERVER-SIDE METRIC CALCULATION FALLBACK
             # If key metrics are missing or zero, calculate them from GPS data
-            needs_calculation = (
-                not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0 or
-                not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0 or
-                not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0 or
-                not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0
-            )
+            distance_missing = not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0
+            calories_missing = not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0
+            elevation_missing = not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0
+            pace_missing = not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0
+            
+            needs_calculation = distance_missing or calories_missing or elevation_missing or pace_missing
+            
+            logger.info(f"Session {ruck_id} metric check - distance: {update_data.get('distance_km')} (missing: {distance_missing}), calories: {update_data.get('calories_burned')} (missing: {calories_missing}), elevation: {update_data.get('elevation_gain_m')} (missing: {elevation_missing}), pace: {update_data.get('average_pace')} (missing: {pace_missing}), needs_calc: {needs_calculation}")
         
             if needs_calculation:
                 logger.info(f"Session {ruck_id}: Missing metrics detected, calculating from GPS data...")
@@ -957,8 +960,8 @@ class RuckSessionCompleteResource(Resource):
                         # Calculate calories if missing (basic estimation)
                         if not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0:
                             # Basic calorie estimation: assume 80kg user, ~400 cal/hour base + elevation
-                            weight_kg = update_data.get('weight_kg', 80)  # Default 80kg if not provided
-                            ruck_weight_kg = update_data.get('ruck_weight_kg', 0)
+                            weight_kg = float(update_data.get('weight_kg', 80))  # Default 80kg if not provided
+                            ruck_weight_kg = float(update_data.get('ruck_weight_kg', 0))
                             total_weight_kg = weight_kg + ruck_weight_kg
                         
                             # Base metabolic rate (calories per hour)
