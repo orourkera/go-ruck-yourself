@@ -410,6 +410,11 @@ class RuckSessionListResource(Resource):
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid planned_ruck_id format: {planned_ruck_id_raw}, ignoring")
             
+            # Handle is_manual flag if provided (for manual sessions)
+            if 'is_manual' in data:
+                session_data['is_manual'] = data['is_manual']
+                logger.info(f"Setting is_manual to {data['is_manual']} for session creation")
+            
             logger.info(f"Final session_data before insert: {session_data}")
             
             insert_resp = supabase.table('ruck_session') \
@@ -878,6 +883,9 @@ class RuckSessionCompleteResource(Resource):
                 update_data['planned_duration_minutes'] = data['planned_duration_minutes']
             if 'is_manual' in data:
                 update_data['is_manual'] = data['is_manual']
+                logger.info(f"[IS_MANUAL_DEBUG] Setting is_manual to {data['is_manual']} for session {ruck_id} completion")
+            else:
+                logger.info(f"[IS_MANUAL_DEBUG] No is_manual field provided in completion data for session {ruck_id}")
             
             # Log the sharing decision for debugging
             logger.info(f"Session {ruck_id} completion: user_allows_sharing={user_allows_sharing}, is_public={update_data['is_public']}")
