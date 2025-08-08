@@ -306,15 +306,42 @@ class RuckSessionListResource(Resource):
                 
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
 
-            # Deduplication: Check for any active (in_progress) session for the current user
+            # Check for any active (in_progress) session for the current user
             active_sessions = supabase.table('ruck_session') \
-                .select('id,status') \
+                .select('id,status,started_at,rucking_weight_kg') \
                 .eq('user_id', g.user.id) \
                 .eq('status', 'in_progress') \
                 .execute()
+            
             if active_sessions.data and len(active_sessions.data) > 0:
-                logger.info(f"Reusing active session {active_sessions.data[0]['id']}")
-                return active_sessions.data[0], 200
+                active_session = active_sessions.data[0]
+                
+                # Check if client explicitly wants to force start a new session
+                force_new = data.get('force_new_session', False)
+                
+                if force_new:
+                    logger.info(f"Force starting new session, auto-completing previous session {active_session['id']}")
+                    
+                    # Auto-complete the previous session with minimal data
+                    try:
+                        supabase.table('ruck_session') \
+                            .update({
+                                'status': 'completed',
+                                'completed_at': datetime.now(tz.tzutc()).isoformat(),
+                                'notes': 'Auto-completed due to new session start'
+                            }) \
+                            .eq('id', active_session['id']) \
+                            .eq('user_id', g.user.id) \
+                            .execute()
+                        logger.info(f"Auto-completed previous session {active_session['id']}")
+                    except Exception as e:
+                        logger.error(f"Failed to auto-complete previous session: {e}")
+                        # Continue with new session creation anyway
+                else:
+                    # Return existing session info with additional context
+                    active_session['has_active_session'] = True
+                    logger.info(f"Returning existing active session {active_session['id']}")
+                    return active_session, 200
 
             session_data = {
                 'user_id': g.user.id,
@@ -1682,3 +1709,102 @@ class RuckSessionHeartRateChunkResource(Resource):
         except Exception as e:
             logger.error(f"Error uploading heart rate chunk for session {ruck_id}: {e}")
             return {'message': f'Error uploading heart rate chunk: {str(e)}'}, 500
+
+
+class RuckSessionAutoEndResource(Resource):
+    def post(self):
+        """Check for and auto-end inactive sessions (POST /api/rucks/auto-end)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                return {'message': 'User not authenticated'}, 401
+            
+            data = request.get_json() or {}
+            inactivity_threshold_minutes = data.get('inactivity_minutes', 30)  # Default 30 minutes
+            
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Find active sessions that haven't had location updates recently
+            cutoff_time = datetime.now(tz.tzutc()) - timedelta(minutes=inactivity_threshold_minutes)
+            
+            # Get active sessions
+            active_sessions = supabase.table('ruck_session') \
+                .select('id,started_at,rucking_weight_kg') \
+                .eq('user_id', g.user.id) \
+                .eq('status', 'in_progress') \
+                .execute()
+            
+            if not active_sessions.data:
+                return {'message': 'No active sessions found'}, 200
+            
+            sessions_to_end = []
+            
+            for session in active_sessions.data:
+                session_id = session['id']
+                
+                # Check last location update for this session
+                last_location = supabase.table('ruck_session_location') \
+                    .select('timestamp') \
+                    .eq('ruck_session_id', session_id) \
+                    .order('timestamp', desc=True) \
+                    .limit(1) \
+                    .execute()
+                
+                if last_location.data:
+                    last_timestamp = datetime.fromisoformat(last_location.data[0]['timestamp'].replace('Z', '+00:00'))
+                    
+                    if last_timestamp < cutoff_time:
+                        sessions_to_end.append({
+                            'id': session_id,
+                            'started_at': session['started_at'],
+                            'last_activity': last_timestamp.isoformat(),
+                            'inactive_minutes': (datetime.now(tz.tzutc()) - last_timestamp).total_seconds() / 60
+                        })
+                else:
+                    # No location data - check if session is old enough to auto-end
+                    started_at = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00'))
+                    if started_at < cutoff_time:
+                        sessions_to_end.append({
+                            'id': session_id,
+                            'started_at': session['started_at'],
+                            'last_activity': None,
+                            'inactive_minutes': (datetime.now(tz.tzutc()) - started_at).total_seconds() / 60
+                        })
+            
+            # Auto-end the inactive sessions if requested
+            auto_end = data.get('auto_end', False)
+            ended_sessions = []
+            
+            if auto_end and sessions_to_end:
+                for session_info in sessions_to_end:
+                    try:
+                        # Auto-complete the session
+                        supabase.table('ruck_session') \
+                            .update({
+                                'status': 'completed',
+                                'completed_at': datetime.now(tz.tzutc()).isoformat(),
+                                'notes': f'Auto-completed due to {session_info["inactive_minutes"]:.0f} minutes of inactivity'
+                            }) \
+                            .eq('id', session_info['id']) \
+                            .eq('user_id', g.user.id) \
+                            .execute()
+                        
+                        ended_sessions.append(session_info['id'])
+                        logger.info(f"Auto-ended session {session_info['id']} after {session_info['inactive_minutes']:.0f} minutes of inactivity")
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to auto-end session {session_info['id']}: {e}")
+            
+            # Clear cache if sessions were ended
+            if ended_sessions:
+                cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+                cache_delete_pattern("ruck_buddies:*")
+            
+            return {
+                'inactive_sessions': sessions_to_end,
+                'ended_sessions': ended_sessions,
+                'threshold_minutes': inactivity_threshold_minutes
+            }, 200
+            
+        except Exception as e:
+            logger.error(f"Error in auto-end sessions: {e}")
+            return {'message': f'Error checking inactive sessions: {str(e)}'}, 500

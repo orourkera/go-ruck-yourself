@@ -1,3 +1,6 @@
+-- Update RPC to include ruck_weight_kg and ensure proper fields in JSON response
+-- Safe to re-run: uses CREATE OR REPLACE FUNCTION
+
 -- RPC function to get public ruck sessions with optimized route data
 -- This function reduces Redis memory usage by using sampled route points
 CREATE OR REPLACE FUNCTION get_public_sessions_optimized(

@@ -579,6 +579,42 @@ class FirebaseMessagingService {
     );
   }
 
+  /// Show a local notification
+  Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'rucking_app_notifications',
+      'Rucking App Notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      playSound: true,
+    );
+    
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+    
+    await _localNotifications.show(
+      id,
+      title,
+      body,
+      details,
+      payload: payload,
+    );
+  }
+
   /// Force refresh and register token (for debugging)
   Future<void> testNotificationSetupDiagnostic() async {
     print('🔔 Testing notification setup...');

@@ -19,7 +19,7 @@ class MemoryManager implements SessionManager {
   bool _autoSaveEnabled = true;
   Timer? _autoSaveTimer;
   
-  static const Duration _autoSaveInterval = Duration(seconds: 30);
+  static const Duration _autoSaveInterval = Duration(seconds: 30); // More frequent saves
   static const String _sessionDataKeyPrefix = 'session_data_';
   static const String _lastSessionKey = 'last_active_session';
   
@@ -117,12 +117,15 @@ class MemoryManager implements SessionManager {
   Future<void> _onMemoryUpdated(MemoryUpdated event) async {
     _sessionData[event.key] = event.value;
     
-    // Save immediately for important updates
-    if (event.immediate) {
+    // Critical data should be saved immediately
+    final criticalKeys = ['totalDistance', 'locationPoints', 'currentPace', 'sessionId', 'status'];
+    final shouldSaveImmediately = event.immediate || criticalKeys.contains(event.key);
+    
+    if (shouldSaveImmediately) {
       await _saveSessionData();
     }
     
-    AppLogger.debug('[MEMORY_MANAGER] Memory updated: ${event.key}');
+    AppLogger.debug('[MEMORY_MANAGER] Memory updated: ${event.key} (immediate: $shouldSaveImmediately)');
   }
 
   Future<void> _onRestoreSessionRequested(RestoreSessionRequested event) async {

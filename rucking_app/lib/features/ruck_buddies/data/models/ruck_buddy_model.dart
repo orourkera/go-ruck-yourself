@@ -145,10 +145,13 @@ class RuckBuddyModel extends RuckBuddy {
     }
 
     try {
+      print(' [WEIGHT_DEBUG] Raw ruck_weight_kg from API: ${json['ruck_weight_kg']}');
+      final parsedWeight = _parseToDouble(json['ruck_weight_kg'] ?? 0.0);
+      print(' [WEIGHT_DEBUG] Parsed ruckWeightKg: $parsedWeight');
       return RuckBuddyModel(
         id: json['id']?.toString() ?? '',
         userId: json['user_id']?.toString() ?? '',
-        ruckWeightKg: _parseToDouble(json['ruck_weight_kg'] ?? json['weight_kg'] ?? 0),
+        ruckWeightKg: parsedWeight,
         durationSeconds: _parseToInt(json['duration_seconds'] ?? json['duration'] ?? 0),
         distanceKm: _parseToDouble(json['distance_km'] ?? json['distance'] ?? 0),
         caloriesBurned: _parseToInt(json['calories_burned'] ?? json['calories'] ?? 0),

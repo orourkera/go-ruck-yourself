@@ -314,22 +314,24 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     final String formattedDuration = MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds.round()));
     final String formattedElevation = MeasurementUtils.formatElevation(widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM, metric: preferMetric);
     final String formattedCalories = '${widget.ruckBuddy.caloriesBurned.round()} kcal';
-    final String formattedWeight = MeasurementUtils.formatWeight(widget.ruckBuddy.ruckWeightKg, metric: preferMetric);
+    // Debug: Log weight value to understand the issue
+    print('🎒 [UI_WEIGHT_DEBUG] RuckBuddyCard: ruckWeightKg = ${widget.ruckBuddy.ruckWeightKg}');
+    final String formattedWeight = widget.ruckBuddy.ruckWeightKg <= 0.0 ? 'Hike' : '${widget.ruckBuddy.ruckWeightKg.toInt()}kg';
 
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       listener: (context, state) {
         // Listen for photo loading completion
         if (state is SessionPhotosLoadedForId) {
-          developer.log('[PHOTO_DEBUG] RuckBuddyCard received SessionPhotosLoadedForId - sessionId: ${state.sessionId}, ruckBuddyId: ${widget.ruckBuddy.id}, photos: ${state.photos.length}', name: 'RuckBuddyCard');
+          print('[PHOTO_DEBUG] RuckBuddyCard received SessionPhotosLoadedForId - sessionId: ${state.sessionId}, ruckBuddyId: ${widget.ruckBuddy.id}, photos: ${state.photos.length}');
           
           // Ensure both IDs are compared as strings
           if (state.sessionId.toString() == widget.ruckBuddy.id.toString()) {
             setState(() {
               _photos = _convertToRuckPhotos(state.photos);
-              developer.log('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionPhotosLoadedForId: ${_photos.length} photos for ruckId: ${widget.ruckBuddy.id}', name: 'RuckBuddyCard');
+              print('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionPhotosLoadedForId: ${_photos.length} photos for ruckId: ${widget.ruckBuddy.id}');
             });
           } else {
-            developer.log('[PHOTO_DEBUG] RuckBuddyCard sessionId mismatch - expected: ${widget.ruckBuddy.id}, got: ${state.sessionId}', name: 'RuckBuddyCard');
+            print('[PHOTO_DEBUG] RuckBuddyCard sessionId mismatch - expected: ${widget.ruckBuddy.id}, got: ${state.sessionId}');
           }
         }
       },
@@ -341,7 +343,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             setState(() {
               _isLiked = state.isLiked;
               _likeCount = state.likeCount; 
-              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked', name: 'RuckBuddyCard');
+              print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked');
             });
           }
           
@@ -354,9 +356,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
               if (countDifference > 1 || _isLiked != state.isLiked) {
                 _isLiked = state.isLiked;
                 _likeCount = state.likeCount;
-                developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}', name: 'RuckBuddyCard');
+                print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}');
               } else {
-                developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed', name: 'RuckBuddyCard');
+                print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed');
               }
             });
           }
@@ -364,7 +366,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
           if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
             setState(() {
               _commentCount = state.comments.length;
-              developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded', name: 'RuckBuddyCard');
+              print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded');
             });
           }
           
@@ -376,7 +378,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
               _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1; // Revert count
               if (_likeCount! < 0) _likeCount = 0;
             });
-            developer.log('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}', name: 'RuckBuddyCard');
+            print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}');
           }
         },
         builder: (context, socialState) {
@@ -408,7 +410,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                 
                 // When returning from detail screen, explicitly refresh photos
                 if (mounted && _ruckId != null) {
-                  developer.log('[PHOTO_DEBUG] Returned from detail screen for ruckId: $_ruckId - refreshing photos', name: 'RuckBuddyCard');
+                  print('[PHOTO_DEBUG] Returned from detail screen for ruckId: $_ruckId - refreshing photos');
                   try {
                     // 1. Clear existing photos from state to force a fresh view
                     setState(() {
@@ -419,7 +421,7 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                     if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
                       setState(() {
                         _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
-                        developer.log('[PHOTO_DEBUG] Directly updated photos from widget after return: ${_photos.length}', name: 'RuckBuddyCard');
+                        print('[PHOTO_DEBUG] Directly updated photos from widget after return: ${_photos.length}');
                       });
                     }
                     
@@ -432,9 +434,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                     
                     // Then request new ones
                     activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
-                    developer.log('[PHOTO_DEBUG] Requested fresh photos from API after return', name: 'RuckBuddyCard');
+                    print('[PHOTO_DEBUG] Requested fresh photos from API after return');
                   } catch (e) {
-                    developer.log('[PHOTO_DEBUG] Error refreshing photos after return: $e', name: 'RuckBuddyCard');
+                    print('[PHOTO_DEBUG] Error refreshing photos after return: $e');
                   }
                 }
               },
@@ -502,14 +504,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                       // Add photos after the map
                       final processedPhotoData = _getProcessedPhotoData(_photos, addCacheBuster: false);
                       for (Map<String, String?> photoData in processedPhotoData) {
-                        developer.log('[MEDIA_DEBUG] Photo URL: ${photoData['fullUrl']}, Thumbnail: ${photoData['thumbnailUrl']}', name: 'RuckBuddyCard');
+                        print('[MEDIA_DEBUG] Photo URL: ${photoData['fullUrl']}, Thumbnail: ${photoData['thumbnailUrl']}');
                         mediaItems.add(MediaCarouselItem.photo(
                           photoData['fullUrl'] ?? '',
                           thumbnailUrl: photoData['thumbnailUrl'],
                         ));
                       }
                       
-                      developer.log('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedPhotoData.length} photos)', name: 'RuckBuddyCard');
+                      print('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedPhotoData.length} photos)');
                       
                       return MediaCarousel(
                         mediaItems: mediaItems,
@@ -1113,8 +1115,9 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
+    print('🗺️ [MAP_WEIGHT_DEBUG] Map overlay: ruckWeightKg = ${widget.ruckWeightKg}');
     final String weightText = widget.ruckWeightKg != null 
-        ? MeasurementUtils.formatWeight(widget.ruckWeightKg!, metric: true) // Always show kg for consistency in social feed
+        ? (widget.ruckWeightKg! <= 0.0 ? 'Hike' : '${widget.ruckWeightKg!.toInt()}kg')
         : '';
 
     if (routePoints.isEmpty) {

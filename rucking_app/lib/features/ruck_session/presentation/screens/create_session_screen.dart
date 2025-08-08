@@ -25,6 +25,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:latlong2/latlong.dart' as latlong;
+import '../widgets/active_session_dialog.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -323,21 +324,56 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           
           final apiClient = GetIt.instance<ApiClient>();
           
-          // Try to create online session first, but fall back quickly to offline
+          // Try to create online session first, but handle active sessions
           try {
             AppLogger.info('Attempting to create online session...');
             final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(milliseconds: 800));
 
             if (!mounted) return;
             
-            // Check if response has the correct ID key
-            if (createResponse == null || createResponse['id'] == null) {
-              throw Exception('Invalid response from server when creating session');
+            // Check if response indicates an active session exists
+            if (createResponse != null && createResponse['has_active_session'] == true) {
+              // Show dialog to handle existing active session
+              setState(() { _isCreating = false; });
+              
+              final choice = await showDialog<String>(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => ActiveSessionDialog(
+                  activeSession: createResponse,
+                  onContinueExisting: () => Navigator.of(context).pop('continue'),
+                  onForceNewSession: () => Navigator.of(context).pop('force_new'),
+                  onCancel: () => Navigator.of(context).pop('cancel'),
+                ),
+              );
+              
+              if (choice == 'cancel' || !mounted) {
+                return;
+              } else if (choice == 'continue') {
+                // Continue with existing session - navigate to active session
+                ruckId = createResponse['id'].toString();
+                AppLogger.info('🔄 Continuing existing session: $ruckId');
+              } else if (choice == 'force_new') {
+                // Force start new session by auto-completing the old one
+                createRequestData['force_new_session'] = true;
+                final forceResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(milliseconds: 800));
+                
+                if (forceResponse == null || forceResponse['id'] == null) {
+                  throw Exception('Failed to force start new session');
+                }
+                
+                ruckId = forceResponse['id'].toString();
+                AppLogger.info('✅ Force started new session: $ruckId');
+              }
+            } else {
+              // Normal session creation
+              if (createResponse == null || createResponse['id'] == null) {
+                throw Exception('Invalid response from server when creating session');
+              }
+              
+              ruckId = createResponse['id'].toString();
+              AppLogger.info('✅ Created online session: $ruckId');
             }
-            
-            // Extract ruck ID from response
-            ruckId = createResponse['id'].toString();
-            AppLogger.info('✅ Created online session: $ruckId');
           } catch (e) {
             // Any error (network, timeout, etc.) immediately goes to offline mode
             AppLogger.warning('Failed to create online session, proceeding offline: $e');

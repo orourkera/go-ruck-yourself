@@ -343,9 +343,6 @@ def get_ruck_buddies():
         # Sample route points
         sampled_location_points = sample_route_points(clipped_location_points)
         
-        # Log privacy clipping for verification
-        print(f"[PRIVACY_DEBUG] Session {session.get('id')}: Original points: {len(location_points)}, Clipped points: {len(clipped_location_points)}, Sampled points: {len(sampled_location_points)}")
-        
         # Add computed fields to session data
         session['like_count'] = like_count
         session['is_liked_by_current_user'] = is_liked_by_current_user
