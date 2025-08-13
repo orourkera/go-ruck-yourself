@@ -41,15 +41,30 @@ class RoutePrivacyUtils {
     List<LatLng> routePoints, {
     bool preferMetric = true,
   }) {
-    // Privacy clipping distances
-    final double privacyDistanceMeters = preferMetric ? 200.0 : 201.0; // 200m or ~1/8 mile
+    // Privacy clipping distance (200m metric, ~1/8 mile imperial)
+    final double privacyDistanceMeters = getClipDistance(preferMetric: preferMetric);
 
+    // If route is too short (few points), do NOT expose any visible middle
     if (routePoints.length < 3) {
-      // Not enough points to clip, return as visible middle segment
       return RoutePrivacySegments(
-        privateStartSegment: [],
-        visibleMiddleSegment: routePoints,
-        privateEndSegment: [],
+        privateStartSegment: routePoints,
+        visibleMiddleSegment: const [],
+        privateEndSegment: const [],
+      );
+    }
+
+    // Compute total route distance up-front to guard short/borderline routes
+    double totalDistanceMeters = 0.0;
+    for (int i = 1; i < routePoints.length; i++) {
+      totalDistanceMeters += haversineDistance(routePoints[i - 1], routePoints[i]);
+    }
+
+    // If total < 2x clip distance, showing any middle risks exposing endpoints
+    if (totalDistanceMeters < (2 * privacyDistanceMeters)) {
+      return RoutePrivacySegments(
+        privateStartSegment: routePoints,
+        visibleMiddleSegment: const [],
+        privateEndSegment: const [],
       );
     }
 
@@ -79,16 +94,21 @@ class RoutePrivacyUtils {
       }
     }
 
-    // Ensure we have a valid middle segment
+    // If indices cross or fail to bound a middle, do NOT expose any middle
     if (startIndex >= endIndex) {
-      // If clipping would remove everything, show middle 50% as visible
-      final quarterPoint = routePoints.length ~/ 4;
-      final threeQuarterPoint = (3 * routePoints.length) ~/ 4;
-      
       return RoutePrivacySegments(
-        privateStartSegment: routePoints.sublist(0, quarterPoint + 1),
-        visibleMiddleSegment: routePoints.sublist(quarterPoint, threeQuarterPoint + 1),
-        privateEndSegment: routePoints.sublist(threeQuarterPoint),
+        privateStartSegment: routePoints,
+        visibleMiddleSegment: const [],
+        privateEndSegment: const [],
+      );
+    }
+
+    // One-sided clipping guard: if only one side reached clip threshold, hide middle entirely
+    if (startIndex == 0 || endIndex == routePoints.length - 1) {
+      return RoutePrivacySegments(
+        privateStartSegment: routePoints,
+        visibleMiddleSegment: const [],
+        privateEndSegment: const [],
       );
     }
 

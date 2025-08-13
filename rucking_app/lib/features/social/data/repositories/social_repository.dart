@@ -57,7 +57,9 @@ class SocialRepository {
     }
     _likeStatusCache[ruckId] = isLiked;
     _likeCountCache[ruckId] = likeCount;
-    _likeCacheTimestamps[ruckId] = DateTime.now();
+    // Mark as stale on purpose so the next check fetches fresh status from backend.
+    // This prevents UI-seeded values (which may be stale) from blocking refresh for 5 minutes.
+    _likeCacheTimestamps[ruckId] = DateTime.now().subtract(const Duration(seconds: _cacheExpirationSeconds + 1));
   }
 
   /// Constructor

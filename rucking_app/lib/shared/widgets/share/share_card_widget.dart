@@ -650,13 +650,23 @@ class ShareCardWidget extends StatelessWidget {
   }
 
   Widget _buildSecondaryStats() {
+    // Determine if it's metric or imperial
+    final preferMetric = this.preferMetric;
+    
+    // Use centralized pace formatting for consistency
+    final double distKm = session.distance;
+    final int secs = session.duration.inSeconds;
+    final String paceDisplay = (distKm > 0 && secs > 0)
+        ? MeasurementUtils.formatPace(secs / distKm, metric: preferMetric)
+        : '--';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _buildSmallStat('🔥', '${session.caloriesBurned}', 'calories'),
         if (session.elevationGain > 50) // Only show if significant elevation
           _buildSmallStat('⛰️', '${session.elevationGain.round()}m', 'elevation'),
-        _buildSmallStat('⚡', _formatPace(), 'pace'),
+        _buildSmallStat('⚡', paceDisplay, 'pace'),
       ],
     );
   }
@@ -758,22 +768,7 @@ class ShareCardWidget extends StatelessWidget {
     );
   }
 
-  String _formatPace() {
-    final distance = session.distance;
-    if (distance <= 0) return '--';
-    
-    final durationSeconds = session.duration.inSeconds;
-    if (durationSeconds <= 0) return '--';
-    
-    final totalMinutes = durationSeconds / 60.0;
-    final pacePerUnit = totalMinutes / (preferMetric ? distance : distance * 0.621371);
-    
-    final minutes = pacePerUnit.floor();
-    final seconds = ((pacePerUnit - minutes) * 60).round();
-    
-    final unit = preferMetric ? '/km' : '/mi';
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}$unit';
-  }
+  
   
   /// Formats a duration to display as h:mm:ss or mm:ss if hours = 0
   /// No leading zeros for hours, but minutes and seconds have leading zeros

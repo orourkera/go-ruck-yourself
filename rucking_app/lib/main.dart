@@ -320,12 +320,6 @@ Future<void> _initializeApp() async {
     AppLogger.error('Session recovery failed: $error');
   });
   
-  // 🔔 Start monitoring for inactive sessions
-  SessionRecoveryService.startInactivityMonitoring(
-    checkInterval: const Duration(minutes: 15), // Check every 15 minutes
-    inactivityThreshold: 30, // Notify if inactive for 30+ minutes
-  );
-  
   // 🧠 Start memory monitoring to prevent crashes
   MemoryMonitorService.startMonitoring();
   

@@ -54,7 +54,7 @@ def clip_route_for_privacy(location_points):
     if not location_points or len(location_points) < 3:
         return location_points
     
-    # Privacy clipping distance (2fix 00m)
+    # Privacy clipping distance (200m)
     PRIVACY_DISTANCE_METERS = 200.0
     
     # Convert to consistent format

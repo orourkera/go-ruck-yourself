@@ -130,7 +130,7 @@ class ActiveSessionStorage {
         'latest_heart_rate': data['latest_heart_rate'] as int?,
         'min_heart_rate': data['min_heart_rate'] as int?,
         'max_heart_rate': data['max_heart_rate'] as int?,
-        'saved_at': DateTime.parse(data['last_persisted_at'] as String),
+        'saved_at': DateTime.tryParse(data['saved_at'] as String? ?? '') ?? DateTime.now(),
       };
 
       AppLogger.info('[SESSION_RECOVERY] Recovered session: ${recoveredData['session_id']}, ${(recoveredData['location_points'] as List).length} GPS points');

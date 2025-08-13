@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
+import 'package:get_it/get_it.dart';
 
 import '../../../../../core/services/api_client.dart';
 import '../../../../../core/services/auth_service.dart';
@@ -12,6 +13,8 @@ import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../../../core/models/location_point.dart';
 import '../../../../../core/models/terrain_segment.dart';
+import '../../../../../core/services/app_lifecycle_service.dart';
+import '../../../../../core/services/firebase_messaging_service.dart';
 import '../../../domain/models/session_split.dart';
 import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
@@ -94,6 +97,17 @@ class LocationTrackingManager implements SessionManager {
   double _lastKnownTotalDistance = 0.0;
   int _lastProcessedLocationIndex = 0;
 
+  // Inactivity detection state
+  DateTime? _lastMovementTime;
+  DateTime? _lastInactivityNotificationTime;
+  bool _inactiveNotified = false;
+  double _lastNotifiedDistanceKm = 0.0;
+  // Thresholds
+  static const Duration _inactivityThreshold = Duration(minutes: 12);
+  static const Duration _inactivityCooldown = Duration(minutes: 20);
+  static const double _movementDistanceMetersThreshold = 12.0; // 10–15m
+  static const double _movementSpeedThreshold = 0.3; // m/s
+
   LocationTrackingManager({
     required LocationService locationService,
     required SplitTrackingService splitTrackingService,
@@ -152,6 +166,11 @@ class LocationTrackingManager implements SessionManager {
     _lastValidLocation = null; // Reset validation state
     _lastKnownTotalDistance = 0.0; // Reset cumulative distance
     _lastProcessedLocationIndex = 0; // Reset processed index
+    // Reset inactivity detection state
+    _lastMovementTime = DateTime.now();
+    _lastInactivityNotificationTime = null;
+    _inactiveNotified = false;
+    _lastNotifiedDistanceKm = 0.0;
     
     // Reset pace smoothing state (version 2.5)
     _recentPaces.clear();
@@ -216,6 +235,11 @@ class LocationTrackingManager implements SessionManager {
     _lastLocationTimestamp = null;
     _sessionStartTime = null;
     _isPaused = false;
+    // Clear inactivity detection state
+    _lastMovementTime = null;
+    _lastInactivityNotificationTime = null;
+    _inactiveNotified = false;
+    _lastNotifiedDistanceKm = 0.0;
     
     AppLogger.info('[LOCATION_MANAGER] MEMORY_CLEANUP: Session stopped, all lists cleared and upload tracking reset');
     
@@ -331,6 +355,25 @@ class LocationTrackingManager implements SessionManager {
     final newDistance = _calculateTotalDistanceWithValidation();
     final newPace = _calculateCurrentPace(position.speed ?? 0.0);
     final newAveragePace = _calculateAveragePace(newDistance);
+    // Movement detection: update lastMovementTime on meaningful progress
+    try {
+      final hasMeaningfulDistance = (() {
+        if (_locationPoints.length < 2) return false;
+        final prev = _locationPoints[_locationPoints.length - 2];
+        final dMeters = _haversineDistance(prev.latitude, prev.longitude, newPoint.latitude, newPoint.longitude) * 1000.0;
+        return dMeters >= _movementDistanceMetersThreshold;
+      })();
+      final hasMeaningfulSpeed = (position.speed ?? 0.0) >= _movementSpeedThreshold;
+      if (hasMeaningfulDistance || hasMeaningfulSpeed) {
+        _lastMovementTime = DateTime.now();
+        if (_inactiveNotified) {
+          // Reset notification flag if user started moving again by 30m from last notified distance
+          if ((newDistance - _lastNotifiedDistanceKm) * 1000.0 >= 30.0) {
+            _inactiveNotified = false;
+          }
+        }
+      }
+    } catch (_) {}
     
     // Calculate elevation gain/loss using sophisticated iOS/Android platform-specific processing
     double elevationGain = 0.0;
@@ -687,6 +730,50 @@ class LocationTrackingManager implements SessionManager {
       if (timeSinceLastLocation < 30 && _watchdogRestartCount > 0) {
         _watchdogRestartCount = 0;
         AppLogger.info('[LOCATION] Watchdog: GPS health restored, reset restart counter');
+      }
+
+      // Inactivity detection check (runs alongside watchdog every 30s)
+      try {
+        if (_activeSessionId != null && !_isPaused) {
+          // Skip if GPS unhealthy (to avoid false positives)
+          final gpsHealthy = _validLocationCount > 5 && timeSinceLastLocation < 60 && (_currentState.isGpsReady == true);
+          if (!gpsHealthy) return;
+
+          // Establish baseline movement time
+          _lastMovementTime ??= _sessionStartTime ?? now;
+          final inactiveFor = now.difference(_lastMovementTime!);
+
+          if (inactiveFor >= _inactivityThreshold) {
+            final cooledDown = _lastInactivityNotificationTime == null || now.difference(_lastInactivityNotificationTime!) >= _inactivityCooldown;
+            if (cooledDown && !_inactiveNotified) {
+              // Foreground/background awareness
+              final lifecycle = GetIt.I<AppLifecycleService>();
+              final inBackground = lifecycle.isInBackground;
+              final minutes = inactiveFor.inMinutes;
+
+              if (inBackground) {
+                // Send local notification
+                final fcm = GetIt.I<FirebaseMessagingService>();
+                final notifId = _activeSessionId!.hashCode;
+                fcm.showNotification(
+                  id: notifId,
+                  title: 'Inactive Ruck Session',
+                  body: 'Your ruck has been inactive for $minutes minutes. Pause or End?',
+                  payload: 'inactive_session:${_activeSessionId!}',
+                ).catchError((e) => AppLogger.error('[LOCATION_MANAGER] Failed to show inactivity notification: $e'));
+              } else {
+                // App in foreground – prefer UI prompt; log for now to avoid cross-file edits
+                AppLogger.info('[LOCATION_MANAGER] Inactivity detected ($minutes min) – app in foreground; suppressing push.');
+              }
+
+              _lastInactivityNotificationTime = now;
+              _inactiveNotified = true;
+              _lastNotifiedDistanceKm = _lastKnownTotalDistance;
+            }
+          }
+        }
+      } catch (e) {
+        AppLogger.error('[LOCATION_MANAGER] Inactivity check error: $e');
       }
     });
   }

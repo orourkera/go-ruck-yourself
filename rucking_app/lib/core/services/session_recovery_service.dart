@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'firebase_messaging_service.dart';
 
 /// Service to recover sessions that were saved locally but failed to upload to server
 class SessionRecoveryService {
@@ -119,105 +118,9 @@ class SessionRecoveryService {
       for (final key in backupKeys) {
         await prefs.remove(key);
       }
-      
-      AppLogger.info('🗑️ Cleared ${backupKeys.length} saved session backups');
+      AppLogger.info(' Cleared ${backupKeys.length} saved session backups');
     } catch (e) {
       AppLogger.error('Error clearing saved sessions: $e');
     }
-  }
-
-  /// Check for inactive sessions and optionally auto-end them
-  static Future<Map<String, dynamic>> checkInactiveSessions({
-    int inactivityMinutes = 30,
-    bool autoEnd = false,
-  }) async {
-    try {
-      final apiClient = GetIt.instance<ApiClient>();
-      
-      final response = await apiClient.post('/rucks/auto-end', {
-        'inactivity_minutes': inactivityMinutes,
-        'auto_end': autoEnd,
-      });
-      
-      final data = response.data as Map<String, dynamic>;
-      final inactiveSessions = data['inactive_sessions'] as List<dynamic>? ?? [];
-      final endedSessions = data['ended_sessions'] as List<dynamic>? ?? [];
-      
-      AppLogger.info('Found ${inactiveSessions.length} inactive sessions, ended ${endedSessions.length}');
-      
-      return {
-        'inactive_sessions': inactiveSessions,
-        'ended_sessions': endedSessions,
-        'threshold_minutes': data['threshold_minutes'],
-      };
-    } catch (e) {
-      AppLogger.error('Error checking inactive sessions: $e');
-      return {
-        'inactive_sessions': [],
-        'ended_sessions': [],
-        'threshold_minutes': inactivityMinutes,
-      };
-    }
-  }
-
-  /// Send notification for inactive sessions
-  static Future<void> notifyInactiveSessions({
-    int inactivityMinutes = 30,
-  }) async {
-    try {
-      final result = await checkInactiveSessions(
-        inactivityMinutes: inactivityMinutes,
-        autoEnd: false, // Just check, don't auto-end
-      );
-      
-      final inactiveSessions = result['inactive_sessions'] as List<dynamic>;
-      
-      if (inactiveSessions.isNotEmpty) {
-        final messagingService = GetIt.instance<FirebaseMessagingService>();
-        
-        for (final session in inactiveSessions) {
-          final sessionMap = session as Map<String, dynamic>;
-          final sessionId = sessionMap['id'];
-          final inactiveMinutes = (sessionMap['inactive_minutes'] as double).round();
-          
-          await messagingService.showNotification(
-            id: sessionId is int ? sessionId : sessionId.hashCode,
-            title: 'Inactive Ruck Session',
-            body: 'Your ruck has been inactive for $inactiveMinutes minutes. Did you forget to end it?',
-            payload: 'inactive_session:$sessionId',
-          );
-        }
-        
-        AppLogger.info('Sent notifications for ${inactiveSessions.length} inactive sessions');
-      }
-    } catch (e) {
-      AppLogger.error('Error sending inactive session notifications: $e');
-    }
-  }
-
-  /// Start periodic background checking for inactive sessions
-  static Timer? _inactivityTimer;
-  
-  static void startInactivityMonitoring({
-    Duration checkInterval = const Duration(minutes: 10),
-    int inactivityThreshold = 30,
-  }) {
-    stopInactivityMonitoring(); // Stop any existing timer
-    
-    _inactivityTimer = Timer.periodic(checkInterval, (timer) async {
-      try {
-        await notifyInactiveSessions(inactivityMinutes: inactivityThreshold);
-      } catch (e) {
-        AppLogger.error('Error in periodic inactivity check: $e');
-      }
-    });
-    
-    AppLogger.info('Started inactivity monitoring (check every ${checkInterval.inMinutes} min, threshold: $inactivityThreshold min)');
-  }
-  
-  static void stopInactivityMonitoring() {
-    _inactivityTimer?.cancel();
-    _inactivityTimer = null;
-    AppLogger.info('Stopped inactivity monitoring');
   }
 }

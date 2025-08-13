@@ -42,17 +42,18 @@ def clip_route_for_privacy(location_points):
         List of clipped location points
     """
     if not location_points or len(location_points) < 3:
+        # Not enough points to meaningfully clip; return as-is
         return location_points
     
     # Privacy clipping distance (200m or ~1/8 mile)
     PRIVACY_DISTANCE_METERS = 200.0
     
-    # Sort points by timestamp to ensure correct order
+    # Sort points by timestamp to ensure correct order (if timestamps exist)
     sorted_points = sorted(location_points, key=lambda p: p.get('timestamp', ''))
     
     if len(sorted_points) < 3:
         return sorted_points
-    
+
     # Find the start clipping index (skip first ~200m)
     start_idx = 0
     cumulative_distance = 0
@@ -63,8 +64,8 @@ def clip_route_for_privacy(location_points):
         if prev_point.get('latitude') and prev_point.get('longitude') and \
            curr_point.get('latitude') and curr_point.get('longitude'):
             distance = haversine_distance(
-                prev_point['latitude'], prev_point['longitude'],
-                curr_point['latitude'], curr_point['longitude']
+                float(prev_point['latitude']), float(prev_point['longitude']),
+                float(curr_point['latitude']), float(curr_point['longitude'])
             )
             cumulative_distance += distance
             
@@ -73,7 +74,7 @@ def clip_route_for_privacy(location_points):
                 break
     
     # Find the end clipping index (skip last ~200m)
-    end_idx = len(sorted_points) - 1
+    end_idx = len(sorted_points)
     cumulative_distance = 0
     for i in range(len(sorted_points) - 2, -1, -1):
         curr_point = sorted_points[i]
@@ -82,66 +83,31 @@ def clip_route_for_privacy(location_points):
         if curr_point.get('latitude') and curr_point.get('longitude') and \
            next_point.get('latitude') and next_point.get('longitude'):
             distance = haversine_distance(
-                curr_point['latitude'], curr_point['longitude'],
-                next_point['latitude'], next_point['longitude']
+                float(curr_point['latitude']), float(curr_point['longitude']),
+                float(next_point['latitude']), float(next_point['longitude'])
             )
             cumulative_distance += distance
             
             if cumulative_distance >= PRIVACY_DISTANCE_METERS:
-                end_idx = i
+                end_idx = i + 1
                 break
+
+    # Safety check: ensure we have valid indices and some points
+    if start_idx >= end_idx or start_idx >= len(sorted_points) or end_idx <= 0:
+        # Fallback: return middle 50% if distance clipping fails
+        total = len(sorted_points)
+        start_idx = total // 4
+        end_idx = 3 * total // 4
+        if end_idx <= start_idx:
+            # Last resort: return all points
+            return sorted_points
+
+    clipped_points = sorted_points[start_idx:end_idx]
     
-    # Ensure we have at least some points left
-    if start_idx >= end_idx:
-        # If clipping would remove everything, reduce clipping distance
-        # Only clip 100m from each end instead of 200m
-        REDUCED_PRIVACY_DISTANCE = 100.0
-        
-        # Recalculate with reduced distance
-        start_idx = 0
-        cumulative_distance = 0
-        for i in range(1, len(sorted_points)):
-            prev_point = sorted_points[i-1]
-            curr_point = sorted_points[i]
-            
-            if prev_point.get('latitude') and prev_point.get('longitude') and \
-               curr_point.get('latitude') and curr_point.get('longitude'):
-                distance = haversine_distance(
-                    prev_point['latitude'], prev_point['longitude'],
-                    curr_point['latitude'], curr_point['longitude']
-                )
-                cumulative_distance += distance
-                
-                if cumulative_distance >= REDUCED_PRIVACY_DISTANCE:
-                    start_idx = i
-                    break
-        
-        # Recalculate end with reduced distance
-        end_idx = len(sorted_points) - 1
-        cumulative_distance = 0
-        for i in range(len(sorted_points) - 2, -1, -1):
-            curr_point = sorted_points[i]
-            next_point = sorted_points[i+1]
-            
-            if curr_point.get('latitude') and curr_point.get('longitude') and \
-               next_point.get('latitude') and next_point.get('longitude'):
-                distance = haversine_distance(
-                    curr_point['latitude'], curr_point['longitude'],
-                    next_point['latitude'], next_point['longitude']
-                )
-                cumulative_distance += distance
-                
-                if cumulative_distance >= REDUCED_PRIVACY_DISTANCE:
-                    end_idx = i
-                    break
-        
-        # If still too aggressive, just clip first and last 10% of points
-        if start_idx >= end_idx:
-            points_to_clip = max(1, len(sorted_points) // 10)
-            start_idx = points_to_clip
-            end_idx = len(sorted_points) - points_to_clip - 1
-    
-    return sorted_points[start_idx:end_idx + 1]
+    # Final safety: never return empty list
+    if not clipped_points:
+        return sorted_points
+    return clipped_points
 
 
 def sample_route_points(location_points, target_distance_between_points_m=75):

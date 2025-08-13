@@ -98,6 +98,16 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     
     developer.log('[SOCIAL_DEBUG] Initialized RuckBuddyCard with API data for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
     
+    // Ensure heart state is synced when card first appears
+    if (_ruckId != null) {
+      try {
+        context.read<SocialBloc>().add(CheckRuckLikeStatus(_ruckId!));
+        developer.log('[SOCIAL_DEBUG] Dispatched CheckRuckLikeStatus on init for ruckId: $_ruckId', name: 'RuckBuddyCard');
+      } catch (e) {
+        developer.log('[SOCIAL_DEBUG] Failed to dispatch CheckRuckLikeStatus on init: $e', name: 'RuckBuddyCard');
+      }
+    }
+    
     // Request photos for this ruck if we have an ID
     if (_ruckId != null) {
       try {
@@ -136,6 +146,22 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       
       if (_ruckId != null) {
         try {
+          // 0. Sync local social fields from new widget data
+          final newLikeCount = widget.ruckBuddy.likeCount ?? 0;
+          final newCommentCount = widget.ruckBuddy.commentCount ?? 0;
+          final newIsLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false;
+          setState(() {
+            _likeCount = newLikeCount;
+            _commentCount = newCommentCount;
+            _isLiked = newIsLiked;
+          });
+          developer.log('[SOCIAL_DEBUG] didUpdateWidget synced from widget for ruckId: $_ruckId → likes=$_likeCount, comments=$_commentCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
+          
+          // Seed repository cache (marked stale) so UI shows something immediately but still refreshes
+          if (_socialRepository != null) {
+            _socialRepository!.updateCacheWithInitialValues(_ruckId!, _isLiked, _likeCount ?? 0);
+          }
+
           // 1. Force update photos from the widget if available
           if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
             setState(() {
@@ -149,6 +175,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             final activeSessionBloc = context.read<ActiveSessionBloc>();
             activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
             developer.log('[PHOTO_DEBUG] RuckBuddyCard requested photos for new ruckId: $_ruckId', name: 'RuckBuddyCard');
+          }
+          
+          // 3. Re-check like status to sync heart state after ID change
+          try {
+            context.read<SocialBloc>().add(CheckRuckLikeStatus(_ruckId!));
+            developer.log('[SOCIAL_DEBUG] Dispatched CheckRuckLikeStatus after ID change for ruckId: $_ruckId', name: 'RuckBuddyCard');
+          } catch (e) {
+            developer.log('[SOCIAL_DEBUG] Failed to dispatch CheckRuckLikeStatus after ID change: $e', name: 'RuckBuddyCard');
           }
         } catch (e) {
           developer.log('[PHOTO_DEBUG] Error handling photos in RuckBuddyCard.didUpdateWidget: $e', name: 'RuckBuddyCard');
@@ -278,14 +312,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
         setState(() => _isProcessingLike = false);
         return;
       }
-      
-      // Reset processing state after a very short delay
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
-          setState(() => _isProcessingLike = false);
-          developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Processing state reset after delay', name: 'RuckBuddyCard');
-        }
-      });
+      // Do not prematurely reset _isProcessingLike here; it will be reset
+      // in Bloc listener upon LikeActionCompleted or LikeActionError to avoid races
       
     } catch (e) {
       // Reset processing state on any error
@@ -340,11 +368,21 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
           if (!mounted || _ruckId == null) return;
 
           if (state is LikeStatusChecked && state.ruckId == _ruckId) {
-            setState(() {
-              _isLiked = state.isLiked;
-              _likeCount = state.likeCount; 
-              print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _isLiked to ${state.isLiked} and _likeCount to ${state.likeCount} from LikeStatusChecked');
-            });
+            // Avoid overriding optimistic UI while processing a like toggle
+            if (_isProcessingLike) {
+              print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) ignoring LikeStatusChecked during processing');
+            } else {
+              // Only update if values actually differ (prevents flicker)
+              final bool likedChanged = _isLiked != state.isLiked;
+              final bool countChanged = (_likeCount ?? -1) != state.likeCount;
+              if (likedChanged || countChanged) {
+                setState(() {
+                  _isLiked = state.isLiked;
+                  _likeCount = state.likeCount; 
+                  print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) applied LikeStatusChecked - liked: ${state.isLiked}, count: ${state.likeCount}');
+                });
+              }
+            }
           }
           
           // Handle successful like action completion - only update if significantly different
