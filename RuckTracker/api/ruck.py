@@ -308,7 +308,7 @@ class RuckSessionListResource(Resource):
 
             # Check for any active (in_progress) session for the current user
             active_sessions = supabase.table('ruck_session') \
-                .select('id,status,started_at,rucking_weight_kg') \
+                .select('id,status,started_at,ruck_weight_kg') \
                 .eq('user_id', g.user.id) \
                 .eq('status', 'in_progress') \
                 .execute()
@@ -1728,7 +1728,7 @@ class RuckSessionAutoEndResource(Resource):
             
             # Get active sessions
             active_sessions = supabase.table('ruck_session') \
-                .select('id,started_at,rucking_weight_kg') \
+                .select('id,started_at,ruck_weight_kg') \
                 .eq('user_id', g.user.id) \
                 .eq('status', 'in_progress') \
                 .execute()

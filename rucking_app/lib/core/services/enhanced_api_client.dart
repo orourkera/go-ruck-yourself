@@ -111,12 +111,28 @@ class EnhancedApiClient {
     dynamic error,
     Map<String, dynamic> context,
   ) async {
-    final user = await _authService.getCurrentUser();
+    String? userId;
+    try {
+      // Avoid triggering network fetches when not authenticated
+      final bool authed = await _authService.isAuthenticated();
+      if (authed) {
+        try {
+          // Best-effort: leverage AuthService caching/deduplication
+          final user = await _authService.getCurrentUser();
+          userId = user?.userId;
+        } catch (_) {
+          // Swallow user fetch errors in error handler path
+        }
+      }
+    } catch (_) {
+      // If even auth check fails, proceed without userId
+    }
+
     await AppErrorHandler.handleError(
       operation,
       error,
       context: context,
-      userId: user?.userId,
+      userId: userId,
       sendToBackend: true,
     );
   }

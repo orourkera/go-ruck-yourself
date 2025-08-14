@@ -34,6 +34,12 @@ class SimplifiedAuthService {
   StreamSubscription<AuthState>? _authSubscription;
   final StreamController<User?> _userController = StreamController<User?>.broadcast();
   
+  // In-memory profile cache and request deduplication
+  User? _cachedUser;
+  DateTime? _lastProfileFetchAt;
+  final Duration _profileCacheDuration = const Duration(seconds: 30);
+  Future<User>? _inflightProfileRequest;
+
   SimplifiedAuthService(this._apiClient, this._storageService) {
     if (AuthFeatureFlags.useSupabaseAuthListener) {
       _setupAuthListener();
@@ -257,6 +263,7 @@ class SimplifiedAuthService {
       
       await _supabase.auth.signOut();
       _apiClient.clearAuthToken();
+      _clearProfileCache();
       _userController.add(null);
       
       AppLogger.info('[SIMPLIFIED_AUTH] 🚪 Sign-out complete');
@@ -268,14 +275,40 @@ class SimplifiedAuthService {
   }
   
   /// Get current user profile
-  Future<User?> getCurrentUser() async {
-    if (!isAuthenticated) return null;
-    
+  Future<User?> getCurrentUser({bool forceRefresh = false}) async {
+    if (!isAuthenticated) {
+      _clearProfileCache();
+      return null;
+    }
+
+    // Serve from cache if valid and not forced
+    if (!forceRefresh && _isCacheValid()) {
+      if (AuthFeatureFlags.enableDebugLogging) {
+        AppLogger.debug('[SIMPLIFIED_AUTH] Using cached user profile');
+      }
+      return _cachedUser;
+    }
+
+    // Deduplicate in-flight request
+    if (_inflightProfileRequest != null) {
+      try {
+        final user = await _inflightProfileRequest!;
+        return user;
+      } catch (e) {
+        AppLogger.warning('[SIMPLIFIED_AUTH] In-flight profile request failed: $e');
+        // Fall through to try fetching again
+      }
+    }
+
     try {
-      return await _fetchUserProfile();
+      _inflightProfileRequest = _fetchUserProfile();
+      final user = await _inflightProfileRequest!;
+      return user;
     } catch (e) {
       AppLogger.warning('[SIMPLIFIED_AUTH] Failed to fetch user profile: $e');
-      return null;
+      return _cachedUser; // Return stale cache if available
+    } finally {
+      _inflightProfileRequest = null;
     }
   }
   
@@ -308,6 +341,7 @@ class SimplifiedAuthService {
           
         case AuthChangeEvent.signedOut:
           _apiClient.clearAuthToken();
+          _clearProfileCache();
           _userController.add(null);
           break;
           
@@ -329,7 +363,22 @@ class SimplifiedAuthService {
   /// Fetch user profile from backend (still needed for extended profile data)
   Future<User> _fetchUserProfile() async {
     final response = await _apiClient.get('/users/profile');
-    return User.fromJson(response);
+    final user = User.fromJson(response);
+    _cachedUser = user;
+    _lastProfileFetchAt = DateTime.now();
+    return user;
+  }
+
+  // Profile cache helpers
+  bool _isCacheValid() {
+    if (_cachedUser == null || _lastProfileFetchAt == null) return false;
+    return DateTime.now().difference(_lastProfileFetchAt!) < _profileCacheDuration;
+  }
+
+  void _clearProfileCache() {
+    _cachedUser = null;
+    _lastProfileFetchAt = null;
+    _inflightProfileRequest = null;
   }
   
   /// Create user profile in backend (still needed - justified custom logic)

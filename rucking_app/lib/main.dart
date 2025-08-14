@@ -165,8 +165,10 @@ bool _isLikelyNonFatalFlutterError(FlutterErrorDetails errorDetails) {
     return true;
   }
 
-  // From dart:ui (codec/decoding issues)
-  if (exception is ImageCodecException) {
+  // Image decoding issues (engine often surfaces an ImageCodecException type)
+  // Avoid direct type reference for broader engine compatibility
+  final String exceptionTypeName = exception.runtimeType.toString();
+  if (exceptionTypeName.contains('ImageCodecException')) {
     return true;
   }
 

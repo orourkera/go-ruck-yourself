@@ -1133,13 +1133,18 @@ class SessionRepository {
       final prefs = await SharedPreferences.getInstance();
       String? userId = prefs.getString('user_id');
       
-      // If SharedPreferences doesn't have it, try API (last resort)
+      // If SharedPreferences doesn't have it, try AuthService (respects caching/dedup)
       if (userId == null) {
-        final response = await _apiClient.get('/users/profile');
-        if (response != null && response['id'] != null) {
-          userId = response['id'].toString();
-          // Store in SharedPreferences for next time
-          await prefs.setString('user_id', userId);
+        try {
+          final authService = GetIt.instance<AuthService>();
+          final user = await authService.getCurrentUser();
+          if (user != null && (user.userId).isNotEmpty) {
+            userId = user.userId;
+            // Store in SharedPreferences for next time
+            await prefs.setString('user_id', userId);
+          }
+        } catch (e) {
+          AppLogger.debug('getCurrentUserId: AuthService.getCurrentUser() failed: $e');
         }
       }
       
