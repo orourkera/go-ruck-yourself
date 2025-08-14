@@ -177,6 +177,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         );
         // Navigate to login screen after a brief delay
         Future.delayed(const Duration(milliseconds: 1500), () {
+          if (!mounted) return;
           Navigator.of(context).pushNamed('/login');
         });
         return;
@@ -193,14 +194,17 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
         
         if (!hasPermission) {
+          if (!mounted) return;
           StyledSnackBar.showError(
             context: context,
             message: 'Location permission is required for ruck tracking. Please enable location access in Settings.',
             duration: const Duration(seconds: 5),
           );
-          setState(() {
-            _isCreating = false;
-          });
+          if (mounted) {
+            setState(() {
+              _isCreating = false;
+            });
+          }
           return;
         }
         
@@ -219,11 +223,13 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             if (!healthAuthorized) {
               AppLogger.warning('Health permissions denied, continuing without health integration');
               // Don't block session creation, just warn the user
-              StyledSnackBar.showError(
-                context: context,
-                message: 'Health permissions denied. Heart rate monitoring will be unavailable.',
-                duration: const Duration(seconds: 3),
-              );
+              if (mounted) {
+                StyledSnackBar.showError(
+                  context: context,
+                  message: 'Health permissions denied. Heart rate monitoring will be unavailable.',
+                  duration: const Duration(seconds: 3),
+                );
+              }
             } else {
               AppLogger.info('Health permissions granted');
             }
@@ -236,6 +242,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
         
         // Check battery optimization status for Android background location
+        if (!mounted) return;
         if (Theme.of(context).platform == TargetPlatform.android) {
           try {
             // Use the proper modal dialog to explain and request battery optimization permissions
@@ -254,17 +261,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
               } catch (e) {
         AppLogger.error('Failed to check location permissions', exception: e);
-        StyledSnackBar.showError(
-          context: context,
-          message: 'Unable to verify location permissions. Please check your device settings.',
-          duration: const Duration(seconds: 4),
-        );
-        setState(() {
-          _isCreating = false;
-        });
+        if (mounted) {
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Unable to verify location permissions. Please check your device settings.',
+            duration: const Duration(seconds: 4),
+          );
+          setState(() {
+            _isCreating = false;
+          });
+        }
         return;
       }
         // Set loading state immediately
+        if (!mounted) return;
         setState(() {
           _isCreating = true;
         });
@@ -501,6 +511,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           });
           
           // Navigate to CountdownPage which will handle the countdown and transition
+          if (!mounted) return;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => CountdownPage(args: sessionArgs),

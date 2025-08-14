@@ -150,6 +150,44 @@ Future<String> _getAppVersion() async {
   }
 }
 
+/// Heuristic to classify benign Flutter framework errors as non-fatal.
+/// We primarily downgrade common image loading/decoding failures that surface via
+/// ImageStreamCompleter as FlutterError reports so they don't crash the app.
+bool _isLikelyNonFatalFlutterError(FlutterErrorDetails errorDetails) {
+  final Object exception = errorDetails.exception;
+  final String message = errorDetails.exceptionAsString().toLowerCase();
+  final String? library = errorDetails.library?.toLowerCase();
+
+  // From dart:io and dart:async
+  if (exception is HttpException ||
+      exception is SocketException ||
+      exception is TimeoutException) {
+    return true;
+  }
+
+  // From dart:ui (codec/decoding issues)
+  if (exception is ImageCodecException) {
+    return true;
+  }
+
+  // Image-related libraries commonly used by Flutter when loading/decoding
+  if (library != null && (library.contains('image') || library.contains('painting'))) {
+    return true;
+  }
+
+  // Message heuristics for image failures
+  if (message.contains('image') &&
+      (message.contains('codec') ||
+       message.contains('decode') ||
+       message.contains('failed') ||
+       message.contains('load') ||
+       message.contains('stream'))) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Set up binary messenger (moved from main for organization)
 void _setUpBinaryMessenger() {
   // Binary messenger setup if needed
@@ -162,13 +200,24 @@ Future<void> _initializeApp() async {
   
   // 🔥 CRITICAL: Initialize Firebase Crashlytics for crash reporting
   FlutterError.onError = (errorDetails) {
-    // Send Flutter framework errors to Crashlytics
-    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
-    // Also print for development
-    FlutterError.presentError(errorDetails);
-    AppLogger.error('Flutter Error: ${errorDetails.exceptionAsString()}');
-    if (errorDetails.stack != null) {
-      AppLogger.error('Stack trace: ${errorDetails.stack}');
+    // Route Flutter framework errors to Crashlytics with correct severity
+    try {
+      final nonFatal = _isLikelyNonFatalFlutterError(errorDetails);
+      if (nonFatal) {
+        // Report as non-fatal to avoid crashing on benign issues (e.g., image load failures)
+        FirebaseCrashlytics.instance.recordFlutterError(errorDetails);
+      } else {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+      }
+    } catch (_) {
+      // Defensive: never let reporting throw
+    } finally {
+      // Also print for development
+      FlutterError.presentError(errorDetails);
+      AppLogger.error('Flutter Error: ${errorDetails.exceptionAsString()}');
+      if (errorDetails.stack != null) {
+        AppLogger.error('Stack trace: ${errorDetails.stack}');
+      }
     }
   };
 

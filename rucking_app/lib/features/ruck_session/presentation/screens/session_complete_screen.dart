@@ -183,7 +183,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   Future<void> _saveAndContinue() async {
     if (_isSaving) return;
     
-    setState(() => _isSaving = true);
+    if (mounted) {
+      setState(() => _isSaving = true);
+    }
     
     try {
       // Debug logging for completion payload values
@@ -278,7 +280,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         await _checkAchievementsBeforeNavigation();
       } else {
         // Navigate directly
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        }
       }
       
     } catch (e) {
@@ -314,22 +318,30 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         if (!localSession.isManual) {
           await _checkAchievementsBeforeNavigation();
         } else {
-          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+          }
         }
         
         // Show warning but don't block user flow
-        StyledSnackBar.show(
-          context: context, 
-          message: 'Session saved locally - server sync may have failed',
-          type: SnackBarType.normal,
-        );
+        if (mounted) {
+          StyledSnackBar.show(
+            context: context, 
+            message: 'Session saved locally - server sync may have failed',
+            type: SnackBarType.normal,
+          );
+        }
       } else {
         // Handle other errors normally
         AppLogger.error('Session completion failed with unexpected error: $e');
-        StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
+        if (mounted) {
+          StyledSnackBar.showError(context: context, message: 'Error saving session: $e');
+        }
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
   
@@ -501,6 +513,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   }
 
   void _handleAchievementDismissed() {
+    if (!mounted) return;
     setState(() {
       _isAchievementDialogShowing = false;
     });
@@ -509,25 +522,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     if (_pendingUpsellNavigation) {
       setState(() {
         _pendingUpsellNavigation = false;
-      });
-      Navigator.pushNamedAndRemoveUntil(
-        context, 
-        '/post_session_upsell', 
-        (route) => false,
-        arguments: _pendingSessionData,
-      );
-      _pendingSessionData = null;
-    }
     */
     
     // SIMPLIFIED: Always navigate to home after achievements dismissed
     if (_pendingUpsellNavigation) {
+      if (!mounted) return;
       setState(() {
         _pendingUpsellNavigation = false;
       });
-      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      }
       _pendingSessionData = null;
-      
+    
       // Reset active session state AFTER navigation to prevent auto-start
       Future.delayed(const Duration(milliseconds: 100), () {
         GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionReset());

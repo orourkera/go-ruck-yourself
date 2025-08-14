@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, g, make_response
+import logging
 from flask_jwt_extended import jwt_required
 import os
 import math
@@ -11,6 +12,7 @@ from RuckTracker.api.auth import auth_required, get_user_id
 from RuckTracker.services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 
 ruck_buddies_bp = Blueprint('ruck_buddies', __name__)
+logger = logging.getLogger(__name__)
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     """
@@ -211,12 +213,12 @@ def get_ruck_buddies():
     # Try to get cached response first
     cached_response = cache_get(cache_key)
     if cached_response:
-        print(f"[CACHE HIT] Returning cached ruck buddies for key: {cache_key}")
+        logger.debug(f"[CACHE HIT] Returning cached ruck buddies for key: {cache_key}")
         response = make_response(gzip.compress(json.dumps(cached_response).encode('utf-8')))
         response.headers['Content-Encoding'] = 'gzip'
         return response
     
-    print(f"[CACHE MISS] Fetching ruck buddies from database for key: {cache_key}")
+    logger.debug(f"[CACHE MISS] Fetching ruck buddies from database for key: {cache_key}")
     
     # Define ordering based on sort_by parameter
     if sort_by == 'calories_desc':

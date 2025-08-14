@@ -6,16 +6,18 @@ bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
 backlog = 128
 
 # Worker processes
-workers = int(os.environ.get('GUNICORN_WORKERS', 2))  # Default to 2 for Heroku
-worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'gevent')  # Try gevent
-worker_connections = 100  # Lower for gevent
+workers = int(os.environ.get('WEB_CONCURRENCY', os.environ.get('GUNICORN_WORKERS', 1)))  # Default to 1 to stay within 512MB dynos
+worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'gevent')  # Default gevent; can set to 'gthread'
+threads = int(os.environ.get('GUNICORN_THREADS', 2))  # Used when worker_class='gthread'
+worker_connections = 100  # For gevent
 timeout = int(os.environ.get('GUNICORN_TIMEOUT', 30))  # Align with Heroku router
 keepalive = 2
 
 # Memory management
-max_requests = 1000
-max_requests_jitter = 100
-preload_app = True
+max_requests = int(os.environ.get('GUNICORN_MAX_REQUESTS', 300))
+max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', 50))
+# Default to False to avoid duplicating memory; enable by setting GUNICORN_PRELOAD=true if needed
+preload_app = os.environ.get('GUNICORN_PRELOAD', 'false').lower() == 'true'
 
 # Logging - Reduced verbosity to prevent log overflow
 accesslog = "-"

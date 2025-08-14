@@ -49,6 +49,7 @@ class LocationTrackingManager implements SessionManager {
   LocationPoint? _lastValidLocation;
   LocationPoint? _lastRecordedLocation;
   DateTime? _lastLocationTimestamp;
+  DateTime? _lastRawLocationTimestamp;
   int _validLocationCount = 0;
   double _totalDistance = 0.0;
   double _elevationGain = 0.0;
@@ -297,7 +298,8 @@ class LocationTrackingManager implements SessionManager {
     if (_isPaused || _activeSessionId == null) return;
     
     final position = event.position;
-    _lastLocationTimestamp = DateTime.now();
+    // Track raw update time separately from valid accepted locations
+    _lastRawLocationTimestamp = DateTime.now();
     
     // Create location point
     final newPoint = LocationPoint(
@@ -323,6 +325,8 @@ class LocationTrackingManager implements SessionManager {
     
     // Add to location points
     _locationPoints.add(newPoint);
+    // Update last valid location timestamp only after accepting the point
+    _lastLocationTimestamp = DateTime.now();
     
     // CRITICAL FIX: Manage memory pressure through data offloading, not data loss
     _manageMemoryPressure();
@@ -425,6 +429,9 @@ class LocationTrackingManager implements SessionManager {
       floor: null,
       isMocked: false,
     )).toList();
+    
+    // Keep last-known total distance in sync for inactivity checks
+    _lastKnownTotalDistance = newDistance;
     
     _updateState(_currentState.copyWith(
       locations: positions,
@@ -682,15 +689,19 @@ class LocationTrackingManager implements SessionManager {
       if (!_isWatchdogActive) return;
       
       final now = DateTime.now();
-      final timeSinceLastLocation = _lastLocationTimestamp != null 
+      // Distinguish raw updates from accepted valid points
+      final timeSinceLastRaw = _lastRawLocationTimestamp != null
+          ? now.difference(_lastRawLocationTimestamp!).inSeconds
+          : 9999;
+      final timeSinceLastValid = _lastLocationTimestamp != null
           ? now.difference(_lastLocationTimestamp!).inSeconds
-          : 0;
+          : 9999;
       
-      // Only restart if we've had valid locations before and haven't received any for 60s
-      if (timeSinceLastLocation > 60 && _validLocationCount > 0) {
+      // Case 1: No raw updates coming in – restart the GPS stack
+      if (timeSinceLastRaw > 60 && _validLocationCount > 0) {
         _watchdogRestartCount++;
         
-        AppLogger.warning('[LOCATION] Watchdog: No valid location for ${timeSinceLastLocation}s. '
+        AppLogger.warning('[LOCATION] Watchdog: No raw location update for ${timeSinceLastRaw}s. '
             'Restarting location service (attempt $_watchdogRestartCount).');
         
         // Adaptive restart strategy
@@ -698,13 +709,13 @@ class LocationTrackingManager implements SessionManager {
           // Normal restart for first 3 attempts
           _locationService.stopLocationTracking();
           _startLocationTracking();
-          _lastLocationTimestamp = now;
+          _lastRawLocationTimestamp = now;
         } else if (_watchdogRestartCount <= 6) {
           // Request high accuracy for next 3 attempts
           AppLogger.info('[LOCATION] Watchdog: Requesting high accuracy mode');
           _locationService.stopLocationTracking();
           _startLocationTracking();
-          _lastLocationTimestamp = now;
+          _lastRawLocationTimestamp = now;
         } else {
           // Give up and switch to offline mode
           AppLogger.error('[LOCATION] Watchdog: GPS restart failed after 6 attempts. '
@@ -724,10 +735,18 @@ class LocationTrackingManager implements SessionManager {
             ));
           });
         }
+      } else if (timeSinceLastValid > 90 && timeSinceLastRaw < 30 && _validLocationCount > 0) {
+        // Case 2: Raw updates are flowing but validation rejects everything – try a soft recovery
+        _watchdogRestartCount++;
+        AppLogger.warning('[LOCATION] Watchdog: Validation stall – raw ok but no valid point for ${timeSinceLastValid}s. '
+            'Restarting location service (attempt $_watchdogRestartCount).');
+        _locationService.stopLocationTracking();
+        _startLocationTracking();
+        _lastRawLocationTimestamp = now;
       }
       
       // Reset restart counter if we've been getting good locations
-      if (timeSinceLastLocation < 30 && _watchdogRestartCount > 0) {
+      if (timeSinceLastRaw < 30 && timeSinceLastValid < 30 && _watchdogRestartCount > 0) {
         _watchdogRestartCount = 0;
         AppLogger.info('[LOCATION] Watchdog: GPS health restored, reset restart counter');
       }
@@ -736,7 +755,7 @@ class LocationTrackingManager implements SessionManager {
       try {
         if (_activeSessionId != null && !_isPaused) {
           // Skip if GPS unhealthy (to avoid false positives)
-          final gpsHealthy = _validLocationCount > 5 && timeSinceLastLocation < 60 && (_currentState.isGpsReady == true);
+          final gpsHealthy = _validLocationCount > 5 && timeSinceLastValid < 60 && (_currentState.isGpsReady == true);
           if (!gpsHealthy) return;
 
           // Establish baseline movement time

@@ -21,8 +21,6 @@ class LeaderboardResource(Resource):
     
     def get(self):
         """Get leaderboard data with sorting, pagination, and search"""
-        print("🚀🚀🚀 LEADERBOARD METHOD START - VERY FIRST LINE 🚀🚀🚀")
-        print("🔥🔥🔥 LEADERBOARD API CALLED - DEBUG TEST 🔥🔥🔥")
         try:
             # Get authenticated user
             if not hasattr(g, 'user') or g.user is None:
@@ -31,8 +29,10 @@ class LeaderboardResource(Resource):
             # Parse query parameters
             sort_by = request.args.get('sortBy', 'powerPoints')
             ascending = request.args.get('ascending', 'false').lower() == 'true'
-            limit = min(int(request.args.get('limit', 50)), 100)  # Cap at 100
-            offset = int(request.args.get('offset', 0))
+            # Only paginate if client explicitly provides a limit; otherwise return all (backward compatible)
+            _limit_param = request.args.get('limit')
+            limit = min(int(_limit_param), 100) if _limit_param is not None else None
+            offset = int(request.args.get('offset', 0)) if _limit_param is not None else 0
             search = request.args.get('search', '').strip()
             
             # Validate sort_by parameter
@@ -40,19 +40,21 @@ class LeaderboardResource(Resource):
             if sort_by not in valid_sorts:
                 sort_by = 'powerPoints'
             
-            # Build cache key
-            cache_key = f"leaderboard:{sort_by}:{ascending}:{limit}:{offset}:{search}"
+            # Build cache key (respect unpaginated responses when no limit provided)
+            _limit_key = limit if limit is not None else 'all'
+            _offset_key = offset if limit is not None else 0
+            cache_key = f"leaderboard:{sort_by}:{ascending}:{_limit_key}:{_offset_key}:{search}"
             cache_service = get_cache_service()
             
             # Try to get from cache first (cache for 5 minutes)
             cached_result = cache_service.get(cache_key)
             if cached_result:
-                logger.info(f"Returning cached leaderboard data for key: {cache_key}")
+                logger.debug(f"Returning cached leaderboard data for key: {cache_key}")
                 return cached_result
             
             # Get Supabase admin client to bypass RLS for public leaderboard data
             supabase: Client = get_supabase_admin_client()
-            logger.info(f"[DEBUG] Using admin client: {type(supabase)}")
+            logger.debug(f"Using admin client: {type(supabase)}")
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
@@ -83,30 +85,21 @@ class LeaderboardResource(Resource):
                 query = query.ilike('username', f'%{search}%')
             
             # Execute the query
-            print("🔍 ABOUT TO EXECUTE SUPABASE QUERY")
-            logger.info(f"[DEBUG] Executing leaderboard query with admin client...")
-            print(f"🔍 Query object type: {type(query)}")
+            logger.debug("Executing leaderboard query with admin client...")
+            logger.debug(f"Query object type: {type(query)}")
             try:
-                print("🔍 Calling query.execute()...")
                 response = query.execute()
-                print(f"🔍 Query executed! Response received: {type(response)}")
-                logger.info(f"[DEBUG] Query executed successfully")
+                logger.debug(f"Query executed successfully, response type: {type(response)}")
                 
                 # Check if embed worked
                 has_ruck_session_data = False
                 if response.data and len(response.data) > 0:
                     first_user = response.data[0]
                     has_ruck_session_data = 'ruck_session' in first_user
-                    print(f"🔍 First user has ruck_session data: {has_ruck_session_data}")
-                    if has_ruck_session_data:
-                        print(f"🔍 First user ruck_session count: {len(first_user['ruck_session'])}")
-                    else:
-                        print(f"🔍 First user keys: {list(first_user.keys())}")
                 
                 # If embed failed, fall back to manual approach
                 if not has_ruck_session_data:
-                    print("🔍 EMBED FAILED - USING MANUAL QUERY APPROACH")
-                    logger.info("[DEBUG] Embed failed, using manual approach")
+                    logger.debug("Embed failed, using manual approach")
                     
                     # Get user IDs for manual session query
                     user_ids = [user['id'] for user in response.data]
@@ -118,7 +111,7 @@ class LeaderboardResource(Resource):
                     ).in_('user_id', user_ids)
                     
                     sessions_response = sessions_query.execute()
-                    print(f"🔍 Manual sessions query returned: {len(sessions_response.data)} sessions")
+                    logger.debug(f"Manual sessions query returned: {len(sessions_response.data)} sessions")
                     
                     # Group sessions by user_id
                     sessions_by_user = {}
@@ -132,13 +125,12 @@ class LeaderboardResource(Resource):
                     for user in response.data:
                         user['ruck_session'] = sessions_by_user.get(user['id'], [])
                     
-                    print(f"🔍 Manual approach complete - users now have ruck_session data")
+                    logger.debug("Manual approach complete - users now have ruck_session data")
                 
-                print(f"🔍 Response data count: {len(response.data) if response.data else 0}")
+                logger.debug(f"Response data count: {len(response.data) if response.data else 0}")
             except Exception as e:
-                print(f"🔍 QUERY EXECUTION FAILED: {str(e)}")
-                logger.error(f"[DEBUG] Query execution failed: {str(e)}")
-                logger.error(f"[DEBUG] Query error type: {type(e)}")
+                logger.error(f"Query execution failed: {str(e)}")
+                logger.error(f"Query error type: {type(e)}")
                 return {'users': [], 'total': 0, 'hasMore': False, 'activeRuckersCount': 0}
             
             if not response.data:
@@ -185,7 +177,7 @@ class LeaderboardResource(Resource):
                     
                     if is_currently_rucking:
                         active_ruckers_count += 1
-                        logger.info(f"Active rucker found: user {user_id[:8]}... - session within 4 hours")
+                        logger.debug(f"Active rucker found: user {user_id[:8]}... - session within 4 hours")
                     
                     # Get the user's most recent location from their latest ruck
                     latest_ruck = None
@@ -226,7 +218,7 @@ class LeaderboardResource(Resource):
             active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
                                 if stats['stats']['rucks'] > 0}
             
-            logger.info(f"Filtered leaderboard: {len(user_stats)} total users -> {len(active_user_stats)} active ruckers")
+            logger.debug(f"Filtered leaderboard: {len(user_stats)} total users -> {len(active_user_stats)} active ruckers")
             
             # Convert to list and sort
             users_list = list(active_user_stats.values())
@@ -246,20 +238,28 @@ class LeaderboardResource(Resource):
             for i, user in enumerate(users_list):
                 user['rank'] = i + 1
             
-            # Return ALL users (no pagination)
+            # Apply optional pagination (only if limit provided)
             total_users = len(users_list)
-            
+            if limit is None:
+                paged_users = users_list
+                has_more = False
+            else:
+                start = max(offset, 0)
+                end = max(start + limit, 0)
+                paged_users = users_list[start:end]
+                has_more = end < total_users
+
             result = {
-                'users': users_list,  # Return all users, not paginated
+                'users': paged_users,
                 'total': total_users,
-                'hasMore': False,  # No more pages since we return everything
+                'hasMore': has_more,
                 'activeRuckersCount': active_ruckers_count
             }
             
             # Cache the result for 5 minutes
             cache_service.set(cache_key, result, expire_seconds=300)
             
-            logger.info(f"Leaderboard query successful: {len(users_list)} users returned")
+            logger.debug(f"Leaderboard query successful: {len(users_list)} users returned")
             return result
             
         except Exception as e:
@@ -301,7 +301,7 @@ class LeaderboardMyRankResource(Resource):
             
             # Get Supabase admin client to bypass RLS for public leaderboard data
             supabase: Client = get_supabase_admin_client()
-            logger.info(f"[DEBUG] My-rank using admin client: {type(supabase)}")
+            logger.debug(f"My-rank using admin client: {type(supabase)}")
             
             # Build the query - users with public ruck sharing enabled only
             query = (
@@ -321,9 +321,9 @@ class LeaderboardMyRankResource(Resource):
                 .eq('allow_ruck_sharing', True)  # Enforce privacy filter
             )
             
-            logger.info(f"[DEBUG] Executing my-rank query with admin client...")
+            logger.debug(f"Executing my-rank query with admin client...")
             response = query.execute()
-            logger.info(f"[DEBUG] My-rank query response count: {len(response.data) if response.data else 0}")
+            logger.debug(f"My-rank query response count: {len(response.data) if response.data else 0}")
             
             if not response.data:
                 return {'rank': None}
@@ -333,11 +333,11 @@ class LeaderboardMyRankResource(Resource):
             if response.data and len(response.data) > 0:
                 first_user = response.data[0]
                 has_ruck_session_data = 'ruck_session' in first_user
-                logger.info(f"[DEBUG] My-rank first user has ruck_session data: {has_ruck_session_data}")
+                logger.debug(f"My-rank first user has ruck_session data: {has_ruck_session_data}")
             
             # If embed failed, fall back to manual approach for my-rank too
             if not has_ruck_session_data:
-                logger.info("[DEBUG] My-rank embed failed, using manual approach")
+                logger.debug("My-rank embed failed, using manual approach")
                 
                 # Get user IDs for manual session query
                 user_ids = [user['id'] for user in response.data]
@@ -349,7 +349,7 @@ class LeaderboardMyRankResource(Resource):
                 ).in_('user_id', user_ids)
                 
                 sessions_response = sessions_query.execute()
-                logger.info(f"[DEBUG] My-rank manual sessions query returned: {len(sessions_response.data)} sessions")
+                logger.debug(f"My-rank manual sessions query returned: {len(sessions_response.data)} sessions")
                 
                 # Group sessions by user_id
                 sessions_by_user = {}
@@ -363,7 +363,7 @@ class LeaderboardMyRankResource(Resource):
                 for user in response.data:
                     user['ruck_session'] = sessions_by_user.get(user['id'], [])
                 
-                logger.info(f"[DEBUG] My-rank manual approach complete - users now have ruck_session data")
+                logger.debug(f"My-rank manual approach complete - users now have ruck_session data")
             
             # Aggregate stats for all users
             user_stats = {}
