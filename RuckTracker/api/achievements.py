@@ -343,14 +343,18 @@ class CheckSessionAchievementsResource(Resource):
             criteria = achievement['criteria']
             criteria_type = criteria.get('type')
             
+            unit_pref = achievement.get('unit_preference')
+            
             if criteria_type == 'first_ruck':
                 return True  # If we're checking, this must be their first completed ruck
             
             elif criteria_type == 'single_session_distance':
                 target = criteria.get('target', 0)
                 distance = session.get('distance_km', 0)
-                result = distance >= target
-                logger.info(f"DISTANCE CHECK: distance={distance}km, target={target}km, result={result}")
+                # Convert target to km if achievement is in standard (miles)
+                target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
+                result = distance >= target_km
+                logger.info(f"DISTANCE CHECK: distance={distance}km, target={target_km}km (orig={target} {'miles' if unit_pref=='standard' else 'km'}), result={result}")
                 return result
             
             elif criteria_type == 'session_duration':
@@ -362,7 +366,11 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'session_weight':
                 target = criteria.get('target', 0)
-                return session.get('ruck_weight_kg', 0) >= target
+                # Convert target to kg if achievement is in standard (lbs)
+                target_kg = target if unit_pref in [None, 'metric'] else target * 0.45359237
+                result = session.get('ruck_weight_kg', 0) >= target_kg
+                logger.info(f"WEIGHT CHECK: weight_kg={session.get('ruck_weight_kg', 0)}, target_kg={target_kg} (orig={target} {'lb' if unit_pref=='standard' else 'kg'}), result={result}")
+                return result
             
             elif criteria_type == 'power_points':
                 # Use pre-loaded stats if available, otherwise fall back to individual queries
@@ -396,7 +404,11 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'elevation_gain':
                 target = criteria.get('target', 0)
-                return session.get('elevation_gain_m', 0) >= target
+                # Convert target to meters if achievement is in standard (feet)
+                target_m = target if unit_pref in [None, 'metric'] else target * 0.3048
+                result = session.get('elevation_gain_m', 0) >= target_m
+                logger.info(f"ELEVATION CHECK: elevation_m={session.get('elevation_gain_m', 0)}, target_m={target_m} (orig={target} {'ft' if unit_pref=='standard' else 'm'}), result={result}")
+                return result
             
 
             
@@ -408,6 +420,9 @@ class CheckSessionAchievementsResource(Resource):
                 if pace is None:
                     logger.info(f"PACE CHECK FAILED: pace is None")
                     return False
+                
+                # Convert target to seconds/km if achievement is in standard (seconds/mile)
+                target_s_per_km = target if unit_pref in [None, 'metric'] else (target / 1.60934)
                 
                 # CRITICAL: Pace achievements must also meet minimum distance requirements
                 achievement_name = achievement.get('name', '').lower()
@@ -444,9 +459,9 @@ class CheckSessionAchievementsResource(Resource):
                     logger.info(f"PACE CHECK FAILED: Distance {session_distance}km not within tolerance of {required_distance}km")
                     return False
                 
-                logger.info(f"PACE FASTER THAN CHECK: pace={pace}, target={target}, result={pace <= target}")
+                logger.info(f"PACE FASTER THAN CHECK: pace_s_per_km={pace}, target_s_per_km={target_s_per_km} (orig_target={target} {'s/mile' if unit_pref=='standard' else 's/km'}), result={pace <= target_s_per_km}")
                 logger.info(f"Session data: distance={session_distance}km, duration={session.get('duration_seconds')}s, required_distance={required_distance}km")
-                return pace <= target
+                return pace <= target_s_per_km
         
             elif criteria_type == 'pace_slower_than':
                 target = criteria.get('target', 0)
@@ -457,9 +472,11 @@ class CheckSessionAchievementsResource(Resource):
                     logger.info(f"PACE CHECK FAILED: pace is None")
                     return False
                 
-                logger.info(f"PACE SLOWER THAN CHECK: pace={pace}, target={target}, result={pace >= target}")
+                # Convert target to seconds/km if achievement is in standard (seconds/mile)
+                target_s_per_km = target if unit_pref in [None, 'metric'] else (target / 1.60934)
+                logger.info(f"PACE SLOWER THAN CHECK: pace_s_per_km={pace}, target_s_per_km={target_s_per_km} (orig_target={target} {'s/mile' if unit_pref=='standard' else 's/km'}), result={pace >= target_s_per_km}")
                 logger.info(f"Session data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s")
-                return pace >= target
+                return pace >= target_s_per_km
         
             elif criteria_type == 'cumulative_distance':
                 # Use pre-loaded stats if available, otherwise fall back to individual queries
@@ -475,10 +492,11 @@ class CheckSessionAchievementsResource(Resource):
                         return False
             
                 target = criteria.get('target', 0)
-                daily_distance = sum(s.get('distance_km', 0) for s in sessions_today)  # Assume sessions_today fetched
-                if daily_distance > 50:
-                    return False  # Unrealistic
-                return total_distance >= target
+                # Convert target to km if achievement is in standard (miles)
+                target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
+                result = total_distance >= target_km
+                logger.debug(f"CUMULATIVE DISTANCE CHECK: total={total_distance}km, target_km={target_km} (orig={target} {'miles' if unit_pref=='standard' else 'km'}), result={result}")
+                return result
         
             elif criteria_type == 'time_of_day':
                 # Check early bird / night owl achievements
@@ -589,8 +607,10 @@ class CheckSessionAchievementsResource(Resource):
                     }).execute()
                     
                     monthly_distance = monthly_distance_response.data or 0
-                    logger.debug(f"Monthly distance check: {monthly_distance} >= {target} = {monthly_distance >= target}")
-                    return monthly_distance >= target
+                    # Convert target to km if achievement is in standard (miles)
+                    target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
+                    logger.debug(f"Monthly distance check: {monthly_distance}km >= {target_km}km (orig={target} {'miles' if unit_pref=='standard' else 'km'}) = {monthly_distance >= target_km}")
+                    return monthly_distance >= target_km
                 except Exception as e:
                     logger.error(f"Error getting user monthly distance: {str(e)}")
                     return False
@@ -609,8 +629,10 @@ class CheckSessionAchievementsResource(Resource):
                     }).execute()
                     
                     quarterly_distance = quarterly_distance_response.data or 0
-                    logger.debug(f"Quarterly distance check: {quarterly_distance} >= {target} = {quarterly_distance >= target}")
-                    return quarterly_distance >= target
+                    # Convert target to km if achievement is in standard (miles)
+                    target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
+                    logger.debug(f"Quarterly distance check: {quarterly_distance}km >= {target_km}km (orig={target} {'miles' if unit_pref=='standard' else 'km'}) = {quarterly_distance >= target_km}")
+                    return quarterly_distance >= target_km
                 except Exception as e:
                     logger.error(f"Error getting user quarterly distance: {str(e)}")
                     return False

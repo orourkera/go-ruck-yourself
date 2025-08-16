@@ -1,4 +1,4 @@
-from flask import g, request
+from flask import g, request, redirect, url_for
 from flask_restful import Resource
 from flask import Blueprint, make_response
 import uuid
@@ -8,6 +8,8 @@ import logging
 from functools import wraps
 from google.auth.transport import requests
 from google.oauth2 import id_token
+import requests as http_requests
+import os
 
 import sys
 import os
@@ -766,3 +768,164 @@ class UserAvatarUploadResource(Resource):
         except Exception as e:
             logger.error(f"Avatar upload error: {str(e)}", exc_info=True)
             return {'message': f'Error uploading avatar: {str(e)}'}, 500
+
+
+class StravaConnectResource(Resource):
+    @auth_required
+    def post(self):
+        """Initiate Strava OAuth connection"""
+        try:
+            # Get Strava OAuth credentials from environment
+            strava_client_id = os.getenv('STRAVA_CLIENT_ID')
+            if not strava_client_id:
+                return {'message': 'Strava integration not configured'}, 500
+            
+            # Build OAuth URL
+            redirect_uri = 'https://getrucky.com/auth/strava/callback'
+            scope = 'activity:write'
+            
+            oauth_url = (
+                f"https://www.strava.com/oauth/authorize"
+                f"?client_id={strava_client_id}"
+                f"&response_type=code"
+                f"&redirect_uri={redirect_uri}"
+                f"&approval_prompt=force"
+                f"&scope={scope}"
+                f"&state={g.user_id}"  # Pass user ID in state for security
+            )
+            
+            return {'oauth_url': oauth_url}, 200
+            
+        except Exception as e:
+            logger.error(f"Strava connect error: {str(e)}", exc_info=True)
+            return {'message': 'Failed to initiate Strava connection'}, 500
+
+
+class StravaCallbackResource(Resource):
+    def get(self):
+        """Handle Strava OAuth callback"""
+        try:
+            # Get authorization code and state from callback
+            code = request.args.get('code')
+            state = request.args.get('state')  # This is the user_id
+            error = request.args.get('error')
+            
+            if error:
+                logger.warning(f"Strava OAuth error: {error}")
+                return redirect('https://getrucky.com/settings?strava_error=access_denied')
+            
+            if not code or not state:
+                logger.warning("Missing code or state in Strava callback")
+                return redirect('https://getrucky.com/settings?strava_error=invalid_callback')
+            
+            # Exchange code for tokens
+            strava_client_id = os.getenv('STRAVA_CLIENT_ID')
+            strava_client_secret = os.getenv('STRAVA_CLIENT_SECRET')
+            
+            if not strava_client_id or not strava_client_secret:
+                logger.error("Strava credentials not configured")
+                return redirect('https://getrucky.com/settings?strava_error=config_error')
+            
+            # Token exchange request
+            token_data = {
+                'client_id': strava_client_id,
+                'client_secret': strava_client_secret,
+                'code': code,
+                'grant_type': 'authorization_code'
+            }
+            
+            response = http_requests.post(
+                'https://www.strava.com/oauth/token',
+                data=token_data,
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Strava token exchange failed: {response.status_code} - {response.text}")
+                return redirect('https://getrucky.com/settings?strava_error=token_exchange_failed')
+            
+            token_response = response.json()
+            
+            # Store tokens in user profile
+            supabase = get_supabase_admin_client()
+            
+            strava_data = {
+                'strava_access_token': token_response.get('access_token'),
+                'strava_refresh_token': token_response.get('refresh_token'),
+                'strava_expires_at': token_response.get('expires_at'),
+                'strava_athlete_id': token_response.get('athlete', {}).get('id'),
+                'strava_connected_at': datetime.utcnow().isoformat()
+            }
+            
+            # Update user record
+            result = supabase.table('user').update(strava_data).eq('id', state).execute()
+            
+            if not result.data:
+                logger.error(f"Failed to update user {state} with Strava tokens")
+                return redirect('https://getrucky.com/settings?strava_error=save_failed')
+            
+            logger.info(f"Successfully connected Strava for user {state}")
+            return redirect('https://getrucky.com/settings?strava_success=true')
+            
+        except Exception as e:
+            logger.error(f"Strava callback error: {str(e)}", exc_info=True)
+            return redirect('https://getrucky.com/settings?strava_error=unexpected_error')
+
+
+class StravaDisconnectResource(Resource):
+    @auth_required
+    def post(self):
+        """Disconnect Strava integration"""
+        try:
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            # Clear Strava tokens from user profile
+            strava_data = {
+                'strava_access_token': None,
+                'strava_refresh_token': None,
+                'strava_expires_at': None,
+                'strava_athlete_id': None,
+                'strava_connected_at': None
+            }
+            
+            result = supabase.table('user').update(strava_data).eq('id', g.user_id).execute()
+            
+            if not result.data:
+                return {'message': 'Failed to disconnect Strava'}, 500
+            
+            logger.info(f"Successfully disconnected Strava for user {g.user_id}")
+            return {'message': 'Strava disconnected successfully'}, 200
+            
+        except Exception as e:
+            logger.error(f"Strava disconnect error: {str(e)}", exc_info=True)
+            return {'message': 'Failed to disconnect Strava'}, 500
+
+
+class StravaStatusResource(Resource):
+    @auth_required
+    def get(self):
+        """Get user's Strava connection status"""
+        try:
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            
+            result = supabase.table('user').select(
+                'strava_access_token, strava_athlete_id, strava_connected_at'
+            ).eq('id', g.user_id).execute()
+            
+            if not result.data:
+                return {'connected': False}, 200
+            
+            user_data = result.data[0]
+            is_connected = bool(user_data.get('strava_access_token'))
+            
+            response_data = {
+                'connected': is_connected,
+                'athlete_id': user_data.get('strava_athlete_id'),
+                'connected_at': user_data.get('strava_connected_at')
+            }
+            
+            return response_data, 200
+            
+        except Exception as e:
+            logger.error(f"Strava status error: {str(e)}", exc_info=True)
+            return {'message': 'Failed to get Strava status'}, 500

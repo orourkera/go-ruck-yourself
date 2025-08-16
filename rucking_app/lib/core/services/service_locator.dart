@@ -55,6 +55,8 @@ import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/services/share_service.dart';
+import 'package:rucking_app/core/services/strava_service.dart';
 import 'package:rucking_app/core/services/google_places_service.dart';
 import 'package:rucking_app/core/services/clubs_cache_service.dart';
 import 'package:rucking_app/core/services/events_cache_service.dart';
@@ -171,6 +173,9 @@ Future<void> setupServiceLocator() async {
   
   // Register EventsCacheService
   getIt.registerSingleton<EventsCacheService>(EventsCacheService());
+  
+  // Register StravaService
+  getIt.registerSingleton<StravaService>(StravaService());
   
   // Repositories
   getIt.registerSingleton<AuthRepository>(

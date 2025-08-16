@@ -285,6 +285,10 @@ from .api.auth import (
     ForgotPasswordResource,
     UserProfileResource,
     UserAvatarUploadResource,
+    StravaConnectResource,
+    StravaCallbackResource,
+    StravaDisconnectResource,
+    StravaStatusResource,
 )
     
 from .api.stats import ( # Import new stats resources
@@ -397,6 +401,12 @@ api.add_resource(RefreshTokenResource, '/api/auth/refresh')
 api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password', '/api/auth/password-reset')
 api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
 api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
+
+# Strava integration endpoints
+api.add_resource(StravaConnectResource, '/api/auth/strava/connect')
+api.add_resource(StravaCallbackResource, '/auth/strava/callback')  # No /api prefix for OAuth callback
+api.add_resource(StravaDisconnectResource, '/api/auth/strava/disconnect')
+api.add_resource(StravaStatusResource, '/api/auth/strava/status')
 
 # Helper used by Flask-Limiter to uniquely identify the caller (user ID or IP)
 

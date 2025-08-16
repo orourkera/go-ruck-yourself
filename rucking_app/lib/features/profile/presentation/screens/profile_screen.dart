@@ -18,6 +18,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/shared/widgets/strava_settings_widget.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -249,6 +250,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 24),
+                        // Strava Integration Section
+                        const StravaSettingsWidget(),
                         const SizedBox(height: 24),
                         _buildSection(
                           title: 'SETTINGS',

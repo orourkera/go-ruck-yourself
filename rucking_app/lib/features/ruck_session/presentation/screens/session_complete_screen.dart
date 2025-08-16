@@ -49,6 +49,7 @@ import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/core/services/share_service.dart';
+import 'package:rucking_app/core/services/strava_service.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
@@ -98,6 +99,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   final _notesController = TextEditingController();
   final _sessionRepo = SessionRepository(apiClient: GetIt.I<ApiClient>());
   final _inAppReviewService = InAppReviewService();
+  final _stravaService = GetIt.I<StravaService>();
 
   // Form state
   int _rating = 3;
@@ -105,6 +107,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   List<String> _selectedPhotos = [];
   bool _isSaving = false;
   bool _isUploadingPhotos = false;
+  bool _isExportingToStrava = false;
   bool? _shareSession; // null means use user's default preference
 
   // Heart rate data
@@ -341,6 +344,71 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _exportToStrava() async {
+    if (_isExportingToStrava) return;
+    
+    setState(() => _isExportingToStrava = true);
+    
+    try {
+      // Check if user is connected to Strava
+      final connectionStatus = await _stravaService.getConnectionStatus();
+      if (!connectionStatus.connected) {
+        if (mounted) {
+          StyledSnackBar.showError(
+            context: context, 
+            message: 'Please connect to Strava in your profile settings first'
+          );
+        }
+        return;
+      }
+
+      // Export the session to Strava
+      final success = await _stravaService.exportRuckSession(
+        sessionId: widget.ruckId,
+        sessionName: _stravaService.formatSessionName(
+          ruckWeightKg: widget.ruckWeight,
+          distanceKm: widget.distance,
+          duration: widget.duration,
+        ),
+        ruckWeightKg: widget.ruckWeight,
+        duration: widget.duration,
+        distanceMeters: widget.distance * 1000, // Convert km to meters
+        description: _stravaService.formatSessionDescription(
+          ruckWeightKg: widget.ruckWeight,
+          distanceKm: widget.distance,
+          duration: widget.duration,
+          calories: widget.caloriesBurned,
+        ),
+      );
+
+      if (mounted) {
+        if (success) {
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: 'Successfully exported to Strava! 🏃‍♂️'
+          );
+        } else {
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Failed to export to Strava. Please try again.'
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Failed to export to Strava: $e', exception: e);
+      if (mounted) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Error exporting to Strava: ${e.toString()}'
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingToStrava = false);
       }
     }
   }
@@ -1246,6 +1314,17 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             text: 'Share Session',
             icon: Icons.share,
             color: AppColors.success,
+            width: 250,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: CustomButton(
+            onPressed: _isExportingToStrava ? null : _exportToStrava,
+            text: 'Export to Strava',
+            icon: Icons.directions_run,
+            color: const Color(0xFFFC4C02), // Strava orange color
+            isLoading: _isExportingToStrava,
             width: 250,
           ),
         ),
