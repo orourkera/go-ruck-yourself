@@ -513,27 +513,49 @@ class PushNotificationService:
         session_id: str
     ) -> bool:
         """Send achievement earned notification for one or multiple achievements"""
-        if not achievement_names:
+        if not device_tokens:
+            logger.warning("No device tokens provided for achievement notification")
             return False
         
-        count = len(achievement_names)
-        
-        if count == 1:
-            title = "Achievement Unlocked! 🏆"
-            body = f"Congratulations! You've earned '{achievement_names[0]}'"
+        if len(achievement_names) == 1:
+            title = "🏆 Achievement Unlocked!"
+            body = f"You earned: {achievement_names[0]}"
         else:
-            title = f"{count} Achievements Unlocked! 🏆"
-            if count == 2:
-                body = f"Congratulations! You've earned '{achievement_names[0]}' and '{achievement_names[1]}'"
-            else:
-                body = f"Congratulations! You've earned {count} new achievements including '{achievement_names[0]}'"
+            title = f"🏆 {len(achievement_names)} Achievements Unlocked!"
+            body = f"You earned: {', '.join(achievement_names[:2])}" + (f" and {len(achievement_names)-2} more!" if len(achievement_names) > 2 else "")
         
         data = {
-            'type': 'achievement_earned',
-            'achievement_names': ','.join(achievement_names),  # Convert list to comma-separated string
-            'achievement_count': str(count),  # Convert int to string
-            'session_id': str(session_id),  # Convert int to string
-            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+            'type': 'achievement',
+            'session_id': session_id,
+            'achievement_count': str(len(achievement_names)),
+            'achievement_names': ','.join(achievement_names)
+        }
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+
+    def send_ruck_started_notification(
+        self,
+        device_tokens: List[str],
+        rucker_name: str,
+        ruck_id: str
+    ) -> bool:
+        """Send ruck started notification to followers"""
+        if not device_tokens:
+            logger.warning("No device tokens provided for ruck started notification")
+            return False
+        
+        title = "🎒 Ruck Started!"
+        body = f"{rucker_name} started rucking"
+        
+        data = {
+            'type': 'ruck_started',
+            'ruck_id': ruck_id,
+            'rucker_name': rucker_name
         }
         
         return self.send_notification(

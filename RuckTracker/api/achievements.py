@@ -104,12 +104,16 @@ class UserAchievementsResource(Resource):
             # Get the user's JWT token from the request context
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
+            # Select only necessary columns to reduce payload size
             response = supabase.table('user_achievements').select(
-                '*, achievements(*)'
+                'id, achievement_id, session_id, earned_at, progress_value, metadata, '
+                'achievements(name, description, tier, category, icon_name, achievement_key)'
             ).eq('user_id', user_id).order('earned_at', desc=True).execute()
             
-            logger.info(f"Supabase response for user {user_id}: {response.data}")
-            logger.info(f"Number of achievements found: {len(response.data) if response.data else 0}")
+            # Log count only to avoid large memory usage in logs
+            logger.info(
+                f"Fetched achievements for user {user_id}: count={len(response.data) if response.data else 0}"
+            )
             
             if response.data:
                 return {
@@ -137,7 +141,7 @@ class UserAchievementsProgressResource(Resource):
             
             # Get user's progress with achievement details
             response = supabase.table('achievement_progress').select(
-                '*, achievements(*)'
+                '*, achievements(name, tier, category, icon_name, achievement_key)'
             ).eq('user_id', user_id).execute()
             
             if response.data:

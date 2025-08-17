@@ -11,6 +11,7 @@ from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
 from RuckTracker.utils.auth_helper import get_current_user_id
 from RuckTracker.utils.api_response import check_auth_and_respond
+from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -710,6 +711,41 @@ class RuckSessionStartResource(Resource):
             if not update_resp.data or len(update_resp.data) == 0:
                 logger.error(f"Failed to start session {ruck_id}: {update_resp.error}")
                 return {'message': 'Failed to start session'}, 500
+        
+            # Send notifications to followers when ruck starts
+            try:
+                # Get user's display name for notification
+                user_profile = supabase.table('user').select('username, display_name').eq('id', g.user.id).single().execute()
+                user_name = user_profile.data.get('display_name') or user_profile.data.get('username') or 'Someone' if user_profile.data else 'Someone'
+                
+                # Get followers (users who follow this user)
+                followers_response = supabase.table('user_follows').select('follower_id').eq('following_id', g.user.id).execute()
+                
+                if followers_response.data:
+                    follower_ids = [f['follower_id'] for f in followers_response.data]
+                    logger.info(f"Sending ruck start notifications to {len(follower_ids)} followers of {user_name}")
+                    
+                    # Get device tokens for followers
+                    device_tokens = get_user_device_tokens(follower_ids)
+                    
+                    if device_tokens:
+                        # Send push notification
+                        push_service = PushNotificationService()
+                        push_service.send_ruck_started_notification(
+                            device_tokens=device_tokens,
+                            rucker_name=user_name,
+                            ruck_id=str(ruck_id)
+                        )
+                        logger.info(f"Sent ruck start notification to {len(device_tokens)} devices")
+                    else:
+                        logger.info(f"No device tokens found for {len(follower_ids)} followers")
+                else:
+                    logger.info(f"User {user_name} has no followers to notify")
+                    
+            except Exception as notification_error:
+                # Don't fail the ruck start if notifications fail
+                logger.error(f"Failed to send ruck start notifications: {notification_error}")
+            
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return update_resp.data[0], 200
         except Exception as e:

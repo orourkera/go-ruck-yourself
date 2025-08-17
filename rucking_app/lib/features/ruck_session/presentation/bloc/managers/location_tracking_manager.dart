@@ -57,6 +57,9 @@ class LocationTrackingManager implements SessionManager {
   Timer? _batchUploadTimer;
   Timer? _watchdogTimer;
   
+  // Prevent concurrent batch upload processing
+  bool _isUploadingBatch = false;
+  
   // Pace calculation optimization
   int _paceTickCounter = 0;
   double? _cachedCurrentPace;
@@ -77,6 +80,9 @@ class LocationTrackingManager implements SessionManager {
   DateTime? _sessionStartTime;
   bool _isPaused = false;
   
+  // Cache user preference to avoid repeated API calls
+  bool? _cachedIsMetric;
+  
   // Terrain tracking
   final List<TerrainSegment> _terrainSegments = [];
   
@@ -89,6 +95,8 @@ class LocationTrackingManager implements SessionManager {
   static const int _memoryPressureThreshold = 800; // Trigger aggressive upload/offload
   static const int _criticalMemoryThreshold = 900; // Emergency offload threshold
   static const int _offloadBatchSize = 200; // Size of batches to offload at once
+  // Upload chunk size to keep payloads reasonable
+  static const int _uploadChunkSize = 100; // Max points per API upload
   
   // Track successful uploads to avoid data loss
   int _lastUploadedLocationIndex = 0;
@@ -173,6 +181,21 @@ class LocationTrackingManager implements SessionManager {
     _inactiveNotified = false;
     _lastNotifiedDistanceKm = 0.0;
     
+    // Cache user metric preference at session start to avoid repeated API calls
+    try {
+      final user = await _authService.getCurrentUser();
+      _cachedIsMetric = user?.preferMetric;
+      AppLogger.info('[LOCATION_MANAGER] Cached user metric preference: $_cachedIsMetric (user: ${user?.username})');
+      
+      // If user preference is null, don't default - let UI handle it
+      if (_cachedIsMetric == null) {
+        AppLogger.warning('[LOCATION_MANAGER] User metric preference is null - UI will use system default');
+      }
+    } catch (e) {
+      AppLogger.error('[LOCATION_MANAGER] Failed to cache user preference, will use system default: $e');
+      _cachedIsMetric = null; // Don't default to metric - let system handle it
+    }
+    
     // Reset pace smoothing state (version 2.5)
     _recentPaces.clear();
     _cachedCurrentPace = null;
@@ -241,6 +264,9 @@ class LocationTrackingManager implements SessionManager {
     _lastInactivityNotificationTime = null;
     _inactiveNotified = false;
     _lastNotifiedDistanceKm = 0.0;
+    
+    // Clear cached user preference
+    _cachedIsMetric = null;
     
     AppLogger.info('[LOCATION_MANAGER] MEMORY_CLEANUP: Session stopped, all lists cleared and upload tracking reset');
     
@@ -490,11 +516,16 @@ class LocationTrackingManager implements SessionManager {
       
       AppLogger.warning('[LOCATION_MANAGER] Failed to upload location batch: $e');
       // Don't update _lastUploadedLocationIndex on failure - keep points in memory
+      // Propagate error so caller can requeue remaining chunks
+      rethrow;
     }
   }
 
   /// CRITICAL FIX: Memory management through data offloading, not data loss
   void _manageMemoryPressure() {
+    // Log current state for debugging distance loss
+    AppLogger.debug('[LOCATION_MANAGER] MEMORY_CHECK: ${_locationPoints.length} points, uploaded: $_lastUploadedLocationIndex, processed: $_lastProcessedLocationIndex, distance: ${_lastKnownTotalDistance.toStringAsFixed(3)}km');
+    
     // Check if we're approaching memory pressure thresholds
     if (_locationPoints.length >= _memoryPressureThreshold) {
       AppLogger.warning('[LOCATION_MANAGER] MEMORY_PRESSURE: ${_locationPoints.length} location points detected, triggering aggressive offload');
@@ -503,6 +534,7 @@ class LocationTrackingManager implements SessionManager {
     
     // Only trim after successful uploads to prevent data loss
     if (_locationPoints.length > _maxLocationPoints && _lastUploadedLocationIndex > _minLocationPointsToKeep) {
+      AppLogger.info('[LOCATION_MANAGER] MEMORY_PRESSURE: Attempting to trim ${_locationPoints.length} points (uploaded: $_lastUploadedLocationIndex)');
       _trimUploadedLocationPoints();
     }
     
@@ -534,8 +566,9 @@ class LocationTrackingManager implements SessionManager {
         // Trigger immediate upload processing
         _processBatchUpload();
         
-        // Update upload tracking
-        _lastUploadedLocationIndex = batchEndIndex;
+        // CRITICAL FIX: Don't mark as uploaded until actual success
+        // _lastUploadedLocationIndex will be updated in _onBatchLocationUpdated after successful upload
+        AppLogger.debug('[LOCATION_MANAGER] MEMORY_PRESSURE: Queued ${batchToUpload.length} points for upload, not marking as uploaded until success');
       }
       
       // Force garbage collection to free memory immediately
@@ -806,15 +839,56 @@ class LocationTrackingManager implements SessionManager {
   }
 
   Future<void> _processBatchUpload() async {
+    // Avoid overlapping uploads
+    if (_isUploadingBatch) {
+      AppLogger.debug('[LOCATION_MANAGER] Batch upload already in progress; skipping trigger');
+      return;
+    }
     if (_pendingLocationPoints.isEmpty || _activeSessionId == null) return;
-    
-    final batch = _pendingLocationPoints.toList();
-    _pendingLocationPoints.clear();
-    
-    AppLogger.info('[LOCATION_MANAGER] Processing batch upload of ${batch.length} points');
-    
-    // Delegate to event handler
-    handleEvent(BatchLocationUpdated(locationPoints: batch));
+
+    _isUploadingBatch = true;
+    List<LocationPoint> batch = const [];
+    int index = 0;
+    try {
+      // Snapshot pending points and clear queue for this cycle
+      batch = _pendingLocationPoints.toList();
+      _pendingLocationPoints.clear();
+
+      AppLogger.info('[LOCATION_MANAGER] Processing batch upload of ${batch.length} points');
+
+      // Sequentially upload in chunks
+      index = 0;
+      while (index < batch.length) {
+        // Session may have been cleared during processing
+        if (_activeSessionId == null) {
+          AppLogger.warning('[LOCATION_MANAGER] Active session ended during batch processing; aborting remaining uploads');
+          break;
+        }
+
+        final end = math.min(index + _uploadChunkSize, batch.length);
+        final chunk = batch.sublist(index, end);
+        final chunkNumber = (index ~/ _uploadChunkSize) + 1;
+        final totalChunks = ((batch.length + _uploadChunkSize - 1) / _uploadChunkSize).floor();
+        AppLogger.debug('[LOCATION_MANAGER] Uploading chunk $chunkNumber/$totalChunks (${chunk.length} pts)');
+
+        // Delegate to existing handler for actual upload + error handling
+        await handleEvent(BatchLocationUpdated(locationPoints: chunk));
+
+        index = end;
+      }
+    } catch (e) {
+      AppLogger.warning('[LOCATION_MANAGER] Batch upload processing error: $e');
+      // Requeue any remaining points that were not processed yet
+      if (index < batch.length) {
+        try {
+          final remaining = batch.sublist(index);
+          _pendingLocationPoints.addAll(remaining);
+          AppLogger.warning('[LOCATION_MANAGER] Re-queued ${remaining.length} unprocessed points after error');
+        } catch (_) {}
+      }
+    } finally {
+      _isUploadingBatch = false;
+    }
   }
 
   double _calculateTotalDistance() {
@@ -832,8 +906,20 @@ class LocationTrackingManager implements SessionManager {
       return _lastKnownTotalDistance;
     }
     
+    // CRITICAL FIX: Ensure startIndex is valid after potential trimming
+    final safeStartIndex = math.max(1, startIndex);
+    if (safeStartIndex >= _locationPoints.length) {
+      return _lastKnownTotalDistance;
+    }
+    
     // Calculate distance only for new points
-    for (int i = startIndex; i < _locationPoints.length; i++) {
+    for (int i = safeStartIndex; i < _locationPoints.length; i++) {
+      // CRITICAL FIX: Ensure previous point exists (boundary check after trimming)
+      if (i - 1 < 0 || i - 1 >= _locationPoints.length) {
+        AppLogger.warning('[LOCATION_MANAGER] DISTANCE_CALC: Invalid previous point index ${i-1}, skipping distance calculation');
+        continue;
+      }
+      
       final distance = Geolocator.distanceBetween(
         _locationPoints[i - 1].latitude,
         _locationPoints[i - 1].longitude,
@@ -853,7 +939,7 @@ class LocationTrackingManager implements SessionManager {
     _lastKnownTotalDistance = totalDistance / 1000; // Convert to km
     
     AppLogger.debug('[LOCATION_MANAGER] Distance update: ${_lastKnownTotalDistance.toStringAsFixed(3)}km, '
-        'processed ${_locationPoints.length} points, last index: $_lastProcessedLocationIndex');
+        'processed ${_locationPoints.length} points, start: $safeStartIndex, last: $_lastProcessedLocationIndex');
     
     return _lastKnownTotalDistance;
   }
@@ -1109,9 +1195,9 @@ double _calculateTotalDistanceWithValidation() {
     required double elevationLoss,
   }) async {
     try {
-      // Get user's metric preference
-      final user = await _authService.getCurrentUser();
-      final isMetric = user?.preferMetric ?? true; // Default to metric
+      // Use cached metric preference to avoid API call on every location update  
+      // If preference is null, watchOS will use system locale default (US=imperial, most others=metric)
+      final isMetric = _cachedIsMetric ?? true; // System default fallback
       
       // Send to watch with user's preference
       await _watchService.updateSessionOnWatch(
@@ -1128,7 +1214,7 @@ double _calculateTotalDistanceWithValidation() {
       AppLogger.debug('[LOCATION_MANAGER] WATCH_UPDATE: Sent session data to watch - Distance: ${state.totalDistance.toStringAsFixed(2)}km, Duration: ${duration.inMinutes}min, Pace: ${state.currentPace.toStringAsFixed(2)}min/km, Metric: $isMetric');
       
     } catch (e) {
-      AppLogger.error('[LOCATION_MANAGER] Error sending watch update with user preferences: $e');
+      AppLogger.error('[LOCATION_MANAGER] Error sending watch update with cached preferences: $e');
       
       // Fallback: send without user preference (defaults to metric)
       try {

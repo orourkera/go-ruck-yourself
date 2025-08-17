@@ -137,7 +137,7 @@ class User extends Equatable {
       heightCm: safeParseNum(json['height_cm'])?.toDouble(),
       dateOfBirth: json['date_of_birth'] as String?,
       createdAt: json['created_at'] as String?,
-      preferMetric: json['prefer_metric'] as bool? ?? true,
+      preferMetric: json['prefer_metric'] as bool? ?? false, // Default to imperial/standard for US users
       allowRuckSharing: json['allow_ruck_sharing'] as bool? ?? true,
       gender: json['gender'] as String?,
       avatarUrl: json['avatar_url'] as String?,
