@@ -362,14 +362,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
             final fetchedUserProfile = await _apiClient.getUserProfile(finalBuddy.userId);
             log('RuckBuddyDetailScreen _loadRuckDetails: Fetched UserProfile object: id=${fetchedUserProfile.id}, username="${fetchedUserProfile.username}", gender=${fetchedUserProfile.gender}'); // DETAILED LOG OF FETCHED PROFILE
 
-            // Check fetched profile: if its username is empty or "Unknown User", use "Rucker"
-            if (fetchedUserProfile.username.isEmpty || fetchedUserProfile.username == 'Unknown User') {
-              log('RuckBuddyDetailScreen _loadRuckDetails: Fetched profile has empty or "Unknown User" username. Using "Rucker". Profile username was: "${fetchedUserProfile.username}"');
-              finalBuddy = finalBuddy.copyWith(user: fetchedUserProfile.copyWith(username: 'Rucker'));
-            } else {
-              finalBuddy = finalBuddy.copyWith(user: fetchedUserProfile);
-              log('RuckBuddyDetailScreen _loadRuckDetails: Successfully fetched user profile: ${fetchedUserProfile.username}');
-            }
+            // Use the fetched profile directly - it should have proper username from backend
+            finalBuddy = finalBuddy.copyWith(user: fetchedUserProfile);
+            log('RuckBuddyDetailScreen _loadRuckDetails: Successfully fetched user profile: ${fetchedUserProfile.username}');
           } catch (e) { // Profile fetch failed
             log('RuckBuddyDetailScreen _loadRuckDetails: Failed to fetch user profile: $e');
             // Fallback: Use username from ruck details (data['users']['username']) if available,

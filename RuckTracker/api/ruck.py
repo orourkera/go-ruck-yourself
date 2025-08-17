@@ -321,22 +321,32 @@ class RuckSessionListResource(Resource):
                 force_new = data.get('force_new_session', False)
                 
                 if force_new:
-                    logger.info(f"Force starting new session, auto-completing previous session {active_session['id']}")
+                    logger.info(f"Force starting new session, deleting abandoned session {active_session['id']}")
                     
-                    # Auto-complete the previous session with minimal data
+                    # Delete the abandoned session and all associated data
                     try:
+                        # Delete associated location points first (if not using CASCADE)
+                        supabase.table('location_point') \
+                            .delete() \
+                            .eq('session_id', active_session['id']) \
+                            .execute()
+                        
+                        # Delete associated heart rate samples (if not using CASCADE)  
+                        supabase.table('heart_rate_samples') \
+                            .delete() \
+                            .eq('session_id', active_session['id']) \
+                            .execute()
+                        
+                        # Delete the session itself
                         supabase.table('ruck_session') \
-                            .update({
-                                'status': 'completed',
-                                'completed_at': datetime.now(tz.tzutc()).isoformat(),
-                                'notes': 'Auto-completed due to new session start'
-                            }) \
+                            .delete() \
                             .eq('id', active_session['id']) \
                             .eq('user_id', g.user.id) \
                             .execute()
-                        logger.info(f"Auto-completed previous session {active_session['id']}")
+                        
+                        logger.info(f"Successfully deleted abandoned session {active_session['id']} and all associated data")
                     except Exception as e:
-                        logger.error(f"Failed to auto-complete previous session: {e}")
+                        logger.error(f"Failed to delete abandoned session: {e}")
                         # Continue with new session creation anyway
                 else:
                     # Return existing session info with additional context

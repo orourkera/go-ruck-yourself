@@ -34,7 +34,7 @@ class UserResource(Resource):
     def get(self, user_id):
         """Get a user by ID"""
         user = User.query.get_or_404(user_id)
-        return {"user": user.to_dict()}, 200
+        return user.to_dict(), 200
     
     def put(self, user_id):
         """Update a user's information"""

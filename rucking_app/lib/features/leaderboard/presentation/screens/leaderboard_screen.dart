@@ -202,6 +202,28 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   ),
                 ),
               ),
+              // Manual scroll to user button
+              BlocBuilder<LeaderboardBloc, LeaderboardState>(
+                builder: (context, state) {
+                  List<LeaderboardUserModel> users = [];
+                  if (state is LeaderboardLoaded) {
+                    users = state.users;
+                  } else if (state is LeaderboardUpdating) {
+                    users = state.users;
+                  }
+                  
+                  final hasCurrentUser = users.any((user) => user.isCurrentUser);
+                  
+                  return hasCurrentUser ? IconButton(
+                    onPressed: () => _scrollToCurrentUser(users),
+                    icon: const Icon(Icons.my_location),
+                    tooltip: 'Find My Position',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                    ),
+                  ) : const SizedBox.shrink();
+                },
+              ),
               // Search toggle button
               IconButton(
                 onPressed: () {
@@ -664,10 +686,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   /// Handle state changes like a good ranch hand
   void _handleStateChanges(BuildContext context, LeaderboardState state) {
-    // Sync sort state with bloc state
+    // Sync sort state with bloc state and trigger auto-scroll
     if (state is LeaderboardLoaded) {
       _currentSortBy = state.sortBy;
       _currentAscending = state.ascending;
+      
+      // Auto-scroll to current user position
+      _scrollToCurrentUser(state.users);
+    } else if (state is LeaderboardUpdating) {
+      // Also scroll on updates in case user position changed
+      _scrollToCurrentUser(state.users);
+      
+      // Show subtle update animation
+      _updateAnimationController.forward().then((_) {
+        _updateAnimationController.reset();
+      });
     }
     
     if (state is LeaderboardError) {
@@ -676,12 +709,51 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         message: state.message,
         type: SnackBarType.error,
       );
-    } else if (state is LeaderboardUpdating) {
-      // Show subtle update animation
-      _updateAnimationController.forward().then((_) {
-        _updateAnimationController.reset();
-      });
     }
+  }
+
+  /// Auto-scroll to current user's position in the leaderboard
+  void _scrollToCurrentUser(List<LeaderboardUserModel> users) {
+    // Find current user's index first
+    final currentUserIndex = users.indexWhere((user) => user.isCurrentUser);
+    if (currentUserIndex == -1) {
+      print('[LEADERBOARD] Current user not found in leaderboard');
+      return; // Current user not found
+    }
+    
+    print('[LEADERBOARD] Found current user at index $currentUserIndex');
+    
+    // Use a longer delay to ensure layout is complete
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted || !_scrollController.hasClients) {
+        print('[LEADERBOARD] Scroll controller not ready or widget disposed');
+        return;
+      }
+      
+      // Calculate scroll position 
+      // Each row is 80px + 4px margin (2px top + 2px bottom) = 84px total
+      const rowHeight = 84.0;
+      
+      // Target position: center the current user's row in the viewport
+      final targetPosition = (currentUserIndex * rowHeight) - (MediaQuery.of(context).size.height * 0.3);
+      
+      // Ensure we don't scroll past bounds
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      final clampedPosition = targetPosition.clamp(0.0, maxScrollExtent);
+      
+      print('[LEADERBOARD] Scrolling to position: $clampedPosition (target: $targetPosition, max: $maxScrollExtent)');
+      
+      // Animate to position
+      _scrollController.animateTo(
+        clampedPosition,
+        duration: const Duration(milliseconds: 1000),
+        curve: Curves.easeInOut,
+      ).then((_) {
+        print('[LEADERBOARD] Scroll animation completed');
+      }).catchError((error) {
+        print('[LEADERBOARD] Scroll animation failed: $error');
+      });
+    });
   }
 
   /// Build rank column with fancy medals for top 3
