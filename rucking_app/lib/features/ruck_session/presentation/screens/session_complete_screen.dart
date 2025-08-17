@@ -354,49 +354,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     setState(() => _isExportingToStrava = true);
     
     try {
-      // Check if user is connected to Strava
-      final connectionStatus = await _stravaService.getConnectionStatus();
-      if (!connectionStatus.connected) {
-        if (mounted) {
-          StyledSnackBar.showError(
-            context: context, 
-            message: 'Please connect to Strava in your profile settings first'
-          );
-        }
-        return;
-      }
-
-      // Export the session to Strava
-      final success = await _stravaService.exportRuckSession(
-        sessionId: widget.ruckId,
-        sessionName: _stravaService.formatSessionName(
-          ruckWeightKg: widget.ruckWeight,
-          distanceKm: widget.distance,
-          duration: widget.duration,
-        ),
-        ruckWeightKg: widget.ruckWeight,
-        duration: widget.duration,
-        distanceMeters: widget.distance * 1000, // Convert km to meters
-        description: _stravaService.formatSessionDescription(
-          ruckWeightKg: widget.ruckWeight,
-          distanceKm: widget.distance,
-          duration: widget.duration,
-          calories: widget.caloriesBurned,
-        ),
-      );
-
+      // Show coming soon message
       if (mounted) {
-        if (success) {
-          StyledSnackBar.showSuccess(
-            context: context,
-            message: 'Successfully exported to Strava! 🏃‍♂️'
-          );
-        } else {
-          StyledSnackBar.showError(
-            context: context,
-            message: 'Failed to export to Strava. Please try again.'
-          );
-        }
+        StyledSnackBar.show(
+          context: context,
+          message: 'Strava integration coming soon! 🏃‍♂️'
+        );
       }
     } catch (e) {
       AppLogger.error('Failed to export to Strava: $e', exception: e);

@@ -508,7 +508,7 @@ class RuckSessionResource(Resource):
                     else:
                         points_resp = supabase.rpc('get_clipped_simplified_route', {'p_session_id': int(ruck_id), 'p_privacy_distance': 200.0, 'p_max_points': 500}).execute()
                     if points_resp.data:
-                        location_points = [{'lat': float(p['lat']), 'lng': float(p['lng']), 'timestamp': p['timestamp']} for p in points_resp.data]
+                        location_points = [{'lat': float(p['lat']), 'lng': float(p['lng']), 'timestamp': p.get('timestamp')} for p in points_resp.data]
                         if is_own_session:  # Cache unclipped for own sessions
                             cache_set(cache_key, location_points, 3600)
                         logger.info(f"[SESSION_DETAIL] Fetched {len(location_points)} points via RPC for {ruck_id}")

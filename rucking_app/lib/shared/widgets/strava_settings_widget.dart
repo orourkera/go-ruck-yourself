@@ -46,25 +46,12 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> {
     setState(() => _isLoading = true);
     
     try {
-      final success = await _stravaService.connectToStrava();
-      
-      if (success && mounted) {
+      // Show coming soon message
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Opening Strava authorization...'),
+            content: Text('Strava integration coming soon! 🏃‍♂️'),
             backgroundColor: Colors.orange,
-          ),
-        );
-        
-        // Refresh status after a delay to allow for OAuth flow
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) _loadConnectionStatus();
-        });
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to connect to Strava'),
-            backgroundColor: Colors.red,
           ),
         );
       }

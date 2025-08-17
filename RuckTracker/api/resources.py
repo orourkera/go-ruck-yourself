@@ -6,7 +6,7 @@ from flask_restful import Resource
 from sqlalchemy import func, extract
 
 from ..extensions import db
-from ..models import RuckSession, LocationPoint, SessionReview
+from ..models import RuckSession, LocationPoint, SessionReview, User
 from .schemas import (
     UserSchema, SessionSchema, LocationPointSchema, 
     SessionReviewSchema, StatisticsSchema, 
