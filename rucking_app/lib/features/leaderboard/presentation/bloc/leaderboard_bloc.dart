@@ -19,7 +19,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   String _currentTimePeriod = 'all_time';
   bool _hasMore = true;
   int _currentOffset = 0;
-  static const int _pageSize = 20;
+  static const int _pageSize = 100;
 
   LeaderboardBloc({
     required this.repository,
@@ -56,7 +56,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         ascending: event.ascending,
         timePeriod: event.timePeriod,
         // Remove limit to get ALL users instead of pagination
-        limit: 999999,  // High limit to get all users
+        limit: 100,  // Load 100 users at a time
         offset: 0,
       );
       print('🔍 BLOC: Repository returned ${response.users.length} users');
@@ -208,7 +208,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         ascending: _currentAscending,
         searchQuery: _currentSearchQuery,
         timePeriod: _currentTimePeriod,
-        limit: 999999,
+        limit: 100,
         offset: 0,
       );
       
@@ -247,7 +247,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         ascending: _currentAscending,
         searchQuery: _currentSearchQuery,
         timePeriod: _currentTimePeriod,
-        limit: 999999,
+        limit: 100,
         offset: 0,
       );
       

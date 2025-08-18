@@ -762,15 +762,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       {'key': 'all_time', 'label': 'All Time'},
     ];
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: timePeriods.map((period) {
-        final isSelected = _currentTimePeriod == period['key'];
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: timePeriods.map((period) {
+          final isSelected = _currentTimePeriod == period['key'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
-              label: Text(period['label']!),
+              label: Text(
+                period['label']!,
+                style: TextStyle(
+                  color: isSelected 
+                      ? Theme.of(context).primaryColor 
+                      : Theme.of(context).textTheme.bodyMedium?.color,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
               selected: isSelected,
               onSelected: (selected) {
                 if (selected && !isSelected) {
@@ -784,16 +792,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               },
               selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
               checkmarkColor: Theme.of(context).primaryColor,
-              labelStyle: TextStyle(
-                color: isSelected 
-                    ? Theme.of(context).primaryColor 
-                    : Theme.of(context).textTheme.bodyMedium?.color,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 

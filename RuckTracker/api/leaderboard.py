@@ -29,10 +29,10 @@ class LeaderboardResource(Resource):
             # Parse query parameters
             sort_by = request.args.get('sortBy', 'powerPoints')
             ascending = request.args.get('ascending', 'false').lower() == 'true'
-            # Only paginate if client explicitly provides a limit; otherwise return all (backward compatible)
+            # Always enforce pagination to prevent memory issues
             _limit_param = request.args.get('limit')
-            limit = min(int(_limit_param), 100) if _limit_param is not None else None
-            offset = int(request.args.get('offset', 0)) if _limit_param is not None else 0
+            limit = min(int(_limit_param), 100) if _limit_param is not None else 100  # Default to 100
+            offset = int(request.args.get('offset', 0))
             search = request.args.get('search', '').strip()
             time_period = request.args.get('timePeriod', 'all_time')
             
@@ -41,10 +41,8 @@ class LeaderboardResource(Resource):
             if sort_by not in valid_sorts:
                 sort_by = 'powerPoints'
             
-            # Build cache key (respect unpaginated responses when no limit provided)
-            _limit_key = limit if limit is not None else 'all'
-            _offset_key = offset if limit is not None else 0
-            cache_key = f"leaderboard:{sort_by}:{ascending}:{_limit_key}:{_offset_key}:{search}:{time_period}"
+            # Build cache key with enforced pagination
+            cache_key = f"leaderboard:{sort_by}:{ascending}:{limit}:{offset}:{search}:{time_period}"
             cache_service = get_cache_service()
             
             # Try to get from cache first (cache for 5 minutes)
@@ -105,11 +103,11 @@ class LeaderboardResource(Resource):
                     # Get user IDs for manual session query
                     user_ids = [user['id'] for user in response.data]
                     
-                    # Query ruck sessions separately
+                    # Query ruck sessions separately with pagination to prevent memory issues
                     sessions_query = supabase.table('ruck_session').select(
                         'id, user_id, distance_km, elevation_gain_m, calories_burned, '
                         'power_points, completed_at, started_at, status'
-                    ).in_('user_id', user_ids)
+                    ).in_('user_id', user_ids).limit(1000)  # Limit total sessions to prevent memory explosion
                     
                     # Apply time period filter
                     if time_period == 'last_7_days':
@@ -292,16 +290,12 @@ class LeaderboardResource(Resource):
             for i, user in enumerate(users_list):
                 user['rank'] = i + 1
             
-            # Apply optional pagination (only if limit provided)
+            # Apply pagination (always enforced now)
             total_users = len(users_list)
-            if limit is None:
-                paged_users = users_list
-                has_more = False
-            else:
-                start = max(offset, 0)
-                end = max(start + limit, 0)
-                paged_users = users_list[start:end]
-                has_more = end < total_users
+            start = max(offset, 0)
+            end = max(start + limit, 0)
+            paged_users = users_list[start:end]
+            has_more = end < total_users
 
             result = {
                 'users': paged_users,
@@ -310,8 +304,8 @@ class LeaderboardResource(Resource):
                 'activeRuckersCount': active_ruckers_count
             }
             
-            # Cache the result for 5 minutes
-            cache_service.set(cache_key, result, expire_seconds=300)
+            # Cache the result for 30 seconds to maintain vibrancy
+            cache_service.set(cache_key, result, expire_seconds=30)
             
             logger.debug(f"Leaderboard query successful: {len(users_list)} users returned")
             return result
