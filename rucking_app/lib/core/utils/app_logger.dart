@@ -20,7 +20,7 @@ class AppLogger {
   /// These are more verbose than info messages and mainly used for development
   static void debug(String message) {
     if (_shouldSuppress(message)) return;
-    if (kDebugMode && _verboseLogs) {
+    if (kDebugMode && (_verboseLogs || _isAiDebug(message))) {
       debugPrint('$_debugPrefix $message');
     }
   }
@@ -28,7 +28,7 @@ class AppLogger {
   /// Logs information messages only in debug mode
   static void info(String message) {
     if (_shouldSuppress(message)) return;
-    if (kDebugMode && _verboseLogs) {
+    if (kDebugMode && (_verboseLogs || _isAiDebug(message))) {
       debugPrint('$_infoPrefix $message');
     }
   }
@@ -36,7 +36,7 @@ class AppLogger {
   /// Logs warning messages only in debug mode
   static void warning(String message) {
     if (_shouldSuppress(message)) return;
-    if (kDebugMode && _verboseLogs) {
+    if (kDebugMode && (_verboseLogs || _isAiDebug(message))) {
       debugPrint('$_warningPrefix $message');
     }
   }
@@ -180,6 +180,7 @@ class AppLogger {
   /// Filters out high-frequency coordinate/location messages unless verbose logs enabled.
   static bool _shouldSuppress(String message) {
     if (_verboseLogs) return false; // developer explicitly asked for logs
+    if (_isAiDebug(message)) return false; // never suppress explicit AI debug logs
 
     final lower = message.toLowerCase();
     if (lower.startsWith('location update:') ||
@@ -187,5 +188,10 @@ class AppLogger {
       return true;
     }
     return false;
+  }
+
+  /// Whitelist AI debug messages so they show up in Debug builds without requiring VERBOSE_LOGS
+  static bool _isAiDebug(String message) {
+    return message.contains('[AI_DEBUG]') || message.contains('[AI_CHEERLEADER_DEBUG]');
   }
 }

@@ -5,6 +5,7 @@ import 'dart:convert'; // For JSON encoding/decoding
 import 'dart:developer' as dev;
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -299,15 +300,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     AICheerleaderManualTriggerRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER BUTTON PRESSED =======');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] AI Cheerleader enabled: $_aiCheerleaderEnabled');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] AI Cheerleader personality: $_aiCheerleaderPersonality');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Current user: $_currentUser');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Current state type: ${state.runtimeType}');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] State is ActiveSessionRunning: ${state is ActiveSessionRunning}');
+    
     if (!_aiCheerleaderEnabled || 
         _aiCheerleaderPersonality == null || 
         _currentUser == null ||
         state is! ActiveSessionRunning) {
-      AppLogger.warning('[AI_CHEERLEADER] Manual trigger ignored - not ready or not running');
+      AppLogger.error('[AI_CHEERLEADER_DEBUG] Manual trigger REJECTED - conditions not met:');
+      AppLogger.error('[AI_CHEERLEADER_DEBUG] - AI enabled: $_aiCheerleaderEnabled');
+      AppLogger.error('[AI_CHEERLEADER_DEBUG] - Personality set: $_aiCheerleaderPersonality');
+      AppLogger.error('[AI_CHEERLEADER_DEBUG] - User exists: ${_currentUser != null}');
+      AppLogger.error('[AI_CHEERLEADER_DEBUG] - Session running: ${state is ActiveSessionRunning}');
       return;
     }
 
     final runningState = state as ActiveSessionRunning;
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Session state OK - proceeding with trigger');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Session elapsed: ${runningState.elapsedSeconds}s, distance: ${runningState.distanceKm}km');
     
     // Create a special manual trigger with current session context
     final manualTrigger = CheerleaderTrigger(
@@ -319,8 +333,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       },
     );
     
-    AppLogger.info('[AI_CHEERLEADER] Manual trigger requested by user');
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Manual trigger created, calling _processAICheerleaderTrigger...');
     await _processAICheerleaderTrigger(manualTrigger, runningState);
+    AppLogger.warning('[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER PROCESSING COMPLETE =======');
   }
 
   /// Process AI Cheerleader trigger through the full pipeline
@@ -329,6 +344,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     ActiveSessionRunning state
   ) async {
     try {
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1: Assembling context...');
       // 1. Assemble context for AI generation
       final context = _aiCheerleaderService.assembleContext(
         state,
@@ -337,30 +353,103 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _aiCheerleaderPersonality!,
         _aiCheerleaderExplicitContent,
       );
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
+
+      // Inspect assembled context typing and normalize environment before any location work
+      AppLogger.info('[AI_CONTEXT_DEBUG] Context runtimeType: ${context.runtimeType}');
+      final envRawBefore = context['environment'];
+      AppLogger.info('[AI_CONTEXT_DEBUG] Environment (pre-normalization) type: ${envRawBefore?.runtimeType}');
+      AppLogger.info('[AI_CONTEXT_DEBUG] Environment (pre-normalization) value: $envRawBefore');
+      try {
+        if (envRawBefore is Map) {
+          final envKeys = (envRawBefore as Map).keys.toList();
+          AppLogger.info('[AI_CONTEXT_DEBUG] Environment keys: $envKeys');
+        }
+      } catch (_) {}
+
+      // Normalize environment to Map<String, dynamic> to avoid Map<String, String> inference downstream
+      final Map<String, dynamic> _normalizedEnv =
+          (envRawBefore is Map)
+              ? Map<String, dynamic>.from(envRawBefore as Map)
+              : <String, dynamic>{};
+      context['environment'] = _normalizedEnv;
+      AppLogger.info('[AI_CONTEXT_DEBUG] Environment normalized type: ${context['environment']?.runtimeType}');
+      AppLogger.info('[AI_CONTEXT_DEBUG] Environment normalized value: ${context['environment']}');
 
       // 2. Add location context if available
-      final lastLocation = state.locationPoints.isNotEmpty ? state.locationPoints.last : null;
-      if (lastLocation != null) {
-        final locationContext = await _locationContextService.getLocationContext(
-          lastLocation.latitude,
-          lastLocation.longitude,
-        );
-        if (locationContext != null) {
-          context['location'] = {
-            'description': locationContext.description,
-            'city': locationContext.city,
-            'terrain': locationContext.terrain,
-            'landmark': locationContext.landmark,
-          };
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 2: Adding location context...');
+      AppLogger.warning('[AI_LOCATION_DEBUG] Checking location context...');
+      AppLogger.warning('[AI_LOCATION_DEBUG] State type: ${state.runtimeType}');
+      AppLogger.warning('[AI_LOCATION_DEBUG] About to access state.locationPoints...');
+      
+      try {
+        AppLogger.warning('[AI_LOCATION_DEBUG] Location points available: ${state.locationPoints.length}');
+        AppLogger.warning('[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints.runtimeType}');
+        
+        AppLogger.warning('[AI_LOCATION_DEBUG] About to check if locationPoints is not empty...');
+        final lastLocation = state.locationPoints.isNotEmpty ? state.locationPoints.last : null;
+        AppLogger.warning('[AI_LOCATION_DEBUG] Last location extracted: $lastLocation');
+        AppLogger.warning('[AI_LOCATION_DEBUG] Last location type: ${lastLocation.runtimeType}');
+        
+        if (lastLocation != null) {
+          AppLogger.warning('[AI_LOCATION_DEBUG] Last location coords: ${lastLocation.latitude}, ${lastLocation.longitude}');
+          AppLogger.warning('[AI_LOCATION_DEBUG] About to call getLocationContext...');
+          
+          final locationContext = await _locationContextService.getLocationContext(
+            lastLocation.latitude,
+            lastLocation.longitude,
+          );
+          AppLogger.warning('[AI_LOCATION_DEBUG] getLocationContext call completed');
+          
+          AppLogger.info('[AI_LOCATION_DEBUG] Location context result: $locationContext');
+          
+          if (locationContext != null) {
+            // Ensure environment is a mutable Map<String, dynamic> before adding location
+            final envRaw = context['environment'];
+            AppLogger.warning('[AI_LOCATION_DEBUG] Environment before update - type: ${envRaw.runtimeType}, value: $envRaw');
+
+            // Create a dynamic-typed copy to avoid Map<String, String> value type restriction
+            final Map<String, dynamic> environment =
+                (envRaw is Map)
+                    ? Map<String, dynamic>.from(envRaw as Map)
+                    : <String, dynamic>{};
+
+            environment['location'] = {
+              'description': locationContext.description,
+              'city': locationContext.city,
+              'terrain': locationContext.terrain,
+              'landmark': locationContext.landmark ?? '', // Handle nullable landmark
+              'weatherCondition': locationContext.weatherCondition,
+              'temperature': locationContext.temperature,
+            };
+            context['environment'] = environment;
+            AppLogger.info('[AI_LOCATION_DEBUG] Added location to context: ${environment['location']}');
+          } else {
+            AppLogger.warning('[AI_LOCATION_DEBUG] Location context service returned null');
+          }
+        } else {
+          AppLogger.warning('[AI_LOCATION_DEBUG] No location points available in session state');
         }
+      } catch (e) {
+        AppLogger.error('[AI_LOCATION_DEBUG] Error in location processing: $e');
+        AppLogger.error('[AI_LOCATION_DEBUG] Error type: ${e.runtimeType}');
+        rethrow;
       }
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 2 complete: Location context processed');
 
       // 3. Generate motivational text with OpenAI
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3: Calling OpenAI...');
+      AppLogger.info('[AI_CHEERLEADER_DEBUG] About to call OpenAI generateMessage with context: $context');
+      AppLogger.info('[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
+      
       final message = await _openAIService.generateMessage(
         context: context,
         personality: _aiCheerleaderPersonality!,
         explicitContent: _aiCheerleaderExplicitContent,
       );
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3 complete: OpenAI call finished');
+      
+      AppLogger.info('[AI_CHEERLEADER_DEBUG] Received message from OpenAI: $message');
 
       if (message != null && message.isNotEmpty) {
         AppLogger.info('[AI_CHEERLEADER] Generated message: "$message"');

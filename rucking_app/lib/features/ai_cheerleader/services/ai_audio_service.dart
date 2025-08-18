@@ -157,97 +157,13 @@ class AIAudioService {
     }
   }
 
-  /// Adjust TTS voice characteristics for different personalities
+  /// Adjust TTS settings based on personality
   Future<void> _adjustTTSForPersonality(String personality) async {
     switch (personality) {
-      case 'Motivational Coach':
-        await _flutterTts.setSpeechRate(0.55);
-        await _flutterTts.setPitch(1.1);
-        await _flutterTts.setVolume(0.9);
-        break;
-        
-      case 'Drill Sergeant':
-        await _flutterTts.setSpeechRate(0.6);
-        await _flutterTts.setPitch(0.9);
-        await _flutterTts.setVolume(1.0);
-        break;
-        
-      case 'Zen Guide':
-        await _flutterTts.setSpeechRate(0.4);
-        await _flutterTts.setPitch(0.8);
-        await _flutterTts.setVolume(0.7);
-        break;
-        
-      case 'Southern Redneck':
-        await _flutterTts.setSpeechRate(0.45);
-        await _flutterTts.setPitch(0.85);
-        await _flutterTts.setVolume(0.85);
-        break;
-        
-      case 'Dwarven Warrior':
-        await _flutterTts.setSpeechRate(0.5);
-        await _flutterTts.setPitch(0.7);
-        await _flutterTts.setVolume(0.9);
-        break;
-        
-      case 'Pirate Captain':
-        await _flutterTts.setSpeechRate(0.45);
-        await _flutterTts.setPitch(0.75);
-        await _flutterTts.setVolume(0.9);
-        break;
-        
-      case 'Yoga Instructor':
-        await _flutterTts.setSpeechRate(0.4);
-        await _flutterTts.setPitch(1.0);
-        await _flutterTts.setVolume(0.7);
-        break;
-        
-      case 'British Butler':
-        await _flutterTts.setSpeechRate(0.45);
-        await _flutterTts.setPitch(0.9);
-        await _flutterTts.setVolume(0.8);
-        break;
-        
-      case 'Surfer Dude':
-        await _flutterTts.setSpeechRate(0.4);
-        await _flutterTts.setPitch(0.8);
-        await _flutterTts.setVolume(0.8);
-        break;
-        
-      case 'Wise Grandmother':
-        await _flutterTts.setSpeechRate(0.4);
-        await _flutterTts.setPitch(1.1);
-        await _flutterTts.setVolume(0.75);
-        break;
-        
-      case 'Sports Commentator':
-        await _flutterTts.setSpeechRate(0.65);
-        await _flutterTts.setPitch(1.1);
-        await _flutterTts.setVolume(1.0);
-        break;
-        
-      case 'Robot Assistant':
-        await _flutterTts.setSpeechRate(0.5);
-        await _flutterTts.setPitch(0.9);
-        await _flutterTts.setVolume(0.8);
-        break;
-        
-      case 'Medieval Knight':
-        await _flutterTts.setSpeechRate(0.5);
-        await _flutterTts.setPitch(0.8);
-        await _flutterTts.setVolume(0.9);
-        break;
-        
       case 'Cowboy/Cowgirl':
         await _flutterTts.setSpeechRate(0.45);
         await _flutterTts.setPitch(0.85);
         await _flutterTts.setVolume(0.9);
-        break;
-        
-      case 'Scientist':
-        await _flutterTts.setSpeechRate(0.5);
-        await _flutterTts.setPitch(1.0);
-        await _flutterTts.setVolume(0.8);
         break;
         
       case 'Stand-up Comedian':
@@ -256,31 +172,19 @@ class AIAudioService {
         await _flutterTts.setVolume(0.9);
         break;
         
-      case 'Ninja Master':
-        await _flutterTts.setSpeechRate(0.45);
-        await _flutterTts.setPitch(0.8);
-        await _flutterTts.setVolume(0.75);
-        break;
-        
-      case 'Chef':
-        await _flutterTts.setSpeechRate(0.55);
-        await _flutterTts.setPitch(1.1);
-        await _flutterTts.setVolume(0.9);
-        break;
-        
-      case 'Flight Attendant':
-        await _flutterTts.setSpeechRate(0.5);
-        await _flutterTts.setPitch(1.0);
-        await _flutterTts.setVolume(0.8);
-        break;
-        
       case 'Game Show Host':
         await _flutterTts.setSpeechRate(0.6);
         await _flutterTts.setPitch(1.1);
         await _flutterTts.setVolume(1.0);
         break;
         
-      default: // Supportive Friend
+      case 'Nature Lover':
+        await _flutterTts.setSpeechRate(0.45);
+        await _flutterTts.setPitch(1.1);
+        await _flutterTts.setVolume(0.8);
+        break;
+        
+      default:
         await _flutterTts.setSpeechRate(0.5);
         await _flutterTts.setPitch(1.0);
         await _flutterTts.setVolume(0.8);

@@ -11,32 +11,26 @@ class ElevenLabsService {
   static const String _baseUrl = 'https://api.elevenlabs.io/v1';
   static const Duration _timeout = Duration(seconds: 15);
   
-  // Voice ID mapping for each personality
+  // Voice ID mapping for each personality - using diverse ElevenLabs voices
   static const Map<String, String> _personalityVoices = {
-    // Original personalities
-    'Motivational Coach': 'EXAVITQu4vr4xnSDxMaL', // Bella - energetic female
+    // Core personalities
     'Supportive Friend': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female
-    'Drill Sergeant': 'VR6AewLTigWG4xSOukaG', // Josh - strong male
-    'Zen Guide': 'pNInz6obpgDQGcFmaJgB', // Adam - calm male
+    'Drill Sergeant': 'DGzg6RaUqxGRTHSBjfgF', // Custom Drill Sergeant voice
     'Southern Redneck': 'yoZ06aMxZJJ28mfd3POQ', // Sam - character male
-    'Dwarven Warrior': 'pqHfZKP75CvOlQylNhV4', // Arnold - deep male
     
-    // New personalities
-    'Pirate Captain': 'yoZ06aMxZJJ28mfd3POQ', // Sam - character male (gruff)
-    'Yoga Instructor': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female (soothing)
-    'British Butler': 'pNInz6obpgDQGcFmaJgB', // Adam - calm male (distinguished)
-    'Surfer Dude': 'yoZ06aMxZJJ28mfd3POQ', // Sam - character male (laid-back)
-    'Wise Grandmother': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female (nurturing)
-    'Sports Commentator': 'VR6AewLTigWG4xSOukaG', // Josh - strong male (energetic)
-    'Robot Assistant': 'pNInz6obpgDQGcFmaJgB', // Adam - calm male (neutral)
-    'Medieval Knight': 'pqHfZKP75CvOlQylNhV4', // Arnold - deep male (noble)
-    'Cowboy/Cowgirl': 'yoZ06aMxZJJ28mfd3POQ', // Sam - character male (rugged)
-    'Scientist': 'pNInz6obpgDQGcFmaJgB', // Adam - calm male (articulate)
-    'Stand-up Comedian': 'yoZ06aMxZJJ28mfd3POQ', // Sam - character male (expressive)
-    'Ninja Master': 'pqHfZKP75CvOlQylNhV4', // Arnold - deep male (mysterious)
-    'Chef': 'EXAVITQu4vr4xnSDxMaL', // Bella - energetic female (enthusiastic)
-    'Flight Attendant': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female (professional)
-    'Game Show Host': 'VR6AewLTigWG4xSOukaG', // Josh - strong male (dramatic)
+    // Missing personalities that were causing failures
+    'Motivational Coach': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female (same as Supportive Friend)
+    'Zen Guide': 'XB0fDUnXU5powFXDhCwa', // Charlotte - soothing female (same as Yoga Instructor)
+    'Dwarven Warrior': 'VR6AewLTigWG4xSOukaG', // Josh - strong male (same as Drill Sergeant)
+    'Cowboy/Cowgirl': 'ruirxsoakN0GWmGNIo04', // Custom Cowboy voice
+    
+    // Character personalities with unique voices from ElevenLabs library
+    'Yoga Instructor': 'XB0fDUnXU5powFXDhCwa', // Charlotte - soothing female
+    'British Butler': '7p1Ofvcwsv7UBPoFNcpI', // Custom British Butler voice
+    'Sports Commentator': 'TxGEqnHWrfWFTfGW9XjX', // Marcus - energetic male
+    'Cowgirl': 'ruirxsoakN0GWmGNIo04', // Custom Cowboy voice (legacy)
+    'Nature Lover': '4tRn1lSkEn13EVTuqb0g', // Serafina - sensual female
+    'Burt Reynolds': '4YYIPFl9wE5c4L2eu2Gb', // Burt Reynolds - charismatic male
   };
   
   final String _apiKey;
@@ -121,7 +115,7 @@ class ElevenLabsService {
       case 'Yoga Instructor':
         return 0.85; // Very stable, peaceful
       case 'British Butler':
-        return 0.8; // High stability, proper
+        return 0.9; // Maximum stability, very proper
       case 'Surfer Dude':
         return 0.5; // Relaxed, variable
       case 'Wise Grandmother':
@@ -215,7 +209,7 @@ class ElevenLabsService {
       case 'Yoga Instructor':
         return 0.2; // Peaceful, minimal
       case 'British Butler':
-        return 0.4; // Refined, proper
+        return 0.2; // Very refined, extremely proper
       case 'Surfer Dude':
         return 0.6; // Laid-back character
       case 'Wise Grandmother':

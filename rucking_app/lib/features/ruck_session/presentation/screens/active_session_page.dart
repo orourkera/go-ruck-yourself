@@ -724,27 +724,45 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   },
                                 ),
                               ),
-                              if (state is ActiveSessionRunning && 
-                                  widget.args.aiCheerleaderEnabled &&
-                                  RemoteConfigService.instance.getBool('ai_cheerleader_manual_trigger', fallback: false))
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Center(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        context.read<ActiveSessionBloc>().add(const AICheerleaderManualTriggerRequested());
-                                      },
-                                      child: Text(
-                                        'Say something',
-                                        style: AppTextStyles.bodyMedium.copyWith(
-                                          color: _getLadyModeColor(context),
-                                          decoration: TextDecoration.underline,
-                                          fontWeight: FontWeight.w500,
+                              Builder(
+                                builder: (context) {
+                                  final isRunning = state is ActiveSessionRunning;
+                                  final aiEnabled = widget.args.aiCheerleaderEnabled;
+                                  final remoteConfigEnabled = RemoteConfigService.instance.getBool('ai_cheerleader_manual_trigger', fallback: true);
+                                  
+                                  print('[AI_CHEERLEADER_DEBUG] Button visibility check:');
+                                  print('[AI_CHEERLEADER_DEBUG] - Session running: $isRunning');
+                                  print('[AI_CHEERLEADER_DEBUG] - AI Cheerleader enabled: $aiEnabled');
+                                  print('[AI_CHEERLEADER_DEBUG] - Remote config enabled: $remoteConfigEnabled');
+                                  print('[AI_CHEERLEADER_DEBUG] - Button will show: ${isRunning && aiEnabled && remoteConfigEnabled}');
+                                  
+                                  if (isRunning && aiEnabled && remoteConfigEnabled) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Center(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            print('[AI_CHEERLEADER_DEBUG] ====== SAY SOMETHING BUTTON TAPPED ======');
+                                            print('[AI_CHEERLEADER_DEBUG] Dispatching AICheerleaderManualTriggerRequested event...');
+                                            context.read<ActiveSessionBloc>().add(const AICheerleaderManualTriggerRequested());
+                                            print('[AI_CHEERLEADER_DEBUG] Event dispatched successfully');
+                                          },
+                                          child: Text(
+                                            'Say something',
+                                            style: AppTextStyles.bodyMedium.copyWith(
+                                              color: _getLadyModeColor(context),
+                                              decoration: TextDecoration.underline,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                ),
+                                    );
+                                  } else {
+                                    return const SizedBox.shrink();
+                                  }
+                                },
+                              ),
                               const SizedBox(height: 16.0), // Added for bottom padding within scroll view
                             ],
                           ),

@@ -129,7 +129,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       
       // Load AI Cheerleader preferences
       _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? false;
-      _aiCheerleaderPersonality = prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
+      
+      // Validate saved personality exists in current options
+      final savedPersonality = prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
+      const availablePersonalities = [
+        'Supportive Friend', 'Drill Sergeant', 'Southern Redneck', 'Pirate Captain',
+        'Yoga Instructor', 'British Butler', 'Surfer Dude', 'Wise Grandmother',
+        'Sports Commentator', 'Cowboy/Cowgirl', 'Stand-up Comedian', 
+        'Game Show Host', 'Nature Lover'
+      ];
+      
+      _aiCheerleaderPersonality = availablePersonalities.contains(savedPersonality) 
+        ? savedPersonality 
+        : 'Supportive Friend';
+        
       _aiCheerleaderExplicitContent = prefs.getBool('aiCheerleaderExplicitContent') ?? false;
 
     } catch (e) {
@@ -1262,27 +1275,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'Motivational Coach', child: Text('Motivational Coach')),
-                              DropdownMenuItem(value: 'Supportive Friend', child: Text('Supportive Friend')),
-                              DropdownMenuItem(value: 'Drill Sergeant', child: Text('Drill Sergeant')),
-                              DropdownMenuItem(value: 'Zen Guide', child: Text('Zen Guide')),
-                              DropdownMenuItem(value: 'Southern Redneck', child: Text('Southern Redneck')),
-                              DropdownMenuItem(value: 'Dwarven Warrior', child: Text('Dwarven Warrior')),
-                              DropdownMenuItem(value: 'Pirate Captain', child: Text('Pirate Captain')),
-                              DropdownMenuItem(value: 'Yoga Instructor', child: Text('Yoga Instructor')),
-                              DropdownMenuItem(value: 'British Butler', child: Text('British Butler')),
-                              DropdownMenuItem(value: 'Surfer Dude', child: Text('Surfer Dude')),
-                              DropdownMenuItem(value: 'Wise Grandmother', child: Text('Wise Grandmother')),
-                              DropdownMenuItem(value: 'Sports Commentator', child: Text('Sports Commentator')),
-                              DropdownMenuItem(value: 'Robot Assistant', child: Text('Robot Assistant')),
-                              DropdownMenuItem(value: 'Medieval Knight', child: Text('Medieval Knight')),
-                              DropdownMenuItem(value: 'Cowboy/Cowgirl', child: Text('Cowboy/Cowgirl')),
-                              DropdownMenuItem(value: 'Scientist', child: Text('Scientist')),
-                              DropdownMenuItem(value: 'Stand-up Comedian', child: Text('Stand-up Comedian')),
-                              DropdownMenuItem(value: 'Ninja Master', child: Text('Ninja Master')),
-                              DropdownMenuItem(value: 'Chef', child: Text('Chef')),
-                              DropdownMenuItem(value: 'Flight Attendant', child: Text('Flight Attendant')),
-                              DropdownMenuItem(value: 'Game Show Host', child: Text('Game Show Host')),
+                              DropdownMenuItem(value: 'Supportive Friend', child: Text('Supportive Friend (F)')),
+                              DropdownMenuItem(value: 'Drill Sergeant', child: Text('Drill Sergeant (M)')),
+                              DropdownMenuItem(value: 'Southern Redneck', child: Text('Southern Redneck (M)')),
+                              DropdownMenuItem(value: 'Yoga Instructor', child: Text('Yoga Instructor (F)')),
+                              DropdownMenuItem(value: 'British Butler', child: Text('British Butler (M)')),
+                              DropdownMenuItem(value: 'Sports Commentator', child: Text('Sports Commentator (M)')),
+                              DropdownMenuItem(value: 'Cowboy/Cowgirl', child: Text('Cowboy (M)')),
+                              DropdownMenuItem(value: 'Nature Lover', child: Text('Nature Lover (F)')),
+                              DropdownMenuItem(value: 'Burt Reynolds', child: Text('Burt Reynolds (M)')),
                             ],
                             onChanged: (String? newValue) async {
                               if (newValue != null) {

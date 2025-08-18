@@ -37,6 +37,14 @@
       <li><strong>Usage Data:</strong> We collect anonymized data about your app usage (e.g., ruck sessions, feature usage) to improve the app experience.</li>
       <li><strong>Device Information:</strong> We may collect device information such as model, OS version, and crash logs for diagnostics.</li>
       <li><strong>Health & Heart Rate Data (if enabled):</strong> If you enable Health integration, we collect heart rate samples during rucking sessions for real-time feedback, calorie estimation, and post-session analytics (average, max, min heart rate). Heart rate data is stored locally on your device, never sold or used for advertising, and is not shared with third parties unless you enable cloud sync or backup.</li>
+      <li><strong>AI Cheerleader Data (if enabled):</strong> When you enable the AI Cheerleader feature, we collect and process session data (distance, pace, duration, location context) and send this information to third-party AI services for generating personalized motivational content. Specifically:
+        <ul>
+          <li><strong>OpenAI Integration:</strong> Session context and performance data are sent to OpenAI's services to generate personalized motivational messages. This data is processed according to OpenAI's privacy policy and data usage terms.</li>
+          <li><strong>ElevenLabs Integration:</strong> Generated text is sent to ElevenLabs for voice synthesis to create audio motivational messages. This data is processed according to ElevenLabs' privacy policy.</li>
+          <li><strong>Session Context:</strong> We may include general location information (city/terrain type) to provide location-relevant motivation, but precise GPS coordinates are not shared with AI services.</li>
+          <li><strong>User Prompts:</strong> Any manual requests for motivation ("Say something" button) are processed through these AI services along with your current session context.</li>
+        </ul>
+      </li>
     </ul>
 
     <h2>How We Use Your Information</h2>
@@ -45,6 +53,7 @@
       <li>To personalize your experience and improve our services.</li>
       <li><strong>Location Data Uses:</strong> We use your location data to track ruck sessions, calculate performance metrics (distance, pace, elevation), display route maps, verify event participation, show nearby events, and provide location-based features.</li>
       <li>To display heart rate analytics and provide feedback during sessions (if enabled).</li>
+      <li><strong>AI Cheerleader Services:</strong> To provide personalized motivational content during ruck sessions by processing your session data through OpenAI and ElevenLabs services. This includes generating contextual motivational messages and converting them to audio for real-time encouragement.</li>
       <li>To communicate important updates, offers, or support.</li>
       <li>To comply with legal obligations and protect user safety.</li>
     </ul>
@@ -55,6 +64,13 @@
       <li><strong>Third-Party Services:</strong> We share data with trusted third parties necessary for app functionality (e.g., analytics, payment processing) and only as required by law.</li>
       <li><strong>Ruck Buddies Feature:</strong> Our app includes a social feature called "Ruck Buddies" that allows users to view ruck sessions completed by other users. By default, your completed ruck sessions will be visible to other users in the Ruck Buddies feed, including your username and session details (distance, duration, calories burned, elevation gain, and an approximate route map). Your exact start/end locations are not shared for privacy reasons.</li>
       <li><strong>Location Data Sharing:</strong> We do not share your precise location data with third parties except as necessary for core app functionality (e.g., map services for route display). Aggregated, anonymized location data may be used for analytics and app improvements.</li>
+      <li><strong>AI Service Providers:</strong> When you enable the AI Cheerleader feature, we share session data with the following third-party AI service providers:
+        <ul>
+          <li><strong>OpenAI:</strong> Session context (distance, pace, duration, general location context) is sent to OpenAI's API to generate personalized motivational messages. Data processing is subject to <a href="https://openai.com/privacy/" target="_blank">OpenAI's Privacy Policy</a>.</li>
+          <li><strong>ElevenLabs:</strong> Generated motivational text is sent to ElevenLabs for voice synthesis. Data processing is subject to <a href="https://elevenlabs.io/privacy" target="_blank">ElevenLabs' Privacy Policy</a>.</li>
+          <li>These services do not receive your personal identifiers, precise GPS coordinates, or any data beyond what is necessary for generating motivational content.</li>
+        </ul>
+      </li>
     </ul>
 
     <h2>Data Security</h2>
@@ -65,6 +81,7 @@
       <li>You can update or delete your account information at any time within the app.</li>
       <li><strong>Location Permissions:</strong> You can manage location permissions through your device settings. However, disabling location access will prevent core app features like ruck tracking from working properly.</li>
       <li>You may opt out of heart rate data collection by disabling Health integration in the app settings. Disabling heart rate will revert calorie estimation to a standard MET-based calculation.</li>
+      <li><strong>AI Cheerleader Privacy:</strong> You can enable or disable the AI Cheerleader feature at any time in your session settings. When disabled, no session data is shared with OpenAI or ElevenLabs. You can also choose different personality modes or disable explicit content options within the AI Cheerleader settings.</li>
       <li><strong>Ruck Sharing Privacy:</strong> You can control whether your ruck sessions appear in the Ruck Buddies feed by toggling the "Allow Ruck Sharing" option in your profile settings. Additionally, you can choose to make individual ruck sessions private even if sharing is enabled globally.</li>
       <li>Contact us at <a href="mailto:rory@getrucky.com">rory@getrucky.com</a> to request data deletion or with any privacy questions.</li>
     </ul>

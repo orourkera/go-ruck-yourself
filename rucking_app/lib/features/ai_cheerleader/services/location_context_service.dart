@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/weather_service.dart';
+import 'package:rucking_app/core/models/weather.dart';
 import 'dart:math' as math;
 
 /// Service for getting location context to enhance AI messages
@@ -13,19 +15,28 @@ class LocationContextService {
   // Cache to avoid repeated API calls for similar locations
   static final Map<String, LocationContext> _cache = {};
   static const double _cacheDistanceMeters = 500; // Cache hits within 500m
+  
+  final WeatherService _weatherService;
+  
+  LocationContextService({WeatherService? weatherService}) 
+      : _weatherService = weatherService ?? WeatherService();
 
   /// Gets location context including city, landmarks, terrain
   Future<LocationContext?> getLocationContext(double latitude, double longitude) async {
     try {
+      AppLogger.warning('[LOCATION_DEBUG] === Starting getLocationContext ===');
+      AppLogger.warning('[LOCATION_DEBUG] Coords: $latitude, $longitude');
+      
       // Check cache first
-      final cacheKey = _getCacheKey(latitude, longitude);
       final cached = _getCachedContext(latitude, longitude);
       if (cached != null) {
-        AppLogger.info('[LOCATION] Using cached context for $cacheKey');
+        AppLogger.info('[LOCATION] Using cached context for ${cached.city}');
         return cached;
       }
 
-      AppLogger.info('[LOCATION] Fetching context for ($latitude, $longitude)');
+      final cacheKey = _getCacheKey(latitude, longitude);
+      AppLogger.warning('[LOCATION_DEBUG] Cache key: $cacheKey');
+      AppLogger.info('[LOCATION] Fetching context for $latitude, $longitude');
 
       final url = Uri.parse(_nominatimUrl).replace(queryParameters: {
         'format': 'json',
@@ -35,6 +46,8 @@ class LocationContextService {
         'extratags': '1',
         'namedetails': '1',
       });
+      
+      AppLogger.warning('[LOCATION_DEBUG] Request URL: $url');
 
       final response = await http.get(
         url,
@@ -43,9 +56,29 @@ class LocationContextService {
         },
       ).timeout(_timeout);
 
+      AppLogger.warning('[LOCATION_DEBUG] Response status: ${response.statusCode}');
+      AppLogger.warning('[LOCATION_DEBUG] Response body length: ${response.body.length}');
+
       if (response.statusCode == 200) {
+        AppLogger.warning('[LOCATION_DEBUG] About to parse JSON...');
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        AppLogger.warning('[LOCATION_DEBUG] JSON parsed successfully, calling _parseLocationData...');
         final context = _parseLocationData(data, latitude, longitude);
+        AppLogger.warning('[LOCATION_DEBUG] _parseLocationData completed successfully');
+        
+        // Try to fetch weather data
+        try {
+          AppLogger.info('[LOCATION] Fetching weather data for $latitude, $longitude');
+          final weather = await _weatherService.getWeatherForecast(
+            latitude: latitude,
+            longitude: longitude,
+          );
+          context._weather = weather;
+          AppLogger.info('[LOCATION] Weather data added to context');
+        } catch (e) {
+          AppLogger.warning('[LOCATION] Failed to fetch weather data: $e');
+          // Continue without weather data
+        }
         
         // Cache the result
         _cache[cacheKey] = context;
@@ -70,44 +103,88 @@ class LocationContextService {
   }
 
   LocationContext _parseLocationData(Map<String, dynamic> data, double lat, double lon) {
-    final address = data['address'] as Map<String, dynamic>? ?? {};
-    final extratags = data['extratags'] as Map<String, dynamic>? ?? {};
-    final category = data['category'] as String?;
-    final type = data['type'] as String?;
+    try {
+      AppLogger.info('[LOCATION_DEBUG] Raw data structure: ${data.runtimeType}');
+      AppLogger.info('[LOCATION_DEBUG] Raw data keys: ${data.keys.toList()}');
+      
+      final address = data['address'] as Map<String, dynamic>? ?? {};
+      final extratags = data['extratags'] as Map<String, dynamic>? ?? {};
+      final category = data['category'] as String?;
+      final type = data['type'] as String?;
 
-    // Extract location components
-    final city = _extractCity(address);
-    final state = _extractState(address);
-    final country = address['country'] as String? ?? 'Unknown';
-    final terrain = _determineTerrain(category, type, extratags);
-    final landmark = _extractLandmark(data);
+      AppLogger.info('[LOCATION_DEBUG] Address structure: ${address.runtimeType}');
+      AppLogger.info('[LOCATION_DEBUG] Address keys: ${address.keys.toList()}');
 
-    return LocationContext(
-      latitude: lat,
-      longitude: lon,
-      city: city,
-      state: state,
-      country: country,
-      terrain: terrain,
-      landmark: landmark,
-      rawData: data,
-    );
+      // Extract location components with error handling
+      final city = _extractCity(address);
+      final state = _extractState(address);
+      final country = _extractCountry(address);
+      final terrain = _determineTerrain(category, type, extratags);
+      final landmark = _extractLandmark(data);
+
+      AppLogger.info('[LOCATION_DEBUG] Extracted values - city: $city, state: $state, country: $country, terrain: $terrain, landmark: $landmark');
+
+      return LocationContext(
+        latitude: lat,
+        longitude: lon,
+        city: city,
+        state: state,
+        country: country,
+        terrain: terrain,
+        landmark: landmark,
+        rawData: data,
+      );
+    } catch (e) {
+      AppLogger.error('[LOCATION_DEBUG] Error parsing location data: $e');
+      AppLogger.error('[LOCATION_DEBUG] Raw data that caused error: $data');
+      rethrow;
+    }
   }
 
   String _extractCity(Map<String, dynamic> address) {
-    // Try multiple possible city fields
-    return address['city'] as String? ??
-           address['town'] as String? ??
-           address['village'] as String? ??
-           address['hamlet'] as String? ??
-           address['suburb'] as String? ??
-           'Unknown Location';
+    // Try multiple possible city fields with defensive type checking
+    try {
+      final cityFields = ['city', 'town', 'village', 'hamlet', 'suburb'];
+      for (final field in cityFields) {
+        final value = address[field];
+        if (value != null && value is String && value.isNotEmpty) {
+          return value;
+        }
+      }
+      return 'Unknown Location';
+    } catch (e) {
+      AppLogger.error('[LOCATION] Error extracting city: $e');
+      return 'Unknown Location';
+    }
   }
 
   String? _extractState(Map<String, dynamic> address) {
-    return address['state'] as String? ??
-           address['province'] as String? ??
-           address['region'] as String?;
+    try {
+      final stateFields = ['state', 'province', 'region'];
+      for (final field in stateFields) {
+        final value = address[field];
+        if (value != null && value is String && value.isNotEmpty) {
+          return value;
+        }
+      }
+      return null;
+    } catch (e) {
+      AppLogger.error('[LOCATION] Error extracting state: $e');
+      return null;
+    }
+  }
+
+  String _extractCountry(Map<String, dynamic> address) {
+    try {
+      final value = address['country'];
+      if (value != null && value is String && value.isNotEmpty) {
+        return value;
+      }
+      return 'Unknown';
+    } catch (e) {
+      AppLogger.error('[LOCATION] Error extracting country: $e');
+      return 'Unknown';
+    }
   }
 
   String _determineTerrain(String? category, String? type, Map<String, dynamic> extratags) {
@@ -222,6 +299,7 @@ class LocationContext {
   final String terrain; // urban, forest, mountain, beach, rural, etc.
   final String? landmark; // nearby notable feature
   final Map<String, dynamic> rawData;
+  Weather? _weather; // Weather data for the location
 
   LocationContext({
     required this.latitude,
@@ -232,7 +310,11 @@ class LocationContext {
     required this.terrain,
     this.landmark,
     required this.rawData,
-  });
+    Weather? weather,
+  }) : _weather = weather;
+
+  /// Gets weather data if available
+  Weather? get weather => _weather;
 
   /// Gets a human-readable description for AI context
   String get description {
@@ -240,7 +322,33 @@ class LocationContext {
     if (state != null) parts.add(state!);
     if (landmark != null) parts.add('near $landmark');
     parts.add('($terrain terrain)');
+    
+    // Add weather info if available
+    if (_weather?.currentWeather != null) {
+      final current = _weather!.currentWeather!;
+      final temp = current.temperature?.round();
+      final condition = current.conditionCode?.description;
+      
+      if (temp != null && condition != null) {
+        parts.add('${temp}°F, $condition');
+      } else if (temp != null) {
+        parts.add('${temp}°F');
+      } else if (condition != null) {
+        parts.add(condition);
+      }
+    }
+    
     return parts.join(', ');
+  }
+
+  /// Gets weather condition for AI context
+  String? get weatherCondition {
+    return _weather?.currentWeather?.conditionCode?.description;
+  }
+
+  /// Gets temperature for AI context  
+  int? get temperature {
+    return _weather?.currentWeather?.temperature?.round();
   }
 
   @override
