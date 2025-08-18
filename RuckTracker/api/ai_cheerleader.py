@@ -18,6 +18,7 @@ class AICheerleaderLogResource(Resource):
             session_id = data.get('session_id')
             personality = data.get('personality')
             openai_response = data.get('openai_response')
+            is_explicit = data.get('is_explicit', False)  # Default to False if not provided
             
             if not all([session_id, personality, openai_response]):
                 return {"error": "Missing required fields: session_id, personality, openai_response"}, 400
@@ -30,7 +31,8 @@ class AICheerleaderLogResource(Resource):
                 'session_id': session_id,
                 'personality': personality,
                 'openai_response': openai_response,
-                'user_id': g.user.id
+                'user_id': g.user.id,
+                'is_explicit': is_explicit
             }).execute()
             
             if result.data:

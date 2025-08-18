@@ -90,6 +90,7 @@ class OpenAIService {
           context: context,
           personality: personality,
           response: message,
+          isExplicit: explicitContent,
         );
         AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 7: _logSimpleResponse call completed');
         AppLogger.info('[OPENAI_DEBUG] _logSimpleResponse call completed');
@@ -235,6 +236,7 @@ Generate a motivational message:''';
     required Map<String, dynamic> context,
     required String personality,
     required String response,
+    required bool isExplicit,
   }) {
     AppLogger.info('[AI_LOG] _logSimpleResponse called - logger is null: ${_logger == null}');
     if (_logger == null) {
@@ -265,6 +267,7 @@ Generate a motivational message:''';
         sessionId: sessionId,
         personality: personality,
         openaiResponse: response,
+        isExplicit: isExplicit,
       );
       AppLogger.info('[AI_LOG] Log response call completed');
     } catch (e) {

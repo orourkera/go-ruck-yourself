@@ -11,6 +11,7 @@ class SimpleAILogger {
     required String sessionId,
     required String personality,
     required String openaiResponse,
+    bool isExplicit = false,
   }) async {
     AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] ===== logResponse method called =====');
     AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] sessionId: $sessionId (type: ${sessionId.runtimeType})');
@@ -31,6 +32,7 @@ class SimpleAILogger {
         'session_id': sessionIdInt,
         'personality': personality,
         'openai_response': openaiResponse,
+        'is_explicit': isExplicit,
       };
 
       AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] About to call _apiClient.post to /ai-cheerleader/log');

@@ -724,37 +724,44 @@ class RuckSessionStartResource(Resource):
         
             # Send notifications to followers when ruck starts
             try:
+                logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Starting notification process for user {g.user.id}")
+                
                 # Get user's display name for notification
                 user_profile = supabase.table('user').select('username, display_name').eq('id', g.user.id).single().execute()
                 user_name = user_profile.data.get('display_name') or user_profile.data.get('username') or 'Someone' if user_profile.data else 'Someone'
+                logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User starting ruck: {user_name}")
                 
                 # Get followers (users who follow this user)
                 followers_response = supabase.table('user_follows').select('follower_id').eq('followed_id', g.user.id).execute()
+                logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Followers query result: {followers_response.data}")
                 
                 if followers_response.data:
                     follower_ids = [f['follower_id'] for f in followers_response.data]
-                    logger.info(f"Sending ruck start notifications to {len(follower_ids)} followers of {user_name}")
+                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Sending ruck start notifications to {len(follower_ids)} followers of {user_name}")
+                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Follower IDs: {follower_ids}")
                     
                     # Get device tokens for followers
                     device_tokens = get_user_device_tokens(follower_ids)
+                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Found {len(device_tokens) if device_tokens else 0} device tokens")
                     
                     if device_tokens:
                         # Send push notification
                         push_service = PushNotificationService()
-                        push_service.send_ruck_started_notification(
+                        result = push_service.send_ruck_started_notification(
                             device_tokens=device_tokens,
                             rucker_name=user_name,
                             ruck_id=str(ruck_id)
                         )
+                        logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Notification send result: {result}")
                         logger.info(f"Sent ruck start notification to {len(device_tokens)} devices")
                     else:
-                        logger.info(f"No device tokens found for {len(follower_ids)} followers")
+                        logger.warning(f"🔔 RUCK START NOTIFICATION DEBUG: No device tokens found for {len(follower_ids)} followers")
                 else:
-                    logger.info(f"User {user_name} has no followers to notify")
+                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User {user_name} has no followers to notify")
                     
             except Exception as notification_error:
                 # Don't fail the ruck start if notifications fail
-                logger.error(f"Failed to send ruck start notifications: {notification_error}")
+                logger.error(f"🔔 RUCK START NOTIFICATION DEBUG: Failed to send ruck start notifications: {notification_error}", exc_info=True)
             
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return update_resp.data[0], 200
