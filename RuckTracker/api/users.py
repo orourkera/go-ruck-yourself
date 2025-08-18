@@ -89,7 +89,7 @@ def get_public_profile(user_id):
     except Exception as e:
         error_time = time.time() - start_time
         logger.error(f"[PROFILE_PERF] get_public_profile: ERROR after {error_time*1000:.2f}ms: {str(e)}")
-        return api_error(str(e), status_code=500)
+        return api_error(str(e))
 
 @users_bp.route('/<uuid:user_id>/followers', methods=['GET'])
 def get_followers(user_id):
@@ -115,7 +115,7 @@ def get_followers(user_id):
         has_more = len(followers) == per_page
         return api_response({'followers': followers, 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
-        return api_error(str(e), status_code=500)
+        return api_error(str(e))
 
 @users_bp.route('/<uuid:user_id>/following', methods=['GET'])
 def get_following(user_id):
@@ -150,7 +150,7 @@ def get_following(user_id):
         has_more = len(following) == per_page
         return api_response({'following': following, 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
-        return api_error(str(e), status_code=500)
+        return api_error(str(e))
 
 @users_bp.route('/<uuid:user_id>/follow', methods=['POST'])
 def follow_user(user_id):
@@ -159,7 +159,7 @@ def follow_user(user_id):
         
         # Check if user is trying to follow themselves
         if str(current_user_id) == str(user_id):
-            return api_error('Cannot follow yourself', status_code=400)
+            return api_error('Cannot follow yourself')
         
         # Check if target user exists and if their profile is private
         # Handle both column names in case of migration timing issues
@@ -186,13 +186,13 @@ def follow_user(user_id):
         
         target_user = user_res.data
         if target_user.get('is_profile_private', False):
-            return api_error('Cannot follow private profiles', status_code=403)
+            return api_error('Cannot follow private profiles')
         
         # Check if already following
         supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
         existing_follow = supabase.table('user_follows').select('id').eq('follower_id', str(current_user_id)).eq('followed_id', str(user_id)).execute()
         if existing_follow.data:
-            return api_error('Already following this user', status_code=400)
+            return api_error('Already following this user')
         
         # Insert the follow relationship
         try:
@@ -232,17 +232,17 @@ def follow_user(user_id):
                 count_res = get_supabase_client().table('user_follows').select('id').eq('followed_id', str(user_id)).execute()
                 followers_count = len(count_res.data) if count_res.data else 0
                 return jsonify({'success': True, 'isFollowing': True, 'followersCount': followers_count})
-            return api_error('Failed to follow', status_code=400)
+            return api_error('Failed to follow')
         except Exception as insert_error:
             # Log the exact error for debugging
             print(f"[ERROR] Follow insert failed: {str(insert_error)}")
             # Check if it's an RLS policy error
             if 'policy' in str(insert_error).lower() or 'permission' in str(insert_error).lower():
-                return api_error('Permission denied - this may be due to profile privacy settings', status_code=403)
+                return api_error('Permission denied - this may be due to profile privacy settings')
             raise insert_error
     except Exception as e:
         print(f"[ERROR] Follow endpoint error: {str(e)}")
-        return api_error(str(e), status_code=500)
+        return api_error(str(e))
 
 @users_bp.route('/<uuid:user_id>/follow', methods=['DELETE'])
 def unfollow_user(user_id):
@@ -255,7 +255,7 @@ def unfollow_user(user_id):
         followers_count = len(count_res.data) if count_res.data else 0
         return jsonify({'success': True, 'isFollowing': False, 'followersCount': followers_count})
     except Exception as e:
-        return api_error(str(e), status_code=500)
+        return api_error(str(e))
 
 @users_bp.route('/social/following-feed', methods=['GET'])
 def get_following_feed():
@@ -273,7 +273,7 @@ def get_following_feed():
         has_more = len(rucks_res.data or []) == per_page
         return api_response({'rucks': rucks_res.data or [], 'pagination': {'page': page, 'hasMore': has_more}})
     except Exception as e:
-        return api_error(str(e), status_code=500)
+        return api_error(str(e))
 
 @users_bp.route('/me/privacy', methods=['PATCH'])
 def update_privacy():
@@ -281,10 +281,10 @@ def update_privacy():
     try:
         data = request.get_json()
         if not isinstance(data, dict) or 'isPrivateProfile' not in data:
-            return api_error('Invalid request: missing isPrivateProfile', status_code=400)
+            return api_error('Invalid request: missing isPrivateProfile')
         is_private = data['isPrivateProfile']
         if not isinstance(is_private, bool):
-            return api_error('isPrivateProfile must be boolean', status_code=400)
+            return api_error('isPrivateProfile must be boolean')
 
         current_user_id = g.user.id
 
@@ -312,6 +312,6 @@ def update_privacy():
 
         if update_res.data:
             return api_response({'success': True, 'isPrivateProfile': is_private})
-        return api_error('Failed to update privacy', status_code=400)
+        return api_error('Failed to update privacy')
     except Exception as e:
-        return api_error(str(e), status_code=500) 
+        return api_error(str(e)) 
