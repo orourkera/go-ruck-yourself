@@ -874,6 +874,25 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         );
                       }
                       
+                      if (state is SessionPhotosLoadedForId) {
+                        // Photos loaded state - just show a simple loading indicator
+                        // This happens when photos are being processed during discard/complete flow
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircularProgressIndicator(),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Processing photos...',
+                                style: AppTextStyles.headlineMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
                       // Catch-all error handler to prevent blank white screens
                       AppLogger.error('Unknown ActiveSessionState encountered: ${state.runtimeType} - ${state.toString()}');
                       

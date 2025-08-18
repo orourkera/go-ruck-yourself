@@ -274,7 +274,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         coordinatorState is ActiveSessionRunning &&
         _aiCheerleaderPersonality != null &&
         _currentUser != null) {
+      AppLogger.info('[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
       _checkAICheerleaderTriggers(coordinatorState);
+    } else {
+      AppLogger.info('[AI_DEBUG] AI triggers skipped - enabled: $_aiCheerleaderEnabled, running: ${coordinatorState is ActiveSessionRunning}, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
     }
     
     // Instead of calling emit directly, we use a custom event to safely forward states
@@ -285,10 +288,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   /// Check for AI Cheerleader triggers and process them
   Future<void> _checkAICheerleaderTriggers(ActiveSessionRunning state) async {
     try {
+      AppLogger.info('[AI_DEBUG] Analyzing triggers for state: distance=${state.distanceKm}km, time=${state.elapsedSeconds}s');
       final trigger = _aiCheerleaderService.analyzeTriggers(state);
+      AppLogger.info('[AI_DEBUG] Trigger analysis result: ${trigger?.type.name ?? 'null'}');
       if (trigger != null) {
         AppLogger.info('[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
         await _processAICheerleaderTrigger(trigger, state);
+      } else {
+        AppLogger.info('[AI_DEBUG] No trigger detected this cycle');
       }
     } catch (e) {
       AppLogger.error('[AI_CHEERLEADER] Trigger detection failed: $e');
@@ -398,6 +405,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           final locationContext = await _locationContextService.getLocationContext(
             lastLocation.latitude,
             lastLocation.longitude,
+          ).timeout(
+            Duration(seconds: 5),
+            onTimeout: () {
+              AppLogger.warning('[AI_LOCATION_DEBUG] Location context call timed out after 5 seconds');
+              return null;
+            },
           );
           AppLogger.warning('[AI_LOCATION_DEBUG] getLocationContext call completed');
           

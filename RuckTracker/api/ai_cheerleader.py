@@ -22,14 +22,15 @@ class AICheerleaderLogResource(Resource):
             if not all([session_id, personality, openai_response]):
                 return {"error": "Missing required fields: session_id, personality, openai_response"}, 400
             
-            # Get Supabase client
-            supabase = get_supabase_client()
+            # Get Supabase client with user JWT for RLS
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
-            # Insert log entry
+            # Insert log entry with user_id for RLS
             result = supabase.table('ai_cheerleader_logs').insert({
                 'session_id': session_id,
                 'personality': personality,
-                'openai_response': openai_response
+                'openai_response': openai_response,
+                'user_id': g.user.id
             }).execute()
             
             if result.data:

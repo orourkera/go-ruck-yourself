@@ -32,8 +32,10 @@ import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
-import 'package:dart_openai/dart_openai.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:dart_openai/dart_openai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
@@ -162,7 +164,11 @@ Future<void> setupServiceLocator() async {
   final openaiApiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
   final elevenLabsApiKey = dotenv.env['ELEVEN_LABS_API_KEY'] ?? '';
   
-  GetIt.I.registerSingleton<OpenAIService>(OpenAIService());
+  // Register SimpleAILogger first
+  GetIt.I.registerSingleton<SimpleAILogger>(SimpleAILogger(GetIt.I<ApiClient>()));
+  
+  // Register OpenAIService with logger dependency
+  GetIt.I.registerSingleton<OpenAIService>(OpenAIService(logger: GetIt.I<SimpleAILogger>()));
   GetIt.I.registerSingleton<ElevenLabsService>(ElevenLabsService(elevenLabsApiKey));
   GetIt.I.registerSingleton<LocationContextService>(LocationContextService());
   GetIt.I.registerSingleton<AIAudioService>(AIAudioService());

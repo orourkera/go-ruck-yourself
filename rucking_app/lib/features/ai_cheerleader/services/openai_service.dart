@@ -2,14 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:dart_openai/dart_openai.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.dart';
+import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 
-/// Service for generating motivational text using OpenAI GPT-3.5-turbo
+/// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
-  static const String _model = 'gpt-3.5-turbo';
+  static const String _model = 'gpt-4o';
   static const int _maxTokens = 150;
-  static const double _temperature = 0.8;
+  static const double _temperature = 0.8; // Increased from 0.8 for more creativity
   static const Duration _timeout = Duration(seconds: 10);
 
   final SimpleAILogger? _logger;
@@ -22,9 +25,13 @@ class OpenAIService {
     required String personality,
     bool explicitContent = false,
   }) async {
+    AppLogger.error('[OPENAI_SERVICE_DEBUG] ===== GENERATE MESSAGE METHOD CALLED =====');
+    AppLogger.error('[OPENAI_SERVICE_DEBUG] This proves the OpenAIService.generateMessage is being called');
     try {
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 1: Starting generateMessage try block');
       AppLogger.info('[OPENAI] Generating message for $personality personality');
       
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 2: About to build prompt');
       final prompt = _buildPrompt(
         personality,
         explicitContent,
@@ -33,6 +40,7 @@ class OpenAIService {
         context['user'] ?? {},
         context['environment'] ?? {},
       );
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
       
       // Debug logging: Show full prompt being sent to OpenAI
       AppLogger.info('[OPENAI_DEBUG] Full prompt being sent to OpenAI:');
@@ -48,6 +56,7 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG] - Environment: ${context['environment']}');
       
       // Make OpenAI API call with timeout
+      AppLogger.info('[OPENAI_DEBUG] About to call OpenAI.instance.chat.create...');
       final completion = await OpenAI.instance.chat.create(
         model: _model,
         messages: [
@@ -61,11 +70,20 @@ class OpenAIService {
         maxTokens: _maxTokens,
         temperature: _temperature,
       ).timeout(_timeout);
+      
+      AppLogger.info('[OPENAI_DEBUG] OpenAI API call completed successfully');
+      AppLogger.info('[OPENAI_DEBUG] Response choices count: ${completion.choices.length}');
 
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 4: OpenAI API call completed successfully');
+      
       final message = completion.choices.first.message.content?.first.text?.trim();
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 5: Extracted message from response');
+      AppLogger.info('[OPENAI_DEBUG] Extracted message: $message');
       
       if (message != null && message.isNotEmpty) {
-        AppLogger.info('[OPENAI] Generated message: "${message.substring(0, 50)}..."');
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 6: Message is valid, about to log to database');
+        AppLogger.info('[OPENAI_DEBUG] Generated message: "${message.substring(0, 50)}..."');
+        AppLogger.info('[OPENAI_DEBUG] About to call _logSimpleResponse...');
         
         // Log simple response if logger is available
         _logSimpleResponse(
@@ -73,10 +91,11 @@ class OpenAIService {
           personality: personality,
           response: message,
         );
-        
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 7: _logSimpleResponse call completed');
+        AppLogger.info('[OPENAI_DEBUG] _logSimpleResponse call completed');
         return message;
       } else {
-        AppLogger.warning('[OPENAI] Empty response from OpenAI');
+        AppLogger.warning('[OPENAI_DEBUG] Empty response from OpenAI');
         return null;
       }
       
@@ -114,18 +133,21 @@ Context:
 $baseContext
 
 Guidelines:
-- Respond as the $personality character
+- Respond as the $personality character with FRESH, UNIQUE phrasing each time
 - Keep message under 25 words
 - Be specific about their current situation
+- ${_getCreativityBooster()}
 - Make fun observations or jokes about their location when mentioned
 - Reference local terrain, landmarks, or city personality if relevant
-- Use only ONE ruck-related pun per message like "you've rucking got this", "way to go mother rucker", or "ruck and roll"
+- Comment on weather conditions when relevant (temperature, conditions, etc.)
+- ${_getVariedInstructions()}
 - $contentGuidelines
 - Sound natural and conversational
 - Focus on encouragement and motivation
+- NEVER repeat phrases you've used before - be inventive and original
 - NEVER use hashtags like #RuckLife #BeastMode - absolutely no # symbols allowed
 - NEVER use social media language or internet slang
- - Address the user by name: ${_extractFirstName(user['username']) ?? 'athlete'}
+- Address the user by name: ${_extractFirstName(user['username']) ?? 'athlete'}
 
 Generate a motivational message:''';
   }
@@ -214,25 +236,73 @@ Generate a motivational message:''';
     required String personality,
     required String response,
   }) {
-    if (_logger == null) return;
+    AppLogger.info('[AI_LOG] _logSimpleResponse called - logger is null: ${_logger == null}');
+    if (_logger == null) {
+      AppLogger.warning('[AI_LOG] Logger is null, cannot log response');
+      return;
+    }
 
     try {
-      final session = context['session'] as Map<String, dynamic>?;
-      final sessionId = session?['sessionId']?.toString();
+      // Get sessionId directly from ActiveSessionBloc
+      final activeSessionBloc = getIt<ActiveSessionBloc>();
+      final activeState = activeSessionBloc.state;
+      
+      String? sessionId;
+      if (activeState is ActiveSessionRunning) {
+        sessionId = activeState.sessionId;
+      }
+      
+      AppLogger.error('[AI_LOG_DEBUG] Got sessionId from ActiveSessionBloc: $sessionId');
 
       if (sessionId == null || sessionId.isEmpty) {
-        AppLogger.warning('[AI_LOG] Missing session ID for logging');
+        AppLogger.error('[AI_LOG_DEBUG] ❌ BLOCKING ISSUE: No active session ID available');
+        AppLogger.error('[AI_LOG_DEBUG] ActiveSessionBloc state: ${activeState.runtimeType}');
         return;
       }
 
+      AppLogger.info('[AI_LOG] About to log response - sessionId: $sessionId, personality: $personality');
       _logger!.logResponse(
         sessionId: sessionId,
         personality: personality,
         openaiResponse: response,
       );
+      AppLogger.info('[AI_LOG] Log response call completed');
     } catch (e) {
       AppLogger.error('[AI_LOG] Error logging response: $e');
     }
+  }
+
+  /// Gets a random creativity booster instruction
+  String _getCreativityBooster() {
+    final boosters = [
+      'Use unexpected metaphors or comparisons in your encouragement',
+      'Include a surprising fact or observation about their performance',
+      'Make a clever wordplay or double meaning with their situation',
+      'Reference something unexpected about the time of day or weather',
+      'Use an unusual but fitting analogy from movies, sports, or nature',
+      'Make a witty observation about human psychology or motivation',
+      'Reference current events, pop culture, or seasonal themes creatively',
+      'Use reverse psychology or an unexpected motivational angle',
+    ];
+    
+    final now = DateTime.now();
+    final index = (now.millisecondsSinceEpoch ~/ 10000) % boosters.length;
+    return boosters[index];
+  }
+
+  /// Gets varied instruction to prevent repetitive phrasing
+  String _getVariedInstructions() {
+    final instructions = [
+      'Use only ONE creative ruck-related pun per message like "you\'ve rucking got this", "way to go mother rucker", or "ruck and roll"',
+      'Include one playful ruck pun but make it different each time - avoid repeating "rucking" or "ruck and roll" patterns',
+      'If using a ruck pun, make it unique and unexpected - mix up the wordplay creatively',
+      'Optional: include one subtle ruck wordplay, but only if it feels natural and original',
+      'Vary your ruck puns - try "rucktastic", "rucking awesome", or create entirely new combinations',
+    ];
+    
+    final now = DateTime.now();
+    final index = (now.millisecondsSinceEpoch ~/ 15000) % instructions.length;
+    return instructions[index];
   }
 
   /// Extract first name from username (before @, spaces, or dots)
@@ -240,17 +310,15 @@ Generate a motivational message:''';
     if (username == null || username.isEmpty) return null;
     
     // Remove @ and everything after it (email-style usernames)
-    String name = username.split('@').first;
+    username = username.split('@').first;
     
-    // Take first word before space or dot
-    name = name.split(RegExp(r'[\s\.]')).first;
+    // Take first word (before spaces)
+    username = username.split(' ').first;
     
-    // Capitalize first letter
-    if (name.isNotEmpty) {
-      return name[0].toUpperCase() + name.substring(1).toLowerCase();
-    }
+    // Take first part (before dots)
+    username = username.split('.').first;
     
-    return null;
+    return username.isEmpty ? null : username;
   }
 
   String _getPersonalityPrompt(String personality, bool explicitContent) {

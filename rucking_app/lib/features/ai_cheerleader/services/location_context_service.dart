@@ -326,13 +326,18 @@ class LocationContext {
     // Add weather info if available
     if (_weather?.currentWeather != null) {
       final current = _weather!.currentWeather!;
-      final temp = current.temperature?.round();
+      final tempCelsius = current.temperature?.round();
       final condition = current.conditionCode?.description;
       
-      if (temp != null && condition != null) {
-        parts.add('${temp}°F, $condition');
-      } else if (temp != null) {
-        parts.add('${temp}°F');
+      if (tempCelsius != null) {
+        // Convert Celsius to Fahrenheit: F = (C × 9/5) + 32
+        final tempFahrenheit = ((tempCelsius * 9 / 5) + 32).round();
+        
+        if (condition != null) {
+          parts.add('${tempFahrenheit}°F, $condition');
+        } else {
+          parts.add('${tempFahrenheit}°F');
+        }
       } else if (condition != null) {
         parts.add(condition);
       }
@@ -346,9 +351,12 @@ class LocationContext {
     return _weather?.currentWeather?.conditionCode?.description;
   }
 
-  /// Gets temperature for AI context  
+  /// Gets temperature for AI context (in Fahrenheit)
   int? get temperature {
-    return _weather?.currentWeather?.temperature?.round();
+    final tempCelsius = _weather?.currentWeather?.temperature?.round();
+    if (tempCelsius == null) return null;
+    // Convert Celsius to Fahrenheit: F = (C × 9/5) + 32
+    return ((tempCelsius * 9 / 5) + 32).round();
   }
 
   @override

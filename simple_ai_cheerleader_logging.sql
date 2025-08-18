@@ -6,6 +6,7 @@ CREATE TABLE ai_cheerleader_logs (
     session_id INTEGER NOT NULL REFERENCES ruck_session(id) ON DELETE CASCADE,
     personality VARCHAR(50) NOT NULL,
     openai_response TEXT NOT NULL,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

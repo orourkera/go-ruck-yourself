@@ -133,10 +133,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       // Validate saved personality exists in current options
       final savedPersonality = prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
       const availablePersonalities = [
-        'Supportive Friend', 'Drill Sergeant', 'Southern Redneck', 'Pirate Captain',
-        'Yoga Instructor', 'British Butler', 'Surfer Dude', 'Wise Grandmother',
-        'Sports Commentator', 'Cowboy/Cowgirl', 'Stand-up Comedian', 
-        'Game Show Host', 'Nature Lover'
+        'Supportive Friend', 'Drill Sergeant', 'Southern Redneck',
+        'Yoga Instructor', 'British Butler', 'Sports Commentator', 
+        'Cowboy/Cowgirl', 'Nature Lover', 'Burt Reynolds'
       ];
       
       _aiCheerleaderPersonality = availablePersonalities.contains(savedPersonality) 
