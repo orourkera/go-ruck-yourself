@@ -334,6 +334,7 @@ from .api.gpx_export import (
     GPXExportBatchResource
 )
 from .api.weather import WeatherResource
+from .api.ai_cheerleader import AICheerleaderLogResource
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
@@ -590,6 +591,9 @@ api.add_resource(GPXExportBatchResource, '/api/gpx/export-batch')
 
 # Weather Endpoints
 api.add_resource(WeatherResource, '/api/weather')
+
+# AI Cheerleader Endpoints
+api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader/log')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
