@@ -23,6 +23,12 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
+import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
@@ -50,6 +56,9 @@ class ActiveSessionArgs {
   final List<latlong.LatLng>? plannedRoute; // Planned route polyline
   final double? plannedRouteDistance; // Route distance in km
   final int? plannedRouteDuration; // Route estimated duration in minutes
+  final bool aiCheerleaderEnabled; // AI Cheerleader feature toggle
+  final String? aiCheerleaderPersonality; // Selected personality type
+  final bool aiCheerleaderExplicitContent; // Explicit language preference
 
   ActiveSessionArgs({
     required this.ruckWeight,
@@ -61,6 +70,9 @@ class ActiveSessionArgs {
     this.plannedRoute, // Add planned route parameter
     this.plannedRouteDistance, // Add route distance parameter
     this.plannedRouteDuration, // Add route duration parameter
+    required this.aiCheerleaderEnabled, // Required AI Cheerleader toggle
+    this.aiCheerleaderPersonality, // Optional personality selection
+    required this.aiCheerleaderExplicitContent, // Required explicit content preference
   });
 }
 
@@ -115,6 +127,11 @@ class ActiveSessionPage extends StatelessWidget {
             activeSessionStorage: locator<ActiveSessionStorage>(),
             terrainTracker: locator<TerrainTracker>(),
             connectivityService: locator<ConnectivityService>(),
+            aiCheerleaderService: locator<AICheerleaderService>(),
+            openAIService: locator<OpenAIService>(),
+            elevenLabsService: locator<ElevenLabsService>(),
+            locationContextService: locator<LocationContextService>(),
+            audioService: locator<AIAudioService>(),
           ),
         ),
         BlocProvider(
@@ -212,7 +229,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             : true;
         
         return AlertDialog(
-          title: const Text('Confirm End Session'),
+          title: const Text('Confirm Finish Session'),
           content: Text('Are you sure you want to end the session?'),
           actions: [
             TextButton(
@@ -226,7 +243,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('End Session'),
+              child: const Text('Finish Session'),
             ),
           ],
         );
@@ -350,6 +367,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 notes: widget.args.notes,
                                 plannedDuration: widget.args.plannedDuration,
                                 eventId: widget.args.eventId, // Pass event ID if creating session from event
+                                aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled,
+                                aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality,
+                                aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent,
                                 initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
@@ -377,6 +397,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   notes: widget.args.notes,
                                   plannedDuration: widget.args.plannedDuration,
                                   eventId: widget.args.eventId, // Pass event ID if creating session from event
+                                  aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled,
+                                  aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality,
+                                  aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent,
                                   initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
@@ -444,6 +467,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                         notes: widget.args.notes,
                                         plannedDuration: widget.args.plannedDuration,
                                         eventId: widget.args.eventId,
+                                        aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled,
+                                        aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality,
+                                        aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent,
                                         initialLocation: widget.args.initialCenter == null 
                                           ? null 
                                           : LocationPoint(
@@ -698,6 +724,27 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   },
                                 ),
                               ),
+                              if (state is ActiveSessionRunning && 
+                                  widget.args.aiCheerleaderEnabled &&
+                                  RemoteConfigService.instance.getBool('ai_cheerleader_manual_trigger', fallback: false))
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Center(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        context.read<ActiveSessionBloc>().add(const AICheerleaderManualTriggerRequested());
+                                      },
+                                      child: Text(
+                                        'Say something',
+                                        style: AppTextStyles.bodyMedium.copyWith(
+                                          color: _getLadyModeColor(context),
+                                          decoration: TextDecoration.underline,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 16.0), // Added for bottom padding within scroll view
                             ],
                           ),

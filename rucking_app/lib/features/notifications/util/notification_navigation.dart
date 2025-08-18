@@ -62,6 +62,7 @@ class NotificationNavigation {
       case NotificationType.duelInvitation:
       case NotificationType.duelJoined:
       case NotificationType.duelCompleted:
+      case NotificationType.duelProgress:
         final duelId = notification.data!['duel_id']?.toString();
         if (duelId != null) {
           Navigator.push(

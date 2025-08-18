@@ -714,6 +714,11 @@ Future<void> clearCrashRecoveryData() async {
   bool get isPaused => !_currentState.isActive && _activeSessionId != null;
   Duration get totalPausedDuration => _currentState.totalPausedDuration;
 
+  /// Public method to reset the session lifecycle manager
+  Future<void> reset() async {
+    await _onSessionReset(const manager_events.SessionReset());
+  }
+
   /// Start session persistence timer for autosave - 30s for crash protection
   void _startSessionPersistenceTimer() {
     _sessionPersistenceTimer?.cancel();

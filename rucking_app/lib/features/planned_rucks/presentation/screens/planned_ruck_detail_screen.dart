@@ -926,6 +926,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             plannedDuration: route.estimatedDurationMinutes * 60,
             initialCenter: initialCenter,
             plannedRoute: plannedRoutePoints, // Pass the planned route
+            aiCheerleaderEnabled: false, // Default disabled for planned rucks
+            aiCheerleaderPersonality: 'Motivational Coach',
+            aiCheerleaderExplicitContent: false,
           ),
         ),
       ),

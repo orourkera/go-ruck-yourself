@@ -291,6 +291,10 @@ class RefreshTokenResource(Resource):
             
             if not refresh_token:
                 return {'message': 'Refresh token is required'}, 400
+            
+            # Get client IP for logging
+            client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
+            logger.info(f"Token refresh attempt from IP: {client_ip}")
                 
             # Refresh token with Supabase
             supabase = get_supabase_client()
@@ -315,12 +319,15 @@ class RefreshTokenResource(Resource):
             except Exception as auth_error:
                 # Check if this is a rate limit error
                 error_message = str(auth_error)
-                if '429' in error_message or 'Too Many Requests' in error_message:
-                    logger.warning(f"Rate limit hit for refresh token: {error_message}")
-                    return {'message': 'Too many requests. Please try again later.'}, 429
+                if '429' in error_message or 'Too Many Requests' in error_message or 'rate limit' in error_message.lower():
+                    logger.warning(f"Rate limit hit for refresh token from {client_ip}: {error_message}")
+                    return {'message': 'Too many requests. Please wait before retrying.'}, 429
+                elif 'already used' in error_message.lower() or 'invalid refresh token' in error_message.lower():
+                    logger.warning(f"Invalid/expired refresh token from {client_ip}: {error_message}")
+                    return {'message': 'Refresh token expired. Please sign in again.'}, 401
                 else:
-                    logger.error(f"Supabase auth error during refresh: {error_message}")
-                    return {'message': 'Authentication service error'}, 503
+                    logger.error(f"Supabase auth error during refresh from {client_ip}: {error_message}")
+                    return {'message': 'Authentication service temporarily unavailable'}, 503
                 
         except Exception as e:
             logger.error(f"Unexpected error in refresh token: {str(e)}")

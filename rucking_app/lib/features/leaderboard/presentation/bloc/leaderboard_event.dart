@@ -14,16 +14,18 @@ class LoadLeaderboard extends LeaderboardEvent {
   final bool ascending;
   final int limit;
   final int offset;
+  final String timePeriod;
 
   const LoadLeaderboard({
     this.sortBy = 'powerPoints',
     this.ascending = false, // Descending by default (highest first)
     this.limit = 100,
     this.offset = 0,
+    this.timePeriod = 'all_time',
   });
 
   @override
-  List<Object?> get props => [sortBy, ascending, limit, offset];
+  List<Object?> get props => [sortBy, ascending, limit, offset, timePeriod];
 }
 
 /// Refresh that data faster than a hound dog chasing a rabbit
@@ -53,6 +55,16 @@ class SearchLeaderboard extends LeaderboardEvent {
 
   @override
   List<Object?> get props => [query];
+}
+
+/// Filter leaderboard by time period
+class FilterLeaderboardByTimePeriod extends LeaderboardEvent {
+  final String timePeriod;
+
+  const FilterLeaderboardByTimePeriod({required this.timePeriod});
+
+  @override
+  List<Object?> get props => [timePeriod];
 }
 
 /// Load more users than you can shake a stick at

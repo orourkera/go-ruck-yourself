@@ -18,6 +18,11 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/active_se
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// A dedicated countdown page that shows a countdown before starting a ruck session
@@ -91,6 +96,11 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       sessionRepository: locator<SessionRepository>(),
       activeSessionStorage: locator<ActiveSessionStorage>(),
       connectivityService: locator<ConnectivityService>(),
+      aiCheerleaderService: locator<AICheerleaderService>(),
+      openAIService: locator<OpenAIService>(),
+      elevenLabsService: locator<ElevenLabsService>(),
+      locationContextService: locator<LocationContextService>(),
+      audioService: locator<AIAudioService>(),
     );
     
     // Start countdown after a brief delay to ensure screen is visible
@@ -120,6 +130,9 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
             plannedRoute: widget.args.plannedRoute, // Pass planned route for navigation
             plannedRouteDistance: widget.args.plannedRouteDistance, // Pass route distance
             plannedRouteDuration: widget.args.plannedRouteDuration, // Pass route duration
+            aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled, // AI Cheerleader toggle
+            aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality, // Selected personality
+            aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent, // Explicit language preference
           ));
           
           // Listen for session state changes
@@ -226,6 +239,9 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         plannedRoute: widget.args.plannedRoute, // Include planned route
         plannedRouteDistance: widget.args.plannedRouteDistance, // Include route distance
         plannedRouteDuration: widget.args.plannedRouteDuration, // Include route duration
+        aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled, // Required AI Cheerleader toggle
+        aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality, // Optional personality
+        aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent, // Required explicit pref
       );
       
       // Debug: Log the args being passed to ActiveSessionPage

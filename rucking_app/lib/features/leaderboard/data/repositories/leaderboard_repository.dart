@@ -23,6 +23,7 @@ class LeaderboardRepository {
     int limit = 50,
     int offset = 0,
     String? searchQuery,
+    String timePeriod = 'all_time',
   }) async {
     try {
       // Build query parameters like stacking hay bales
@@ -31,6 +32,7 @@ class LeaderboardRepository {
         'ascending': ascending.toString(), // Backend expects 'ascending', not 'order'
         'limit': limit.toString(),
         'offset': offset.toString(),
+        'timePeriod': timePeriod,
       };
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {

@@ -729,7 +729,7 @@ class RuckSessionStartResource(Resource):
                 user_name = user_profile.data.get('display_name') or user_profile.data.get('username') or 'Someone' if user_profile.data else 'Someone'
                 
                 # Get followers (users who follow this user)
-                followers_response = supabase.table('user_follows').select('follower_id').eq('following_id', g.user.id).execute()
+                followers_response = supabase.table('user_follows').select('follower_id').eq('followed_id', g.user.id).execute()
                 
                 if followers_response.data:
                     follower_ids = [f['follower_id'] for f in followers_response.data]

@@ -27,6 +27,13 @@ import 'package:rucking_app/features/clubs/data/repositories/clubs_repository_im
 import 'package:rucking_app/features/clubs/domain/repositories/clubs_repository.dart';
 import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
+import 'package:dart_openai/dart_openai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_history_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
@@ -101,9 +108,9 @@ Future<void> setupServiceLocator() async {
   
   // Core services - order matters!
   getIt.registerSingleton<Dio>(_configureDio());
-  final apiClient = ApiClient(getIt<Dio>());
-  getIt.registerSingleton<ApiClient>(apiClient);
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
+  final apiClient = ApiClient(getIt<StorageService>(), getIt<Dio>());
+  getIt.registerSingleton<ApiClient>(apiClient);
   // 🚩 FEATURE-FLAGGED AUTH SERVICE
   // This wrapper allows safe switching between legacy auth and simplified Supabase auth
   // Feature flags control which implementation is used - see feature_flags.dart
@@ -119,7 +126,7 @@ Future<void> setupServiceLocator() async {
   await getIt<FeatureFlags>().initialize();
   
   // Connect services to resolve circular dependencies
-  apiClient.setStorageService(getIt<StorageService>());
+  // apiClient already constructed with StorageService via constructor; no setter needed
   
   // Add token refresh interceptor after auth service is initialized
   final tokenRefreshInterceptor = TokenRefreshInterceptor(
@@ -151,6 +158,21 @@ Future<void> setupServiceLocator() async {
     ),
   );
   
+  // AI Cheerleader Services
+  final openaiApiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+  final elevenLabsApiKey = dotenv.env['ELEVEN_LABS_API_KEY'] ?? '';
+  
+  GetIt.I.registerSingleton<OpenAIService>(OpenAIService());
+  GetIt.I.registerSingleton<ElevenLabsService>(ElevenLabsService(elevenLabsApiKey));
+  GetIt.I.registerSingleton<LocationContextService>(LocationContextService());
+  GetIt.I.registerSingleton<AIAudioService>(AIAudioService());
+  GetIt.I.registerSingleton<AICheerleaderService>(AICheerleaderService());
+  
+  // Initialize OpenAI with API key
+  if (openaiApiKey.isNotEmpty) {
+    OpenAI.apiKey = openaiApiKey;
+  }
+
   // Register SplitTrackingService which depends on WatchService
   getIt.registerSingleton<SplitTrackingService>(
     SplitTrackingService(watchService: getIt<WatchService>()),
@@ -258,6 +280,11 @@ Future<void> setupServiceLocator() async {
     sessionRepository: getIt<SessionRepository>(),
     activeSessionStorage: getIt<ActiveSessionStorage>(),
     connectivityService: getIt<ConnectivityService>(),
+    aiCheerleaderService: getIt<AICheerleaderService>(),
+    openAIService: getIt<OpenAIService>(),
+    elevenLabsService: getIt<ElevenLabsService>(),
+    locationContextService: getIt<LocationContextService>(),
+    audioService: getIt<AIAudioService>(),
   ));
   
   // Register session bloc for operations like delete

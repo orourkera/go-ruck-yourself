@@ -708,6 +708,34 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         }
         
         AppLogger.info('[COORDINATOR] Session completion recovered from server sync error');
+      } else if (e.toString().contains('NotFoundException') || 
+                 e.toString().contains('Session not found') ||
+                 e.toString().contains('failed to delete') ||
+                 e.toString().contains('status code of 404') ||
+                 e.toString().contains('DioException [bad response]') ||
+                 e.toString().contains('session_delete failed') ||
+                 (e.toString().contains('404') && e.toString().contains('session'))) {
+        AppLogger.warning('[COORDINATOR] Session not found (404) - cleaning up and navigating to homepage: $e');
+        
+        // Clean up local storage for the orphaned session
+        final sessionId = _lifecycleManager.currentState.sessionId ?? 'unknown';
+        try {
+          // Use storage service to clear session data
+          await _storageService.remove('active_session_data');
+          await _storageService.remove('active_session_last_save');
+          AppLogger.info('[COORDINATOR] Local session storage cleared for session: $sessionId');
+        } catch (cleanupError) {
+          AppLogger.error('[COORDINATOR] Failed to clean local storage: $cleanupError');
+        }
+        
+        // Reset coordinator state to clean state
+        await _lifecycleManager.reset();
+        
+        // Navigate to homepage by emitting initial state
+        // The UI listener will detect this transition and navigate accordingly
+        emit(const ActiveSessionInitial());
+        
+        AppLogger.info('[COORDINATOR] Session not found - reset to initial state');
       } else {
         // Handle other errors by emitting failure state
         AppLogger.error('[COORDINATOR] Session completion failed with unexpected error: $e');

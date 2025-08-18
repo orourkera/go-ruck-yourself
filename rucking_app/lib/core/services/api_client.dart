@@ -8,22 +8,25 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:jwt_decode/jwt_decode.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 /// Client for handling API requests to the backend
 class ApiClient {
   // Note: Dio is already configured with the base URL in service_locator.dart
-  final Dio _dio;
-  late final StorageService _storageService;
+  late final Dio _dio;
+  final StorageService _storageService;
   
-  // Callback to refresh token via auth service (with circuit breaker)
+  // Prevent concurrent refresh attempts
+  static Future<String?>? _refreshFuture;
+  static DateTime? _lastRefreshAttempt;
+  static const Duration _refreshCooldown = Duration(seconds: 10);
+  
+  // Token refresh coordination
   Function()? _tokenRefreshCallback;
-  
-  // Prevent simultaneous refresh attempts
   bool _isRefreshing = false;
   final List<Completer<void>> _refreshCompleters = [];
 
-  ApiClient(this._dio) {
+  ApiClient(this._storageService, this._dio) {
     // Add logging interceptor only in debug mode
     if (kDebugMode) {
       _dio.interceptors.add(LogInterceptor(
@@ -118,10 +121,6 @@ class ApiClient {
     }
   }
   
-  /// Set the storage service after it has been initialized
-  void setStorageService(StorageService storageService) {
-    _storageService = storageService;
-  }
   
   /// Gets the auth token, attempting to refresh if necessary
   Future<String?> getToken() async {
@@ -142,6 +141,33 @@ class ApiClient {
   
   /// Refreshes the authentication token
   Future<String?> refreshToken() async {
+    // Prevent concurrent refresh attempts - return existing future if refresh in progress
+    if (_refreshFuture != null) {
+      debugPrint('[API] Refresh already in progress, waiting for existing attempt');
+      return await _refreshFuture!;
+    }
+    
+    // Check cooldown period to prevent rapid retry storms
+    if (_lastRefreshAttempt != null && 
+        DateTime.now().difference(_lastRefreshAttempt!) < _refreshCooldown) {
+      debugPrint('[API] Refresh cooldown active, skipping attempt');
+      return null;
+    }
+    
+    // Create shared future for this refresh attempt
+    _refreshFuture = _performRefresh();
+    _lastRefreshAttempt = DateTime.now();
+    
+    try {
+      final result = await _refreshFuture!;
+      return result;
+    } finally {
+      _refreshFuture = null;
+    }
+  }
+  
+  /// Performs the actual token refresh with retry logic
+  Future<String?> _performRefresh() async {
     // Retry logic for long sessions - attempt refresh up to 3 times with exponential backoff
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -187,14 +213,22 @@ class ApiClient {
       } catch (e) {
         debugPrint('[API] Error refreshing token (attempt $attempt/3): $e');
         
-        // For network errors, wait before retrying (exponential backoff)
+        // For rate limit (429) or network errors, wait before retrying (exponential backoff)
         if (attempt < 3 && (e is DioException && 
             (e.type == DioExceptionType.connectionError || 
-             e.type == DioExceptionType.connectionTimeout))) {
-          final waitTime = Duration(seconds: attempt * 2); // 2s, 4s for attempts 1,2
-          debugPrint('[API] Network error, waiting ${waitTime.inSeconds}s before retry...');
+             e.type == DioExceptionType.connectionTimeout ||
+             e.response?.statusCode == 429 ||
+             e.response?.statusCode == 503))) {
+          final waitTime = Duration(seconds: attempt * 5); // 5s, 10s for attempts 1,2
+          debugPrint('[API] Error ${e.response?.statusCode}, waiting ${waitTime.inSeconds}s before retry...');
           await Future.delayed(waitTime);
           continue; // Retry
+        }
+        
+        // For 401 errors (invalid token), don't retry - token is dead
+        if (e is DioException && e.response?.statusCode == 401) {
+          debugPrint('[API] Refresh token invalid/expired, stopping retries');
+          break;
         }
       }
       
@@ -233,7 +267,7 @@ class ApiClient {
         
         // Check if token is expired
         try {
-          if (Jwt.isExpired(tokenPart)) {
+          if (JwtDecoder.isExpired(tokenPart)) {
             debugPrint('[API] 🔑 Current token is expired, clearing and refreshing');
             _dio.options.headers.remove('Authorization');
           } else {
@@ -262,7 +296,7 @@ class ApiClient {
       debugPrint('[API] 🔑 Found token in storage, validating');
       // Validate the token from storage before using it
       try {
-        if (!Jwt.isExpired(token)) {
+        if (!JwtDecoder.isExpired(token)) {
           // Token is valid and not expired, set it
           debugPrint('[API] 🔑 Stored token is valid, setting as auth token');
           setAuthToken(token);
@@ -294,7 +328,7 @@ class ApiClient {
         final refreshedToken = await _storageService.getSecureString(AppConfig.tokenKey);
         if (refreshedToken != null && refreshedToken.isNotEmpty) {
           try {
-            if (!Jwt.isExpired(refreshedToken)) {
+            if (!JwtDecoder.isExpired(refreshedToken)) {
               debugPrint('[API] 🔑 AuthService refresh successful, setting token');
               setAuthToken(refreshedToken);
               return true;

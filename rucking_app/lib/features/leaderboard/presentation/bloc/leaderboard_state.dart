@@ -47,6 +47,7 @@ class LeaderboardLoaded extends LeaderboardState {
   final DateTime lastUpdated;
   final int? currentUserRank;
   final int activeRuckersCount;
+  final String timePeriod;
 
   const LeaderboardLoaded({
     required this.users,
@@ -57,6 +58,7 @@ class LeaderboardLoaded extends LeaderboardState {
     required this.lastUpdated,
     this.currentUserRank,
     this.activeRuckersCount = 0,
+    this.timePeriod = 'all_time',
   });
 
   /// Copy this state slicker than a whistle
@@ -69,6 +71,7 @@ class LeaderboardLoaded extends LeaderboardState {
     DateTime? lastUpdated,
     int? currentUserRank,
     int? activeRuckersCount,
+    String? timePeriod,
   }) {
     return LeaderboardLoaded(
       users: users ?? this.users,
@@ -79,6 +82,7 @@ class LeaderboardLoaded extends LeaderboardState {
       lastUpdated: lastUpdated ?? this.lastUpdated,
       currentUserRank: currentUserRank ?? this.currentUserRank,
       activeRuckersCount: activeRuckersCount ?? this.activeRuckersCount,
+      timePeriod: timePeriod ?? this.timePeriod,
     );
   }
 
@@ -92,6 +96,7 @@ class LeaderboardLoaded extends LeaderboardState {
         lastUpdated,
         currentUserRank,
         activeRuckersCount,
+        timePeriod,
       ];
 }
 

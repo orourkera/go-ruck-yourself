@@ -44,6 +44,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'active_session_coordinator.dart';
 
@@ -64,6 +69,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ActiveSessionStorage _activeSessionStorage;
   final TerrainTracker _terrainTracker;
   final ConnectivityService _connectivityService;
+  
+  // AI Cheerleader services
+  final AICheerleaderService _aiCheerleaderService;
+  final OpenAIService _openAIService;
+  final ElevenLabsService _elevenLabsService;
+  final LocationContextService _locationContextService;
+  final AIAudioService _audioService;
 
   // Coordinator for delegating to managers
   ActiveSessionCoordinator? _coordinator;
@@ -96,6 +108,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   /// Heart rate API throttling - only send to API every 30 seconds
   DateTime? _lastApiHeartRateTime;
 
+  // AI Cheerleader state tracking
+  bool _aiCheerleaderEnabled = false;
+  String? _aiCheerleaderPersonality;
+  bool _aiCheerleaderExplicitContent = false;
+  User? _currentUser;
+
   // Batch upload system for real-time data uploads during session
   Timer? _batchUploadTimer;
   final List<LocationPoint> _pendingLocationPoints = [];
@@ -117,6 +135,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required ActiveSessionStorage activeSessionStorage,
     required TerrainTracker terrainTracker,
     required ConnectivityService connectivityService,
+    required AICheerleaderService aiCheerleaderService,
+    required OpenAIService openAIService,
+    required ElevenLabsService elevenLabsService,
+    required LocationContextService locationContextService,
+    required AIAudioService audioService,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -128,6 +151,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _activeSessionStorage = activeSessionStorage,
         _terrainTracker = terrainTracker,
         _connectivityService = connectivityService,
+        _aiCheerleaderService = aiCheerleaderService,
+        _openAIService = openAIService,
+        _elevenLabsService = elevenLabsService,
+        _locationContextService = locationContextService,
+        _audioService = audioService,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
@@ -149,6 +177,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<FetchSessionPhotosRequested>(_onFetchSessionPhotosRequested);
     on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
     on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
+    on<AICheerleaderManualTriggerRequested>(_onAICheerleaderManualTriggerRequested);
     on<ClearSessionPhotos>(_onClearSessionPhotos);
     on<TakePhotoRequested>(_onTakePhotoRequested);
     on<PickPhotoRequested>(_onPickPhotoRequested);
@@ -171,6 +200,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     AppLogger.info('Starting session with delegation to coordinator');
     
     try {
+      // Capture AI Cheerleader parameters
+      _aiCheerleaderEnabled = event.aiCheerleaderEnabled;
+      _aiCheerleaderPersonality = event.aiCheerleaderPersonality;
+      _aiCheerleaderExplicitContent = event.aiCheerleaderExplicitContent;
+      
+      // Reset AI Cheerleader service for new session
+      if (_aiCheerleaderEnabled) {
+        _aiCheerleaderService.reset();
+        AppLogger.info('AI Cheerleader enabled: $_aiCheerleaderPersonality (explicit: $_aiCheerleaderExplicitContent)');
+        
+        // Get current user for context
+        final authService = GetIt.I<AuthService>();
+        _currentUser = await authService.getCurrentUser();
+      }
+      
       // Create coordinator if it doesn't exist
       if (_coordinator == null) {
         _coordinator = _createCoordinator();
@@ -224,9 +268,141 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   /// Forward coordinator state safely by converting it to an internal event
   void _forwardCoordinatorState(ActiveSessionState coordinatorState) {
+    // Check for AI Cheerleader triggers if enabled and session is running
+    if (_aiCheerleaderEnabled && 
+        coordinatorState is ActiveSessionRunning &&
+        _aiCheerleaderPersonality != null &&
+        _currentUser != null) {
+      _checkAICheerleaderTriggers(coordinatorState);
+    }
+    
     // Instead of calling emit directly, we use a custom event to safely forward states
     // This ensures the emission happens within a proper event handler context
     add(_CoordinatorStateForwarded(coordinatorState));
+  }
+
+  /// Check for AI Cheerleader triggers and process them
+  Future<void> _checkAICheerleaderTriggers(ActiveSessionRunning state) async {
+    try {
+      final trigger = _aiCheerleaderService.analyzeTriggers(state);
+      if (trigger != null) {
+        AppLogger.info('[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
+        await _processAICheerleaderTrigger(trigger, state);
+      }
+    } catch (e) {
+      AppLogger.error('[AI_CHEERLEADER] Trigger detection failed: $e');
+    }
+  }
+
+  /// Handle manual AI Cheerleader trigger request from user
+  Future<void> _onAICheerleaderManualTriggerRequested(
+    AICheerleaderManualTriggerRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    if (!_aiCheerleaderEnabled || 
+        _aiCheerleaderPersonality == null || 
+        _currentUser == null ||
+        state is! ActiveSessionRunning) {
+      AppLogger.warning('[AI_CHEERLEADER] Manual trigger ignored - not ready or not running');
+      return;
+    }
+
+    final runningState = state as ActiveSessionRunning;
+    
+    // Create a special manual trigger with current session context
+    final manualTrigger = CheerleaderTrigger(
+      type: TriggerType.manualRequest,
+      data: {
+        'elapsedMinutes': runningState.elapsedSeconds ~/ 60,
+        'distanceKm': runningState.distanceKm,
+        'manualRequest': true,
+      },
+    );
+    
+    AppLogger.info('[AI_CHEERLEADER] Manual trigger requested by user');
+    await _processAICheerleaderTrigger(manualTrigger, runningState);
+  }
+
+  /// Process AI Cheerleader trigger through the full pipeline
+  Future<void> _processAICheerleaderTrigger(
+    CheerleaderTrigger trigger, 
+    ActiveSessionRunning state
+  ) async {
+    try {
+      // 1. Assemble context for AI generation
+      final context = _aiCheerleaderService.assembleContext(
+        state,
+        trigger,
+        _currentUser!,
+        _aiCheerleaderPersonality!,
+        _aiCheerleaderExplicitContent,
+      );
+
+      // 2. Add location context if available
+      final lastLocation = state.locationPoints.isNotEmpty ? state.locationPoints.last : null;
+      if (lastLocation != null) {
+        final locationContext = await _locationContextService.getLocationContext(
+          lastLocation.latitude,
+          lastLocation.longitude,
+        );
+        if (locationContext != null) {
+          context['location'] = {
+            'description': locationContext.description,
+            'city': locationContext.city,
+            'terrain': locationContext.terrain,
+            'landmark': locationContext.landmark,
+          };
+        }
+      }
+
+      // 3. Generate motivational text with OpenAI
+      final message = await _openAIService.generateMessage(
+        context: context,
+        personality: _aiCheerleaderPersonality!,
+        explicitContent: _aiCheerleaderExplicitContent,
+      );
+
+      if (message != null && message.isNotEmpty) {
+        AppLogger.info('[AI_CHEERLEADER] Generated message: "$message"');
+        
+        // 4. Synthesize speech with ElevenLabs
+        final audioBytes = await _elevenLabsService.synthesizeSpeech(
+          text: message,
+          personality: _aiCheerleaderPersonality!,
+        );
+
+        if (audioBytes != null) {
+          AppLogger.info('[AI_CHEERLEADER] Audio synthesized successfully');
+          
+          // 5. Play audio through audio service
+          final playbackSuccess = await _audioService.playCheerleaderAudio(
+            audioBytes: audioBytes,
+            fallbackText: message,
+            personality: _aiCheerleaderPersonality!,
+          );
+          
+          if (playbackSuccess) {
+            AppLogger.info('[AI_CHEERLEADER] Audio playback completed successfully');
+          } else {
+            AppLogger.warning('[AI_CHEERLEADER] Audio playback failed');
+          }
+        } else {
+          AppLogger.warning('[AI_CHEERLEADER] Audio synthesis failed, falling back to TTS');
+          
+          // Play fallback TTS directly
+          await _audioService.playCheerleaderAudio(
+            audioBytes: Uint8List(0), // Empty bytes to trigger TTS fallback
+            fallbackText: message,
+            personality: _aiCheerleaderPersonality!,
+          );
+        }
+      } else {
+        AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
+      }
+
+    } catch (e) {
+      AppLogger.error('[AI_CHEERLEADER] Pipeline processing failed: $e');
+    }
   }
 
   void _startLocationUpdates(String sessionId) {

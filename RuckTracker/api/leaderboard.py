@@ -34,6 +34,7 @@ class LeaderboardResource(Resource):
             limit = min(int(_limit_param), 100) if _limit_param is not None else None
             offset = int(request.args.get('offset', 0)) if _limit_param is not None else 0
             search = request.args.get('search', '').strip()
+            time_period = request.args.get('timePeriod', 'all_time')
             
             # Validate sort_by parameter
             valid_sorts = ['powerPoints', 'rucks', 'distance', 'elevation', 'calories']
@@ -43,7 +44,7 @@ class LeaderboardResource(Resource):
             # Build cache key (respect unpaginated responses when no limit provided)
             _limit_key = limit if limit is not None else 'all'
             _offset_key = offset if limit is not None else 0
-            cache_key = f"leaderboard:{sort_by}:{ascending}:{_limit_key}:{_offset_key}:{search}"
+            cache_key = f"leaderboard:{sort_by}:{ascending}:{_limit_key}:{_offset_key}:{search}:{time_period}"
             cache_service = get_cache_service()
             
             # Try to get from cache first (cache for 5 minutes)
@@ -109,6 +110,17 @@ class LeaderboardResource(Resource):
                         'id, user_id, distance_km, elevation_gain_m, calories_burned, '
                         'power_points, completed_at, started_at, status'
                     ).in_('user_id', user_ids)
+                    
+                    # Apply time period filter
+                    if time_period == 'last_7_days':
+                        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+                        sessions_query = sessions_query.gte('completed_at', cutoff_date)
+                    elif time_period == 'last_30_days':
+                        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+                        sessions_query = sessions_query.gte('completed_at', cutoff_date)
+                    elif time_period == 'rucking_now':
+                        # Only show currently active sessions (in_progress or paused)
+                        sessions_query = sessions_query.in_('status', ['in_progress', 'paused']).is_('completed_at', None)
                     
                     sessions_response = sessions_query.execute()
                     logger.debug(f"Manual sessions query returned: {len(sessions_response.data)} sessions")
@@ -207,12 +219,54 @@ class LeaderboardResource(Resource):
                 # Aggregate completed ruck sessions only
                 for ruck in user_data.get('ruck_session', []):
                     if ruck.get('completed_at'):  # Only count completed rucks
-                        stats = user_stats[user_id]['stats']
-                        stats['rucks'] += 1
-                        stats['distanceKm'] += ruck.get('distance_km') or 0.0
-                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
-                        stats['caloriesBurned'] += ruck.get('calories_burned') or 0
-                        stats['powerPoints'] += ruck.get('power_points') or 0.0
+                        # Apply time period filter
+                        include_ruck = True
+                        if time_period != 'all_time':
+                            completed_at = ruck.get('completed_at')
+                            if completed_at:
+                                try:
+                                    # Parse completion date
+                                    if completed_at.endswith('Z'):
+                                        completion_time = datetime.fromisoformat(completed_at.replace('Z', '+00:00'))
+                                    elif '+' in completed_at:
+                                        completion_time = datetime.fromisoformat(completed_at)
+                                    else:
+                                        completion_time = datetime.fromisoformat(completed_at + '+00:00')
+                                    
+                                    # Check if within time period
+                                    if time_period == 'last_7_days':
+                                        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+                                        include_ruck = completion_time >= cutoff_date
+                                    elif time_period == 'last_30_days':
+                                        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+                                        include_ruck = completion_time >= cutoff_date
+                                except (ValueError, AttributeError):
+                                    # If we can't parse the date, exclude it to be safe
+                                    include_ruck = False
+                        
+                        # Handle rucking_now filter - only count active sessions
+                        if time_period == 'rucking_now':
+                            if ruck.get('status') in ['in_progress', 'paused'] and not ruck.get('completed_at'):
+                                include_ruck = True
+                            else:
+                                include_ruck = False
+                        
+                        if include_ruck:
+                            stats = user_stats[user_id]['stats']
+                            # For rucking_now, count active sessions as "rucks" but don't double count stats
+                            if time_period == 'rucking_now':
+                                stats['rucks'] += 1
+                                # For active sessions, show current progress if available
+                                stats['distanceKm'] += ruck.get('distance_km') or 0.0
+                                stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
+                                stats['caloriesBurned'] += ruck.get('calories_burned') or 0
+                                stats['powerPoints'] += ruck.get('power_points') or 0.0
+                            else:
+                                stats['rucks'] += 1
+                                stats['distanceKm'] += ruck.get('distance_km') or 0.0
+                                stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
+                                stats['caloriesBurned'] += ruck.get('calories_burned') or 0
+                                stats['powerPoints'] += ruck.get('power_points') or 0.0
             
             # Filter out users with zero completed rucks - only show active ruckers!
             active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 

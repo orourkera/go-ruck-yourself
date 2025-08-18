@@ -99,6 +99,9 @@ class RemoteConfigService {
       // Rollout controls
       'auth_rollout_percentage': kDebugMode ? 100 : 0, // 0% in production initially
       'emergency_disable_all_flags': false,
+
+      // AI Cheerleader feature flags
+      'ai_cheerleader_manual_trigger': kDebugMode, // Enable in debug for testing
     };
   }
 

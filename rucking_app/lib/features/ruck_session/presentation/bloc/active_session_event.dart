@@ -26,6 +26,9 @@ class SessionStarted extends ActiveSessionEvent {
   final List<latlong.LatLng>? plannedRoute; // Add planned route for navigation
   final double? plannedRouteDistance; // Route distance in km
   final int? plannedRouteDuration; // Route estimated duration in minutes
+  final bool aiCheerleaderEnabled; // AI Cheerleader feature toggle
+  final String? aiCheerleaderPersonality; // Selected personality type
+  final bool aiCheerleaderExplicitContent; // Explicit language preference
   
   const SessionStarted({
     required this.ruckWeightKg,
@@ -37,10 +40,13 @@ class SessionStarted extends ActiveSessionEvent {
     this.plannedRoute, // Add plannedRoute parameter
     this.plannedRouteDistance, // Add route distance parameter
     this.plannedRouteDuration, // Add route duration parameter
+    required this.aiCheerleaderEnabled, // Required AI Cheerleader toggle
+    this.aiCheerleaderPersonality, // Optional personality selection
+    required this.aiCheerleaderExplicitContent, // Required explicit content preference
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId, plannedRoute, plannedRouteDistance, plannedRouteDuration];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId, plannedRoute, plannedRouteDistance, plannedRouteDuration, aiCheerleaderEnabled, aiCheerleaderPersonality, aiCheerleaderExplicitContent];
 }
 
 class SessionRecoveryRequested extends ActiveSessionEvent {
@@ -393,4 +399,12 @@ class CheckForCrashedSession extends ActiveSessionEvent {
 class SessionRecovered extends ActiveSessionEvent {
   @override
   List<Object> get props => [];
+}
+
+/// Event to manually trigger AI Cheerleader speech on demand
+class AICheerleaderManualTriggerRequested extends ActiveSessionEvent {
+  const AICheerleaderManualTriggerRequested();
+  
+  @override
+  List<Object?> get props => [];
 }

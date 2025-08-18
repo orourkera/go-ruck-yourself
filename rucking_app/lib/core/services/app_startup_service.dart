@@ -68,6 +68,9 @@ class AppStartupService {
           notes: null, // Notes aren't stored in session data
           plannedDuration: null, // Planned duration isn't stored in session data  
           initialCenter: null, // Initial center isn't stored in session data
+          aiCheerleaderEnabled: false, // Default disabled for recovered sessions
+          aiCheerleaderPersonality: 'Motivational Coach',
+          aiCheerleaderExplicitContent: false,
         );
 
         // Clear the navigation stack and go directly to active session with proper arguments

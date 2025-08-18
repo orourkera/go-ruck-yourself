@@ -29,12 +29,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   late final TextEditingController _searchController;
   late final AnimationController _refreshAnimationController;
   late final AnimationController _updateAnimationController;
+  late final AnimationController _explosionAnimationController;
   Timer? _realTimeUpdateTimer;
 
   String _currentSortBy = 'distanceKm'; // Default sort by distance
   bool _currentAscending = false;
   bool _isSearching = false;
   bool _isUpdatingScroll = false; // Prevent infinite loops
+  String _currentTimePeriod = 'all_time'; // Default time period
   
   // Shared horizontal scroll offset using ValueNotifier
   late ValueNotifier<double> _horizontalScrollNotifier;
@@ -55,6 +57,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
     _updateAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _explosionAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
@@ -95,6 +101,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     _searchController.dispose();
     _refreshAnimationController.dispose();
     _updateAnimationController.dispose();
+    _explosionAnimationController.dispose();
     _realTimeUpdateTimer?.cancel(); // Cancel the timer
     super.dispose();
   }
@@ -162,6 +169,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                         : const SizedBox.shrink(); // Hide when no active ruckers
                     },
                   ),
+                ),
+              ),
+              
+              // Explosion animation overlay
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _explosionAnimationController,
+                  builder: (context, child) {
+                    if (_explosionAnimationController.value == 0) {
+                      return const SizedBox.shrink();
+                    }
+                    return _buildExplosionAnimation();
+                  },
                 ),
               ),
             ],
@@ -244,6 +264,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               ),
             ],
           ),
+          
+          // Time period filter chips
+          const SizedBox(height: 16),
+          _buildTimePeriodFilters(),
           
           // Search bar (if searching)
           if (_isSearching) ...[
@@ -684,12 +708,102 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
+  /// Build explosion animation when ruck completes
+  Widget _buildExplosionAnimation() {
+    final animation = _explosionAnimationController;
+    final screenSize = MediaQuery.of(context).size;
+    
+    return IgnorePointer(
+      child: Container(
+        color: Colors.transparent,
+        child: Stack(
+          children: List.generate(20, (index) {
+            final angle = (index / 20) * 2 * 3.14159;
+            final distance = animation.value * 200;
+            final x = screenSize.width / 2 + distance * (index % 2 == 0 ? 1 : -1) * 0.5;
+            final y = screenSize.height / 2 + distance * (index % 3 == 0 ? 1 : -1) * 0.5;
+            
+            return Positioned(
+              left: x,
+              top: y,
+              child: Transform.scale(
+                scale: (1 - animation.value) * 2,
+                child: Opacity(
+                  opacity: 1 - animation.value,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: [Colors.orange, Colors.red, Colors.yellow, Colors.blue][index % 4],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  /// Trigger explosion animation
+  void _triggerExplosion() {
+    _explosionAnimationController.reset();
+    _explosionAnimationController.forward();
+  }
+
+  /// Build time period filter chips
+  Widget _buildTimePeriodFilters() {
+    final timePeriods = [
+      {'key': 'rucking_now', 'label': 'Rucking Now'},
+      {'key': 'last_7_days', 'label': 'Last 7 Days'},
+      {'key': 'last_30_days', 'label': 'Last 30 Days'},
+      {'key': 'all_time', 'label': 'All Time'},
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: timePeriods.map((period) {
+        final isSelected = _currentTimePeriod == period['key'];
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FilterChip(
+              label: Text(period['label']!),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected && !isSelected) {
+                  setState(() {
+                    _currentTimePeriod = period['key']!;
+                  });
+                  context.read<LeaderboardBloc>().add(
+                    FilterLeaderboardByTimePeriod(timePeriod: period['key']!),
+                  );
+                }
+              },
+              selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+              checkmarkColor: Theme.of(context).primaryColor,
+              labelStyle: TextStyle(
+                color: isSelected 
+                    ? Theme.of(context).primaryColor 
+                    : Theme.of(context).textTheme.bodyMedium?.color,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   /// Handle state changes like a good ranch hand
   void _handleStateChanges(BuildContext context, LeaderboardState state) {
     // Sync sort state with bloc state and trigger auto-scroll
     if (state is LeaderboardLoaded) {
       _currentSortBy = state.sortBy;
       _currentAscending = state.ascending;
+      _currentTimePeriod = state.timePeriod;
       
       // Auto-scroll to current user position
       _scrollToCurrentUser(state.users);

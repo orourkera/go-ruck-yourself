@@ -16,6 +16,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   String _currentSortBy = 'powerPoints';
   bool _currentAscending = false;
   String? _currentSearchQuery;
+  String _currentTimePeriod = 'all_time';
   bool _hasMore = true;
   int _currentOffset = 0;
   static const int _pageSize = 20;
@@ -28,6 +29,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     on<RefreshLeaderboard>(_onRefreshLeaderboard);
     on<SortLeaderboard>(_onSortLeaderboard);
     on<SearchLeaderboard>(_onSearchLeaderboard);
+    on<FilterLeaderboardByTimePeriod>(_onFilterByTimePeriod);
     on<LoadMoreUsers>(_onLoadMoreUsers);
     on<UserRuckStarted>(_onUserRuckStarted);
     on<UserRuckCompleted>(_onUserRuckCompleted);
@@ -44,10 +46,15 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     print('🔍 BLOC: Emitted LeaderboardLoading state');
 
     try {
+      _currentSortBy = event.sortBy;
+      _currentAscending = event.ascending;
+      _currentTimePeriod = event.timePeriod;
+      
       print('🔍 BLOC: About to call repository.getLeaderboard...');
       final response = await repository.getLeaderboard(
-        sortBy: _currentSortBy,
-        ascending: _currentAscending,
+        sortBy: event.sortBy,
+        ascending: event.ascending,
+        timePeriod: event.timePeriod,
         // Remove limit to get ALL users instead of pagination
         limit: 999999,  // High limit to get all users
         offset: 0,
@@ -75,6 +82,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
         activeRuckersCount: response.activeRuckersCount,
+        timePeriod: _currentTimePeriod,
       );
       print('🔍 BLOC: LeaderboardLoaded state created successfully');
       
@@ -186,46 +194,79 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     }
   }
 
-  /// Search for users like hunting for a lost calf
+  /// Search the leaderboard like a bloodhound tracking a scent
   Future<void> _onSearchLeaderboard(
     SearchLeaderboard event,
     Emitter<LeaderboardState> emit,
   ) async {
-    if (state is! LeaderboardLoaded) return;
-
-    emit(const LeaderboardLoading());
-
+    _currentSearchQuery = event.query.isEmpty ? null : event.query;
+    _currentOffset = 0;
+    
     try {
-      _currentSearchQuery = event.query.trim().isEmpty ? null : event.query.trim();
-      _currentOffset = 0;
-      _hasMore = true;
-
       final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
         ascending: _currentAscending,
-        limit: _pageSize,
-        offset: 0,
         searchQuery: _currentSearchQuery,
+        timePeriod: _currentTimePeriod,
+        limit: 999999,
+        offset: 0,
       );
-
+      
       final currentUserRank = await _getCurrentUserRank();
 
       _currentUsers = response.users;
-      _hasMore = response.users.length >= _pageSize;
-      _currentOffset = response.users.length;
-
       emit(LeaderboardLoaded(
         users: response.users,
         sortBy: _currentSortBy,
         ascending: _currentAscending,
-        hasMore: _hasMore,
+        hasMore: false, // Search returns all results
         searchQuery: _currentSearchQuery,
         lastUpdated: DateTime.now(),
         currentUserRank: currentUserRank,
         activeRuckersCount: response.activeRuckersCount,
+        timePeriod: _currentTimePeriod,
       ));
     } catch (e) {
       emit(LeaderboardError(message: 'Well I\'ll be! Failed to search leaderboard: $e'));
+    }
+  }
+
+  /// Filter leaderboard by time period like sorting cattle by season
+  Future<void> _onFilterByTimePeriod(
+    FilterLeaderboardByTimePeriod event,
+    Emitter<LeaderboardState> emit,
+  ) async {
+    _currentTimePeriod = event.timePeriod;
+    _currentOffset = 0;
+    
+    emit(const LeaderboardLoading());
+    
+    try {
+      final response = await repository.getLeaderboard(
+        sortBy: _currentSortBy,
+        ascending: _currentAscending,
+        searchQuery: _currentSearchQuery,
+        timePeriod: _currentTimePeriod,
+        limit: 999999,
+        offset: 0,
+      );
+      
+      final currentUserRank = await _getCurrentUserRank();
+      
+      _currentUsers = response.users;
+      emit(LeaderboardLoaded(
+        users: response.users,
+        sortBy: _currentSortBy,
+        ascending: _currentAscending,
+        hasMore: false,
+        searchQuery: _currentSearchQuery,
+        lastUpdated: DateTime.now(),
+        currentUserRank: currentUserRank,
+        activeRuckersCount: response.activeRuckersCount,
+        timePeriod: _currentTimePeriod,
+      ));
+    } catch (e) {
+      emit(LeaderboardError(message: 'Well I\'ll be! Failed to filter leaderboard: $e'));
     }
   }
 

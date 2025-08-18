@@ -134,7 +134,7 @@ class _ServiceLocator {
           call<StorageService>(),
         );
       } else if (T == ApiClient) {
-        _services[T] = ApiClient(Dio());
+        _services[T] = ApiClient(call<StorageService>(), Dio());
       } else if (T == StorageService) {
         // Create a simple working storage service
         _services[T] = _StubStorageService();

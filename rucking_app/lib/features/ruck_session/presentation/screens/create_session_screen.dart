@@ -85,6 +85,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final TextEditingController _offlineElevationGainController = TextEditingController();
   final TextEditingController _offlineElevationLossController = TextEditingController();
 
+  // AI Cheerleader state variables
+  bool _aiCheerleaderEnabled = false;
+  String _aiCheerleaderPersonality = 'Supportive Friend';
+  bool _aiCheerleaderExplicitContent = false;
+
   /// Loads preferences and last used values (ruck weight and duration)
   Future<void> _loadDefaults() async {
     setState(() { _isLoading = true; });
@@ -121,6 +126,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       if (lastUserWeight != null && lastUserWeight.isNotEmpty) {
         _userWeightController.text = lastUserWeight;
       }
+      
+      // Load AI Cheerleader preferences
+      _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? false;
+      _aiCheerleaderPersonality = prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
+      _aiCheerleaderExplicitContent = prefs.getBool('aiCheerleaderExplicitContent') ?? false;
 
     } catch (e) {
       
@@ -492,6 +502,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             plannedRoute: plannedRoute, // Pass the parsed route points
             plannedRouteDistance: plannedRouteDistance, // Pass route distance
             plannedRouteDuration: plannedRouteDuration, // Pass route duration
+            aiCheerleaderEnabled: _aiCheerleaderEnabled, // AI Cheerleader toggle
+            aiCheerleaderPersonality: _aiCheerleaderPersonality, // Selected personality
+            aiCheerleaderExplicitContent: _aiCheerleaderExplicitContent, // Explicit language preference
           );
           
           // CRITICAL DEBUG: Print the actual args being created
@@ -1197,6 +1210,116 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     if (!_isCreating) _createSession();
                   },
                 ),
+                const SizedBox(height: 32),
+                
+                // AI Cheerleader Controls
+                Card(
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Cheerleader',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Get AI-powered motivation during your ruck',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // AI Cheerleader Toggle
+                        SwitchListTile(
+                          title: const Text('Enable AI Cheerleader'),
+                          subtitle: const Text('Get motivational messages during your ruck'),
+                          value: _aiCheerleaderEnabled,
+                          onChanged: (bool value) async {
+                            setState(() {
+                              _aiCheerleaderEnabled = value;
+                            });
+                            // Save preference immediately
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('aiCheerleaderEnabled', value);
+                          },
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        
+                        // Personality Dropdown (only shown when enabled)
+                        if (_aiCheerleaderEnabled) ...[
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: _aiCheerleaderPersonality,
+                            decoration: const InputDecoration(
+                              labelText: 'Personality',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'Motivational Coach', child: Text('Motivational Coach')),
+                              DropdownMenuItem(value: 'Supportive Friend', child: Text('Supportive Friend')),
+                              DropdownMenuItem(value: 'Drill Sergeant', child: Text('Drill Sergeant')),
+                              DropdownMenuItem(value: 'Zen Guide', child: Text('Zen Guide')),
+                              DropdownMenuItem(value: 'Southern Redneck', child: Text('Southern Redneck')),
+                              DropdownMenuItem(value: 'Dwarven Warrior', child: Text('Dwarven Warrior')),
+                              DropdownMenuItem(value: 'Pirate Captain', child: Text('Pirate Captain')),
+                              DropdownMenuItem(value: 'Yoga Instructor', child: Text('Yoga Instructor')),
+                              DropdownMenuItem(value: 'British Butler', child: Text('British Butler')),
+                              DropdownMenuItem(value: 'Surfer Dude', child: Text('Surfer Dude')),
+                              DropdownMenuItem(value: 'Wise Grandmother', child: Text('Wise Grandmother')),
+                              DropdownMenuItem(value: 'Sports Commentator', child: Text('Sports Commentator')),
+                              DropdownMenuItem(value: 'Robot Assistant', child: Text('Robot Assistant')),
+                              DropdownMenuItem(value: 'Medieval Knight', child: Text('Medieval Knight')),
+                              DropdownMenuItem(value: 'Cowboy/Cowgirl', child: Text('Cowboy/Cowgirl')),
+                              DropdownMenuItem(value: 'Scientist', child: Text('Scientist')),
+                              DropdownMenuItem(value: 'Stand-up Comedian', child: Text('Stand-up Comedian')),
+                              DropdownMenuItem(value: 'Ninja Master', child: Text('Ninja Master')),
+                              DropdownMenuItem(value: 'Chef', child: Text('Chef')),
+                              DropdownMenuItem(value: 'Flight Attendant', child: Text('Flight Attendant')),
+                              DropdownMenuItem(value: 'Game Show Host', child: Text('Game Show Host')),
+                            ],
+                            onChanged: (String? newValue) async {
+                              if (newValue != null) {
+                                setState(() {
+                                  _aiCheerleaderPersonality = newValue;
+                                });
+                                // Save preference immediately
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('aiCheerleaderPersonality', newValue);
+                              }
+                            },
+                          ),
+                          
+                          const SizedBox(height: 8),
+                          
+                          // Explicit Content Toggle
+                          SwitchListTile(
+                            title: const Text('Explicit Language'),
+                            subtitle: const Text('Allow stronger language for intense motivation'),
+                            value: _aiCheerleaderExplicitContent,
+                            onChanged: (bool value) async {
+                              setState(() {
+                                _aiCheerleaderExplicitContent = value;
+                              });
+                              // Save preference immediately
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool('aiCheerleaderExplicitContent', value);
+                            },
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
                 if (_isOfflineMode) ...[
                   const SizedBox(height: 16),
                   CustomTextField(
