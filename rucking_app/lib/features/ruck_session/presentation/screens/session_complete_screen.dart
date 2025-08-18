@@ -354,11 +354,103 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     setState(() => _isExportingToStrava = true);
     
     try {
-      // Show coming soon message
-      if (mounted) {
-        StyledSnackBar.show(
+      // Check connection status first
+      final status = await _stravaService.getConnectionStatus();
+      if (!status.connected) {
+        // Show dialog to connect to Strava directly
+        if (mounted) {
+          final shouldConnect = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Connect to Strava'),
+              content: const Text('Connect your Strava account to export this ruck session.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFC4C02),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Connect'),
+                ),
+              ],
+            ),
+          );
+          
+          if (shouldConnect == true) {
+            // Attempt to connect to Strava
+            final success = await _stravaService.connectToStrava();
+            if (success) {
+              StyledSnackBar.show(
+                context: context,
+                message: 'Opening Strava authorization...',
+                type: SnackBarType.success,
+              );
+              // Wait a moment for OAuth flow then retry export
+              await Future.delayed(const Duration(seconds: 3));
+              final newStatus = await _stravaService.getConnectionStatus();
+              if (!newStatus.connected) {
+                StyledSnackBar.show(
+                  context: context,
+                  message: 'Strava connection required to export',
+                  type: SnackBarType.error,
+                );
+                return;
+              }
+            } else {
+              StyledSnackBar.show(
+                context: context,
+                message: 'Failed to open Strava authorization',
+                type: SnackBarType.error,
+              );
+              return;
+            }
+          } else {
+            return;
+          }
+        } else {
+          return;
+        }
+      }
+
+      // Format session name using StravaService helper
+      final sessionName = _stravaService.formatSessionName(
+        ruckWeightKg: widget.ruckWeight,
+        distanceKm: widget.distance,
+        duration: widget.duration,
+      );
+
+      // Format session description
+      final description = _stravaService.formatSessionDescription(
+        ruckWeightKg: widget.ruckWeight,
+        distanceKm: widget.distance,
+        duration: widget.duration,
+        calories: widget.caloriesBurned,
+      );
+
+      // Export to Strava
+      final success = await _stravaService.exportRuckSession(
+        sessionId: widget.ruckId,
+        sessionName: sessionName,
+        ruckWeightKg: widget.ruckWeight,
+        duration: widget.duration,
+        distanceMeters: widget.distance * 1000, // Convert km to meters
+        description: description,
+      );
+
+      if (success && mounted) {
+        StyledSnackBar.showSuccess(
           context: context,
-          message: 'Strava integration coming soon! 🏃‍♂️'
+          message: 'Successfully exported to Strava! 🎉',
+        );
+      } else if (mounted) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Failed to export to Strava. Please try again.',
         );
       }
     } catch (e) {
@@ -1282,13 +1374,38 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         ),
         const SizedBox(height: 16),
         Center(
-          child: CustomButton(
+          child: ElevatedButton(
             onPressed: _isExportingToStrava ? null : _exportToStrava,
-            text: 'Export to Strava',
-            icon: Icons.directions_run,
-            color: const Color(0xFFFC4C02), // Strava orange color
-            isLoading: _isExportingToStrava,
-            width: 250,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.zero,
+            ),
+            child: _isExportingToStrava
+                ? Container(
+                    width: 250,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFC4C02),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                    ),
+                  )
+                : Image.asset(
+                    'assets/images/btn_strava_connect_with_orange.png',
+                    width: 250,
+                    fit: BoxFit.contain,
+                  ),
           ),
         ),
         const SizedBox(height: 24),

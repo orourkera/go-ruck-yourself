@@ -850,6 +850,155 @@ def terms():
 def support():
     return render_template('support.html')
 
+@app.route('/settings')
+def settings():
+    """Handle OAuth success/error redirects from Strava integration"""
+    strava_success = request.args.get('strava_success')
+    strava_error = request.args.get('strava_error')
+    
+    if strava_success:
+        # Success page that can redirect back to app
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Strava Connected Successfully</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+                    text-align: center; 
+                    padding: 50px 20px; 
+                    background: #f8f9fa;
+                }
+                .container { 
+                    max-width: 400px; 
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 40px 20px; 
+                    border-radius: 12px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                .success { color: #28a745; font-size: 48px; margin-bottom: 20px; }
+                h1 { color: #333; margin-bottom: 10px; }
+                p { color: #666; margin-bottom: 30px; line-height: 1.5; }
+                .button { 
+                    background: #FC4C02; 
+                    color: white; 
+                    padding: 12px 24px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    text-decoration: none; 
+                    display: inline-block;
+                    font-weight: 600;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="success">✅</div>
+                <h1>Strava Connected!</h1>
+                <p>Your Strava account has been successfully connected. You can now export your ruck sessions to Strava.</p>
+                <a href="javascript:window.close()" class="button">Close Window</a>
+            </div>
+        </body>
+        </html>
+        '''
+    elif strava_error:
+        # Error page with details
+        error_messages = {
+            'access_denied': 'You cancelled the Strava authorization.',
+            'invalid_callback': 'Invalid authorization response from Strava.',
+            'config_error': 'Strava integration is not properly configured.',
+            'token_exchange_failed': 'Failed to exchange authorization code for tokens.',
+            'save_failed': 'Failed to save Strava connection to your account.',
+            'unexpected_error': 'An unexpected error occurred during Strava connection.'
+        }
+        error_message = error_messages.get(strava_error, 'Unknown error occurred.')
+        
+        return f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Strava Connection Failed</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body {{ 
+                    font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+                    text-align: center; 
+                    padding: 50px 20px; 
+                    background: #f8f9fa;
+                }}
+                .container {{ 
+                    max-width: 400px; 
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 40px 20px; 
+                    border-radius: 12px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                .error {{ color: #dc3545; font-size: 48px; margin-bottom: 20px; }}
+                h1 {{ color: #333; margin-bottom: 10px; }}
+                p {{ color: #666; margin-bottom: 30px; line-height: 1.5; }}
+                .button {{ 
+                    background: #6c757d; 
+                    color: white; 
+                    padding: 12px 24px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    text-decoration: none; 
+                    display: inline-block;
+                    font-weight: 600;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="error">❌</div>
+                <h1>Connection Failed</h1>
+                <p>{error_message}</p>
+                <p>Please try again from the app settings.</p>
+                <a href="javascript:window.close()" class="button">Close Window</a>
+            </div>
+        </body>
+        </html>
+        '''
+    else:
+        # Generic settings page if accessed directly
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Settings</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+                    text-align: center; 
+                    padding: 50px 20px; 
+                    background: #f8f9fa;
+                }
+                .container { 
+                    max-width: 400px; 
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 40px 20px; 
+                    border-radius: 12px; 
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                h1 { color: #333; margin-bottom: 20px; }
+                p { color: #666; line-height: 1.5; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Settings</h1>
+                <p>Please use the RuckingApp mobile app to access settings.</p>
+            </div>
+        </body>
+        </html>
+        '''
+
 # Add route for health check (remains unprefixed)
 @app.route('/health')
 def health():

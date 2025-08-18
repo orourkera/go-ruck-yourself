@@ -135,7 +135,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       const availablePersonalities = [
         'Supportive Friend', 'Drill Sergeant', 'Southern Redneck',
         'Yoga Instructor', 'British Butler', 'Sports Commentator', 
-        'Cowboy/Cowgirl', 'Nature Lover', 'Burt Reynolds'
+        'Cowboy/Cowgirl', 'Nature Lover', 'Burt Reynolds', 'Tom Selleck'
       ];
       
       _aiCheerleaderPersonality = availablePersonalities.contains(savedPersonality) 
@@ -1283,6 +1283,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                               DropdownMenuItem(value: 'Cowboy/Cowgirl', child: Text('Cowboy (M)')),
                               DropdownMenuItem(value: 'Nature Lover', child: Text('Nature Lover (F)')),
                               DropdownMenuItem(value: 'Burt Reynolds', child: Text('Burt Reynolds (M)')),
+                              DropdownMenuItem(value: 'Tom Selleck', child: Text('Tom Selleck (M)')),
                             ],
                             onChanged: (String? newValue) async {
                               if (newValue != null) {

@@ -46,12 +46,27 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> {
     setState(() => _isLoading = true);
     
     try {
-      // Show coming soon message
-      if (mounted) {
+      final success = await _stravaService.connectToStrava();
+      
+      if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Strava integration coming soon! 🏃‍♂️'),
-            backgroundColor: Colors.orange,
+            content: Text('Opening Strava authorization...'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Reload status after a short delay to allow OAuth flow
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _loadConnectionStatus();
+          }
+        });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to open Strava authorization'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -157,13 +172,16 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFFC4C02), // Strava orange
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.directions_run,
-                color: Colors.white,
-                size: 24,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/images/btn_strava_connect_with_orange.png',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             title: const Text(
@@ -254,10 +272,16 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _connectToStrava,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFC4C02),
+                            backgroundColor: Colors.transparent,
                             foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.zero,
                           ),
-                          child: const Text('Connect to Strava'),
+                          child: Image.asset(
+                            'assets/images/btn_strava_connect_with_orange.png',
+                            height: 48,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ],

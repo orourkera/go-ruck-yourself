@@ -31,6 +31,7 @@ class ElevenLabsService {
     'Cowgirl': 'ruirxsoakN0GWmGNIo04', // Custom Cowboy voice (legacy)
     'Nature Lover': '4tRn1lSkEn13EVTuqb0g', // Serafina - sensual female
     'Burt Reynolds': '4YYIPFl9wE5c4L2eu2Gb', // Burt Reynolds - charismatic male
+    'Tom Selleck': '8Txe4M8OANBrlZqYIBZv', // Tom Selleck - iconic mustache voice
   };
   
   final String _apiKey;
@@ -140,6 +141,8 @@ class ElevenLabsService {
         return 0.75; // Professional, clear
       case 'Game Show Host':
         return 0.4; // Dramatic, variable
+      case 'Tom Selleck':
+        return 0.7; // Confident, steady delivery
       default:
         return 0.65; // Default balanced stability
     }
@@ -186,6 +189,8 @@ class ElevenLabsService {
         return 0.8; // Professional consistency
       case 'Game Show Host':
         return 0.65; // Dramatic but clear
+      case 'Tom Selleck':
+        return 0.8; // Distinctive voice consistency
       default:
         return 0.75; // Default good similarity
     }
@@ -234,6 +239,8 @@ class ElevenLabsService {
         return 0.4; // Professional, clear
       case 'Game Show Host':
         return 0.9; // Maximum theatrical style
+      case 'Tom Selleck':
+        return 0.6; // Smooth, charismatic delivery
       default:
         return 0.5; // Default balanced style
     }
