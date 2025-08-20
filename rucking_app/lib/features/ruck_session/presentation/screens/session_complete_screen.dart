@@ -209,7 +209,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         completionData['terrain_segments'] = terrainsData;
       }
 
-      // Complete the session with basic data
+      // Complete the session with basic data using PATCH
       final response = await _apiClient.patch('/rucks/${widget.ruckId}/complete', completionData);
       
       if (response.statusCode == 200) {

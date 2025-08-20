@@ -1489,17 +1489,25 @@ class RuckSessionEditResource(Resource):
             cache_delete_pattern(f"location_points:{ruck_id}:*")
             cache_delete_pattern(f"session_details:{ruck_id}:*")
             
-            logger.info(f"Successfully edited session {ruck_id}")
+            logger.info(f"Successfully completed session {ruck_id}")
             
             return {
-                'message': 'Session updated successfully',
+                'message': 'Session completed successfully',
                 'session_id': ruck_id,
-                'updated_at': (update_resp.data[0].get('updated_at') if update_resp and update_resp.data else None)
+                'distance_km': update_data.get('distance_km', 0),
+                'calories_burned': update_data.get('calories_burned', 0),
+                'duration_seconds': update_data.get('duration_seconds', 0),
+                'average_pace': update_data.get('average_pace', 0)
             }, 200
             
         except Exception as e:
-            logger.error(f"Error editing session {ruck_id}: {e}")
-            return {'message': f'Error editing session: {str(e)}'}, 500
+            logger.error(f"Error completing ruck session {ruck_id}: {e}")
+            return {'message': f"Error completing ruck session: {str(e)}"}, 500
+
+    def patch(self, ruck_id):
+        """PATCH method for session completion - redirects to POST for compatibility"""
+        logger.info(f"PATCH /rucks/{ruck_id}/complete received - redirecting to POST method")
+        return self.post(ruck_id)
 
 
 class HeartRateSampleUploadResource(Resource):
