@@ -754,6 +754,7 @@ class RuckSessionStartResource(Resource):
                         )
                         logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Notification send result: {result}")
                         logger.info(f"Sent ruck start notification to {len(device_tokens)} devices")
+                        
                     else:
                         logger.warning(f"🔔 RUCK START NOTIFICATION DEBUG: No device tokens found for {len(follower_ids)} followers")
                 else:

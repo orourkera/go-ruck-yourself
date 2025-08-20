@@ -146,18 +146,80 @@ class ActiveSessionStorage {
   Future<bool> shouldRecoverSession() async {
     try {
       final lastSave = await getLastSaveTime();
-      if (lastSave == null) return false;
+      if (lastSave == null) {
+        AppLogger.info('[SESSION_RECOVERY] No last save time - no recovery needed');
+        return false;
+      }
 
-      // Only recover sessions saved within the last 6 hours
-      // This prevents recovering very old sessions that are likely abandoned
       final timeSinceLastSave = DateTime.now().difference(lastSave);
-      final shouldRecover = timeSinceLastSave.inHours < 6;
+      AppLogger.info('[SESSION_RECOVERY] Last save: $lastSave, Time since: ${timeSinceLastSave.inMinutes} mins');
 
-      AppLogger.info('[SESSION_RECOVERY] Last save: $lastSave, Time since: ${timeSinceLastSave.inMinutes} mins, Should recover: $shouldRecover');
-      
-      return shouldRecover;
+      // DEFENSIVE: Auto-cleanup if older than 12 hours
+      if (timeSinceLastSave.inHours >= 12) {
+        AppLogger.info('[SESSION_RECOVERY] Session data older than 12 hours - auto-cleaning');
+        await clearSessionData();
+        return false;
+      }
+
+      // DEFENSIVE: Only recover sessions saved within the last 6 hours
+      if (timeSinceLastSave.inHours >= 6) {
+        AppLogger.info('[SESSION_RECOVERY] Session data older than 6 hours - skipping recovery');
+        return false;
+      }
+
+      // DEFENSIVE: Validate session data integrity before recovery
+      final sessionData = await loadSessionData();
+      if (sessionData == null) {
+        AppLogger.warning('[SESSION_RECOVERY] No session data found despite last save time');
+        await clearSessionData(); // Clean up orphaned timestamp
+        return false;
+      }
+
+      // DEFENSIVE: Check for valid session ID
+      final sessionId = sessionData['session_id'] as String?;
+      if (sessionId == null || sessionId.isEmpty) {
+        AppLogger.warning('[SESSION_RECOVERY] Invalid session ID in stored data');
+        await clearSessionData();
+        return false;
+      }
+
+      // DEFENSIVE: Check for reasonable session duration
+      final elapsedSeconds = sessionData['elapsed_seconds'] as int? ?? 0;
+      if (elapsedSeconds > 86400) { // More than 24 hours
+        AppLogger.warning('[SESSION_RECOVERY] Session duration unreasonably long: ${elapsedSeconds}s');
+        await clearSessionData();
+        return false;
+      }
+
+      // DEFENSIVE: Check for valid start time
+      final startTimeStr = sessionData['session_start_time'] as String?;
+      if (startTimeStr == null) {
+        AppLogger.warning('[SESSION_RECOVERY] No valid start time in session data');
+        await clearSessionData();
+        return false;
+      }
+
+      try {
+        final startTime = DateTime.parse(startTimeStr);
+        final sessionAge = DateTime.now().difference(startTime);
+        if (sessionAge.inHours > 24) {
+          AppLogger.warning('[SESSION_RECOVERY] Session start time too old: ${sessionAge.inHours} hours');
+          await clearSessionData();
+          return false;
+        }
+      } catch (e) {
+        AppLogger.warning('[SESSION_RECOVERY] Invalid start time format: $startTimeStr');
+        await clearSessionData();
+        return false;
+      }
+
+      AppLogger.info('[SESSION_RECOVERY] All validation checks passed - recovery eligible');
+      return true;
     } catch (e) {
       AppLogger.error('[SESSION_RECOVERY] Failed to check recovery eligibility: $e');
+      // Clear potentially corrupted data
+      await clearSessionData().catchError((error) => 
+        AppLogger.error('[SESSION_RECOVERY] Failed to clear corrupted data: $error'));
       return false;
     }
   }
@@ -265,6 +327,28 @@ class ActiveSessionStorage {
     }
   }
 
+  /// Clear orphaned session data without deleting the actual session
+  /// This is safer than deleting as it only clears local storage
+  Future<void> clearOrphanedSessionData() async {
+    try {
+      // Get session data first to log what we're clearing
+      final sessionData = await loadSessionData();
+      if (sessionData != null) {
+        final sessionId = sessionData['session_id'] as String?;
+        final savedAt = sessionData['saved_at'] as String?;
+        AppLogger.info('[ORPHANED_CLEANUP] Clearing orphaned session data: sessionId=$sessionId, savedAt=$savedAt');
+      }
+      
+      // Clear local storage only - do NOT delete from database
+      await _prefs.remove(_activeSessionKey);
+      await _prefs.remove(_lastSaveKey);
+      
+      AppLogger.info('[ORPHANED_CLEANUP] Successfully cleared orphaned session from local storage');
+    } catch (e) {
+      AppLogger.error('[ORPHANED_CLEANUP] Failed to clear orphaned session data: $e');
+    }
+  }
+  
   /// Clean up synced offline sessions (remove old ones)
   Future<void> cleanupSyncedOfflineSessions() async {
     try {

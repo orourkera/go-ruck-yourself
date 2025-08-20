@@ -9,14 +9,12 @@ import '../../../../core/utils/measurement_utils.dart';
 class ActiveSessionDialog extends StatelessWidget {
   final Map<String, dynamic> activeSession;
   final VoidCallback onContinueExisting;
-  final VoidCallback onForceNewSession;
   final VoidCallback onCancel;
 
   const ActiveSessionDialog({
     super.key,
     required this.activeSession,
     required this.onContinueExisting,
-    required this.onForceNewSession,
     required this.onCancel,
   });
 
@@ -138,7 +136,7 @@ class ActiveSessionDialog extends StatelessWidget {
           
           const SizedBox(height: 16),
           Text(
-            'What would you like to do?',
+            'You must complete or continue your existing session before starting a new one.',
             style: AppTextStyles.bodyMedium.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -152,16 +150,6 @@ class ActiveSessionDialog extends StatelessWidget {
             'Cancel',
             style: AppTextStyles.labelLarge.copyWith(
               color: Colors.grey[600],
-            ),
-          ),
-        ),
-        TextButton(
-          onPressed: onForceNewSession,
-          child: Text(
-            'End & Start New',
-            style: AppTextStyles.labelLarge.copyWith(
-              color: AppColors.warning,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ),

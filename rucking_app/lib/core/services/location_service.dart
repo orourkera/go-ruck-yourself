@@ -702,6 +702,13 @@ class LocationServiceImpl implements LocationService {
     AppLogger.info('Stopping location tracking...');
     _isTracking = false;
     
+    // CRITICAL: Send any pending location data before stopping
+    // This prevents data loss when stopping location tracking
+    if (_locationBatch.isNotEmpty) {
+      AppLogger.info('📤 Sending ${_locationBatch.length} pending location points before stopping');
+      _sendBatchUpdate();
+    }
+    
     // Safely cancel all subscriptions and timers
     try {
       await _rawLocationSubscription?.cancel();
@@ -781,23 +788,49 @@ class LocationServiceImpl implements LocationService {
     
     // Only restart if configuration actually changed
     if (_currentConfig.mode != newConfig.mode) {
+      final previousConfig = _currentConfig;
       _currentConfig = newConfig;
       
       // If currently tracking, restart with new configuration
       if (_isTracking) {
         AppLogger.info('♻️ Restarting location tracking with new configuration');
-        _restartLocationTrackingWithNewConfig();
+        
+        // Handle async restart without breaking the void signature
+        () async {
+          final success = await _restartLocationTrackingWithNewConfig();
+          
+          if (!success) {
+            AppLogger.error('CRITICAL: Failed to restart location tracking - attempting recovery');
+            _currentConfig = previousConfig;
+            
+            // Try to recover with previous config
+            final recoverySuccess = await _restartLocationTrackingWithNewConfig();
+            
+            if (!recoverySuccess) {
+              // Last resort: just continue with existing tracking if possible
+              AppLogger.error('CRITICAL: Could not restart tracking - maintaining existing tracking state');
+              _isTracking = true; // Keep the flag true to accept any incoming location updates
+            }
+          }
+        }();
       }
       
-      AppLogger.info('✅ Location tracking frequency adjusted: ${newConfig.mode} (${newConfig.distanceFilter}m, ${newConfig.batchInterval}s)');
+      AppLogger.info('✅ Location tracking frequency adjustment initiated: ${newConfig.mode} (${newConfig.distanceFilter}m, ${newConfig.batchInterval}s)');
     } else {
       AppLogger.info('ℹ️ Location tracking already at requested frequency: $mode');
     }
   }
   
   /// Restart location tracking with new configuration
-  void _restartLocationTrackingWithNewConfig() async {
+  Future<bool> _restartLocationTrackingWithNewConfig() async {
     try {
+      // CRITICAL: Send any pending location data before restarting
+      // This prevents distance recording from stopping during memory pressure
+      if (_locationBatch.isNotEmpty) {
+        AppLogger.info('📤 Sending ${_locationBatch.length} pending location points before config restart');
+        _sendBatchUpdate();
+      }
+      
       // Safely cancel current tracking
       try {
         await _rawLocationSubscription?.cancel();
@@ -838,6 +871,7 @@ class LocationServiceImpl implements LocationService {
         },
         onError: (error) {
           AppLogger.error('Location stream error after config restart', exception: error);
+          // Don't stop tracking on errors - GPS can be flaky
         },
       );
       
@@ -848,9 +882,14 @@ class LocationServiceImpl implements LocationService {
       );
       
       AppLogger.info('🔄 Location tracking restarted with new configuration');
+      return true;
       
     } catch (e) {
       AppLogger.error('Failed to restart location tracking with new config', exception: e);
+      
+      // CRITICAL: If restart fails, try to maintain tracking with any config
+      _isTracking = true; // Ensure flag stays true
+      return false;
     }
   }
   

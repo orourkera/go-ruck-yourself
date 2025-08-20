@@ -13,6 +13,7 @@ import 'package:get_it/get_it.dart';
 // Core imports
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/in_app_review_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
@@ -109,6 +110,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   bool _isUploadingPhotos = false;
   bool _isExportingToStrava = false;
   bool? _shareSession; // null means use user's default preference
+  bool _isSessionSaved = false; // Track if basic session data is saved
 
   // Heart rate data
   List<HeartRateSample>? _heartRateSamples;
@@ -144,12 +146,89 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
       _setHeartRateSamples(widget.heartRateSamples!);
     }
+    
+    // Auto-save the main session data immediately
+    _autoSaveBasicSession();
   }
 
   @override
   void dispose() {
     _notesController.dispose();
     super.dispose();
+  }
+
+  /// Auto-save the main session data immediately when screen loads
+  Future<void> _autoSaveBasicSession() async {
+    if (_isSessionSaved) return;
+    
+    try {
+      AppLogger.info('[SESSION_SAVE] Auto-saving basic session data for ${widget.ruckId}');
+      
+      // Build basic completion data - same as _saveAndContinue but without optional fields
+      final completionData = <String, dynamic>{
+        'completed_at': widget.completedAt.toIso8601String(),
+        'duration_seconds': widget.duration.inSeconds,
+        'ruck_weight_lbs': widget.ruckWeight,
+        'is_manual': widget.isManual,
+        'calories_burned': widget.caloriesBurned,
+        'elevation_gain_ft': widget.elevationGain,
+        'elevation_loss_ft': widget.elevationLoss,
+      };
+
+      // Include heart rate data if available
+      if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
+        final heartRates = widget.heartRateSamples!.map((sample) => sample.bpm).toList();
+        completionData['avg_heart_rate'] = (heartRates.reduce((a, b) => a + b) / heartRates.length).round();
+        completionData['max_heart_rate'] = heartRates.reduce((a, b) => a > b ? a : b);
+        completionData['min_heart_rate'] = heartRates.reduce((a, b) => a < b ? a : b);
+      }
+
+      // Include splits data if available
+      if (widget.splits != null && widget.splits!.isNotEmpty) {
+        final splitsData = widget.splits!.map((split) => {
+          'split_number': split.splitNumber,
+          'split_distance': split.splitDistance,
+          'split_duration_seconds': split.splitDurationSeconds,
+          'total_distance': split.totalDistance,
+          'total_duration_seconds': split.totalDurationSeconds,
+          'calories_burned': split.caloriesBurned,
+          'elevation_gain_m': split.elevationGainM,
+          'timestamp': split.timestamp.toIso8601String(),
+        }).toList();
+        completionData['splits'] = splitsData;
+      }
+
+      // Include terrain segments if available
+      if (widget.terrainSegments != null && widget.terrainSegments!.isNotEmpty) {
+        final terrainsData = widget.terrainSegments!.map((segment) => {
+          'surface_type': segment.surfaceType,
+          'distance_km': segment.distanceKm,
+          'energy_multiplier': segment.energyMultiplier,
+          'timestamp': segment.timestamp.toIso8601String(),
+        }).toList();
+        completionData['terrain_segments'] = terrainsData;
+      }
+
+      // Complete the session with basic data
+      final response = await _apiClient.patch('/api/rucks/${widget.ruckId}/complete', completionData);
+      
+      if (response.statusCode == 200) {
+        setState(() => _isSessionSaved = true);
+        AppLogger.info('[SESSION_SAVE] Basic session data saved successfully');
+        
+        // Show confirmation to user
+        if (mounted) {
+          StyledSnackBar.showSuccess(
+            context: context,
+            message: 'Session saved! 🎉',
+            duration: const Duration(seconds: 2),
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('[SESSION_SAVE] Failed to auto-save basic session: $e');
+      // Don't show error to user for auto-save failure - they can still manually save
+    }
   }
 
   // Heart rate handling
@@ -182,7 +261,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     return MeasurementUtils.formatPaceSeconds(paceSecondsPerKm, metric: preferMetric);
   }
 
-  // Session management
+  // Session management - now only handles additional user data since basic session is auto-saved
   Future<void> _saveAndContinue() async {
     if (_isSaving) return;
     
@@ -191,62 +270,41 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     }
     
     try {
-      // Debug logging for completion payload values
-      print('[COMPLETION_DEBUG] Widget values:');
-      print('  duration: ${widget.duration}');
-      print('  duration.inSeconds: ${widget.duration.inSeconds}');
-      print('  ruckWeight: ${widget.ruckWeight}');
-      print('  completedAt: ${widget.completedAt}');
-      print('  completedAt.toIso8601String(): ${widget.completedAt.toIso8601String()}');
-      print('  distance: ${widget.distance}');
-      print('  caloriesBurned: ${widget.caloriesBurned}');
-      
-      final completionData = {
-        'rating': _rating,
-        'perceived_exertion': _perceivedExertion,
-        'status': 'completed',
-        'notes': _notesController.text.trim(),
-        'distance_km': widget.distance,
-        'calories_burned': widget.caloriesBurned,
-        'elevation_gain_m': widget.elevationGain,
-        'elevation_loss_m': widget.elevationLoss,
-        'duration_seconds': widget.duration.inSeconds,
-        'ruck_weight_kg': widget.ruckWeight,
-        'completed_at': widget.completedAt.toIso8601String(),
-        'is_manual': widget.isManual,
-      };
-      
-      print('[COMPLETION_DEBUG] Completion data before processing:');
-      print('  completionData: $completionData');
-      
-      // Let backend calculate pace authoritatively from stored distance_km and duration_seconds
-      // This ensures pace is calculated from the same processed data that gets stored
-      
-      // Include heart rate data if available
-      if (widget.heartRateSamples != null && widget.heartRateSamples!.isNotEmpty) {
-        final heartRates = widget.heartRateSamples!.map((sample) => sample.bpm).toList();
-        completionData['avg_heart_rate'] = (heartRates.reduce((a, b) => a + b) / heartRates.length).round();
-        completionData['max_heart_rate'] = heartRates.reduce((a, b) => a > b ? a : b);
-        completionData['min_heart_rate'] = heartRates.reduce((a, b) => a < b ? a : b);
+      // If basic session isn't saved yet, save it first
+      if (!_isSessionSaved) {
+        await _autoSaveBasicSession();
       }
       
-      // Include splits if available to preserve them during completion
-      if (widget.splits != null && widget.splits!.isNotEmpty) {
-        completionData['splits'] = widget.splits!.map((split) => split.toJson()).toList();
+      // Now patch additional user-entered data (notes, rating, sharing preference)
+      final hasUserData = _notesController.text.trim().isNotEmpty || 
+                         _rating != 3 || 
+                         _perceivedExertion != 5 ||
+                         _shareSession != null;
+      
+      if (hasUserData) {
+        AppLogger.info('[SESSION_PATCH] Updating session with user data');
+        
+        final updateData = <String, dynamic>{};
+        
+        // Only include fields that have been modified from defaults
+        if (_notesController.text.trim().isNotEmpty) {
+          updateData['notes'] = _notesController.text.trim();
+        }
+        if (_rating != 3) {
+          updateData['rating'] = _rating;
+        }
+        if (_perceivedExertion != 5) {
+          updateData['perceived_exertion'] = _perceivedExertion;
+        }
+        if (_shareSession != null) {
+          updateData['is_public'] = _shareSession!;
+        }
+        
+        if (updateData.isNotEmpty) {
+          await _apiClient.patch('/api/rucks/${widget.ruckId}', updateData);
+          AppLogger.info('[SESSION_PATCH] User data updated successfully');
+        }
       }
-      
-      // Include is_public field - either user's explicit choice or their default preference
-      final authState = BlocProvider.of<AuthBloc>(context).state;
-      final bool userAllowsSharing = authState is Authenticated ? 
-          authState.user.allowRuckSharing : false;
-      completionData['is_public'] = _shareSession ?? userAllowsSharing;
-
-      print('[COMPLETION_DEBUG] Final completion data being sent:');
-      print('  completionData: $completionData');
-      
-      // Save session first - this is fast and immediate
-      // Use the dedicated completion endpoint which properly handles session completion
-      await _apiClient.postSessionCompletion('/rucks/${widget.ruckId}/complete', completionData);
       
       // Clear caches before checking achievements
       SessionRepository.clearSessionHistoryCache();
@@ -758,6 +816,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Use a slight delay to ensure navigation completes first
       Future.delayed(const Duration(milliseconds: 100), () {
         GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().add(SessionReset());
+        
+        // CRITICAL: Clear local session storage to prevent false recovery detection
+        GetIt.instance<ActiveSessionStorage>().clearSessionData();
       });
       
       // Upload photos in background if any are selected - using repository
@@ -1355,8 +1416,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         Center(
           child: CustomButton(
             onPressed: _isSaving ? null : _saveAndContinue,
-            text: 'Save and Continue',
-            icon: Icons.save,
+            text: _isSessionSaved ? 'Continue' : 'Save and Continue',
+            icon: _isSessionSaved ? Icons.arrow_forward : Icons.save,
             color: _getLadyModeColor(context),
             isLoading: _isSaving,
             width: 250,

@@ -63,8 +63,9 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
   }
 
   void _dismiss() {
+    // Only call the onDismiss callback, don't pop here
+    // The onDismiss callback will handle the navigation
     widget.onDismiss?.call();
-    Navigator.of(context).pop();
   }
 
   @override

@@ -329,8 +329,18 @@ class CheckSessionAchievementsResource(Resource):
             distance_km = 0
         if duration_seconds is None:
             duration_seconds = 0
+        
+        # CRITICAL: Ensure values are numeric before comparison
+        try:
+            distance_km = float(distance_km) if distance_km is not None else 0.0
+            duration_seconds = int(duration_seconds) if duration_seconds is not None else 0
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid session data types: distance={distance_km}, duration={duration_seconds}")
+            return False
             
-        return duration_seconds >= 300 and distance_km >= 0.5
+        is_valid = duration_seconds >= 300 and distance_km >= 0.5
+        logger.info(f"Session validation: duration={duration_seconds}s, distance={distance_km}km, valid={is_valid}")
+        return is_valid
 
     def _check_achievement_criteria(self, supabase, user_id: str, session: Dict, achievement: Dict, user_stats: Dict = None) -> bool:
         """Check if user meets criteria for a specific achievement"""
@@ -338,6 +348,14 @@ class CheckSessionAchievementsResource(Resource):
             # CRITICAL: Check minimum session requirements first
             session_distance = session.get('distance_km', 0)
             session_duration = session.get('duration_seconds', 0)
+            
+            # Ensure numeric values for comparison
+            try:
+                session_distance = float(session_distance) if session_distance is not None else 0.0
+                session_duration = int(session_duration) if session_duration is not None else 0
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid criteria check data types: distance={session_distance}, duration={session_duration}")
+                return False
             
             # Minimum session requirements: at least 5 minutes AND 500 meters
             if session_duration < 300 or session_distance < 0.5:

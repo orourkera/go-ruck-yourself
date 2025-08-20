@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/session_cleanup_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -20,6 +21,9 @@ class AppStartupService {
   Future<bool> checkAndRecoverSession(BuildContext context) async {
     try {
       AppLogger.info('[STARTUP] Checking for recoverable session...');
+      
+      // Start background cleanup service
+      _startBackgroundServices();
       
       final shouldRecover = await _activeSessionStorage.shouldRecoverSession();
       
@@ -116,6 +120,25 @@ class AppStartupService {
     );
     
     return result ?? false;
+  }
+
+  /// Start background services for maintenance
+  void _startBackgroundServices() {
+    try {
+      // Start session cleanup service
+      final sessionCleanupService = getIt<SessionCleanupService>();
+      if (!sessionCleanupService.isRunning) {
+        sessionCleanupService.startPeriodicCleanup();
+        AppLogger.info('[STARTUP] Session cleanup service started');
+      }
+
+      // Start duel completion service
+      final duelCompletionService = getIt<DuelCompletionService>();
+      duelCompletionService.startCompletionChecking();
+      AppLogger.info('[STARTUP] Duel completion service started');
+    } catch (e) {
+      AppLogger.error('[STARTUP] Failed to start background services: $e');
+    }
   }
 
   Future<void> _initializeDuelCompletionService() async {

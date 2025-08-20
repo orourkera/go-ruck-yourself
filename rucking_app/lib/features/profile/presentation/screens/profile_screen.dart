@@ -18,6 +18,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/shared/widgets/strava_settings_widget.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/health_integration/presentation/screens/health_integration_intro_screen.dart';
@@ -433,6 +434,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 24),
                         _buildSection(
+                          title: 'Debug Tools',
+                          children: [
+                            _buildClickableItem(
+                              icon: Icons.storage_outlined,
+                              label: 'Clear Session Storage',
+                              subtitle: 'Fix stuck session recovery issues',
+                              onTap: () => _clearSessionStorage(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSection(
                           title: 'Danger Zone',
                           children: [
                             _buildClickableItem(
@@ -643,6 +656,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    String? subtitle,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
@@ -659,11 +673,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(
-                label,
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: isDark ? const Color(0xFF728C69).withOpacity(0.7) : AppColors.textDarkSecondary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Icon(
@@ -870,6 +898,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  /// Clear session storage to fix stuck recovery issues
+  Future<void> _clearSessionStorage(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear Session Storage'),
+          content: const Text(
+            'This will clear any stored session data that might be causing the app to redirect to the active session screen.\n\n'
+            'This is safe to do and won\'t affect your completed sessions or achievements.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Clear Storage'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      try {
+        final activeSessionStorage = GetIt.instance<ActiveSessionStorage>();
+        await activeSessionStorage.clearSessionData();
+        
+        if (context.mounted) {
+          StyledSnackBar.showSuccess(
+            context: context, 
+            message: 'Session storage cleared successfully'
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          StyledSnackBar.showError(
+            context: context, 
+            message: 'Failed to clear storage: $e'
+          );
+        }
+      }
+    }
   }
 
   /// Gets the initials from a name

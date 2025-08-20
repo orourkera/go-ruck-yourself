@@ -11,6 +11,8 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
+import 'package:rucking_app/core/services/session_cleanup_service.dart';
+import 'package:rucking_app/core/services/session_completion_detection_service.dart';
 import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/revenue_cat_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
@@ -230,6 +232,16 @@ Future<void> setupServiceLocator() async {
     ActiveSessionStorage(getIt<SharedPreferences>())
   );
   
+  // Session cleanup service for defensive maintenance
+  getIt.registerSingleton<SessionCleanupService>(
+    SessionCleanupService(getIt<ActiveSessionStorage>())
+  );
+  
+  // Session completion detection service
+  getIt.registerSingleton<SessionCompletionDetectionService>(
+    SessionCompletionDetectionService()
+  );
+  
   // App startup service for session recovery
   getIt.registerSingleton<AppStartupService>(
     AppStartupService(getIt<ActiveSessionStorage>())
@@ -286,6 +298,7 @@ Future<void> setupServiceLocator() async {
     sessionRepository: getIt<SessionRepository>(),
     activeSessionStorage: getIt<ActiveSessionStorage>(),
     connectivityService: getIt<ConnectivityService>(),
+    completionDetectionService: getIt<SessionCompletionDetectionService>(),
     aiCheerleaderService: getIt<AICheerleaderService>(),
     openAIService: getIt<OpenAIService>(),
     elevenLabsService: getIt<ElevenLabsService>(),

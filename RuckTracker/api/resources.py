@@ -109,23 +109,23 @@ class UserResource(Resource):
                 'isMetric': 'prefer_metric',
                 'heightCm': 'height_cm',
                 'avatarUrl': 'avatar_url',
-                'lastActiveAt': 'last_active_at',  # not a real column but accepted in payload
+                'lastActiveAt': 'last_active_at',  # maps to dedicated last_active_at column
             }
             data = {camel_to_snake.get(k, k): v for k, v in data.items()}
 
             # Prepare update data
             update_data = {}
             
-            # Handle last_active_at specially – we just bump updated_at for now
+            # Handle last_active_at - update the dedicated last_active_at column for DAU tracking
             if 'last_active_at' in data:
                 try:
                     # Parse ISO8601 – datetime.fromisoformat handles microseconds & timezone info
                     ts = datetime.fromisoformat(data['last_active_at'].replace('Z', '+00:00'))
-                    update_data['updated_at'] = ts.isoformat()
+                    update_data['last_active_at'] = ts.isoformat()
                     logger.info(f"Updated last_active_at for user {user_id} to {ts}")
                 except Exception as e:
                     # If parsing fails just use current UTC time (fail-safe)
-                    update_data['updated_at'] = datetime.utcnow().isoformat()
+                    update_data['last_active_at'] = datetime.utcnow().isoformat()
                     logger.warning(f"Failed to parse last_active_at, using current time: {e}")
 
             # For any other provided fields reuse the same logic as PUT but without validation

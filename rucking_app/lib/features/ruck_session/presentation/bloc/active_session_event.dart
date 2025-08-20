@@ -56,6 +56,15 @@ class SessionRecoveryRequested extends ActiveSessionEvent {
   List<Object?> get props => [];
 }
 
+/// Event to clear orphaned session data from local storage only
+/// Does NOT delete the session from the database - safer than deletion
+class ClearOrphanedSessionRequested extends ActiveSessionEvent {
+  const ClearOrphanedSessionRequested();
+  
+  @override
+  List<Object?> get props => [];
+}
+
 class LocationUpdated extends ActiveSessionEvent {
   final LocationPoint locationPoint;
   

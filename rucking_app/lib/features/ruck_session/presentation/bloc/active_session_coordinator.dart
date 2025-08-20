@@ -674,6 +674,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       
       AppLogger.info('[COORDINATOR] Emitting completed state');
       emit(_currentAggregatedState);
+      
+      // CRITICAL: Clear local storage after successful completion to prevent orphaned sessions
+      try {
+        await _storageService.remove('active_session_data');
+        await _storageService.remove('active_session_last_save');
+        AppLogger.info('[COORDINATOR] Local session storage cleared after successful completion');
+      } catch (clearError) {
+        AppLogger.error('[COORDINATOR] Failed to clear local storage after completion: $clearError');
+      }
+      
       AppLogger.info('[COORDINATOR] Session completion process finished');
       
     } catch (e) {

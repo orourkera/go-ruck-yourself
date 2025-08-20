@@ -16,6 +16,7 @@ import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:rucking_app/core/services/session_completion_detection_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
@@ -122,6 +123,7 @@ class ActiveSessionPage extends StatelessWidget {
             healthService: locator<HealthService>(),
             watchService: locator<WatchService>(),
             heartRateService: locator<HeartRateService>(),
+            completionDetectionService: locator<SessionCompletionDetectionService>(),
             splitTrackingService: locator<SplitTrackingService>(),
             sessionRepository: locator<SessionRepository>(),
             activeSessionStorage: locator<ActiveSessionStorage>(),

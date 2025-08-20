@@ -167,7 +167,10 @@ Generate a motivational message:''';
     switch (triggerType) {
       case 'milestone':
         final milestone = triggerData['milestone'];
-        contextText += " Just hit ${milestone}km milestone!";
+        final unit = session['distance']['unit'] ?? 'km';
+        final userPreferMetric = user['preferMetric'] ?? true;
+        final milestoneValue = userPreferMetric ? milestone : (milestone * 0.621371).toStringAsFixed(1);
+        contextText += " Just hit ${milestoneValue}${unit} milestone!";
         break;
       case 'paceDrop':
         final slowdown = triggerData['slowdownPercent'];

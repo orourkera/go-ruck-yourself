@@ -58,7 +58,7 @@ class AIAnalyticsService {
 
       final response = await _apiClient.post(
         '/ai-cheerleader/interactions',
-        data: interactionData,
+        interactionData,
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -99,7 +99,7 @@ class AIAnalyticsService {
 
       final response = await _apiClient.post(
         '/ai-cheerleader/personality-selections',
-        data: selectionData,
+        selectionData,
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -131,7 +131,7 @@ class AIAnalyticsService {
 
       final response = await _apiClient.post(
         '/ai-cheerleader/sessions',
-        data: sessionData,
+        sessionData,
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -172,7 +172,7 @@ class AIAnalyticsService {
 
       final response = await _apiClient.patch(
         '/ai-cheerleader/sessions/$sessionId',
-        data: updateData,
+        updateData,
       );
 
       if (response.statusCode == 200) {
@@ -253,7 +253,7 @@ class AIAnalyticsService {
 
       final response = await _apiClient.get(
         '/ai-cheerleader/analytics',
-        queryParameters: queryParams,
+        queryParams: queryParams,
       );
 
       if (response.statusCode == 200) {

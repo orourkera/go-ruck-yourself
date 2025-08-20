@@ -244,6 +244,30 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         }
       }
       
+      // Parse pace value (seconds per km) - calculate if not provided
+      double parsePace(dynamic value, double distance, Duration duration) {
+        // Try to parse the provided pace value first
+        if (value != null) {
+          if (value is double) return value;
+          if (value is int) return value.toDouble();
+          try {
+            final parsed = double.parse(value.toString());
+            // Sanity check - pace should be positive and reasonable (not over 90 min/km)
+            if (parsed > 0 && parsed < 5400) return parsed;
+          } catch (e) {
+            // Fall through to calculation
+          }
+        }
+        
+        // Calculate pace from distance and duration if not provided or invalid
+        if (distance > 0 && duration.inSeconds > 0) {
+          return duration.inSeconds / distance;
+        }
+        
+        // Default to 0 if can't calculate
+        return 0.0;
+      }
+      
       final distance = parseDistance(json['distance_km'] ?? json['distance'] ?? 0.0);
       
       // Handle status (map string to enum)
@@ -267,7 +291,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         caloriesBurned: (json['calories_burned'] ?? json['caloriesBurned'] ?? 0) is int
             ? (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
             : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0).toInt(),
-        averagePace: parseDistance(json['average_pace'] ?? json['averagePace'] ?? 0.0),
+        averagePace: parsePace(json['average_pace'] ?? json['averagePace'], distance, duration),
         ruckWeightKg: parseDistance(json['ruck_weight_kg'] ?? json['ruckWeightKg'] ?? 0.0),
         status: status,
         notes: json['notes']?.toString(),

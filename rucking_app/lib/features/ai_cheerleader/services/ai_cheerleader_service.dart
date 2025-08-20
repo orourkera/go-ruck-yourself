@@ -222,6 +222,11 @@ class AICheerleaderService {
           'distanceKm': state.distanceKm,
           'distanceMeters': state.distanceKm * 1000,
           'distanceMiles': state.distanceKm * 0.621371,
+          'formatted': user.preferMetric 
+            ? '${state.distanceKm.toStringAsFixed(2)}km'
+            : '${(state.distanceKm * 0.621371).toStringAsFixed(2)}mi',
+          'unit': user.preferMetric ? 'km' : 'mi',
+          'primaryValue': user.preferMetric ? state.distanceKm : (state.distanceKm * 0.621371),
         },
         'pace': <String, dynamic>{
           'pace': state.pace,

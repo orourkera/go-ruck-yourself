@@ -24,6 +24,7 @@ import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/session_completion_detection_service.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/android_optimization_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
@@ -46,6 +47,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_analytics_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
@@ -70,6 +72,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ActiveSessionStorage _activeSessionStorage;
   final TerrainTracker _terrainTracker;
   final ConnectivityService _connectivityService;
+  final SessionCompletionDetectionService _completionDetectionService;
   
   // AI Cheerleader services
   final AICheerleaderService _aiCheerleaderService;
@@ -136,6 +139,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required ActiveSessionStorage activeSessionStorage,
     required TerrainTracker terrainTracker,
     required ConnectivityService connectivityService,
+    required SessionCompletionDetectionService completionDetectionService,
     required AICheerleaderService aiCheerleaderService,
     required OpenAIService openAIService,
     required ElevenLabsService elevenLabsService,
@@ -152,6 +156,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _activeSessionStorage = activeSessionStorage,
         _terrainTracker = terrainTracker,
         _connectivityService = connectivityService,
+        _completionDetectionService = completionDetectionService,
         _aiCheerleaderService = aiCheerleaderService,
         _openAIService = openAIService,
         _elevenLabsService = elevenLabsService,
@@ -269,6 +274,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   /// Forward coordinator state safely by converting it to an internal event
   void _forwardCoordinatorState(ActiveSessionState coordinatorState) {
+    // Handle session completion detection service lifecycle
+    _handleCompletionDetectionServiceLifecycle(coordinatorState);
+    
     // Check for AI Cheerleader triggers if enabled and session is running
     if (_aiCheerleaderEnabled && 
         coordinatorState is ActiveSessionRunning &&
@@ -283,6 +291,43 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Instead of calling emit directly, we use a custom event to safely forward states
     // This ensures the emission happens within a proper event handler context
     add(_CoordinatorStateForwarded(coordinatorState));
+  }
+
+  /// Handle session completion detection service lifecycle
+  void _handleCompletionDetectionServiceLifecycle(ActiveSessionState state) {
+    try {
+      if (state is ActiveSessionRunning && state.isPaused == false) {
+        // Start monitoring if session is actively running
+        if (!_completionDetectionService.isMonitoring) {
+          AppLogger.info('[SESSION_COMPLETION] Starting completion detection monitoring');
+          _completionDetectionService.startMonitoring();
+          
+          // Update heart rate data if available
+          if (state.latestHeartRate != null) {
+            // Calculate average heart rate from samples
+            double? workoutAverage;
+            if (state.heartRateSamples.isNotEmpty) {
+              final totalHr = state.heartRateSamples.fold<double>(0, (sum, sample) => sum + sample.bpm);
+              workoutAverage = totalHr / state.heartRateSamples.length;
+            }
+            
+            _completionDetectionService.updateHeartRateData(
+              currentHeartRate: state.latestHeartRate!.toDouble(),
+              restingHeartRate: null, // Could be added from health profile
+              workoutAverage: workoutAverage,
+            );
+          }
+        }
+      } else {
+        // Stop monitoring if session is paused, completed, or failed
+        if (_completionDetectionService.isMonitoring) {
+          AppLogger.info('[SESSION_COMPLETION] Stopping completion detection monitoring');
+          _completionDetectionService.stopMonitoring();
+        }
+      }
+    } catch (e) {
+      AppLogger.error('[SESSION_COMPLETION] Error managing detection service lifecycle: $e');
+    }
   }
 
   /// Check for AI Cheerleader triggers and process them
@@ -455,23 +500,30 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.info('[AI_CHEERLEADER_DEBUG] About to call OpenAI generateMessage with context: $context');
       AppLogger.info('[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
       
+      final messageStartTime = DateTime.now();
       final message = await _openAIService.generateMessage(
         context: context,
         personality: _aiCheerleaderPersonality!,
         explicitContent: _aiCheerleaderExplicitContent,
       );
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3 complete: OpenAI call finished');
+      final messageEndTime = DateTime.now();
+      final generationTimeMs = messageEndTime.difference(messageStartTime).inMilliseconds;
       
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3 complete: OpenAI call finished');
       AppLogger.info('[AI_CHEERLEADER_DEBUG] Received message from OpenAI: $message');
 
       if (message != null && message.isNotEmpty) {
         AppLogger.info('[AI_CHEERLEADER] Generated message: "$message"');
         
         // 4. Synthesize speech with ElevenLabs
+        final synthesisStartTime = DateTime.now();
         final audioBytes = await _elevenLabsService.synthesizeSpeech(
           text: message,
           personality: _aiCheerleaderPersonality!,
         );
+        final synthesisEndTime = DateTime.now();
+        final synthesisTimeMs = synthesisEndTime.difference(synthesisStartTime).inMilliseconds;
+        final synthesisSuccess = audioBytes != null;
 
         if (audioBytes != null) {
           AppLogger.info('[AI_CHEERLEADER] Audio synthesized successfully');
@@ -497,6 +549,39 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             fallbackText: message,
             personality: _aiCheerleaderPersonality!,
           );
+        }
+
+        // 5. Log interaction to analytics
+        try {
+          final aiAnalyticsService = GetIt.instance<AIAnalyticsService>();
+          await aiAnalyticsService.logInteraction(
+            sessionId: state.sessionId,
+            userId: _currentUser!.userId,
+            personality: _aiCheerleaderPersonality!,
+            triggerType: trigger.type.toString(),
+            openaiPrompt: context.toString(),
+            openaiResponse: message,
+            elevenlabsVoiceId: _aiCheerleaderPersonality!,
+            sessionContext: {
+              'distance_km': state.distanceKm,
+              'elapsed_seconds': state.elapsedSeconds,
+              'pace': state.pace,
+              'calories': state.calories,
+              'elevation_gain': state.elevationGain,
+              'is_paused': state.isPaused,
+            },
+            locationContext: context['environment']?['location'],
+            triggerData: trigger.data,
+            explicitContentEnabled: _aiCheerleaderExplicitContent,
+            userGender: _currentUser!.gender,
+            userPreferMetric: _currentUser!.preferMetric,
+            generationTimeMs: generationTimeMs,
+            synthesisSuccess: synthesisSuccess,
+            synthesisTimeMs: synthesisTimeMs,
+          );
+          AppLogger.info('[AI_ANALYTICS] Interaction logged successfully for automatic trigger');
+        } catch (e) {
+          AppLogger.error('[AI_ANALYTICS] Failed to log automatic trigger interaction: $e');
         }
       } else {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
@@ -1040,6 +1125,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       await _coordinatorSubscription?.cancel();
       await _coordinator?.close();
       _coordinator = null;
+      
+      // Stop session completion detection monitoring
+      _completionDetectionService.stopMonitoring();
       
       // Clean up the underlying services that this bloc still directly manages
       // Stop location tracking

@@ -38,4 +38,7 @@ class NotificationType {
   
   /// Club membership rejected notification
   static const String clubMembershipRejected = 'club_membership_rejected';
+  
+  /// Session completion prompt notification
+  static const String sessionCompletionPrompt = 'session_completion_prompt';
 }

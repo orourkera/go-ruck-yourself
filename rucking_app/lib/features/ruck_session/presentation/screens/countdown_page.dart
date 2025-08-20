@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
+import 'package:rucking_app/core/services/session_completion_detection_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
@@ -89,6 +90,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       apiClient: locator<ApiClient>(),
       locationService: locator<LocationService>(),
       healthService: locator<HealthService>(),
+      completionDetectionService: locator<SessionCompletionDetectionService>(),
       watchService: locator<WatchService>(),
       heartRateService: locator<HeartRateService>(),
       splitTrackingService: locator<SplitTrackingService>(),

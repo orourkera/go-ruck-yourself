@@ -281,7 +281,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             // Don't block session creation if this check fails
           }
         }
-              } catch (e) {
+      } catch (e) {
         AppLogger.error('Failed to check location permissions', exception: e);
         if (mounted) {
           StyledSnackBar.showError(
@@ -374,7 +374,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 builder: (context) => ActiveSessionDialog(
                   activeSession: createResponse,
                   onContinueExisting: () => Navigator.of(context).pop('continue'),
-                  onForceNewSession: () => Navigator.of(context).pop('force_new'),
                   onCancel: () => Navigator.of(context).pop('cancel'),
                 ),
               );
@@ -385,17 +384,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 // Continue with existing session - navigate to active session
                 ruckId = createResponse['id'].toString();
                 AppLogger.info('🔄 Continuing existing session: $ruckId');
-              } else if (choice == 'force_new') {
-                // Force start new session by auto-completing the old one
-                createRequestData['force_new_session'] = true;
-                final forceResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(milliseconds: 800));
-                
-                if (forceResponse == null || forceResponse['id'] == null) {
-                  throw Exception('Failed to force start new session');
-                }
-                
-                ruckId = forceResponse['id'].toString();
-                AppLogger.info('✅ Force started new session: $ruckId');
+                // Removed force_new option - users must complete or continue existing sessions
               }
             } else {
               // Normal session creation
@@ -478,7 +467,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                 plannedRouteDuration = (widget.routeData['estimated_duration_minutes'] as num).toInt();
                 AppLogger.info('Estimated route duration: ${plannedRouteDuration} minutes');
               }
-              
             } catch (e) {
               AppLogger.warning('Failed to parse route data for session: $e');
             }
@@ -894,7 +882,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     );
   }
 
-  @override
   /// Parse route polyline string into LatLng coordinates
   List<latlong.LatLng> _parsePolylineToLatLng(String polylineString) {
     final List<latlong.LatLng> coordinates = [];
@@ -923,6 +910,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     return coordinates;
   }
 
+  @override
   Widget build(BuildContext context) {
     final String weightUnit = _preferMetric ? 'kg' : 'lbs';
     // Determine the correct list for the chips
