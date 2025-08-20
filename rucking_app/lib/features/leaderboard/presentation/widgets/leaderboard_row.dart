@@ -181,22 +181,23 @@ class LeaderboardRow extends StatelessWidget {
     return Stack(
       children: [
         avatarWidget,
-        if (user.isCurrentlyRucking)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 2,
-                ),
-              ),
-            ),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: user.isCurrentlyRucking
+              ? Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 2,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
           ),
       ],
     );

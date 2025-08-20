@@ -937,19 +937,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                             ),
                     ),
                   ),
-                  if (user.isCurrentlyRucking)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: user.isCurrentlyRucking
+                        ? Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ],
               ),
               const SizedBox(width: 8),
@@ -1124,25 +1125,26 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return Stack(
       children: [
         avatarWidget,
-        if (user.isCurrentlyRucking)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context).scaffoldBackgroundColor
-                      : Colors.white, 
-                  width: 2
-                ),
-              ),
-            ),
-          ),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: user.isCurrentlyRucking
+              ? Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).scaffoldBackgroundColor
+                          : Colors.white, 
+                      width: 2
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
     );
   }

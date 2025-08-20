@@ -341,6 +341,8 @@ class LocationServiceImpl implements LocationService {
         accuracy: _currentConfig.accuracy,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5), // Force frequent updates
+        forceLocationManager: false, // Use FusedLocationProvider for better battery
+        useMSLAltitude: true, // Use MSL altitude if available
         foregroundNotificationConfig: _canStartForegroundService ? const ForegroundNotificationConfig(
           notificationTitle: 'Ruck in Progress',
           notificationText: 'Tracking your ruck session - tap to return to app',
@@ -401,6 +403,12 @@ class LocationServiceImpl implements LocationService {
           final issueType = Platform.isIOS ? 'iOS background throttling' : 'Android Doze Mode or battery optimization';
           AppLogger.critical('$platform Location Gap: ${timeSinceLastUpdate}s gap detected - possible $issueType', 
             exception: '${platform}_LOCATION_GAP_${timeSinceLastUpdate}s');
+          
+          // On Android, log additional debugging info for 70+ minute failures
+          if (Platform.isAndroid && timeSinceLastUpdate > 4200) { // 70 minutes
+            AppLogger.critical('ANDROID CRITICAL: Location stopped after 70+ minutes!', 
+              exception: 'ANDROID_70MIN_LOCATION_FAILURE');
+          }
         }
         
         // Log GPS accuracy degradation to Crashlytics (non-critical)

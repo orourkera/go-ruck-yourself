@@ -14,7 +14,7 @@ import android.util.Log
  */
 object SessionHeartbeatManager {
     
-    private const val HEARTBEAT_INTERVAL_MS = 15 * 60 * 1000L // 15 minutes like FitoTrack
+    private const val HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes for aggressive keep-alive
     internal const val HEARTBEAT_ACTION = "com.ruck.app.SESSION_HEARTBEAT"
     private const val REQUEST_CODE = 1001
     

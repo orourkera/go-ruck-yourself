@@ -1057,6 +1057,24 @@ def before_request_logging():
     """Track request start time for performance monitoring"""
     g.start_time = datetime.now()
     
+    # HOTFIX: Handle doubled /api/api/ paths from Flutter app bug
+    if request.path.startswith('/api/api/'):
+        # Remove the doubled /api/ prefix and redirect to correct path
+        correct_path = request.path.replace('/api/api/', '/api/', 1)
+        logger.warning(f"FIXING DOUBLED API PATH: {request.path} -> {correct_path}")
+        
+        # Build the full URL with query string if present
+        from werkzeug.urls import url_encode
+        query_string = request.query_string.decode('utf-8')
+        if query_string:
+            correct_url = f"{correct_path}?{query_string}"
+        else:
+            correct_url = correct_path
+            
+        # Return a redirect to the correct path
+        # Use 307 to preserve the request method (PATCH, POST, etc.)
+        return redirect(correct_url, code=307)
+    
     # Skip detailed logging for static files and health checks
     if (request.path.startswith('/static/') or 
         request.path.startswith('/favicon.ico') or 
