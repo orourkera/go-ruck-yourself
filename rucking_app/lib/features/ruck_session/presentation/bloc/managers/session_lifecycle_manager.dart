@@ -302,8 +302,7 @@ class SessionLifecycleManager implements SessionManager {
             _updateState(newState);
             _activeSessionId = null;
             
-            // Notify coordinator to trigger navigation to homepage
-            _coordinator.handleSessionError('Session not found in backend');
+            // State change will be picked up by coordinator through state stream
             return; // Exit early - don't retry
           }
           

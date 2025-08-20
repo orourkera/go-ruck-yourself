@@ -113,15 +113,22 @@ class ReadAllNotificationsResource(Resource):
                 
             # Get Supabase client
             supabase_client = get_supabase_admin_client()
-                
-            # Update all notifications for this user in Supabase
-            response = supabase_client.table('notifications').update({"is_read": True}).eq('recipient_id', user_id).execute()
+            
+            # Use more efficient approach: only update unread notifications to avoid unnecessary updates
+            response = supabase_client.table('notifications').update({
+                "is_read": True,
+                "read_at": "now()"  # Set read timestamp
+            }).eq('recipient_id', user_id).eq('is_read', False).execute()
             
             if hasattr(response, 'error') and response.error:
                 logger.error(f"Error marking all notifications as read: {response.error}")
                 return {"error": "Failed to mark all notifications as read"}, 500
             
-            return {"success": True, "message": "All notifications marked as read"}
+            # Return count of updated notifications
+            updated_count = len(response.data) if response.data else 0
+            logger.info(f"Marked {updated_count} notifications as read for user {user_id}")
+            
+            return {"success": True, "message": f"Marked {updated_count} notifications as read"}
             
         except Exception as e:
             logger.error(f"Exception in mark all notifications as read: {str(e)}")

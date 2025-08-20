@@ -389,12 +389,12 @@ class ApiClient {
   /// Makes a POST request to the specified endpoint with the given body
   Future<dynamic> post(String endpoint, dynamic body) async {
     try {
-      // Require token for /rucks/*, /users/*, /achievements/*, and /duels/* endpoints, EXCEPT for /users/register
+      // Require token for rucks/*, users/*, achievements/*, and duels/* endpoints, EXCEPT for users/register
       bool requiresAuth = ((endpoint.startsWith('/rucks') || endpoint.startsWith('/users/') || endpoint.startsWith('/achievements/') || endpoint.startsWith('/duels/')) && 
                         endpoint != '/users/register') ||
                         endpoint.startsWith('/duel-') ||
                         endpoint == '/device-token'; // Ensure device token registration is authenticated
-      // Explicitly do not set auth token for /auth/refresh endpoint
+      // Explicitly do not set auth token for auth/refresh endpoint
       bool excludeAuth = endpoint == '/auth/refresh';
                           
       if (requiresAuth && !excludeAuth) {
@@ -404,7 +404,7 @@ class ApiClient {
         }
       }
       
-      // Debug logging for /auth/refresh request
+      // Debug logging for auth/refresh request
       if (endpoint == '/auth/refresh') {
         AppLogger.sessionCompletion('Sending refresh token request to $endpoint', context: {
           'request_body': body,

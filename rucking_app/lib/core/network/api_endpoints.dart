@@ -2,8 +2,8 @@
 /// This file contains all the endpoint constants used throughout the application
 
 class ApiEndpoints {
-  // Base API endpoint
-  static const String baseApi = '/api';
+  // Base API endpoint - empty since baseURL already includes /api
+  static const String baseApi = '';
   
   // Ruck Sessions
   static const String ruckSessions = '$baseApi/ruck-sessions';
