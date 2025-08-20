@@ -251,15 +251,31 @@ class LeaderboardResource(Resource):
                     
                     if include_ruck:
                         stats = user_stats[user_id]['stats']
-                        stats['rucks'] += 1
-                        stats['distanceKm'] += ruck.get('distance_km') or 0.0
-                        stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
-                        stats['caloriesBurned'] += ruck.get('calories_burned') or 0
-                        stats['powerPoints'] += ruck.get('power_points') or 0.0
+                        # For rucking_now filter, only count if there's actual progress
+                        if time_period == 'rucking_now':
+                            # For active sessions, show current progress
+                            stats['rucks'] += 1
+                            # Active sessions should have current progress data
+                            stats['distanceKm'] += ruck.get('distance_km') or 0.0
+                            stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
+                            stats['caloriesBurned'] += ruck.get('calories_burned') or 0
+                            stats['powerPoints'] += ruck.get('power_points') or 0.0
+                        else:
+                            # For completed rucks, add all stats
+                            stats['rucks'] += 1
+                            stats['distanceKm'] += ruck.get('distance_km') or 0.0
+                            stats['elevationGainMeters'] += ruck.get('elevation_gain_m') or 0.0
+                            stats['caloriesBurned'] += ruck.get('calories_burned') or 0
+                            stats['powerPoints'] += ruck.get('power_points') or 0.0
             
             # Filter out users with zero completed rucks - only show active ruckers!
-            active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
-                                if stats['stats']['rucks'] > 0}
+            # For rucking_now, show all users with active sessions even if distance is 0
+            if time_period == 'rucking_now':
+                active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
+                                    if stats['stats']['rucks'] > 0 or stats['isCurrentlyRucking']}
+            else:
+                active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
+                                    if stats['stats']['rucks'] > 0}
             
             logger.debug(f"Filtered leaderboard: {len(user_stats)} total users -> {len(active_user_stats)} active ruckers")
             
