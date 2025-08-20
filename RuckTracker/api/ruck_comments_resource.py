@@ -159,7 +159,7 @@ class RuckCommentsResource(Resource):
 
             created_comment = insert_result.data[0] if insert_result.data else None
             
-            # Send push notification to ruck owner
+            # Send push notifications to ruck owner AND all other commenters
             try:
                 # Get ruck owner info
                 ruck_response = supabase.table('ruck_session') \
@@ -167,15 +167,46 @@ class RuckCommentsResource(Resource):
                     .eq('id', ruck_id) \
                     .execute()
                 
+                users_to_notify = set()
+                
+                # Add ruck owner to notification list (if not the commenter)
                 if ruck_response.data and ruck_response.data[0]['user_id'] != user_id:
                     ruck_owner_id = ruck_response.data[0]['user_id']
+                    users_to_notify.add(ruck_owner_id)
+                
+                # Get all previous commenters on this ruck (excluding current commenter)
+                previous_comments = supabase.table('ruck_comments') \
+                    .select('user_id') \
+                    .eq('ruck_id', ruck_id) \
+                    .neq('user_id', user_id) \
+                    .execute()
+                
+                if previous_comments.data:
+                    # Add all unique commenters to notification list
+                    for comment in previous_comments.data:
+                        users_to_notify.add(comment['user_id'])
+                
+                # Get all users who liked this ruck (excluding current commenter)
+                ruck_likes = supabase.table('ruck_likes') \
+                    .select('user_id') \
+                    .eq('ruck_id', ruck_id) \
+                    .neq('user_id', user_id) \
+                    .execute()
+                
+                if ruck_likes.data:
+                    # Add all users who liked the ruck to notification list
+                    for like in ruck_likes.data:
+                        users_to_notify.add(like['user_id'])
+                
+                # Send notifications to all users who should be notified
+                if users_to_notify:
                     commenter_name = user_profile['username']
                     
                     # Send push notification
-                    logger.info(f"🔔 PUSH NOTIFICATION: Using global push service")
+                    logger.info(f"🔔 PUSH NOTIFICATION: Notifying {len(users_to_notify)} users about new comment")
                     
-                    device_tokens = get_user_device_tokens([ruck_owner_id])
-                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens: {device_tokens}")
+                    device_tokens = get_user_device_tokens(list(users_to_notify))
+                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens")
                     
                     if device_tokens:
                         logger.info(f"🔔 PUSH NOTIFICATION: Calling send_ruck_comment_notification...")
@@ -187,7 +218,7 @@ class RuckCommentsResource(Resource):
                         )
                         
             except Exception as e:
-                logger.error(f"Failed to send comment notification: {e}")
+                logger.error(f"Failed to send comment notifications: {e}")
                 # Don't fail the comment if notification fails
 
             return build_api_response(data=created_comment, status_code=201)
