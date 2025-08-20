@@ -284,18 +284,25 @@ class SessionLifecycleManager implements SessionManager {
           AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
           
           // Check for 404/405 errors indicating session doesn't exist in backend
-          if (e.toString().contains('404') || e.toString().contains('405')) {
-            AppLogger.error('[LIFECYCLE] Session $sessionId does not exist in backend (404/405). Cleaning up local state.');
+          if (e.toString().contains('404') || e.toString().contains('405') || e.toString().contains('Not Found')) {
+            AppLogger.error('[LIFECYCLE] Session $_activeSessionId does not exist in backend. Cleaning up and returning to homepage.');
             
             // Clear all local session data
             await _storageService.remove('active_session_data');
             await _storageService.remove('pending_completion_$_activeSessionId');
             
-            // Reset state to initial to trigger navigation to homepage
-            _updateState(SessionLifecycleState.initial());
+            // Mark session as completed to trigger navigation
+            final newState = _currentState.copyWith(
+              isActive: false,
+              sessionId: null,
+              duration: finalDuration,
+              isSaving: false,
+              errorMessage: 'Session not found. Returning to homepage.',
+            );
+            _updateState(newState);
             _activeSessionId = null;
             
-            // Notify coordinator to reset
+            // Notify coordinator to trigger navigation to homepage
             _coordinator.handleSessionError('Session not found in backend');
             return; // Exit early - don't retry
           }

@@ -915,6 +915,25 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     }
   }
   
+  /// Handle session errors and trigger navigation to homepage
+  void handleSessionError(String errorMessage) {
+    AppLogger.error('[COORDINATOR] Session error: $errorMessage');
+    
+    // Emit state that will trigger navigation to homepage
+    emit(ActiveSessionState(
+      status: ActiveSessionStatus.inactive,
+      error: errorMessage,
+    ));
+    
+    // Clear all manager states
+    _lifecycleManager.reset();
+    _locationManager.reset();
+    _heartRateManager.reset();
+    _photoManager.reset();
+    _uploadManager.reset();
+    _memoryManager.reset();
+  }
+  
   @override
   Future<void> close() async {
     AppLogger.info('[COORDINATOR] Closing ActiveSessionCoordinator');
