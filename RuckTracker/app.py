@@ -1122,13 +1122,19 @@ def forbidden(error):
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 Not Found errors"""
-    # Only log 404s for API endpoints to avoid spam from bots hitting random URLs
+    # Log all 404s at ERROR level for Papertrail visibility
+    # Include user agent to help identify bots vs real users
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+    
     if request.path.startswith('/api/'):
+        # API 404s are critical - log with full details
         logger.error(f"404 NOT FOUND: {request.method} {request.path} - "
-                    f"IP: {request.remote_addr} - Referrer: {request.headers.get('Referer', 'None')}")
+                    f"IP: {request.remote_addr} - Referrer: {request.headers.get('Referer', 'None')} - "
+                    f"User-Agent: {user_agent}")
     else:
-        # Log bot traffic at debug level (won't appear in production logs)
-        logger.debug(f"404 BOT TRAFFIC: {request.method} {request.path} - IP: {request.remote_addr}")
+        # Non-API 404s might be bots, but still log at ERROR for visibility
+        logger.error(f"404 NOT FOUND (Non-API): {request.method} {request.path} - "
+                    f"IP: {request.remote_addr} - User-Agent: {user_agent[:100]}")  # Truncate long user agents
     
     return jsonify({
         'error': 'Not Found',
