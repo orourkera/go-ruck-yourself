@@ -23,17 +23,17 @@ class ApiEndpoints {
   
   // Notifications
   static const String notifications = '$baseApi/notifications';
-  static const String notificationRead = '/notifications/{id}/read'; // Replace {id} with notification ID
-  static const String readAllNotifications = '/notifications/read-all';
+  static const String notificationRead = '$baseApi/notifications/{id}/read'; // Replace {id} with notification ID
+  static const String readAllNotifications = '$baseApi/notifications/read-all';
   
   // Achievements
-  static const String achievements = '/achievements';
-  static const String achievementCategories = '/achievements/categories';
-  static const String userAchievements = '/users/{user_id}/achievements'; // Replace {user_id} with actual user ID
-  static const String userAchievementsProgress = '/users/{user_id}/achievements/progress'; // Replace {user_id} with actual user ID
-  static const String checkSessionAchievements = '/achievements/check/{session_id}'; // Replace {session_id} with actual session ID
-  static const String achievementStats = '/achievements/stats/{user_id}'; // Replace {user_id} with actual user ID
-  static const String recentAchievements = '/achievements/recent';
+  static const String achievements = '$baseApi/achievements';
+  static const String achievementCategories = '$baseApi/achievements/categories';
+  static const String userAchievements = '$baseApi/users/{user_id}/achievements'; // Replace {user_id} with actual user ID
+  static const String userAchievementsProgress = '$baseApi/users/{user_id}/achievements/progress'; // Replace {user_id} with actual user ID
+  static const String checkSessionAchievements = '$baseApi/achievements/check/{session_id}'; // Replace {session_id} with actual session ID
+  static const String achievementStats = '$baseApi/achievements/stats/{user_id}'; // Replace {user_id} with actual user ID
+  static const String recentAchievements = '$baseApi/achievements/recent';
 
   // Helper methods for path parameters
   static String getRuckEndpoint(String ruckId) => '$ruckById/$ruckId';

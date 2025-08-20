@@ -468,7 +468,7 @@ class SessionCompletionDetectionService {
       
       final apiClient = GetIt.instance<ApiClient>();
       
-      await apiClient.post('/api/notifications', {
+      await apiClient.post('/notifications', {
         'type': type,
         'title': title,
         'message': body,

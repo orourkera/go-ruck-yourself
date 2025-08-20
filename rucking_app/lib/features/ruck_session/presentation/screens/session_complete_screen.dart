@@ -210,7 +210,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       }
 
       // Complete the session with basic data
-      final response = await _apiClient.patch('/api/rucks/${widget.ruckId}/complete', completionData);
+      final response = await _apiClient.patch('/rucks/${widget.ruckId}/complete', completionData);
       
       if (response.statusCode == 200) {
         setState(() => _isSessionSaved = true);
@@ -301,7 +301,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         }
         
         if (updateData.isNotEmpty) {
-          await _apiClient.patch('/api/rucks/${widget.ruckId}', updateData);
+          await _apiClient.patch('/rucks/${widget.ruckId}', updateData);
           AppLogger.info('[SESSION_PATCH] User data updated successfully');
         }
       }

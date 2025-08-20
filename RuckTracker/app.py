@@ -1064,10 +1064,8 @@ def before_request_logging():
         logger.warning(f"FIXING DOUBLED API PATH: {request.path} -> {correct_path}")
         
         # Build the full URL with query string if present
-        from werkzeug.urls import url_encode
-        query_string = request.query_string.decode('utf-8')
-        if query_string:
-            correct_url = f"{correct_path}?{query_string}"
+        if request.query_string:
+            correct_url = f"{correct_path}?{request.query_string.decode('utf-8')}"
         else:
             correct_url = correct_path
             
