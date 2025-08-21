@@ -272,6 +272,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     }
     
     try {
+      // Get user preferences for metric/imperial
+      final authState = context.read<AuthBloc>().state;
+      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+      
       // If basic session isn't saved yet, save it first
       if (!_isSessionSaved) {
         await _autoSaveBasicSession();
@@ -353,6 +357,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       if (e.toString().contains('Session not in progress') || 
           e.toString().contains('BadRequestException')) {
         AppLogger.warning('Session completion failed - session already completed or invalid state: $e');
+        
+        // Get user preferences for metric/imperial
+        final authState = context.read<AuthBloc>().state;
+        final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
         
         // Session was likely already completed or terminated server-side
         // Still create local session record and continue with normal flow

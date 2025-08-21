@@ -449,6 +449,10 @@ class RuckSessionListResource(Resource):
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid planned_ruck_id format: {planned_ruck_id_raw}, ignoring")
             
+            # Insert the session into the database
+            logger.info(f"Inserting session data: {session_data}")
+            insert_resp = supabase.table('ruck_session').insert(session_data).execute()
+            
             if not insert_resp.data:
                 logger.error(f"Failed to create session: {insert_resp.error}")
                 return {'message': 'Failed to create session'}, 500

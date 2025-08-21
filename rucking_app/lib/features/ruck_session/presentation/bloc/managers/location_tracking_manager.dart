@@ -737,32 +737,45 @@ class LocationTrackingManager implements SessionManager {
         AppLogger.warning('[LOCATION] Watchdog: No raw location update for ${timeSinceLastRaw}s. '
             'Restarting location service (attempt $_watchdogRestartCount).');
         
-        // Adaptive restart strategy
-        if (_watchdogRestartCount <= 3) {
-          // Normal restart for first 3 attempts
+        // Extended adaptive restart strategy - try for up to 30 minutes
+        if (_watchdogRestartCount <= 10) {
+          // Normal restart for first 10 attempts (5 minutes)
+          AppLogger.info('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (normal mode)');
           _locationService.stopLocationTracking();
           _startLocationTracking();
           _lastRawLocationTimestamp = now;
-        } else if (_watchdogRestartCount <= 6) {
-          // Request high accuracy for next 3 attempts
-          AppLogger.info('[LOCATION] Watchdog: Requesting high accuracy mode');
+        } else if (_watchdogRestartCount <= 30) {
+          // High accuracy mode for next 20 attempts (10 minutes)
+          AppLogger.info('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (high accuracy mode)');
+          _locationService.stopLocationTracking();
+          _startLocationTracking();
+          _lastRawLocationTimestamp = now;
+        } else if (_watchdogRestartCount <= 50) {
+          // Emergency mode with longer intervals for next 20 attempts (10 minutes)
+          AppLogger.warning('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (emergency mode)');
+          _locationService.stopLocationTracking();
+          _startLocationTracking();
+          _lastRawLocationTimestamp = now;
+        } else if (_watchdogRestartCount <= 60) {
+          // Final desperate attempts for last 10 attempts (5 minutes)
+          AppLogger.error('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (final attempt mode)');
           _locationService.stopLocationTracking();
           _startLocationTracking();
           _lastRawLocationTimestamp = now;
         } else {
-          // Give up and switch to offline mode
-          AppLogger.error('[LOCATION] Watchdog: GPS restart failed after 6 attempts. '
+          // Give up and switch to offline mode after 30 minutes
+          AppLogger.error('[LOCATION] Watchdog: GPS restart failed after 60 attempts (30 minutes). '
               'Switching to offline mode.');
           _stopWatchdog();
           
           // Emit offline state
           _updateState(_currentState.copyWith(
             isGpsReady: false,
-            errorMessage: 'GPS unavailable - session continues in offline mode',
+            errorMessage: 'GPS unavailable after 30 minutes - session continues in offline mode',
           ));
           
-          // Clear error message after 5 seconds
-          Timer(const Duration(seconds: 5), () {
+          // Clear error message after 10 seconds
+          Timer(const Duration(seconds: 10), () {
             _updateState(_currentState.copyWith(
               errorMessage: null,
             ));

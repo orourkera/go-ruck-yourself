@@ -179,10 +179,10 @@ class LocationTrackingService : Service() {
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "RuckingApp:LocationTracking"
             )
-            // CRITICAL FIX: Extend wakelock to 8 hours for long ruck sessions
-            // Most rucks are under 4 hours, but ultra-ruckers may go longer
-            wakeLock?.acquire(8 * 60 * 60 * 1000L) // 8 hour timeout
-            Log.d("LocationService", "WakeLock acquired for 8 hours")
+            // CRITICAL FIX: Extend wakelock to 12 hours for ultra-long ruck sessions
+            // Guarantees CPU stays awake for 10+ hour rucks
+            wakeLock?.acquire(12 * 60 * 60 * 1000L) // 12 hour timeout
+            Log.d("LocationService", "WakeLock acquired for 12 hours")
         } catch (e: Exception) {
             Log.e("LocationService", "Failed to acquire WakeLock", e)
         }

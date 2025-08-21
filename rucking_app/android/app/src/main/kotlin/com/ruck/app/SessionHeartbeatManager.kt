@@ -136,8 +136,24 @@ class SessionHeartbeatReceiver : BroadcastReceiver() {
     }
     
     private fun isLocationServiceRunning(context: Context): Boolean {
-        // This is a simplified check - in reality you'd check ActivityManager.getRunningServices()
-        // or use a more sophisticated method to detect if the foreground service is actually running
-        return true // Placeholder - implement proper service detection
+        // Use shared preference flag first (set by service lifecycle)
+        val prefs = context.getSharedPreferences("RuckingApp", Context.MODE_PRIVATE)
+        val markedActive = prefs.getBoolean("has_active_session", false)
+
+        if (!markedActive) return false
+
+        // Best-effort service detection for Android O+ using foreground service notification
+        return try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            // If our foreground notification is present, service is active
+            val active = notificationManager.activeNotifications.any {
+                it.id == LocationTrackingService.NOTIFICATION_ID && it.notification.channelId == LocationTrackingService.CHANNEL_ID
+            }
+            active
+        } catch (e: Exception) {
+            Log.w("SessionHeartbeat", "Notification check failed: ${e.message}")
+            // Fall back to preference flag
+            markedActive
+        }
     }
 }
