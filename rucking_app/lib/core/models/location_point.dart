@@ -1,3 +1,5 @@
+import 'dart:convert' show utf8;
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:equatable/equatable.dart';
 
 /// Represents a GPS location point with timestamp and accuracy data
@@ -20,27 +22,43 @@ class LocationPoint extends Equatable {
   /// Speed in meters per second (optional)
   final double? speed;
 
-  const LocationPoint({
+  final bool isEstimated;
+
+  final String uniqueId;
+
+  LocationPoint({
     required this.latitude,
     required this.longitude,
     required this.elevation,
     required this.timestamp,
     required this.accuracy,
     this.speed,
-  });
+    this.isEstimated = false,  // Default to false for real GPS points
+    String? uniqueId,
+  }) : uniqueId = uniqueId ?? _generateId(timestamp, latitude, longitude);
+
+  static String _generateId(DateTime timestamp, double lat, double lng) {
+    final input = '${timestamp.toIso8601String()}-$lat-$lng';
+    return sha256.convert(utf8.encode(input)).toString().substring(0, 16); // Truncated for brevity
+  }
   
   @override
-  List<Object?> get props => [latitude, longitude, elevation, timestamp, accuracy, speed];
+  List<Object?> get props => [latitude, longitude, elevation, timestamp, accuracy, speed, isEstimated, uniqueId];
   
   /// Create a LocationPoint from JSON
   factory LocationPoint.fromJson(Map<String, dynamic> json) {
+    final timestamp = DateTime.parse(json['timestamp'] as String);
+    final latitude = (json['latitude'] as num).toDouble();
+    final longitude = (json['longitude'] as num).toDouble();
     return LocationPoint(
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      latitude: latitude,
+      longitude: longitude,
       elevation: (json['elevation_meters'] as num).toDouble(),
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: timestamp,
       accuracy: (json['accuracy_meters'] as num).toDouble(),
       speed: json['speed'] != null ? (json['speed'] as num).toDouble() : null,
+      isEstimated: json['is_estimated'] as bool? ?? false,
+      uniqueId: json['unique_id'] as String?,
     );
   }
   
@@ -53,6 +71,8 @@ class LocationPoint extends Equatable {
       'timestamp': timestamp.toIso8601String(),
       'accuracy_meters': accuracy,
       if (speed != null) 'speed': speed,
+      'is_estimated': isEstimated,
+      'unique_id': uniqueId,
     };
   }
 } 

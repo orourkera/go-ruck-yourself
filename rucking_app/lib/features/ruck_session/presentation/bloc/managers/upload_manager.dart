@@ -462,9 +462,22 @@ class UploadManager implements SessionManager {
   Future<void> _uploadLocationBatch(List<LocationPoint> locations) async {
     if (_activeSessionId == null || locations.isEmpty) return;
     
-    AppLogger.info('[UPLOAD_MANAGER] Uploading ${locations.length} location points');
+    // Deduplicate using uniqueId
+    final seenIds = <String>{};
+    final uniqueLocations = locations.where((point) {
+      if (seenIds.contains(point.uniqueId)) return false;
+      seenIds.add(point.uniqueId);
+      return true;
+    }).toList();
     
-    final locationData = locations.map((point) => point.toJson()).toList();
+    if (uniqueLocations.isEmpty) {
+      AppLogger.info('[UPLOAD_MANAGER] All points were duplicates - skipping upload');
+      return;
+    }
+    
+    AppLogger.info('[UPLOAD_MANAGER] Uploading ${uniqueLocations.length} unique location points (deduped from ${locations.length})');
+    
+    final locationData = uniqueLocations.map((point) => point.toJson()).toList();
     
     await _apiClient.post('/rucks/$_activeSessionId/location-batch', {
       'location_points': locationData,

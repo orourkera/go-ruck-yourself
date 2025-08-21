@@ -16,6 +16,11 @@ import 'package:rucking_app/features/ruck_session/domain/services/split_tracking
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
 
 class InstantStartPage extends StatefulWidget {
   final ActiveSessionArgs args;
@@ -46,6 +51,11 @@ class _InstantStartPageState extends State<InstantStartPage> {
       sessionRepository: locator<SessionRepository>(),
       activeSessionStorage: locator<ActiveSessionStorage>(),
       connectivityService: locator<ConnectivityService>(),
+      aiCheerleaderService: locator<AICheerleaderService>(),
+      openAIService: locator<OpenAIService>(),
+      elevenLabsService: locator<ElevenLabsService>(),
+      locationContextService: locator<LocationContextService>(),
+      audioService: locator<AIAudioService>(),
     );
 
     // Kick off the session immediately

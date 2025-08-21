@@ -70,10 +70,15 @@ class LocationValidationService {
       if (_lowGpsStartTime == null) {
         _lowGpsStartTime = point.timestamp;
       } else if (point.timestamp.difference(_lowGpsStartTime!) > lowGpsWarningDelay) {
-        _validationErrorCount++;
-        results['isValid'] = false;
-        results['message'] = 'Low GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
-        return results;
+        // Only reject if accuracy is REALLY bad (>50m) or has been bad for too long
+        if (point.accuracy > 50.0) {
+          _validationErrorCount++;
+          results['isValid'] = false;
+          results['message'] = 'Low GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
+          return results;
+        }
+        // For moderate accuracy (30-50m), accept but warn
+        results['message'] = 'GPS accuracy reduced (${point.accuracy.toStringAsFixed(1)}m)';
       }
       // Don't return yet if we're still in the buffer period - continue processing the point
     } else {

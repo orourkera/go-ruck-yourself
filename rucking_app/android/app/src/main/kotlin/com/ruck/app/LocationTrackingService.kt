@@ -15,6 +15,16 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import io.flutter.plugin.common.MethodChannel
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
+import android.os.Looper
+import android.os.Handler
 
 /**
  * Dedicated location tracking service for background session recording.
@@ -33,9 +43,13 @@ class LocationTrackingService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isTracking = false
     
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private val cancellationTokenSource = CancellationTokenSource()
+    
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         Log.d("LocationService", "Location tracking service created")
     }
     

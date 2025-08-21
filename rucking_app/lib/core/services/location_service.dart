@@ -1,4 +1,4 @@
-import 'dart:math' show cos, sqrt, asin, pi, sin, atan2;
+import 'dart:math' as math show cos, sqrt, asin, pi, sin, atan2, max;
 import 'dart:async';
 import 'dart:io';
 
@@ -124,6 +124,8 @@ class LocationServiceImpl implements LocationService {
   DateTime? _lastLocationUpdate;
   LocationPoint? _lastValidLocation;
   bool _isTracking = false;
+  StreamSubscription<Position>? _significantSubscription;
+  bool _usingSignificantFallback = false;
   
   @override
   Stream<List<LocationPoint>> get batchedLocationUpdates => _batchController.stream;
@@ -134,8 +136,13 @@ class LocationServiceImpl implements LocationService {
   @override
   Future<bool> hasLocationPermission() async {
     final permission = await Geolocator.checkPermission();
-    return permission == LocationPermission.always || 
+    final granted = permission == LocationPermission.always || 
            permission == LocationPermission.whileInUse;
+    // Ensure we enable Geolocator foreground service path on Android when already granted
+    if (granted && Platform.isAndroid) {
+      _canStartForegroundService = true;
+    }
+    return granted;
   }
   
   @override
@@ -760,15 +767,15 @@ class LocationServiceImpl implements LocationService {
     // Standard Haversine formula for calculating distance between two lat/lng points
     const double earthRadius = 6371.0; // Earth's radius in kilometers
     
-    final double lat1Rad = point1.latitude * (pi / 180);
-    final double lat2Rad = point2.latitude * (pi / 180);
-    final double deltaLatRad = (point2.latitude - point1.latitude) * (pi / 180);
-    final double deltaLngRad = (point2.longitude - point1.longitude) * (pi / 180);
+    final double lat1Rad = point1.latitude * (math.pi / 180);
+    final double lat2Rad = point2.latitude * (math.pi / 180);
+    final double deltaLatRad = (point2.latitude - point1.latitude) * (math.pi / 180);
+    final double deltaLngRad = (point2.longitude - point1.longitude) * (math.pi / 180);
     
-    final double a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
-        cos(lat1Rad) * cos(lat2Rad) * 
-        sin(deltaLngRad / 2) * sin(deltaLngRad / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a)); // CORRECT: sqrt(1 - a)
+    final double a = math.sin(deltaLatRad / 2) * math.sin(deltaLatRad / 2) +
+        math.cos(lat1Rad) * math.cos(lat2Rad) * 
+        math.sin(deltaLngRad / 2) * math.sin(deltaLngRad / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)); // CORRECT: sqrt(1 - a)
     
     return earthRadius * c; // Return distance in kilometers
   }
@@ -899,6 +906,42 @@ class LocationServiceImpl implements LocationService {
       _isTracking = true; // Ensure flag stays true
       return false;
     }
+  }
+  
+  Future<void> startSignificantFallback() async {
+    if (!Platform.isIOS || _significantSubscription != null) return;
+    
+    AppLogger.info('Starting iOS significant location changes fallback');
+    _usingSignificantFallback = true;
+    
+    final settings = AppleSettings(
+      accuracy: LocationAccuracy.low,
+      distanceFilter: 500, // Significant change default
+      activityType: ActivityType.fitness,
+    );
+    
+         _significantSubscription = Geolocator.getPositionStream(locationSettings: settings).listen(
+       (position) {
+         // Handle significant update: lower accuracy, but better than nothing
+         final point = LocationPoint(
+           latitude: position.latitude,
+           longitude: position.longitude,
+           elevation: position.altitude,
+           accuracy: math.max(position.accuracy, 100.0), // Mark as coarse
+           timestamp: position.timestamp,
+           speed: position.speed,
+         );
+         _locationController.add(point);
+         AppLogger.info('Significant location update received during fallback');
+       },
+       onError: (e) => AppLogger.error('Significant changes error: $e'),
+     );
+  }
+
+  Future<void> stopSignificantFallback() async {
+    await _significantSubscription?.cancel();
+    _significantSubscription = null;
+    _usingSignificantFallback = false;
   }
   
   /// Dispose of resources

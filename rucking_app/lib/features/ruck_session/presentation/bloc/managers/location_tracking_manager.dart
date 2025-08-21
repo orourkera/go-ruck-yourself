@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:geolocator/geolocator.dart';
 import 'package:uuid/uuid.dart';
 import 'package:get_it/get_it.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../../../../core/services/api_client.dart';
 import '../../../../../core/services/auth_service.dart';
@@ -15,6 +16,7 @@ import '../../../../../core/models/location_point.dart';
 import '../../../../../core/models/terrain_segment.dart';
 import '../../../../../core/services/app_lifecycle_service.dart';
 import '../../../../../core/services/firebase_messaging_service.dart';
+import '../../../../../core/services/app_error_handler.dart';
 import '../../../domain/models/session_split.dart';
 import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
@@ -90,13 +92,13 @@ class LocationTrackingManager implements SessionManager {
   final List<TerrainSegment> _terrainSegments = [];
   
   // CRITICAL FIX: Memory optimization constants - focus on data offloading, not data loss
-  static const int _maxLocationPoints = 1000; // Keep reasonable amount in memory
+  static const int _maxLocationPoints = 10000; // Support 12+ hour sessions (10000 * 5sec = ~14 hours)
   static const int _maxTerrainSegments = 500; // Keep reasonable amount in memory
   static const int _minLocationPointsToKeep = 100; // Always keep for real-time calculations
   
   // Memory pressure thresholds for aggressive data offloading
-  static const int _memoryPressureThreshold = 800; // Trigger aggressive upload/offload
-  static const int _criticalMemoryThreshold = 900; // Emergency offload threshold
+  static const int _memoryPressureThreshold = 8000; // Trigger aggressive upload/offload (80% of max)
+  static const int _criticalMemoryThreshold = 9000; // Emergency offload threshold (90% of max)
   static const int _offloadBatchSize = 200; // Size of batches to offload at once
   // Upload chunk size to keep payloads reasonable
   static const int _uploadChunkSize = 100; // Max points per API upload
@@ -119,6 +121,24 @@ class LocationTrackingManager implements SessionManager {
   static const Duration _inactivityCooldown = Duration(minutes: 20);
   static const double _movementDistanceMetersThreshold = 12.0; // 10–15m
   static const double _movementSpeedThreshold = 0.3; // m/s
+
+  // Distance stall detection
+  DateTime? _lastDistanceIncreaseTime;
+  double _lastDistanceValueForStall = 0.0;
+  DateTime? _lastStallReportTime;
+
+  // Validation rejection analytics and adaptive recovery
+  final Map<String, int> _validationRejectCounts = {};
+  DateTime? _validationRejectWindowStart;
+  DateTime? _lowAccuracyBypassUntil;
+
+  // Sensor fusion estimation state
+  StreamSubscription<AccelerometerEvent>? _accelerometerSub;
+  StreamSubscription<GyroscopeEvent>? _gyroSub;
+  LocationPoint? _lastEstimatedPosition;
+  DateTime? _estimationStartTime;
+  double _estimatedDistance = 0.0;
+  double _estimatedDirection = 0.0; // in degrees
 
   LocationTrackingManager({
     required LocationService locationService,
@@ -205,6 +225,11 @@ class LocationTrackingManager implements SessionManager {
     _cachedAveragePace = null;
     _lastPaceCalculation = null;
     
+    // Reset distance stall detection
+    _lastDistanceIncreaseTime = DateTime.now();
+    _lastDistanceValueForStall = 0.0;
+    _lastStallReportTime = null;
+
     // Reset comprehensive validation service
     _validationService.reset();
     _sessionValidationService.reset();
@@ -346,7 +371,75 @@ class LocationTrackingManager implements SessionManager {
     if (!(validationResult['isValid'] as bool? ?? false)) {
       final String message = validationResult['message'] as String? ?? 'Validation failed';
       AppLogger.warning('[LOCATION_MANAGER] Location validation failed: $message');
-      return;
+
+      // Track rejection analytics in a 5-minute rolling window
+      final now = DateTime.now();
+      _validationRejectWindowStart ??= now;
+      if (now.difference(_validationRejectWindowStart!).inMinutes >= 5) {
+        _validationRejectCounts.clear();
+        _validationRejectWindowStart = now;
+      }
+      _validationRejectCounts[message] = (_validationRejectCounts[message] ?? 0) + 1;
+
+      // If rejections are due to prolonged low GPS accuracy while we appear to be getting raw updates,
+      // enable a short-lived bypass to avoid distance freeze.
+      final bool isLowAccuracy = message.toLowerCase().contains('low gps accuracy');
+      final int timeSinceLastRaw = _lastRawLocationTimestamp != null
+          ? now.difference(_lastRawLocationTimestamp!).inSeconds
+          : 9999;
+      final int timeSinceLastValid = _lastLocationTimestamp != null
+          ? now.difference(_lastLocationTimestamp!).inSeconds
+          : 9999;
+      final bool gpsHealthy = _validLocationCount > 5 && timeSinceLastRaw < 60;
+      final bool distanceStalled = _lastDistanceIncreaseTime != null &&
+          now.difference(_lastDistanceIncreaseTime!).inSeconds >= 120;
+      final bool bypassActive = _lowAccuracyBypassUntil != null && now.isBefore(_lowAccuracyBypassUntil!);
+
+      // Auto-extend bypass window while stall persists
+      if (isLowAccuracy && gpsHealthy && distanceStalled) {
+        _lowAccuracyBypassUntil = now.add(const Duration(minutes: 2));
+        await AppErrorHandler.handleError(
+          'low_accuracy_bypass_enabled',
+          'Temporarily bypassing low accuracy validation to prevent distance stall',
+          context: {
+            'session_id': _activeSessionId ?? 'unknown',
+            'rejects_in_window': _validationRejectCounts[message] ?? 1,
+            'time_since_last_raw_s': timeSinceLastRaw,
+            'time_since_last_valid_s': timeSinceLastValid,
+            'total_distance_km': _lastKnownTotalDistance.toStringAsFixed(3),
+          },
+          severity: ErrorSeverity.warning,
+        );
+        AppLogger.warning('[LOCATION_MANAGER] LOW_ACCURACY_BYPASS enabled for 2 minutes');
+      }
+
+      // If bypass is active and this is a low-accuracy rejection, accept the point to keep distance monotonic
+      if (isLowAccuracy && (_lowAccuracyBypassUntil != null) && now.isBefore(_lowAccuracyBypassUntil!)) {
+        AppLogger.info('[LOCATION_MANAGER] Accepting low-accuracy point due to temporary bypass');
+      } else {
+        // Conservative raw-point fallback to keep UI distance progressing
+        bool acceptedFallback = false;
+        try {
+          if (_lastValidLocation != null) {
+            final double dt = now.difference(_lastValidLocation!.timestamp).inSeconds.toDouble();
+            final double dMeters = _haversineDistance(
+                  _lastValidLocation!.latitude,
+                  _lastValidLocation!.longitude,
+                  newPoint.latitude,
+                  newPoint.longitude,
+                ) * 1000.0;
+            final double speedMs = dt > 0 ? dMeters / dt : 0.0;
+            if (dt >= 1.0 && dMeters <= 30.0 && speedMs <= 4.2) {
+              AppLogger.info('[LOCATION_MANAGER] Fallback-accepting conservative point (dt=${dt.toStringAsFixed(1)}s, d=${dMeters.toStringAsFixed(1)}m, v=${speedMs.toStringAsFixed(2)}m/s)');
+              acceptedFallback = true;
+            }
+          }
+        } catch (_) {}
+
+        if (!acceptedFallback) {
+          return;
+        }
+      }
     }
     
     _validLocationCount++;
@@ -474,6 +567,49 @@ class LocationTrackingManager implements SessionManager {
       elevationGain: newElevationGain,
       elevationLoss: newElevationLoss,
     ));
+
+    // Detect distance stall while GPS appears healthy and user is moving
+    try {
+      final now = DateTime.now();
+      final timeSinceLastRaw = _lastRawLocationTimestamp != null
+          ? now.difference(_lastRawLocationTimestamp!).inSeconds
+          : 9999;
+      final timeSinceLastValid = _lastLocationTimestamp != null
+          ? now.difference(_lastLocationTimestamp!).inSeconds
+          : 9999;
+      final bool gpsHealthy = _validLocationCount > 5 && timeSinceLastRaw < 60 && timeSinceLastValid < 60;
+      final bool appearsMoving = (position.speed ?? 0.0) >= _movementSpeedThreshold;
+
+      if (newDistance > _lastDistanceValueForStall + 0.005) { // >5 meters
+        _lastDistanceIncreaseTime = now;
+        _lastDistanceValueForStall = newDistance;
+      } else if (gpsHealthy && appearsMoving && _lastDistanceIncreaseTime != null) {
+        final stallMins = now.difference(_lastDistanceIncreaseTime!).inMinutes;
+        final recentlyReported = _lastStallReportTime != null && now.difference(_lastStallReportTime!).inMinutes < 10;
+        if (stallMins >= 3 && !recentlyReported) {
+          _lastStallReportTime = now;
+          // Non-fatal telemetry to Crashlytics/Sentry
+          await AppErrorHandler.handleError(
+            'distance_stall_detected',
+            'No distance increase for ${stallMins}m while GPS healthy',
+            context: {
+              'session_id': _activeSessionId ?? 'unknown',
+              'total_distance_km': newDistance.toStringAsFixed(3),
+              'valid_points': _validLocationCount,
+              'points_buffer': _locationPoints.length,
+              'time_since_last_raw_s': timeSinceLastRaw,
+              'time_since_last_valid_s': timeSinceLastValid,
+              'speed_ms': position.speed ?? 0.0,
+              'accuracy_m': position.accuracy,
+            },
+            severity: ErrorSeverity.warning,
+          );
+          AppLogger.warning('[LOCATION_MANAGER] DISTANCE_STALL: ${stallMins}m without increase while GPS healthy');
+        }
+      }
+    } catch (e) {
+      AppLogger.debug('[LOCATION_MANAGER] Distance stall detection error: $e');
+    }
   }
 
   Future<void> _onBatchLocationUpdated(BatchLocationUpdated event) async {
@@ -771,10 +907,13 @@ class LocationTrackingManager implements SessionManager {
               'Switching to offline mode.');
           _stopWatchdog();
           
+          // Start sensor estimation
+          _startSensorEstimation();
+
           // Emit offline state
           _updateState(_currentState.copyWith(
             isGpsReady: false,
-            errorMessage: 'GPS unavailable after 30 minutes - session continues in offline mode',
+            errorMessage: 'GPS unavailable after 30 minutes - estimating position from sensors',
           ));
           
           // Clear error message after 10 seconds
@@ -1025,25 +1164,25 @@ class LocationTrackingManager implements SessionManager {
 /// Calculate total distance with v2.5/v2.6 compatible logic
 /// Simplified approach that matches the working versions
 double _calculateTotalDistanceWithValidation() {
-  if (_locationPoints.length < 2) return 0.0;
-  
-  // FIXED: Use simple direct accumulation like v2.5/v2.6
-  // The initial distance threshold is handled by validation service
-  double totalDistance = 0.0;
-  
-  for (int i = 1; i < _locationPoints.length; i++) {
-    final distance = Geolocator.distanceBetween(
-      _locationPoints[i - 1].latitude,
-      _locationPoints[i - 1].longitude,
-      _locationPoints[i].latitude,
-      _locationPoints[i].longitude,
+  // Monotonic cumulative method that survives trimming
+  if (_locationPoints.length < 2) return _lastKnownTotalDistance;
+
+  final startIndex = math.max(1, _lastProcessedLocationIndex + 1);
+  if (startIndex >= _locationPoints.length) return _lastKnownTotalDistance;
+
+  double accumulatedMeters = _lastKnownTotalDistance * 1000.0;
+  for (int i = startIndex; i < _locationPoints.length; i++) {
+    final prev = _locationPoints[i - 1];
+    final curr = _locationPoints[i];
+    final d = Geolocator.distanceBetween(
+      prev.latitude, prev.longitude, curr.latitude, curr.longitude,
     );
-    
-    // FIXED: Remove aggressive filtering - direct accumulation like v2.5/v2.6
-    totalDistance += distance;
+    accumulatedMeters += d;
   }
-  
-  return totalDistance / 1000; // Convert to km
+
+  _lastProcessedLocationIndex = _locationPoints.length - 1;
+  _lastKnownTotalDistance = accumulatedMeters / 1000.0; // km
+  return _lastKnownTotalDistance;
 }  
 
   double _calculateCurrentPace(double speedMs) {
@@ -1390,5 +1529,80 @@ double _calculateTotalDistanceWithValidation() {
   
     AppLogger.info('[LOCATION_MANAGER] Metrics restored successfully');
   AppLogger.debug('[LOCATION_MANAGER] Elevation getter test: gain=${elevationGain}m, loss=${elevationLoss}m');
+  }
+
+  void _startSensorEstimation() {
+    if (_estimationStartTime != null) return;
+    _estimationStartTime = DateTime.now();
+    _lastEstimatedPosition = _lastValidLocation;
+    _estimatedDistance = 0.0;
+    _estimatedDirection = 0.0; // Assume initial direction from last speed/heading if available
+    
+    // Subscribe to sensors
+    _accelerometerSub = accelerometerEvents.listen((event) {
+      // Simple step detection: magnitude > threshold counts as step
+      final magnitude = math.sqrt(event.x*event.x + event.y*event.y + event.z*event.z) - 9.8;
+      if (magnitude.abs() > 1.5) { // Tune threshold
+        _estimatedDistance += 0.7; // Average stride length in meters, can personalize
+      }
+    });
+    
+    _gyroSub = gyroscopeEvents.listen((event) {
+      // Integrate angular velocity for direction change
+      _estimatedDirection += event.z * 0.0167; // Assuming 60Hz, convert rad/s to degrees
+      _estimatedDirection = _estimatedDirection % 360;
+    });
+    
+    // Generate estimated points every 5s
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_estimationStartTime == null) {
+        timer.cancel();
+        return;
+      }
+      if (_lastEstimatedPosition == null) return;
+      
+      // Estimate new position: distance in direction from last
+      final deltaLat = (_estimatedDistance / 6371000) * (180 / math.pi) * math.cos(_estimatedDirection * math.pi / 180);
+      final deltaLng = (_estimatedDistance / 6371000) * (180 / math.pi);
+      
+      final newPoint = LocationPoint(
+        latitude: _lastEstimatedPosition!.latitude + deltaLat,
+        longitude: _lastEstimatedPosition!.longitude + deltaLng,
+        elevation: _lastEstimatedPosition!.elevation, // Keep same or estimate
+        accuracy: 50.0, // High uncertainty for estimated
+        timestamp: DateTime.now(),
+        speed: _estimatedDistance / 5, // Avg speed over interval
+        isEstimated: true,
+      );
+      
+      // Add to points and reset accumulators
+      _locationPoints.add(newPoint);
+      _lastEstimatedPosition = newPoint;
+      _estimatedDistance = 0.0;
+      
+      // Update state as if real point using a properly constructed Position
+      final position = Position(
+        latitude: newPoint.latitude,
+        longitude: newPoint.longitude,
+        timestamp: newPoint.timestamp,
+        altitude: newPoint.elevation,
+        accuracy: newPoint.accuracy,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: newPoint.speed ?? 0,
+        speedAccuracy: 0,
+        floor: null,
+        isMocked: false,
+      );
+      handleEvent(LocationUpdated(position: position));
+    });
+  }
+
+  void _stopSensorEstimation() {
+    _accelerometerSub?.cancel();
+    _gyroSub?.cancel();
+    _estimationStartTime = null;
+    _lastEstimatedPosition = null;
   }
 }

@@ -462,6 +462,8 @@ Future<void> _initializeApp() async {
       AppLogger.error('[Main] Error requesting tracking authorization: $e');
     }
   });
+
+  // Update check intentionally disabled per product decision
   
   // 🛡️ ANR Prevention: Initialize heavy services after surface is stable
   WidgetsBinding.instance.addPostFrameCallback((_) async {

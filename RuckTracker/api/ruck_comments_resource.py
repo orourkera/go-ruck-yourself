@@ -38,10 +38,10 @@ class RuckCommentsResource(Resource):
 
         # Get comments for the ruck using separate queries (leaderboard pattern)
         try:
-            # First, get the comments
+            # First, get the comments (limit to 100 most recent to avoid timeout)
             query_result = supabase.from_('ruck_comments').select(
                 'id, ruck_id, user_id, user_display_name, content, created_at, updated_at'
-            ).eq('ruck_id', ruck_id).order('created_at', desc=True).execute()
+            ).eq('ruck_id', ruck_id).order('created_at', desc=True).limit(100).execute()
             
             if hasattr(query_result, 'error') and query_result.error:
                 logger.error(f"RuckCommentsResource: Supabase query error: {query_result.error}")
@@ -175,10 +175,13 @@ class RuckCommentsResource(Resource):
                     users_to_notify.add(ruck_owner_id)
                 
                 # Get all previous commenters on this ruck (excluding current commenter)
+                # Limit to 50 most recent to avoid timeout on popular rucks
                 previous_comments = supabase.table('ruck_comments') \
                     .select('user_id') \
                     .eq('ruck_id', ruck_id) \
                     .neq('user_id', user_id) \
+                    .order('created_at', desc=True) \
+                    .limit(50) \
                     .execute()
                 
                 if previous_comments.data:
@@ -187,10 +190,13 @@ class RuckCommentsResource(Resource):
                         users_to_notify.add(comment['user_id'])
                 
                 # Get all users who liked this ruck (excluding current commenter)
+                # Limit to 100 most recent to avoid timeout on popular rucks
                 ruck_likes = supabase.table('ruck_likes') \
                     .select('user_id') \
                     .eq('ruck_id', ruck_id) \
                     .neq('user_id', user_id) \
+                    .order('created_at', desc=True) \
+                    .limit(100) \
                     .execute()
                 
                 if ruck_likes.data:

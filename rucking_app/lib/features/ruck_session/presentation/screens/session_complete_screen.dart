@@ -1087,7 +1087,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         StatCard(title: 'Pace', value: _formatPace(preferMetric), icon: Icons.speed, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
         StatCard(
           title: 'Elevation',
-          value: preferMetric ? '${widget.elevationGain.toStringAsFixed(0)} m' : '${(widget.elevationGain * 3.28084).toStringAsFixed(0)} ft',
+          value: () {
+            final gain = preferMetric
+                ? widget.elevationGain
+                : widget.elevationGain * 3.28084;
+            final loss = preferMetric
+                ? widget.elevationLoss
+                : widget.elevationLoss * 3.28084;
+            final unit = preferMetric ? 'm' : 'ft';
+            return '+${gain.toStringAsFixed(0)}/-${loss.toStringAsFixed(0)} $unit';
+          }(),
           icon: Icons.terrain,
           color: AppColors.success,
           centerContent: true,
