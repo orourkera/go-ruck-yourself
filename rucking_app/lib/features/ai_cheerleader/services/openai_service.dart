@@ -148,7 +148,7 @@ Guidelines:
 - NEVER repeat phrases you've used before - be inventive and original
 - NEVER use hashtags like #RuckLife #BeastMode - absolutely no # symbols allowed
 - NEVER use social media language or internet slang
-- Address the user by name: ${_extractFirstName(user['username']) ?? 'athlete'}
+- Get creative with the user's name: ${_extractFirstName(user['username']) ?? 'athlete'} - make up fun nicknames, rhymes, or playful variations that match your $personality character (e.g., Drill Sergeant: "Soldier Billy", Southern Redneck: "Wild Willie", British Butler: "Master William", Yoga Instructor: "Mindful Will", etc.)
 
 Generate a motivational message:''';
   }

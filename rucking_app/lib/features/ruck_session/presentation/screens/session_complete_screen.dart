@@ -168,11 +168,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final completionData = <String, dynamic>{
         'completed_at': widget.completedAt.toIso8601String(),
         'duration_seconds': widget.duration.inSeconds,
-        'ruck_weight_lbs': widget.ruckWeight,
+        // Always send metric fields expected by backend
+        'distance_km': widget.distance,
+        'ruck_weight_kg': widget.ruckWeight,
         'is_manual': widget.isManual,
         'calories_burned': widget.caloriesBurned,
-        'elevation_gain_ft': widget.elevationGain,
-        'elevation_loss_ft': widget.elevationLoss,
+        'elevation_gain_m': widget.elevationGain,
+        'elevation_loss_m': widget.elevationLoss,
+        // Provide average pace in seconds per km when distance>0
+        if (widget.distance > 0)
+          'average_pace': widget.duration.inSeconds / widget.distance,
       };
 
       // Include heart rate data if available
@@ -253,8 +258,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Return -- for no distance or duration
     if (widget.distance <= 0.001 || widget.duration.inSeconds <= 0) return '--:--';
     
-    // Convert distance to km if needed (widget.distance is in user's preferred unit)
-    final distanceKm = preferMetric ? widget.distance : widget.distance / 0.621371;
+    // NOTE: widget.distance is ALWAYS provided in kilometers from upstream.
+    // Compute pace in seconds per kilometer, then let MeasurementUtils
+    // render per km or per mile based on user preference.
+    final distanceKm = widget.distance;
     final paceSecondsPerKm = widget.duration.inSeconds / distanceKm;
     
     // Cap pace at a reasonable maximum (99:59 per km/mi)

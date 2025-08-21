@@ -30,8 +30,9 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 /// This avoids showing any map or loading screens before the session is ready
 class CountdownPage extends StatefulWidget {
   final ActiveSessionArgs args;
+  final bool skipCountdown;
 
-  const CountdownPage({Key? key, required this.args}) : super(key: key);
+  const CountdownPage({Key? key, required this.args, this.skipCountdown = false}) : super(key: key);
 
   @override
   State<CountdownPage> createState() => _CountdownPageState();
@@ -106,7 +107,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     );
     
     // Start countdown after a brief delay to ensure screen is visible
-    Future.delayed(const Duration(milliseconds: 200), () {
+    Future.delayed(const Duration(milliseconds: 50), () {
       _startCountdown();
     });
   }
@@ -178,7 +179,18 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         return;
       }
       
-      if (_count > 1) {
+      if (widget.skipCountdown) {
+        // Immediately complete countdown when skipping
+        AppLogger.debug('[COUNTDOWN] Skipping countdown by user preference');
+        setState(() {
+          _countdownComplete = true;
+          _count = 0;
+        });
+        _controller.forward(from: 0.0).then((_) {
+          timer.cancel();
+          _checkAndNavigateIfReady();
+        });
+      } else if (_count > 1) {
         setState(() {
           _count--;
         });
@@ -220,8 +232,10 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       AppLogger.debug('[COUNTDOWN] Location fetch failed: $e');
     }
     
-    // Simulate resource loading with a minimum delay so the countdown animation isn't cut short
-    await Future.delayed(const Duration(seconds: 3));
+    // Simulate resource loading only when countdown is visible
+    if (!widget.skipCountdown) {
+      await Future.delayed(const Duration(seconds: 3));
+    }
     
     if (mounted) {
       setState(() {

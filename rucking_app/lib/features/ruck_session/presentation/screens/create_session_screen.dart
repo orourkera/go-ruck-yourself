@@ -11,6 +11,8 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/countdown_page.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/instant_start_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
@@ -525,9 +527,18 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           
           // Navigate to CountdownPage which will handle the countdown and transition
           if (!mounted) return;
+          // Read skip countdown preference
+          bool skipCountdown = false;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            skipCountdown = prefs.getBool('skip_countdown') ?? false;
+          } catch (_) {}
+
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => CountdownPage(args: sessionArgs),
+              builder: (context) => skipCountdown
+                  ? InstantStartPage(args: sessionArgs)
+                  : CountdownPage(args: sessionArgs),
             ),
           );
         } catch (e) {

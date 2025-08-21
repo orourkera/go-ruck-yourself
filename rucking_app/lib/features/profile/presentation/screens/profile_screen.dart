@@ -25,6 +25,7 @@ import 'package:rucking_app/features/health_integration/presentation/screens/hea
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:rucking_app/core/utils/push_notification_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -306,6 +307,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ),
                                         ))
                                     .toList(),
+                              ),
+                            ),
+                            const Divider(),
+                            _buildSettingItem(
+                              icon: Icons.timer_off_outlined,
+                              label: 'Skip Countdown',
+                              trailing: FutureBuilder<bool>(
+                                future: SharedPreferences.getInstance().then((p) => p.getBool('skip_countdown') ?? false),
+                                builder: (context, snapshot) {
+                                  final current = snapshot.data ?? false;
+                                  return Switch(
+                                    value: current,
+                                    activeColor: isDark 
+                                        ? const Color(0xFF728C69)
+                                        : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                    onChanged: (value) async {
+                                      final prefs = await SharedPreferences.getInstance();
+                                      await prefs.setBool('skip_countdown', value);
+                                      setState(() {});
+                                    },
+                                  );
+                                },
                               ),
                             ),
                             const Divider(),

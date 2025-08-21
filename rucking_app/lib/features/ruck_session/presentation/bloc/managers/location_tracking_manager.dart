@@ -18,6 +18,7 @@ import '../../../../../core/services/firebase_messaging_service.dart';
 import '../../../domain/models/session_split.dart';
 import '../../../domain/services/split_tracking_service.dart';
 import '../../../../../core/services/terrain_tracker.dart';
+import '../../../../../core/services/storage_service.dart';
 import '../../../../../core/utils/location_validator.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/location_validation_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/session_validation_service.dart';
@@ -56,6 +57,8 @@ class LocationTrackingManager implements SessionManager {
   double _elevationLoss = 0.0;
   Timer? _batchUploadTimer;
   Timer? _watchdogTimer;
+  Timer? _journalTimer;
+  int _journalLastIndex = 0;
   
   // Prevent concurrent batch upload processing
   bool _isUploadingBatch = false;
@@ -490,28 +493,24 @@ class LocationTrackingManager implements SessionManager {
       
       // Now we can safely trim location points
       _trimUploadedLocationPoints();
+      // Prune journal after successful upload
+      await _pruneLocationJournal();
     } catch (e) {
       final errorMessage = e.toString().toLowerCase();
       
       // Check if this is a 404 error indicating orphaned session
       if (errorMessage.contains('404') || errorMessage.contains('not found')) {
-        AppLogger.error('[LOCATION_MANAGER] 🚨 ORPHANED SESSION DETECTED: Session $_activeSessionId does not exist on server');
-        AppLogger.error('[LOCATION_MANAGER] This indicates app crashed/restarted with stale session state');
-        
-        // Stop location tracking immediately to prevent further 404s
-        await _stopLocationTracking();
-        
-        // Update state to show error
+        AppLogger.error('[LOCATION_MANAGER] 🚨 ORPHANED SESSION DETECTED: Session $_activeSessionId missing on server');
+        AppLogger.error('[LOCATION_MANAGER] Switching to OFFLINE MODE – continuing to record and journal points locally');
+
+        // Continue tracking locally: queue will retry later; journal ensures durability
         _updateState(_currentState.copyWith(
-          isTracking: false,
-          errorMessage: 'Session no longer exists - please start a new ruck',
+          // Keep isTracking true; surface a non-blocking warning
+          errorMessage: 'Server sync issue – tracking offline, will retry',
         ));
-        
-        // Trigger session cleanup by sending stop event
-        handleEvent(SessionStopRequested());
-        
-        AppLogger.error('[LOCATION_MANAGER] Session stopped due to orphaned state. User should start new session.');
-        return;
+        // Also journal immediately to ensure durability during desync
+        try { await _journalNewPoints(forceAllPending: true); } catch (_) {}
+        return; // Do not rethrow; avoid stopping tracking
       }
       
       AppLogger.warning('[LOCATION_MANAGER] Failed to upload location batch: $e');
@@ -671,6 +670,8 @@ class LocationTrackingManager implements SessionManager {
       
       // Start watchdog timer
       _startWatchdog();
+      // Start journaling timer (durable on-disk persistence)
+      _startLocationJournaling();
       
       AppLogger.info('[LOCATION_MANAGER] Location tracking started successfully');
     } catch (e) {
@@ -693,6 +694,8 @@ class LocationTrackingManager implements SessionManager {
     
     _watchdogTimer?.cancel();
     _watchdogTimer = null;
+    _journalTimer?.cancel();
+    _journalTimer = null;
     
     _locationService.stopLocationTracking();
     
@@ -849,6 +852,68 @@ class LocationTrackingManager implements SessionManager {
     _watchdogTimer = null;
     _isWatchdogActive = false;
     _watchdogStartTime = null;
+  }
+
+  /// Start a lightweight journaling timer to persist new points to disk every 2 seconds
+  void _startLocationJournaling() {
+    _journalTimer?.cancel();
+    _journalLastIndex = _locationPoints.length; // initialize baseline
+    _journalTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      try {
+        await _journalNewPoints();
+      } catch (e) {
+        AppLogger.debug('[LOCATION_MANAGER] Journal flush failed (non-fatal): $e');
+      }
+    });
+  }
+
+  /// Append newly collected points to on-disk journal for crash resilience
+  Future<void> _journalNewPoints({bool forceAllPending = false}) async {
+    if (_activeSessionId == null || _locationPoints.isEmpty) return;
+    final startIndex = forceAllPending ? 0 : _journalLastIndex;
+    if (startIndex >= _locationPoints.length) return;
+
+    final newPoints = _locationPoints.sublist(startIndex).map((p) => p.toJson()).toList();
+    try {
+      final storage = GetIt.I<StorageService>();
+      final key = 'location_journal_${_activeSessionId}';
+      final existing = await storage.getObject(key) ?? <String, dynamic>{};
+      final list = (existing['points'] as List<dynamic>? ?? <dynamic>[]);
+      list.addAll(newPoints);
+      existing['points'] = list;
+      existing['last_updated'] = DateTime.now().toIso8601String();
+      await storage.setObject(key, existing);
+
+      _journalLastIndex = _locationPoints.length; // advance watermark
+
+      // Prevent unbounded growth: soft cap at 50k points; prune oldest 10k if uploaded allows
+      if (list.length > 50000 && _lastUploadedLocationIndex > 10000) {
+        final toDrop = 10000;
+        existing['points'] = list.sublist(toDrop);
+        await storage.setObject(key, existing);
+      }
+    } catch (e) {
+      AppLogger.debug('[LOCATION_MANAGER] Journal append skipped (storage unavailable): $e');
+    }
+  }
+
+  /// Prune journal entries that have been successfully uploaded
+  Future<void> _pruneLocationJournal() async {
+    if (_activeSessionId == null) return;
+    try {
+      final storage = GetIt.I<StorageService>();
+      final key = 'location_journal_${_activeSessionId}';
+      final existing = await storage.getObject(key);
+      if (existing == null) return;
+      final list = (existing['points'] as List<dynamic>? ?? <dynamic>[]);
+      // If journal is longer than uploaded count, keep tail beyond uploaded points
+      if (_lastUploadedLocationIndex > 0 && list.isNotEmpty && list.length > _lastUploadedLocationIndex) {
+        existing['points'] = list.sublist(_lastUploadedLocationIndex);
+        await storage.setObject(key, existing);
+      }
+    } catch (e) {
+      AppLogger.debug('[LOCATION_MANAGER] Journal prune skipped: $e');
+    }
   }
 
   Future<void> _processBatchUpload() async {
