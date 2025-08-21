@@ -675,14 +675,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       AppLogger.info('[COORDINATOR] Emitting completed state');
       emit(_currentAggregatedState);
       
-      // CRITICAL: Clear local storage after successful completion to prevent orphaned sessions
-      try {
-        await _storageService.remove('active_session_data');
-        await _storageService.remove('active_session_last_save');
-        AppLogger.info('[COORDINATOR] Local session storage cleared after successful completion');
-      } catch (clearError) {
-        AppLogger.error('[COORDINATOR] Failed to clear local storage after completion: $clearError');
-      }
+      // DELAYED: Clear local storage after a delay to ensure UI navigation completes first
+      Future.delayed(const Duration(seconds: 2), () async {
+        try {
+          await _storageService.remove('active_session_data');
+          await _storageService.remove('active_session_last_save');
+          AppLogger.info('[COORDINATOR] Local session storage cleared after completion (delayed)');
+        } catch (clearError) {
+          AppLogger.error('[COORDINATOR] Failed to clear local storage after completion: $clearError');
+        }
+      });
       
       AppLogger.info('[COORDINATOR] Session completion process finished');
       
@@ -727,16 +729,18 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
                  (e.toString().contains('404') && e.toString().contains('session'))) {
         AppLogger.warning('[COORDINATOR] Session not found (404) - cleaning up and navigating to homepage: $e');
         
-        // Clean up local storage for the orphaned session
+        // DELAYED: Clean up local storage for the orphaned session after UI navigation
         final sessionId = _lifecycleManager.currentState.sessionId ?? 'unknown';
-        try {
-          // Use storage service to clear session data
-          await _storageService.remove('active_session_data');
-          await _storageService.remove('active_session_last_save');
-          AppLogger.info('[COORDINATOR] Local session storage cleared for session: $sessionId');
-        } catch (cleanupError) {
-          AppLogger.error('[COORDINATOR] Failed to clean local storage: $cleanupError');
-        }
+        Future.delayed(const Duration(seconds: 3), () async {
+          try {
+            // Use storage service to clear session data
+            await _storageService.remove('active_session_data');
+            await _storageService.remove('active_session_last_save');
+            AppLogger.info('[COORDINATOR] Local session storage cleared for session: $sessionId (delayed)');
+          } catch (cleanupError) {
+            AppLogger.error('[COORDINATOR] Failed to clean local storage: $cleanupError');
+          }
+        });
         
         // Reset coordinator state to clean state
         await _lifecycleManager.reset();

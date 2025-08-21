@@ -139,14 +139,29 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
           
           // Listen for session state changes
           _blocSubscription = _sessionBloc.stream.listen((state) {
+            AppLogger.debug('[COUNTDOWN] Session state changed: ${state.runtimeType}');
+            
             if (state is ActiveSessionRunning) {
               // Session is now running - mark as ready
               AppLogger.debug('[COUNTDOWN] ActiveSessionRunning state received - setting isLoading=false');
+              if (state.errorMessage != null) {
+                AppLogger.warning('[COUNTDOWN] Session has error but running: ${state.errorMessage} - proceeding anyway');
+              }
               if (mounted) {
                 setState(() {
                   _isLoading = false;
                 });
               }
+            }
+          });
+          
+          // FAILSAFE: Force navigation after 8 seconds regardless of session state
+          Future.delayed(const Duration(seconds: 8), () {
+            if (mounted && _isLoading) {
+              AppLogger.warning('[COUNTDOWN] Timeout reached - forcing navigation despite session not ready');
+              setState(() {
+                _isLoading = false;
+              });
             }
           });
         }

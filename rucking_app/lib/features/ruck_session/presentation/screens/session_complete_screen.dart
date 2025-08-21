@@ -209,8 +209,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         completionData['terrain_segments'] = terrainsData;
       }
 
-      // Complete the session with basic data using PATCH
-      final response = await _apiClient.patch('/rucks/${widget.ruckId}/complete', completionData);
+      // Complete the session with basic data using POST
+      final response = await _apiClient.post('/rucks/${widget.ruckId}/complete', completionData);
       
       if (response.statusCode == 200) {
         setState(() => _isSessionSaved = true);
@@ -253,7 +253,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Return -- for no distance or duration
     if (widget.distance <= 0.001 || widget.duration.inSeconds <= 0) return '--:--';
     
-    final paceSecondsPerKm = widget.duration.inSeconds / widget.distance;
+    // Convert distance to km if needed (widget.distance is in user's preferred unit)
+    final distanceKm = preferMetric ? widget.distance : widget.distance / 0.621371;
+    final paceSecondsPerKm = widget.duration.inSeconds / distanceKm;
     
     // Cap pace at a reasonable maximum (99:59 per km/mi)
     if (paceSecondsPerKm > 5999) return '--:--';
@@ -321,7 +323,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         caloriesBurned: widget.caloriesBurned,
         elevationGain: widget.elevationGain,
         elevationLoss: widget.elevationLoss,
-        averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 ? (widget.duration.inSeconds / widget.distance) : 0.0,
+        averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 ? (widget.duration.inSeconds / (preferMetric ? widget.distance : widget.distance / 0.621371)) : 0.0,
         ruckWeightKg: widget.ruckWeight,
         status: RuckStatus.completed,
         heartRateSamples: widget.heartRateSamples,
@@ -363,7 +365,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           caloriesBurned: widget.caloriesBurned,
           elevationGain: widget.elevationGain,
           elevationLoss: widget.elevationLoss,
-          averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 ? (widget.duration.inSeconds / widget.distance) : 0.0,
+          averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 ? (widget.duration.inSeconds / (preferMetric ? widget.distance : widget.distance / 0.621371)) : 0.0,
           ruckWeightKg: widget.ruckWeight,
           status: RuckStatus.completed,
           heartRateSamples: widget.heartRateSamples,
@@ -578,7 +580,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         elevationGain: widget.elevationGain,
         elevationLoss: widget.elevationLoss,
         averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 
-            ? (widget.duration.inMinutes / widget.distance) : 0.0,
+            ? (widget.duration.inMinutes / (preferMetric ? widget.distance : widget.distance / 0.621371)) : 0.0,
         ruckWeightKg: widget.ruckWeight ?? 0.0,
         status: RuckStatus.completed,
         heartRateSamples: _heartRateSamples,

@@ -284,25 +284,21 @@ class SessionLifecycleManager implements SessionManager {
           AppLogger.warning('[LIFECYCLE] Completion attempt $attempt failed: $e');
           
           // Check for 404/405 errors indicating session doesn't exist in backend
-          if (e.toString().contains('404') || e.toString().contains('405') || e.toString().contains('Not Found')) {
-            AppLogger.error('[LIFECYCLE] Session $_activeSessionId does not exist in backend. Cleaning up and returning to homepage.');
+          if (e.toString().contains('404') || e.toString().contains('405')) {
+            AppLogger.error('[LIFECYCLE] Session $_activeSessionId does not exist in backend (404/405). Cleaning up local state.');
             
             // Clear all local session data
             await _storageService.remove('active_session_data');
             await _storageService.remove('pending_completion_$_activeSessionId');
             
-            // Mark session as completed to trigger navigation
-            final newState = _currentState.copyWith(
+            // Reset state to initial to trigger navigation to homepage
+            _updateState(const SessionLifecycleState(
               isActive: false,
               sessionId: null,
-              duration: finalDuration,
-              isSaving: false,
-              errorMessage: 'Session not found. Returning to homepage.',
-            );
-            _updateState(newState);
+              startTime: null,
+            ));
             _activeSessionId = null;
             
-            // State change will be picked up by coordinator through state stream
             return; // Exit early - don't retry
           }
           
@@ -565,6 +561,21 @@ class SessionLifecycleManager implements SessionManager {
       // If session was started more than 6 hours ago, probably abandon it
       if (crashDuration.inHours > 6) {
         AppLogger.info('[RECOVERY] Session too old (${crashDuration.inHours}h), abandoning');
+        await _storageService.remove('active_session_data');
+        return;
+      }
+
+      // CRITICAL: Validate session exists in backend before recovery
+      try {
+        AppLogger.info('[RECOVERY] Validating session $sessionId exists in backend...');
+        final response = await _apiClient.get('/rucks/$sessionId');
+        if (response.statusCode != 200) {
+          throw Exception('Session validation failed: ${response.statusCode}');
+        }
+        AppLogger.info('[RECOVERY] ✅ Session $sessionId validated in backend');
+      } catch (e) {
+        AppLogger.error('[RECOVERY] ❌ Session $sessionId does not exist in backend: $e');
+        AppLogger.error('[RECOVERY] Clearing orphaned session data and aborting recovery');
         await _storageService.remove('active_session_data');
         return;
       }
@@ -895,6 +906,20 @@ Future<void> clearCrashRecoveryData() async {
       final newSessionId = createResponse['id']?.toString();
       if (newSessionId != null && newSessionId.isNotEmpty) {
         AppLogger.info('[LIFECYCLE] Successfully synced offline session. New session ID: $newSessionId');
+        
+        // CRITICAL: Complete the session with calculated metrics
+        try {
+          final completionData = _getCompletionData?.call();
+          if (completionData != null) {
+            AppLogger.info('[LIFECYCLE] Completing offline session with metrics: ${completionData.keys.join(", ")}');
+            await _apiClient.post('/rucks/$newSessionId/complete', completionData);
+            AppLogger.info('[LIFECYCLE] Offline session completed with metrics successfully');
+          } else {
+            AppLogger.warning('[LIFECYCLE] No completion data available for offline session - session created but not completed');
+          }
+        } catch (e) {
+          AppLogger.error('[LIFECYCLE] Failed to complete offline session with metrics: $e');
+        }
         
         // Check if session is still active and update state atomically
         if (_currentState.isActive && _activeSessionId == sessionId) {

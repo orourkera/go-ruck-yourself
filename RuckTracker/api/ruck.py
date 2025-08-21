@@ -449,16 +449,6 @@ class RuckSessionListResource(Resource):
                 except (ValueError, TypeError):
                     logger.warning(f"Invalid planned_ruck_id format: {planned_ruck_id_raw}, ignoring")
             
-            # Handle is_manual flag if provided (for manual sessions)
-            if 'is_manual' in data:
-                session_data['is_manual'] = data['is_manual']
-                logger.info(f"Setting is_manual to {data['is_manual']} for session creation")
-            
-            logger.info(f"Final session_data before insert: {session_data}")
-            
-            insert_resp = supabase.table('ruck_session') \
-                .insert(session_data) \
-                .execute()
             if not insert_resp.data:
                 logger.error(f"Failed to create session: {insert_resp.error}")
                 return {'message': 'Failed to create session'}, 500
@@ -868,17 +858,28 @@ class RuckSessionCompleteResource(Resource):
                 return {'message': 'Session not found'}, 404
             current_status = session_check.data[0]['status']
             started_at_str = session_check.data[0].get('started_at')
-            if current_status not in ['in_progress', 'paused']:
-                logger.warning(f"Session {ruck_id} completion failed: status is '{current_status}', expected 'in_progress' or 'paused'")
-                if current_status == 'completed':
-                    # Session already completed, return success to avoid client errors
-                    return {
-                        'message': 'Session already completed',
-                        'session_id': ruck_id,
-                        'status': 'already_completed'
-                    }, 200
-                else:
-                    return {'message': f'Session not in progress or paused (current status: {current_status})'}, 400
+            if current_status not in ['in_progress', 'paused', 'completed']:
+                return {'message': f'Session not in valid state for completion (current status: {current_status})'}, 400
+            
+            # Check if this is a manual session being updated after auto-completion
+            session_resp = supabase.table('ruck_session') \
+                .select('is_manual') \
+                .eq('id', ruck_id) \
+                .eq('user_id', user_id) \
+                .single() \
+                .execute()
+            
+            is_manual_session = session_resp.data.get('is_manual', False) if session_resp.data else False
+            
+            if current_status == 'completed' and not is_manual_session:
+                # Non-manual session already completed, return early
+                return {
+                    'message': 'Session already completed',
+                    'session_id': ruck_id,
+                    'status': 'already_completed'
+                }, 200
+            elif current_status == 'completed' and is_manual_session:
+                logger.info(f"Updating already-completed manual session {ruck_id} with new data")
             
             # Fetch user's allow_ruck_sharing preference to set default for is_public
             user_resp = supabase.table('user') \
