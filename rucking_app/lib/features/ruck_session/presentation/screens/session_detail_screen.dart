@@ -788,6 +788,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       '${widget.session.caloriesBurned}',
                       Icons.local_fire_department,
                     ),
+                    if (widget.session.steps != null && widget.session.steps! > 0)
+                      _buildDetailRow(
+                        context,
+                        'Steps',
+                        '${widget.session.steps}',
+                        Icons.directions_walk,
+                      ),
                     _buildDetailRow(
                       context,
                       'Ruck Weight',

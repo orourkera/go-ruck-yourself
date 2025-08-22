@@ -11,8 +11,8 @@ body {
   color: #F7F3E8;
   min-height: 100vh;
   box-sizing: border-box;
-  /* Reserve space for fixed footer to prevent overlap */
-  padding-bottom: 80px;
+  /* Footer is no longer fixed; no extra bottom padding needed */
+  padding-bottom: 0;
 }
 
 /* Keep the nice fixed effect on larger screens only */
@@ -27,7 +27,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px 16px 100px 16px;
+  padding: 20px 16px 40px 16px; /* reduced bottom padding since footer is static */
   box-sizing: border-box;
   position: relative;
 }
@@ -85,15 +85,12 @@ body {
   top: -20px;
 }
 .footer-pinned {
-  position: fixed;
-  left: 0;
-  bottom: 0;
+  position: static; /* not fixed; sits after content */
   width: 100%;
   background: rgba(0,0,0,0.7);
   color: #fff;
   text-align: center;
   padding: 14px 0 4px 0;
-  z-index: 100;
 }
 .footer-links a {
   color: #F7F3E8;
@@ -151,6 +148,15 @@ body {
   color: #CC6A2A;
 }
 
+/* Blog headline links: keep appearance the same on hover for readability */
+.content-container h2 a,
+.content-container h2 a:hover,
+.content-container h2 a:focus,
+.content-container h2 a:active {
+  color: #CC6A2A;
+  text-decoration: none;
+}
+
 @media (max-width: 700px) {
   .headline {
     font-size: 3.3em;
@@ -165,13 +171,13 @@ body {
     margin: 12px auto 0 auto;
   }
   .landing-container {
-    padding: 40px 16px 120px 16px;
+    padding: 40px 16px 60px 16px; /* reduced bottom padding on mobile */
     min-height: 100vh;
     justify-content: flex-start;
     padding-top: 60px;
   }
   /* Slightly more body padding on small screens for taller footer */
-  body { padding-bottom: 110px; }
+  body { padding-bottom: 0; }
   .app-icon {
     width: 100px;
     height: 100px;

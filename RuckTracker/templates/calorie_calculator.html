@@ -45,8 +45,8 @@
   </script>
   <style>
     .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    /* Two columns on desktop with extra spacing between them */
-    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; column-gap: 2rem; row-gap: 1.25rem; } }
+    /* Keep single column on desktop so results appear below inputs */
+    @media (min-width: 900px) { .grid { grid-template-columns: 1fr; column-gap: 1rem; row-gap: 1rem; } }
     .card { padding: 1rem; border-radius: 8px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
     /* Darker descriptive text */
     .muted { color: #444; font-size: .9rem; }

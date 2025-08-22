@@ -74,8 +74,9 @@
     /* Reviews widget styling */
     .reviews-widget {
       margin: 40px auto;
-      max-width: 600px;
+      max-width: 1000px; /* wider to allow a row of three */
       text-align: center;
+      width: 100%;
     }
     
     .reviews-header {
@@ -109,17 +110,28 @@
       overflow: visible; /* Show full text */
       height: auto;      /* Allow container to grow with content */
       margin: 20px 0;
+      display: flex;     /* Arrange visible reviews in a row */
+      gap: 16px;
+      justify-content: center;
+      align-items: stretch;
+      flex-wrap: nowrap;
     }
     
     .review-item {
       position: relative; /* Stack normally */
       width: 100%;
+      max-width: 320px;
       opacity: 0;
       transition: opacity 0.4s ease-in-out;
-      padding: 0 20px;
+      padding: 16px 20px;
       box-sizing: border-box;
       display: none; /* Hidden when not visible */
       margin-bottom: 14px;
+      text-align: left;
+      background: #fff;           /* white card */
+      border-radius: 12px;        /* rounded corners */
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      color: #222;                /* default text color inside card */
     }
     
     .review-item.visible {
@@ -129,14 +141,14 @@
     
     .review-text {
       font-style: italic;
-      color: #fff;
+      color: #222; /* dark text inside white card */
       font-size: 16px;
       line-height: 1.4;
       margin-bottom: 10px;
     }
     
     .review-author {
-      color: #ccc;
+      color: #555; /* darker, readable on white */
       font-size: 14px;
       font-weight: 500;
     }
@@ -151,6 +163,10 @@
       .reviews-widget {
         margin: 30px auto;
         padding: 0 20px;
+      }
+      .review-carousel {
+        flex-direction: column; /* Stack on small screens */
+        align-items: stretch;
       }
       
       .review-text {
@@ -169,13 +185,17 @@
     <img src="{{ url_for('static', filename='images/app_icon_transparent.png') }}" alt="Ruck App Icon" class="app-icon">
     <div class="subtitle">The World's #1 Rucking App. Track your ruck, count your calories, and connect with other ruckers around the world.</div>
     
+    <div class="download-links">
+      <a class="store-badge" href="https://apps.apple.com/us/app/go-ruck-yourself/id6744974620" target="_blank" rel="noopener">
+        <img src="{{ url_for('static', filename='images/app-store-badge.png') }}" alt="Download on the App Store" class="store-img">
+      </a>
+      <a class="store-badge" href="https://play.google.com/store/apps/details?id=com.ruck.app" target="_blank" rel="noopener">
+        <img src="{{ url_for('static', filename='images/google-play-badge.png') }}" alt="Get it on Google Play" class="store-img">
+      </a>
+    </div>
+
     <!-- Reviews Widget -->
     <div class="reviews-widget">
-      <div class="reviews-header">
-        <div class="star-rating">★★★★★</div>
-        <div class="rating-text">4.9/5</div>
-      </div>
-      
       <div class="review-carousel">
         <div class="review-item visible">
           <div class="review-stars">★★★★★</div>
@@ -214,15 +234,6 @@
         </div>
       </div>
     </div>
-    
-    <div class="download-links">
-      <a class="store-badge" href="https://apps.apple.com/us/app/go-ruck-yourself/id6744974620" target="_blank" rel="noopener">
-        <img src="{{ url_for('static', filename='images/app-store-badge.png') }}" alt="Download on the App Store" class="store-img">
-      </a>
-      <a class="store-badge" href="https://play.google.com/store/apps/details?id=com.ruck.app" target="_blank" rel="noopener">
-        <img src="{{ url_for('static', filename='images/google-play-badge.png') }}" alt="Get it on Google Play" class="store-img">
-      </a>
-    </div>
   </div>
   <footer class="footer-pinned">
     <div class="footer-links">
@@ -258,9 +269,9 @@
         render();
       }
 
-      // Initial render and rotate every 4s
+      // Initial render and rotate every 8s (slower)
       render();
-      setInterval(advance, 4000);
+      setInterval(advance, 8000);
     });
   </script>
 </body>
