@@ -103,8 +103,8 @@ body {
 
 /* Content page styles */
 .content-container {
-  background: rgba(0, 0, 0, 0.75);
-  color: #F7F3E8;
+  background: rgba(72, 61, 52, 0.85);
+  color: #222;
   padding: 2rem;
   border-radius: 12px;
   max-width: 700px;

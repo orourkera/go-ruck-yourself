@@ -12,12 +12,12 @@
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ post.title }} - Get Rucky Blog</title>
+  <title>{{ post.title }} - Ruck! Blog</title>
   <meta name="description" content="{{ post.description }}" />
   <link rel="canonical" href="https://getrucky.com/blog/{{ post.slug }}" />
   <link rel="stylesheet" href="/static/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <meta property="og:title" content="{{ post.title }} - Get Rucky Blog" />
+  <meta property="og:title" content="{{ post.title }} - Ruck! Blog" />
   <meta property="og:description" content="{{ post.description }}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="https://getrucky.com/blog/{{ post.slug }}" />
@@ -46,7 +46,7 @@
   <main class="content-container">
     <article>
       <header style="margin-bottom: .75rem;">
-        <p style="margin:0; color:#6b7280; font-size:.95rem;">Get Rucky Blog</p>
+        <p style="margin:0; color:#6b7280; font-size:.95rem;">Ruck! Blog</p>
         <h1 style="margin:.1rem 0 .25rem 0;">{{ post.title }}</h1>
         <p style="color:#777; font-size: .95rem;">
           <time datetime="{{ post.date }}">{{ post.date[:10] }}</time> · {{ post.read_time }} min read · {{ post.author }}
@@ -54,7 +54,7 @@
         {% if post.tags %}
         <p style="margin:.35rem 0 0 0; color:#888; font-size:.9rem;">
           {% for tag in post.tags %}
-            <span style="background:#f2f2f2; color:#333; padding:.15rem .5rem; border-radius:999px; margin-right:.35rem;">#{{ tag }}</span>
+            <span style="background:#f2f2f2; color:#333; padding:.15rem .5rem; border-radius:999px; margin-right:.35rem;">{{ tag }}</span>
           {% endfor %}
         </p>
         {% endif %}
