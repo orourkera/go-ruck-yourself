@@ -234,9 +234,17 @@ def auto_instrument_flask_app(app):
     
     def instrumented_route(*args, **kwargs):
         def decorator(func):
-            # Apply memory tracking to the function
+            # Determine the endpoint name Flask will use for this registration
+            endpoint_name = kwargs.get('endpoint') or func.__name__
+            
+            # If this endpoint was already registered, reuse the same function object
+            # so stacked @app.route decorators don't conflict
+            if endpoint_name in app.view_functions:
+                existing_func = app.view_functions[endpoint_name]
+                return original_route(*args, **kwargs)(existing_func)
+            
+            # First-time registration for this endpoint: wrap and register
             tracked_func = track_endpoint_memory()(func)
-            # Apply original route decorator
             return original_route(*args, **kwargs)(tracked_func)
         return decorator
     
