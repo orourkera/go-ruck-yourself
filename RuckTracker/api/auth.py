@@ -549,7 +549,7 @@ class UserProfileResource(Resource):
             if not update_data:
                  return {'message': 'No valid fields provided for update'}, 400
 
-            logger.debug(f"Authenticated user id: {g.user.id}")
+            logger.error(f"[PROFILE_UPDATE] Authenticated user id: {g.user.id}")
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # First check if user profile exists
@@ -579,7 +579,8 @@ class UserProfileResource(Resource):
                     if field not in create_data:
                         create_data[field] = value
                         
-                insert_response = supabase.table('user').insert(create_data).execute()
+                logger.error(f"[PROFILE_UPDATE] Creating profile with fields: {list(create_data.keys())}")
+                insert_response = supabase.table('user').insert(create_data).select('*').execute()
                 logger.info(f"Created user profile for {g.user.id} during avatar update")
                 
                 if not insert_response.data or len(insert_response.data) == 0:
@@ -589,24 +590,19 @@ class UserProfileResource(Resource):
                 profile_data = insert_response.data[0]
             else:
                 # User profile exists - update it
-                logger.debug(f"Updating existing profile for {g.user.id} with: {update_data}")
+                logger.error(f"[PROFILE_UPDATE] Updating profile {g.user.id} with fields: {list(update_data.keys())}")
                 response = supabase.table('user') \
                     .update(update_data) \
                     .eq('id', str(g.user.id)) \
+                    .select('*') \
                     .execute()
-                logger.debug(f"Update response: {response.__dict__}")
-                
-                # Fetch the updated data
-                fetch_response = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
-                
-                if not fetch_response.data or len(fetch_response.data) == 0:
+                logger.error(f"[PROFILE_UPDATE] Update response has {len(response.data) if response and hasattr(response, 'data') and response.data else 0} rows")
+                if not response.data or len(response.data) == 0:
                     logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
                     return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500
-                    
-                profile_data = fetch_response.data[0]
+                profile_data = response.data[0]
             
-            profile_data = fetch_response.data[0]
-            logger.debug(f"Profile updated/fetched successfully: {profile_data}")
+            logger.error(f"[PROFILE_UPDATE] Final profile keys: {list(profile_data.keys())}")
             
             # Ensure email from auth is included if missing
             if 'email' not in profile_data or not profile_data['email']:
