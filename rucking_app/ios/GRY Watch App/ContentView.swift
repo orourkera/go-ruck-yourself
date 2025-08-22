@@ -43,6 +43,25 @@ struct ContentView: View {
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+
+                    // Start button to initiate a ruck directly from the watch
+                    Button(action: {
+                        sessionManager.startSession()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "figure.walk")
+                            Text("Start Ruck")
+                                .font(.headline)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.green.opacity(0.2))
+                        .cornerRadius(10)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal)
                     
                     Spacer()
                 }

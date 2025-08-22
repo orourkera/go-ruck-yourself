@@ -580,23 +580,26 @@ class UserProfileResource(Resource):
                         create_data[field] = value
                         
                 logger.error(f"[PROFILE_UPDATE] Creating profile with fields: {list(create_data.keys())}")
-                insert_response = supabase.table('user').insert(create_data).select('*').execute()
+                insert_response = supabase.table('user').insert(create_data).execute()
                 logger.info(f"Created user profile for {g.user.id} during avatar update")
-                
-                if not insert_response.data or len(insert_response.data) == 0:
+
+                # Fetch the created row explicitly (supabase-py doesn't support select() chaining after insert)
+                fetch_after_insert = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
+                if not fetch_after_insert.data or len(fetch_after_insert.data) == 0:
                     logger.error(f"Profile creation failed during update for user ID {g.user.id}")
                     return {'message': 'Failed to create user profile'}, 500
-                    
-                profile_data = insert_response.data[0]
+
+                profile_data = fetch_after_insert.data[0]
             else:
                 # User profile exists - update it
                 logger.error(f"[PROFILE_UPDATE] Updating profile {g.user.id} with fields: {list(update_data.keys())}")
-                response = supabase.table('user') \
+                update_exec = supabase.table('user') \
                     .update(update_data) \
                     .eq('id', str(g.user.id)) \
-                    .select('*') \
                     .execute()
-                logger.error(f"[PROFILE_UPDATE] Update response has {len(response.data) if response and hasattr(response, 'data') and response.data else 0} rows")
+                # Explicitly fetch updated row (supabase-py does not support .select() after update)
+                response = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
+                logger.error(f"[PROFILE_UPDATE] Update fetch returned {len(response.data) if response and hasattr(response, 'data') and response.data else 0} rows")
                 if not response.data or len(response.data) == 0:
                     logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
                     return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500

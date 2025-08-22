@@ -147,7 +147,8 @@ body {
 }
 
 .content-container a:hover {
-  color: #F7F3E8;
+  /* Keep link color consistent on hover to maintain readability */
+  color: #CC6A2A;
 }
 
 @media (max-width: 700px) {

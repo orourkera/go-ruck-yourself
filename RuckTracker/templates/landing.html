@@ -106,21 +106,24 @@
     
     .review-carousel {
       position: relative;
-      overflow: hidden;
-      height: 120px;
+      overflow: visible; /* Show full text */
+      height: auto;      /* Allow container to grow with content */
       margin: 20px 0;
     }
     
     .review-item {
-      position: absolute;
+      position: relative; /* Stack normally */
       width: 100%;
       opacity: 0;
-      transition: opacity 0.5s ease-in-out;
+      transition: opacity 0.4s ease-in-out;
       padding: 0 20px;
       box-sizing: border-box;
+      display: none; /* Hidden when not visible */
+      margin-bottom: 14px;
     }
     
-    .review-item.active {
+    .review-item.visible {
+      display: block;
       opacity: 1;
     }
     
@@ -172,22 +175,21 @@
         <div class="star-rating">★★★★★</div>
         <div class="rating-text">4.9/5</div>
       </div>
-      <div class="reviews-count">Based on 2,847+ App Store reviews</div>
       
       <div class="review-carousel">
-        <div class="review-item active">
+        <div class="review-item visible">
           <div class="review-stars">★★★★★</div>
           <div class="review-text">"Super awesome app with great features and easy to use! Calorie burn calculation seems pretty accurate, great ruck tracking stats, cool achievements and ideas like dueling."</div>
           <div class="review-author">- William T.</div>
         </div>
         
-        <div class="review-item">
+        <div class="review-item visible">
           <div class="review-stars">★★★★★</div>
           <div class="review-text">"Rucking has changed my life. I had to give up sports like soccer and lifetime fitness activities like running. Rucking is walking with a weighted backpack. This has shifted my paradigm. FIVE. STARS."</div>
           <div class="review-author">- OBrienByd</div>
         </div>
         
-        <div class="review-item">
+        <div class="review-item visible">
           <div class="review-stars">★★★★★</div>
           <div class="review-text">"Best rucking calorie tracker I've found plus I love the live leaderboard feature and social feed. Tons of data and a great community!"</div>
           <div class="review-author">- Duc</div>
@@ -235,24 +237,30 @@
   </footer>
   
   <script>
-    // Reviews carousel functionality
+    // Reviews carousel functionality (show 3 at a time)
     document.addEventListener('DOMContentLoaded', function() {
-      const reviewItems = document.querySelectorAll('.review-item');
-      let currentIndex = 0;
-      
-      function showNextReview() {
-        // Hide current review
-        reviewItems[currentIndex].classList.remove('active');
-        
-        // Move to next review (loop back to start if at end)
-        currentIndex = (currentIndex + 1) % reviewItems.length;
-        
-        // Show next review
-        reviewItems[currentIndex].classList.add('active');
+      const reviewItems = Array.from(document.querySelectorAll('.review-item'));
+      let start = 0;
+
+      function render() {
+        // Clear all
+        reviewItems.forEach(el => el.classList.remove('visible'));
+        // Show next 3
+        for (let i = 0; i < 3 && i < reviewItems.length; i++) {
+          const idx = (start + i) % reviewItems.length;
+          reviewItems[idx].classList.add('visible');
+        }
       }
-      
-      // Auto-rotate reviews every 4 seconds
-      setInterval(showNextReview, 4000);
+
+      function advance() {
+        if (reviewItems.length <= 3) return; // no need to rotate
+        start = (start + 3) % reviewItems.length;
+        render();
+      }
+
+      // Initial render and rotate every 4s
+      render();
+      setInterval(advance, 4000);
     });
   </script>
 </body>

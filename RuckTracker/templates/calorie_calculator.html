@@ -45,8 +45,8 @@
   </script>
   <style>
     .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    /* Stack results below inputs on all screen sizes */
-    @media (min-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    /* Two columns on desktop with extra spacing between them */
+    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; column-gap: 2rem; row-gap: 1.25rem; } }
     .card { padding: 1rem; border-radius: 8px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
     /* Darker descriptive text */
     .muted { color: #444; font-size: .9rem; }
@@ -57,6 +57,8 @@
     input, select { width: 100%; padding: .6rem .7rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
     .results td, .results th { padding: .5rem .6rem; border-bottom: 1px solid #eee; text-align: right; }
     .results th:first-child, .results td:first-child { text-align: left; }
+    /* Left-align the Notes column */
+    .results th:last-child, .results td:last-child { text-align: left; }
     .pill { background:#f2f2f2; padding:.2rem .5rem; border-radius: 999px; font-size:.85rem; }
   </style>
 </head>
@@ -72,11 +74,12 @@
         <h2 style="margin-top:0;">Inputs</h2>
         <div class="row">
           <div>
-            <label for="unitSystem">Units</label>
-            <select id="unitSystem">
-              <option value="metric" selected>Metric (kg, km, m)</option>
-              <option value="imperial">Imperial (lb, mi, ft)</option>
-            </select>
+            <label>Units</label>
+            <div style="display:flex; gap:.5rem; align-items:center;">
+              <button id="unitsMetric" type="button" aria-pressed="true" style="padding:.45rem .8rem; border:1px solid #ddd; border-radius:6px; background:#222; color:#fff; cursor:pointer;">Metric</button>
+              <button id="unitsImperial" type="button" aria-pressed="false" style="padding:.45rem .8rem; border:1px solid #ddd; border-radius:6px; background:#fff; color:#222; cursor:pointer;">Imperial</button>
+            </div>
+            <input id="unitSystem" type="hidden" value="metric" />
           </div>
           <div></div>
         </div>
@@ -385,20 +388,35 @@
       try { calculate(); gtag('event', 'calculate', { 'event_category': 'calorie_calculator' }); } catch(e){}
     });
 
-    // Units setup
+    // Units setup with toggle buttons
     (function initUnits(){
-      const unitSel = document.getElementById('unitSystem');
-      if (unitSel){
-        let last = unitSel.value || 'metric';
-        updateUnitLabels(last);
-        unitSel.addEventListener('change', function(){
-          const next = unitSel.value || 'metric';
-          convertInputs(last, next);
-          updateUnitLabels(next);
-          last = next;
-          try { calculate(); gtag('event', 'unit_change', { 'event_category': 'calorie_calculator', 'unit': next }); } catch(e){}
-        });
+      const unitHidden = document.getElementById('unitSystem');
+      const btnMetric = document.getElementById('unitsMetric');
+      const btnImperial = document.getElementById('unitsImperial');
+      let last = unitHidden?.value || 'metric';
+      function setActive(next){
+        if (!unitHidden) return;
+        convertInputs(last, next);
+        unitHidden.value = next;
+        updateUnitLabels(next);
+        last = next;
+        const metricActive = next === 'metric';
+        if (btnMetric){
+          btnMetric.setAttribute('aria-pressed', metricActive ? 'true' : 'false');
+          btnMetric.style.background = metricActive ? '#222' : '#fff';
+          btnMetric.style.color = metricActive ? '#fff' : '#222';
+        }
+        if (btnImperial){
+          btnImperial.setAttribute('aria-pressed', metricActive ? 'false' : 'true');
+          btnImperial.style.background = metricActive ? '#fff' : '#222';
+          btnImperial.style.color = metricActive ? '#222' : '#fff';
+        }
+        try { calculate(); gtag('event', 'unit_change', { 'event_category': 'calorie_calculator', 'unit': next }); } catch(e){}
       }
+      btnMetric?.addEventListener('click', () => setActive('metric'));
+      btnImperial?.addEventListener('click', () => setActive('imperial'));
+      updateUnitLabels(last);
+      setActive(last);
     })();
 
     // Initial calc

@@ -23,7 +23,7 @@ apple_health_sync_schema = AppleHealthSyncSchema()
 apple_health_status_schema = AppleHealthStatusSchema()
 from ..utils.location import calculate_distance, calculate_elevation_change
 from ..utils.calculations import calculate_calories
-from ..supabase_client import get_supabase_admin_client
+from ..supabase_client import get_supabase_admin_client, get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -32,46 +32,62 @@ class UserResource(Resource):
     """Resource for managing individual users"""
     
     def get(self, user_id):
-        """Get a user by ID"""
-        user = User.query.get_or_404(user_id)
-        return user.to_dict(), 200
+        """Get a user by ID (Supabase-backed)"""
+        try:
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            resp = supabase.table('user').select('*').eq('id', str(user_id)).execute()
+            if not hasattr(resp, 'data') or not resp.data:
+                return {"message": "User not found"}, 404
+            user_row = resp.data[0]
+            return {"user": user_row}, 200
+        except Exception as e:
+            logger.error(f"GET /api/users/{user_id} failed: {e}", exc_info=True)
+            return {"message": "Internal server error"}, 500
     
     def put(self, user_id):
-        """Update a user's information"""
-        user = User.query.get_or_404(user_id)
-        data = request.get_json() or {}
-        # Map common camelCase keys from the Flutter app to snake_case expected by the backend
-        camel_to_snake = {
-            'weightKg': 'weight_kg',
-            'isMetric': 'prefer_metric',
-            'heightCm': 'height_cm',
-            'avatarUrl': 'avatar_url'
-        }
-        data = {camel_to_snake.get(k, k): v for k, v in data.items()}
-        
-        # Validate data
-        errors = user_schema.validate(data, partial=True)
-        if errors:
-            return {"errors": errors}, 400
-        
-        # Update user fields
-        if 'username' in data:
-            user.username = data['username']
-        if 'email' in data:
-            user.email = data['email']
-        if 'weight_kg' in data:
-            user.weight_kg = data['weight_kg']
-        if 'prefer_metric' in data:
-            user.prefer_metric = data['prefer_metric']
-        if 'height_cm' in data:
-            user.height_cm = data['height_cm']
-        if 'avatar_url' in data:
-            user.avatar_url = data['avatar_url']
-        if 'is_profile_private' in data:
-            user.is_profile_private = data['is_profile_private']
-        
-        db.session.commit()
-        return {"user": user.to_dict()}, 200
+        """Update a user's information (Supabase-backed)"""
+        try:
+            data = request.get_json() or {}
+            # Map common camelCase keys from the Flutter app to snake_case expected by the backend
+            camel_to_snake = {
+                'weightKg': 'weight_kg',
+                'isMetric': 'prefer_metric',
+                'heightCm': 'height_cm',
+                'avatarUrl': 'avatar_url',
+                'dateOfBirth': 'date_of_birth',
+                'restingHr': 'resting_hr',
+                'maxHr': 'max_hr',
+                'calorieMethod': 'calorie_method',
+                'calorieActiveOnly': 'calorie_active_only',
+            }
+            data = {camel_to_snake.get(k, k): v for k, v in data.items()}
+
+            # Validate subset via marshmallow schema if available
+            errors = user_schema.validate(data, partial=True)
+            if errors:
+                return {"errors": errors}, 400
+
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            # Ensure row exists
+            check = supabase.table('user').select('id').eq('id', str(user_id)).execute()
+            if not hasattr(check, 'data') or not check.data:
+                return {"message": "User not found"}, 404
+
+            # Perform update and return updated row
+            update_resp = (
+                supabase
+                .table('user')
+                .update(data)
+                .eq('id', str(user_id))
+                .execute()
+            )
+            if hasattr(update_resp, 'data') and update_resp.data:
+                return {"user": update_resp.data[0]}, 200
+            else:
+                return {"message": "Update failed"}, 400
+        except Exception as e:
+            logger.error(f"PUT /api/users/{user_id} failed: {e}", exc_info=True)
+            return {"message": "Internal server error"}, 500
     
     def patch(self, user_id):
         """Partially update user fields. Primarily used for `last_active_at` pings from the mobile app.
