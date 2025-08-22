@@ -5,13 +5,21 @@ body, html {
 }
 body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background: linear-gradient(135deg, #2A3714 0%, #1a2408 50%, #0a0a0a 100%), url('/static/images/bg-test.png') no-repeat center center fixed;
+  /* Remove fixed background to reduce repaint cost on scroll, especially mobile */
+  background: linear-gradient(135deg, #2A3714 0%, #1a2408 50%, #0a0a0a 100%), url('/static/images/bg-test.png') no-repeat center center;
   background-size: cover;
   color: #F7F3E8;
   min-height: 100vh;
   box-sizing: border-box;
   /* Reserve space for fixed footer to prevent overlap */
   padding-bottom: 80px;
+}
+
+/* Keep the nice fixed effect on larger screens only */
+@media (min-width: 1024px) {
+  body {
+    background-attachment: fixed;
+  }
 }
 .landing-container {
   min-height: 100vh;
@@ -103,15 +111,14 @@ body {
 
 /* Content page styles */
 .content-container {
-  background: rgba(72, 61, 52, 0.85);
+  background: #F7F3E8; /* cream */
   color: #222;
   padding: 2rem;
   border-radius: 12px;
   max-width: 700px;
   margin: 3rem auto 6rem auto;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(247, 243, 232, 0.1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  border: 1px solid rgba(0,0,0,0.06);
 }
 
 .content-container h1 {

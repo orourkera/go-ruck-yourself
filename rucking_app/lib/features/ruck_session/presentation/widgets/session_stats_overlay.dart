@@ -56,6 +56,12 @@ class SessionStatsOverlay extends StatelessWidget {
               label: 'ELEV',
               value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)} m',
             ),
+            if (state.steps != null)
+              _StatTile(
+                label: 'STEPS',
+                value: state.steps!.toString(),
+                icon: Icons.directions_walk,
+              ),
           ],
         ),
       );
@@ -82,6 +88,12 @@ class SessionStatsOverlay extends StatelessWidget {
         value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)}',
         icon: Icons.terrain,
       ),
+      if (state.steps != null)
+        _StatTile(
+          label: 'Steps',
+          value: state.steps!.toString(),
+          icon: Icons.directions_walk,
+        ),
     ];
     return Column(
       mainAxisSize: MainAxisSize.max,

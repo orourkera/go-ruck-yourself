@@ -72,6 +72,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final List<SessionSplit>? splits;
   final List<TerrainSegment>? terrainSegments;
   final bool isManual;
+  final int? steps;
 
   const SessionCompleteScreen({
     super.key,
@@ -88,6 +89,7 @@ class SessionCompleteScreen extends StatefulWidget {
     this.splits,
     this.terrainSegments,
     this.isManual = false,
+    this.steps,
   });
 
   @override
@@ -1084,6 +1086,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         StatCard(title: 'Time', value: _formatDuration(widget.duration), icon: Icons.timer, color: _getLadyModeColor(context), centerContent: true, valueFontSize: 36),
         StatCard(title: 'Distance', value: MeasurementUtils.formatDistance(widget.distance, metric: preferMetric), icon: Icons.straighten, color: _getLadyModeColor(context), centerContent: true, valueFontSize: 36),
         StatCard(title: 'Calories', value: widget.caloriesBurned.toString(), icon: Icons.local_fire_department, color: AppColors.accent, centerContent: true, valueFontSize: 36),
+        if (widget.steps != null) StatCard(title: 'Steps', value: widget.steps.toString(), icon: Icons.directions_walk, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
         StatCard(title: 'Pace', value: _formatPace(preferMetric), icon: Icons.speed, color: AppColors.secondary, centerContent: true, valueFontSize: 36),
         StatCard(
           title: 'Elevation',

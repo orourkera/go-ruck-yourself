@@ -640,6 +640,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                              prev.calories != curr.calories ||
                                              prev.elevationGain != curr.elevationGain ||
                                              prev.elevationLoss != curr.elevationLoss ||
+                                             prev.steps != curr.steps ||
                                              prev.plannedDuration != curr.plannedDuration;
                                     }
                                     return true;

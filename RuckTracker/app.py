@@ -64,6 +64,25 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 # Create Flask app
 app = Flask(__name__)
+ 
+# Cache static files aggressively to improve load performance
+from datetime import timedelta as _timedelta  # alias to avoid name clash
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = _timedelta(days=30)
+
+# Add Cache-Control for static assets (defense-in-depth)
+@app.after_request
+def add_cache_headers(response):
+    try:
+        path = request.path  # from flask import request
+        if path.startswith('/static/'):
+            # 30 days
+            response.headers['Cache-Control'] = 'public, max-age=2592000, immutable'
+        else:
+            # keep dynamic endpoints fresh
+            response.headers.setdefault('Cache-Control', 'no-store')
+    except Exception:
+        pass
+    return response
 
 # Initialize Migrate (db comes from RuckTracker.extensions)
 migrate = Migrate(directory='RuckTracker/migrations')

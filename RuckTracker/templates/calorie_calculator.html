@@ -45,8 +45,8 @@
   </script>
   <style>
     .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    /* Make the results card wider on larger screens to reduce wrapping */
-    @media (min-width: 900px) { .grid { grid-template-columns: 0.8fr 1.2fr; } }
+    /* Make the inputs (left) column wider on larger screens so controls fit comfortably */
+    @media (min-width: 900px) { .grid { grid-template-columns: 1.3fr 0.7fr; } }
     .card { padding: 1rem; border-radius: 8px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
     /* Darker descriptive text */
     .muted { color: #444; font-size: .9rem; }
@@ -72,17 +72,27 @@
         <h2 style="margin-top:0;">Inputs</h2>
         <div class="row">
           <div>
-            <label for="weightKg">Body weight (kg)</label>
+            <label for="unitSystem">Units</label>
+            <select id="unitSystem">
+              <option value="metric" selected>Metric (kg, km, m)</option>
+              <option value="imperial">Imperial (lb, mi, ft)</option>
+            </select>
+          </div>
+          <div></div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="weightKg">Body weight (<span id="unitWeight">kg</span>)</label>
             <input id="weightKg" type="number" min="20" max="250" step="0.1" value="80" />
           </div>
           <div>
-            <label for="ruckKg">Ruck weight (kg)</label>
+            <label for="ruckKg">Ruck weight (<span id="unitRuck">kg</span>)</label>
             <input id="ruckKg" type="number" min="0" max="60" step="0.1" value="10" />
           </div>
         </div>
         <div class="row">
           <div>
-            <label for="distanceKm">Distance (km)</label>
+            <label for="distanceKm">Distance (<span id="unitDistance">km</span>)</label>
             <input id="distanceKm" type="number" min="0" max="100" step="0.01" value="5" />
           </div>
           <div>
@@ -92,11 +102,11 @@
         </div>
         <div class="row">
           <div>
-            <label for="elevGain">Elevation gain (m)</label>
+            <label for="elevGain">Elevation gain (<span id="unitElev">m</span>)</label>
             <input id="elevGain" type="number" min="0" max="5000" step="1" value="50" />
           </div>
           <div>
-            <label for="elevLoss">Elevation loss (m)</label>
+            <label for="elevLoss">Elevation loss (<span id="unitElev2">m</span>)</label>
             <input id="elevLoss" type="number" min="0" max="5000" step="1" value="0" />
           </div>
         </div>
@@ -191,6 +201,57 @@
     function kmhToMph(kmh){ return kmh * 0.621371; }
     function clamp(x, a, b){ return Math.min(Math.max(x, a), b); }
 
+    // Unit handling
+    const KG_PER_LB = 0.45359237;
+    const LB_PER_KG = 1 / KG_PER_LB;
+    const KM_PER_MI = 1.609344;
+    const MI_PER_KM = 1 / KM_PER_MI;
+    const M_PER_FT = 0.3048;
+    const FT_PER_M = 1 / M_PER_FT;
+
+    function getUnitSystem(){
+      const sel = document.getElementById('unitSystem');
+      return sel ? sel.value : 'metric';
+    }
+
+    function updateUnitLabels(unit){
+      const isImp = unit === 'imperial';
+      const weightLabel = document.getElementById('unitWeight');
+      const ruckLabel = document.getElementById('unitRuck');
+      const distLabel = document.getElementById('unitDistance');
+      const elevLabel = document.getElementById('unitElev');
+      const elevLabel2 = document.getElementById('unitElev2');
+      if (weightLabel) weightLabel.textContent = isImp ? 'lb' : 'kg';
+      if (ruckLabel) ruckLabel.textContent = isImp ? 'lb' : 'kg';
+      if (distLabel) distLabel.textContent = isImp ? 'mi' : 'km';
+      if (elevLabel) elevLabel.textContent = isImp ? 'ft' : 'm';
+      if (elevLabel2) elevLabel2.textContent = isImp ? 'ft' : 'm';
+    }
+
+    function convertNumber(v, factor){
+      const n = parseFloat(v);
+      if (isNaN(n)) return '';
+      const out = n * factor;
+      // keep reasonable precision for UI
+      return Math.round(out * 1000) / 1000;
+    }
+
+    function convertInputs(fromUnit, toUnit){
+      if (fromUnit === toUnit) return;
+      const toImp = (toUnit === 'imperial');
+      const weightEl = document.getElementById('weightKg');
+      const ruckEl = document.getElementById('ruckKg');
+      const distEl = document.getElementById('distanceKm');
+      const gainEl = document.getElementById('elevGain');
+      const lossEl = document.getElementById('elevLoss');
+
+      if (weightEl) weightEl.value = convertNumber(weightEl.value, toImp ? LB_PER_KG : KG_PER_LB);
+      if (ruckEl) ruckEl.value = convertNumber(ruckEl.value, toImp ? LB_PER_KG : KG_PER_LB);
+      if (distEl) distEl.value = convertNumber(distEl.value, toImp ? MI_PER_KM : KM_PER_MI);
+      if (gainEl) gainEl.value = convertNumber(gainEl.value, toImp ? FT_PER_M : M_PER_FT);
+      if (lossEl) lossEl.value = convertNumber(lossEl.value, toImp ? FT_PER_M : M_PER_FT);
+    }
+
     // MET calculator pieces matching lib/core/utils/met_calculator.dart
     function calcRuckingMetByGrade(speedMph, grade, ruckWeightLbs){
       let baseMet;
@@ -254,11 +315,20 @@
     }
 
     function calculate(){
-      const weightKg = parseFloat(document.getElementById('weightKg').value) || 0;
-      const ruckKg = parseFloat(document.getElementById('ruckKg').value) || 0;
-      const distanceKm = parseFloat(document.getElementById('distanceKm').value) || 0;
-      const elevGain = parseFloat(document.getElementById('elevGain').value) || 0;
-      const elevLoss = parseFloat(document.getElementById('elevLoss').value) || 0;
+      const unit = getUnitSystem();
+      let weightKg = parseFloat(document.getElementById('weightKg').value) || 0;
+      let ruckKg = parseFloat(document.getElementById('ruckKg').value) || 0;
+      let distanceKm = parseFloat(document.getElementById('distanceKm').value) || 0;
+      let elevGain = parseFloat(document.getElementById('elevGain').value) || 0;
+      let elevLoss = parseFloat(document.getElementById('elevLoss').value) || 0;
+      // Convert UI values back to metric if imperial is selected
+      if (unit === 'imperial'){
+        weightKg = weightKg * KG_PER_LB;
+        ruckKg = ruckKg * KG_PER_LB;
+        distanceKm = distanceKm * KM_PER_MI;
+        elevGain = elevGain * M_PER_FT;
+        elevLoss = elevLoss * M_PER_FT;
+      }
       const genderSel = document.getElementById('gender').value;
       const age = parseInt(document.getElementById('age').value, 10) || 30;
       const terrain = parseFloat(document.getElementById('terrain').value) || 1.0;
@@ -315,7 +385,24 @@
       try { calculate(); gtag('event', 'calculate', { 'event_category': 'calorie_calculator' }); } catch(e){}
     });
 
+    // Units setup
+    (function initUnits(){
+      const unitSel = document.getElementById('unitSystem');
+      if (unitSel){
+        let last = unitSel.value || 'metric';
+        updateUnitLabels(last);
+        unitSel.addEventListener('change', function(){
+          const next = unitSel.value || 'metric';
+          convertInputs(last, next);
+          updateUnitLabels(next);
+          last = next;
+          try { calculate(); gtag('event', 'unit_change', { 'event_category': 'calorie_calculator', 'unit': next }); } catch(e){}
+        });
+      }
+    })();
+
     // Initial calc
+    updateUnitLabels(getUnitSystem());
     calculate();
   </script>
 </body>

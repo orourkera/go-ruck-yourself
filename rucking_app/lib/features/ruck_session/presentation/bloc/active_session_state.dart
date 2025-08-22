@@ -105,6 +105,8 @@ class ActiveSessionRunning extends ActiveSessionState {
   // Terrain tracking
   final List<TerrainSegment> terrainSegments;
   final bool isRecovered;
+  // Live steps (optional)
+  final int? steps;
 
   static const _unset = Object();
 
@@ -156,6 +158,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.isGpsReady = false, // Default to false
     this.hasGpsAccess = false, // Default to false
     this.isRecovered = false,
+    this.steps,
   });
   
   @override
@@ -206,6 +209,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     plannedRouteDistance, // Add route distance to props
     plannedRouteDuration, // Add route duration to props
     isRecovered,
+    steps,
   ];
   
   ActiveSessionRunning copyWith({
@@ -259,6 +263,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     double? plannedRouteDistance, // Add route distance to copyWith parameters
     int? plannedRouteDuration, // Add route duration to copyWith parameters
     bool? isRecovered,
+    int? steps,
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -306,6 +311,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       plannedRouteDistance: plannedRouteDistance ?? this.plannedRouteDistance, // Use route distance in copyWith
       plannedRouteDuration: plannedRouteDuration ?? this.plannedRouteDuration, // Use route duration in copyWith
       isRecovered: isRecovered ?? this.isRecovered,
+      steps: steps ?? this.steps,
     );
   }
 }
@@ -367,6 +373,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
   final DateTime completedAt;
   final bool isOffline;
   final double ruckWeightKg;
+  final int? steps;
   
   const ActiveSessionCompleted({
     required this.sessionId,
@@ -386,6 +393,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
     required this.completedAt,
     this.isOffline = false,
     required this.ruckWeightKg,
+    this.steps,
   });
   
   @override
@@ -407,6 +415,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
     completedAt,
     isOffline,
     ruckWeightKg,
+    steps,
   ];
 }
 

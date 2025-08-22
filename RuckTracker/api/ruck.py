@@ -941,6 +941,14 @@ class RuckSessionCompleteResource(Resource):
                 update_data['ruck_weight_kg'] = data['ruck_weight_kg']
             if 'calories_burned' in data:
                 update_data['calories_burned'] = data['calories_burned']
+            # Optional steps support
+            if 'steps' in data:
+                try:
+                    steps_val = int(data['steps']) if data['steps'] is not None else None
+                    if steps_val is not None and steps_val >= 0:
+                        update_data['steps'] = steps_val
+                except Exception:
+                    logger.warning(f"Invalid steps value provided: {data.get('steps')}")
             if 'calorie_method' in data and data['calorie_method'] in ['fusion','mechanical','hr']:
                 update_data['calorie_method'] = data['calorie_method']
             if 'elevation_gain_m' in data:

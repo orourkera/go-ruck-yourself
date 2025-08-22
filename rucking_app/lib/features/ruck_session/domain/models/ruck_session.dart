@@ -48,6 +48,7 @@ class RuckSession {
     String? routeId,
     String? plannedRuckId,
     Route? route,
+    int? steps,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -81,6 +82,7 @@ class RuckSession {
       routeId: routeId ?? this.routeId,
       plannedRuckId: plannedRuckId ?? this.plannedRuckId,
       route: route ?? this.route,
+      steps: steps ?? this.steps,
     );
   }
 
@@ -118,6 +120,7 @@ class RuckSession {
   final String? routeId; // ID of the route used for this session
   final String? plannedRuckId; // ID of the planned ruck that was completed
   final Route? route; // Full route data (loaded separately)
+  final int? steps; // Optional step count
 
   RuckSession({
     this.id,
@@ -151,6 +154,7 @@ class RuckSession {
     this.routeId,
     this.plannedRuckId,
     this.route,
+    this.steps,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -328,6 +332,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         route: json['route'] != null && json['route'] is Map<String, dynamic>
             ? Route.fromJson(json['route'] as Map<String, dynamic>)
             : null,
+        steps: (json['steps'] as num?)?.toInt(),
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -387,6 +392,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'route_id': routeId,
       'planned_ruck_id': plannedRuckId,
       'route': route?.toJson(),
+      if (steps != null) 'steps': steps,
     };
   }
 }

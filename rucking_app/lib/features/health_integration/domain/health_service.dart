@@ -298,6 +298,17 @@ class HealthService {
     await prefs.setBool('${_userId}_$_isHealthIntegrationEnabledKeyBase', enabled);
   }
 
+  /// Local preference for enabling live step tracking in-app (independent of watch)
+  Future<void> setLiveStepTrackingEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('live_step_tracking', enabled);
+  }
+
+  Future<bool> isLiveStepTrackingEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('live_step_tracking') ?? false;
+  }
+
   /// Sets whether the user has an Apple Watch
   Future<void> setHasAppleWatch(bool hasWatch) async {
     if (_userId.isEmpty) {
@@ -408,6 +419,60 @@ class HealthService {
       AppLogger.error('Error reading distance between $start and $end: $e');
       return 0.0;
     }
+  }
+  
+  /// Read total steps between start and end
+  Future<int> getStepsBetween(DateTime start, DateTime end) async {
+    if (!Platform.isIOS && !Platform.isAndroid) return 0;
+    try {
+      if (!_isAuthorized) {
+        final ok = await requestAuthorization();
+        if (!ok) return 0;
+      }
+      final List<HealthDataPoint> points = await _health.getHealthDataFromTypes(
+        startTime: start,
+        endTime: end,
+        types: [HealthDataType.STEPS],
+      );
+      int total = 0;
+      for (final p in points) {
+        final dynamic raw = p.value;
+        if (raw is NumericHealthValue) {
+          total += (raw.numericValue ?? 0).toInt();
+        } else if (raw is num) {
+          total += raw.toInt();
+        } else {
+          final parsed = int.tryParse(raw.toString());
+          if (parsed != null) total += parsed;
+        }
+      }
+      return total;
+    } catch (e) {
+      AppLogger.error('Error reading steps between $start and $end: $e');
+      return 0;
+    }
+  }
+  
+  // Live steps polling
+  StreamController<int>? _stepsController;
+  Timer? _stepsTimer;
+  
+  Stream<int> startLiveSteps(DateTime start) {
+    _stepsController?.close();
+    _stepsController = StreamController<int>.broadcast();
+    _stepsTimer?.cancel();
+    _stepsTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      final total = await getStepsBetween(start, DateTime.now());
+      _stepsController?.add(total);
+    });
+    return _stepsController!.stream;
+  }
+  
+  void stopLiveSteps() {
+    _stepsTimer?.cancel();
+    _stepsTimer = null;
+    _stepsController?.close();
+    _stepsController = null;
   }
   
   /// Update heart rate from Watch (called from native code)

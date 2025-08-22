@@ -342,6 +342,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const Divider(),
                             _buildSettingItem(
+                              icon: Icons.directions_walk,
+                              label: 'Live Step Tracking',
+                              trailing: FutureBuilder<bool>(
+                                future: SharedPreferences.getInstance().then((p) => p.getBool('live_step_tracking') ?? false),
+                                builder: (context, snapshot) {
+                                  final current = snapshot.data ?? false;
+                                  return Switch(
+                                    value: current,
+                                    activeColor: isDark 
+                                        ? const Color(0xFF728C69)
+                                        : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                    onChanged: (value) async {
+                                      final prefs = await SharedPreferences.getInstance();
+                                      await prefs.setBool('live_step_tracking', value);
+                                      setState(() {});
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            const Divider(),
+                            _buildSettingItem(
                               icon: Icons.share_outlined,
                               label: 'Allow Ruck Sharing',
                               trailing: Switch(

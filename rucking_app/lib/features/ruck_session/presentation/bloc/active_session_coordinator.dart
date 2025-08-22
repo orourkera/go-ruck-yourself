@@ -29,6 +29,8 @@ import 'managers/memory_manager.dart';
 import 'managers/diagnostics_manager.dart';
 import 'managers/memory_pressure_manager.dart';
 import 'models/manager_states.dart';
+import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Main coordinator that orchestrates all session managers
 class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionState> {
@@ -44,6 +46,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   final SplitTrackingService _splitTrackingService;
   final TerrainTracker _terrainTracker;
   final HeartRateService _heartRateService;
+  final HealthService _healthService = GetIt.instance<HealthService>();
   
   // Managers
   late final SessionLifecycleManager _lifecycleManager;
@@ -74,6 +77,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   List<latlong.LatLng>? _plannedRoute;
   double? _plannedRouteDistance;
   int? _plannedRouteDuration;
+  // Steps tracking
+  StreamSubscription<int>? _stepsSub;
+  int? _currentSteps;
   
   ActiveSessionCoordinator({
     required SessionRepository sessionRepository,
@@ -460,6 +466,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         completedAt: DateTime.now(),
         isOffline: false,
         ruckWeightKg: lifecycleState.ruckWeightKg,
+        steps: _currentSteps,
       );
       AppLogger.info('[COORDINATOR] Completion state built successfully');
       
@@ -477,6 +484,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'start_time': lifecycleState.startTime?.toIso8601String(),
         'completed_at': DateTime.now().toIso8601String(),
         'average_pace': finalDistance > 0 ? (lifecycleState.duration.inMinutes / finalDistance) : 0.0,
+        if (_currentSteps != null) 'steps': _currentSteps,
       };
       AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
     } else if (lifecycleState.sessionId != null && (lifecycleState.isActive || (_lifecycleManager.isPaused && !lifecycleState.isSaving))) {
@@ -529,6 +537,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         plannedRoute: _plannedRoute, // Pass planned route for navigation
         plannedRouteDistance: _plannedRouteDistance, // Pass route distance
         plannedRouteDuration: _plannedRouteDuration, // Pass route duration
+        steps: _currentSteps,
       );
     } else {
       AppLogger.warning('[COORDINATOR] Unmatched state combination: isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
@@ -666,6 +675,19 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.info('[COORDINATOR] Session start requested');
+    // Start live steps if enabled in preferences
+    try {
+      final prefs = GetIt.instance<SharedPreferences>();
+      final enabled = prefs.getBool('live_step_tracking') ?? false;
+      if (enabled) {
+        final startTime = DateTime.now();
+        _stepsSub?.cancel();
+        _stepsSub = _healthService.startLiveSteps(startTime).listen((total) {
+          _currentSteps = total;
+          add(const StateAggregationRequested());
+        });
+      }
+    } catch (_) {}
     
     // Store planned route data for navigation
     _plannedRoute = event.plannedRoute;
@@ -685,6 +707,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.info('[COORDINATOR] Session completion started');
+    // Stop steps
+    try { _stepsSub?.cancel(); } catch (_) {}
+    try { _healthService.stopLiveSteps(); } catch (_) {}
     AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
     AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
     
