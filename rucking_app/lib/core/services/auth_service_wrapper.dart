@@ -235,6 +235,11 @@ class AuthServiceWrapper implements AuthService {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
   }) => _legacyAuth.updateProfile(
     username: username,
     weightKg: weightKg,
@@ -247,6 +252,11 @@ class AuthServiceWrapper implements AuthService {
     notificationBuddies: notificationBuddies,
     notificationEvents: notificationEvents,
     notificationDuels: notificationDuels,
+    dateOfBirth: dateOfBirth,
+    restingHr: restingHr,
+    maxHr: maxHr,
+    calorieMethod: calorieMethod,
+    calorieActiveOnly: calorieActiveOnly,
   );
   
   @override

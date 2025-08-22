@@ -156,6 +156,7 @@ class SessionLifecycleManager implements SessionManager {
         plannedRoute: routePoints,
         plannedRouteDistance: event.plannedRouteDistance,
         plannedRouteDuration: event.plannedRouteDuration,
+        calorieMethod: null,
       );
       
       // Get user metric preference
@@ -410,6 +411,7 @@ class SessionLifecycleManager implements SessionManager {
     List<Map<String, double>>? plannedRoute,
     double? plannedRouteDistance,
     int? plannedRouteDuration,
+    String? calorieMethod,
   }) async {
     try {
       // Create session payload
@@ -422,6 +424,7 @@ class SessionLifecycleManager implements SessionManager {
         'platform': Platform.isIOS ? 'iOS' : 'Android',
         'start_time': _sessionStartTime!.toIso8601String(),
         'is_manual': false, // Explicitly set for active/tracked sessions
+        'calorie_method': calorieMethod,
       };
       
       // Add route data if available

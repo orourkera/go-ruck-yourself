@@ -66,6 +66,11 @@ abstract class AuthService {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
   });
 
   /// Delete the current user's account
@@ -750,6 +755,11 @@ class AuthServiceImpl implements AuthService {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
   }) async {
     AppLogger.info('[AUTH] 🔧 Starting profile update request');
     AppLogger.info('[AUTH] 🔧 Update fields: preferMetric=$preferMetric, username=$username, weightKg=$weightKg');
@@ -767,6 +777,11 @@ class AuthServiceImpl implements AuthService {
       if (notificationBuddies != null) data['notification_buddies'] = notificationBuddies;
       if (notificationEvents != null) data['notification_events'] = notificationEvents;
       if (notificationDuels != null) data['notification_duels'] = notificationDuels;
+      if (dateOfBirth != null) data['date_of_birth'] = dateOfBirth;
+      if (restingHr != null) data['resting_hr'] = restingHr;
+      if (maxHr != null) data['max_hr'] = maxHr;
+      if (calorieMethod != null) data['calorie_method'] = calorieMethod;
+      if (calorieActiveOnly != null) data['calorie_active_only'] = calorieActiveOnly;
       
       // Only send request if there is data to update
       if (data.isEmpty) {

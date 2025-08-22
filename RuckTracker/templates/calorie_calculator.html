@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Analytics Tag -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYLNW662H0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    gtag('js', new Date());
+    gtag('config', 'G-PYLNW662H0');
+  </script>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rucking Calorie Calculator | Compare Methods (Mechanical, MET, HR)</title>
+  <meta name="description" content="Rucking calorie calculator. Enter your stats to compare calories by three methods: Mechanical (Pandolf), MET-based, and Heart Rate-based. Dial in accurate calorie estimates for your rucks." />
+  <link rel="canonical" href="https://getrucky.com/rucking-calorie-calculator" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <meta property="og:title" content="Rucking Calorie Calculator" />
+  <meta property="og:description" content="Compare rucking calories with Mechanical (Pandolf), MET-based, and HR-based methods." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://getrucky.com/rucking-calorie-calculator" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .card { padding: 1rem; border-radius: 8px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .muted { color: #666; font-size: .9rem; }
+    .row { display:flex; gap: .75rem; }
+    .row > div { flex: 1; }
+    label { font-weight: 600; display:block; margin-bottom: .25rem; }
+    input, select { width: 100%; padding: .6rem .7rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+    .results td, .results th { padding: .5rem .6rem; border-bottom: 1px solid #eee; text-align: right; }
+    .results th:first-child, .results td:first-child { text-align: left; }
+    .pill { background:#f2f2f2; padding:.2rem .5rem; border-radius: 999px; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <main class="content-container">
+    <header style="margin-bottom: 1rem;">
+      <h1 style="margin-bottom: .25rem;">Rucking Calorie Calculator</h1>
+      <p class="subtitle">Compare calories by three methods used in the Get Rucky app.</p>
+    </header>
+
+    <section class="grid" aria-label="Calorie input and results">
+      <div class="card">
+        <h2 style="margin-top:0;">Inputs</h2>
+        <div class="row">
+          <div>
+            <label for="weightKg">Body weight (kg)</label>
+            <input id="weightKg" type="number" min="20" max="250" step="0.1" value="80" />
+          </div>
+          <div>
+            <label for="ruckKg">Ruck weight (kg)</label>
+            <input id="ruckKg" type="number" min="0" max="60" step="0.1" value="10" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="distanceKm">Distance (km)</label>
+            <input id="distanceKm" type="number" min="0" max="100" step="0.01" value="5" />
+          </div>
+          <div>
+            <label for="duration">Duration (hh:mm)</label>
+            <input id="duration" type="text" value="01:00" placeholder="hh:mm" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="elevGain">Elevation gain (m)</label>
+            <input id="elevGain" type="number" min="0" max="5000" step="1" value="50" />
+          </div>
+          <div>
+            <label for="elevLoss">Elevation loss (m)</label>
+            <input id="elevLoss" type="number" min="0" max="5000" step="1" value="0" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="gender">Gender</label>
+            <select id="gender">
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="unspecified" selected>Unspecified</option>
+            </select>
+          </div>
+          <div>
+            <label for="age">Age (for HR method)</label>
+            <input id="age" type="number" min="10" max="90" step="1" value="30" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="avgHr">Average Heart Rate (bpm)</label>
+            <input id="avgHr" type="number" min="60" max="220" step="1" value="140" />
+            <p class="muted">Optional. If blank, HR method will show N/A.</p>
+          </div>
+          <div>
+            <label for="terrain">Terrain</label>
+            <select id="terrain">
+              <option value="1.00">Pavement (1.00)</option>
+              <option value="1.05">Gravel / packed dirt (1.05)</option>
+              <option value="1.10">Trail / grass (1.10)</option>
+              <option value="1.20">Sand / snow (1.20)</option>
+            </select>
+          </div>
+        </div>
+        <button id="calcBtn" style="margin-top: .75rem; padding:.7rem 1.2rem; border:0; background:#222; color:#fff; border-radius:6px; cursor:pointer;">Calculate</button>
+        <p class="muted" style="margin-top:.5rem;">All methods follow the app logic in <span class="pill">mechanical (Pandolf)</span>, <span class="pill">MET-based</span>, and <span class="pill">HR-based (Keytel)</span>.</p>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0;">Results</h2>
+        <table class="results" style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Calories</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Mechanical (Pandolf)</td>
+              <td id="mechOut">—</td>
+              <td class="muted">Terrain & grade aware</td>
+            </tr>
+            <tr>
+              <td>MET-based</td>
+              <td id="metOut">—</td>
+              <td class="muted">Speed, grade, load; terrain factor</td>
+            </tr>
+            <tr>
+              <td>HR-based</td>
+              <td id="hrOut">—</td>
+              <td class="muted">Keytel equation using avg HR</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="muted" id="fusionNote" style="display:none; margin-top:.6rem;">Tip: With HR available in the app, we blend HR and mechanical for best accuracy.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer-pinned">
+    <div class="footer-links">
+      <a href="/">Home</a> |
+      <a href="/blog">Blog</a> | <a href="/rucking-calorie-calculator">Rucking Calorie Calculator</a> |
+      <a href="/privacy">Privacy Policy</a> |
+      <a href="/terms">Terms of Service</a> |
+      <a href="/support">Support</a>
+    </div>
+    <div class="copyright">
+      &copy; 2025 Get Rucky, Inc. All rights reserved.
+    </div>
+  </footer>
+
+  <script>
+    function parseDuration(hhmm) {
+      const m = /^\s*(\d{1,2}):(\d{2})\s*$/.exec(hhmm || '');
+      if (!m) return 0;
+      const h = parseInt(m[1], 10); const min = parseInt(m[2], 10);
+      if (min >= 60) return 0;
+      return h * 3600 + min * 60;
+    }
+    function kmhToMph(kmh){ return kmh * 0.621371; }
+    function clamp(x, a, b){ return Math.min(Math.max(x, a), b); }
+
+    // MET calculator pieces matching lib/core/utils/met_calculator.dart
+    function calcRuckingMetByGrade(speedMph, grade, ruckWeightLbs){
+      let baseMet;
+      if (speedMph < 2.0) baseMet = 2.5;
+      else if (speedMph < 2.5) baseMet = 3.0;
+      else if (speedMph < 3.0) baseMet = 3.5;
+      else if (speedMph < 3.5) baseMet = 4.0;
+      else if (speedMph < 4.0) baseMet = 4.5;
+      else if (speedMph < 5.0) baseMet = 5.0;
+      else baseMet = 6.0;
+
+      let gradeAdj = 0.0;
+      if (grade > 0) {
+        gradeAdj = grade * 0.6 * (speedMph / 4.0);
+      } else if (grade < 0) {
+        const absG = Math.abs(grade);
+        if (absG <= 10) gradeAdj = -absG * 0.1; else gradeAdj = (absG - 10) * 0.15;
+      }
+
+      let loadAdj = 0.0;
+      if (ruckWeightLbs > 0) loadAdj = Math.min(ruckWeightLbs * 0.05, 5.0);
+
+      const finalMet = clamp(baseMet + gradeAdj + loadAdj, 2.0, 15.0);
+      return finalMet;
+    }
+
+    function calcCaloriesMet(weightKgTotal, durationMinutes, metValue){
+      const hours = durationMinutes / 60.0;
+      return Math.max(0, metValue * weightKgTotal * hours);
+    }
+
+    // Mechanical (Pandolf/Givoni–Goldman inspired) matching _calculateMechanicalCaloriesPandolf()
+    function calcMechanicalPandolf({userWeightKg, ruckWeightKg, speedKmh, gradePct, terrainMultiplier, elapsedSeconds}){
+      const v = clamp(speedKmh / 3.6, 0.0, 3.0); // m/s
+      const W = userWeightKg;
+      const L = ruckWeightKg;
+      const G = gradePct; // percent
+      const eta = clamp(terrainMultiplier, 0.8, 1.3);
+      const lw = (W > 0) ? (L / W) : 0.0;
+      const termLoad = 2.0 * (W + L) * (lw * lw);
+      const termSpeedGrade = eta * (W + L) * (1.5 * v * v + 0.35 * v * clamp(G, -20.0, 30.0));
+      let M = 1.5 * W + termLoad + termSpeedGrade; // Watts
+      M = clamp(M, 50.0, 800.0);
+      const kcalPerSec = (M / 4186.0);
+      let kcal = kcalPerSec * elapsedSeconds;
+      if (speedKmh < 0.5 && elapsedSeconds > 0) kcal *= 0.2;
+      return Math.max(0, kcal);
+    }
+
+    // Heart-rate based (Keytel equations)
+    function calcCaloriesHR({avgHr, weightKg, age, gender, durationMinutes}){
+      if (!avgHr || avgHr <= 0) return null;
+      let calsPerMin;
+      if (gender === 'female') {
+        calsPerMin = (-20.4022 + (0.4472 * avgHr) - (0.1263 * weightKg) + (0.074 * age)) / 4.184;
+      } else {
+        calsPerMin = (-55.0969 + (0.6309 * avgHr) + (0.1988 * weightKg) + (0.2017 * age)) / 4.184;
+      }
+      const total = calsPerMin * durationMinutes;
+      return Math.max(0, total);
+    }
+
+    function calculate(){
+      const weightKg = parseFloat(document.getElementById('weightKg').value) || 0;
+      const ruckKg = parseFloat(document.getElementById('ruckKg').value) || 0;
+      const distanceKm = parseFloat(document.getElementById('distanceKm').value) || 0;
+      const elevGain = parseFloat(document.getElementById('elevGain').value) || 0;
+      const elevLoss = parseFloat(document.getElementById('elevLoss').value) || 0;
+      const genderSel = document.getElementById('gender').value;
+      const age = parseInt(document.getElementById('age').value, 10) || 30;
+      const terrain = parseFloat(document.getElementById('terrain').value) || 1.0;
+      const avgHr = parseInt(document.getElementById('avgHr').value, 10);
+      const elapsed = parseDuration(document.getElementById('duration').value);
+      const durationHours = elapsed / 3600.0;
+      const durationMinutes = elapsed / 60.0;
+      const speedKmh = (durationHours > 0) ? (distanceKm / durationHours) : 0;
+
+      // grade
+      let gradePct = 0.0;
+      if (distanceKm > 0) gradePct = ((elevGain - elevLoss) / (distanceKm * 1000)) * 100.0;
+
+      // MET path
+      const speedMph = kmhToMph(speedKmh);
+      const ruckLbs = ruckKg * 2.20462;
+      const metVal = calcRuckingMetByGrade(speedMph, gradePct, ruckLbs);
+      let metCalories = calcCaloriesMet(weightKg + ruckKg, durationMinutes, metVal) * terrain;
+
+      // Mechanical path
+      const mechCalories = calcMechanicalPandolf({
+        userWeightKg: weightKg,
+        ruckWeightKg: ruckKg,
+        speedKmh: speedKmh,
+        gradePct: gradePct,
+        terrainMultiplier: terrain,
+        elapsedSeconds: elapsed,
+      });
+
+      // HR path
+      const hrGender = (genderSel === 'female') ? 'female' : 'male';
+      const hrCalories = calcCaloriesHR({
+        avgHr: avgHr,
+        weightKg: weightKg,
+        age: age,
+        gender: hrGender,
+        durationMinutes: durationMinutes,
+      });
+
+      // Apply small sex adjustment to MET if gender unspecified (mirroring app fusion behavior)
+      if (genderSel === 'unspecified') {
+        metCalories *= 0.925;
+      }
+
+      // Render
+      const fmt = (x) => (x == null || isNaN(x)) ? 'N/A' : Math.round(x).toLocaleString();
+      document.getElementById('mechOut').textContent = fmt(mechCalories);
+      document.getElementById('metOut').textContent = fmt(metCalories);
+      document.getElementById('hrOut').textContent = hrCalories == null ? 'N/A' : fmt(hrCalories);
+      document.getElementById('fusionNote').style.display = (hrCalories != null) ? 'block' : 'none';
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', function(){
+      try { calculate(); gtag('event', 'calculate', { 'event_category': 'calorie_calculator' }); } catch(e){}
+    });
+
+    // Initial calc
+    calculate();
+  </script>
+</body>
+</html>

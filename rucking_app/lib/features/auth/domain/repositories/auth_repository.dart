@@ -63,6 +63,11 @@ abstract class AuthRepository {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
   });
 
   /// Delete the current user's account

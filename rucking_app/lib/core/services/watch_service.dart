@@ -16,6 +16,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'rucking_api_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
@@ -34,6 +35,13 @@ class WatchService {
   int _currentCalories = 0;
   double _currentElevationGain = 0.0;
   double _currentElevationLoss = 0.0;
+  DateTime? _watchStartedAt;
+
+  // Persisted settings
+  static const String _lastRuckWeightKey = 'last_ruck_weight_kg';
+  static const String _lastUserWeightKey = 'last_user_weight_kg';
+  double? _lastRuckWeightKg;
+  double? _lastUserWeightKg;
 
   // Method channels
   late MethodChannel _watchSessionChannel;
@@ -89,6 +97,24 @@ class WatchService {
     // Register Pigeon handler
     RuckingApi.setUp(RuckingApiHandler(this));
     // Platform channels setup complete
+
+    // Drain any queued watch messages that arrived while Flutter wasn't ready
+    // This ensures world-class reliability when the iPhone app wasn't foregrounded.
+    Future.delayed(const Duration(milliseconds: 500), _drainQueuedMessages);
+
+    // Load persisted settings and sync to watch
+    Future.delayed(const Duration(milliseconds: 600), () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _lastRuckWeightKg = prefs.getDouble(_lastRuckWeightKey) ?? _lastRuckWeightKg;
+        _lastUserWeightKg = prefs.getDouble(_lastUserWeightKey) ?? _lastUserWeightKg;
+        await _sendMessageToWatch({
+          'command': 'updateSettings',
+          if (_lastRuckWeightKg != null) 'ruckWeightKg': _lastRuckWeightKg,
+          if (_lastUserWeightKg != null) 'userWeightKg': _lastUserWeightKg,
+        });
+      } catch (_) {}
+    });
   }
 
   /// Handle method calls from the watch session channel
@@ -142,6 +168,9 @@ class WatchService {
   /// Handle a session started from the watch
   Future<void> _handleSessionStartedFromWatch(Map<String, dynamic> data) async {
     final double ruckWeight = (data['ruckWeight'] as num?)?.toDouble() ?? 10.0;
+    final DateTime? startedAt = _parseEpochOrIso(data['startedAt']);
+    final double? userWeightKg = (data['userWeightKg'] as num?)?.toDouble();
+    final double? ruckWeightKg = (data['ruckWeightKg'] as num?)?.toDouble() ?? ruckWeight;
     // Handle session start from watch
 
     try {
@@ -155,8 +184,11 @@ class WatchService {
 
       // Create ruck session
       final response = await GetIt.instance<ApiClient>().post('/rucks', {
-        'ruckWeight': ruckWeight,
-        'is_manual': false, // Watch sessions are active/tracked sessions
+        'ruckWeight': ruckWeightKg,
+        'ruck_weight_kg': ruckWeightKg,
+        if (userWeightKg != null) 'weight_kg': userWeightKg,
+        'is_manual': false,
+        if (startedAt != null) 'started_at': startedAt.toUtc().toIso8601String(),
       });
 
       AppLogger.debug('[WATCH] API response for session creation: $response');
@@ -174,7 +206,9 @@ class WatchService {
       await sendSessionIdToWatch(sessionId);
 
       // Start session on backend
-      await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {});
+      await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {
+        if (startedAt != null) 'started_at': startedAt.toUtc().toIso8601String(),
+      });
 
       // Notify watch of workout start
       await _sendMessageToWatch({
@@ -185,11 +219,111 @@ class WatchService {
 
       // Update app state
       _isSessionActive = true;
-      _ruckWeight = ruckWeight;
+      _ruckWeight = ruckWeightKg ?? ruckWeight;
       _currentSessionHeartRateSamples = [];
+      _watchStartedAt = startedAt ?? DateTime.now().toUtc();
+
+      // Persist weights locally
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (ruckWeightKg != null) {
+          _lastRuckWeightKg = ruckWeightKg;
+          await prefs.setDouble(_lastRuckWeightKey, ruckWeightKg);
+        }
+        if (userWeightKg != null) {
+          _lastUserWeightKg = userWeightKg;
+          await prefs.setDouble(_lastUserWeightKey, userWeightKg);
+        }
+      } catch (_) {}
+
+      // Backfill distance from Health for the watch-only window up to now
+      try {
+        final DateTime backfillStart = _watchStartedAt!;
+        final DateTime backfillEnd = DateTime.now().toUtc();
+        await backfillDistanceFromHealth(
+          sessionId: sessionId,
+          startedAt: backfillStart,
+          endedAt: backfillEnd,
+        );
+      } catch (e) {
+        AppLogger.debug('[WATCH] Backfill distance skipped/failed: $e');
+      }
       // Session started successfully
     } catch (e) {
       AppLogger.error('[ERROR] Failed to process session start from Watch: $e');
+    }
+  }
+
+  /// Backfill distance from Apple Health for watch-only period
+  Future<void> backfillDistanceFromHealth({required String sessionId, required DateTime startedAt, required DateTime endedAt}) async {
+    try {
+      final health = GetIt.instance.get<HealthService>();
+      final meters = await health.getDistanceMetersBetween(startedAt, endedAt);
+      if (meters <= 0) return;
+      final km = meters / 1000.0;
+      await GetIt.instance<ApiClient>().patch('/rucks/$sessionId', {
+        'distance_km': km,
+        // Optionally set completed_at if this is a finalization path
+      });
+      AppLogger.info('[WATCH] Backfilled distance ${km.toStringAsFixed(3)} km from Health');
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to backfill distance from Health: $e');
+    }
+  }
+
+  DateTime? _parseEpochOrIso(dynamic value) {
+    try {
+      if (value == null) return null;
+      if (value is int) {
+        // seconds precision assumed
+        return DateTime.fromMillisecondsSinceEpoch(value * 1000, isUtc: true);
+      }
+      if (value is double) {
+        return DateTime.fromMillisecondsSinceEpoch((value * 1000).round(), isUtc: true);
+      }
+      if (value is String) {
+        return DateTime.tryParse(value)?.toUtc();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Drain queued watch messages from native and process them
+  Future<void> _drainQueuedMessages() async {
+    try {
+      final dynamic result = await _watchSessionChannel.invokeMethod('getQueuedWatchMessages');
+      if (result is List) {
+        for (final item in result) {
+          if (item is Map) {
+            final Map<String, dynamic> data = item.map((k, v) => MapEntry(k.toString(), v));
+            final String? command = data['command'] as String?;
+            if (command == null) continue;
+            switch (command) {
+              case 'startSession':
+              case 'startSessionFromWatch':
+              case 'workoutStarted':
+                await _handleSessionStartedFromWatch(data);
+                break;
+              case 'pauseSession':
+                await pauseSessionFromWatchCallback();
+                break;
+              case 'resumeSession':
+                await resumeSessionFromWatchCallback();
+                break;
+              case 'endSession':
+              case 'workoutStopped':
+              case 'sessionEnded':
+                await _handleSessionEndedFromWatch(data);
+                break;
+              default:
+                // Ignore unknown commands; may be metrics/context updates already handled elsewhere
+                break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to drain queued watch messages: $e');
     }
   }
 
@@ -200,6 +334,19 @@ class WatchService {
       // Save heart rate samples to storage
       await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
       // Heart rate samples sent successfully
+      // Attempt a final distance backfill from watch start to now
+      if (_watchStartedAt != null) {
+        final activeBloc = GetIt.I.isRegistered<ActiveSessionBloc>() ? GetIt.I<ActiveSessionBloc>() : null;
+        final currentState = activeBloc?.state;
+        final String? sessionId = (currentState is ActiveSessionRunning) ? currentState.sessionId?.toString() : null;
+        if (sessionId != null) {
+          await backfillDistanceFromHealth(
+            sessionId: sessionId,
+            startedAt: _watchStartedAt!,
+            endedAt: DateTime.now().toUtc(),
+          );
+        }
+      }
     } catch (e) {
       AppLogger.error('[WATCH] Failed to handle session end from Watch: $e');
     }

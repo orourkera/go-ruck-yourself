@@ -171,6 +171,10 @@ class MetCalculator {
     double elevationLoss = 0.0,
     String? gender,
     double terrainMultiplier = 1.0, // Default to pavement baseline
+    String calorieMethod = 'fusion', // 'mechanical' | 'hr' | 'fusion'
+    List<dynamic>? heartRateSamples, // expects objects with bpm:int and timestamp:DateTime
+    int age = 30,
+    bool activeOnly = false,
   }) {
     // Calculate average speed (km/h)
     double durationHours = elapsedSeconds / 3600.0;
@@ -187,54 +191,124 @@ class MetCalculator {
     }
     double ruckWeightLbs = ruckWeightKg * 2.20462;
 
-    // Calculate MET dynamically
+    // Mechanical model (Pandolf/Givoni–Goldman inspired)
+    final mechanicalCalories = _calculateMechanicalCaloriesPandolf(
+      userWeightKg: userWeightKg,
+      ruckWeightKg: ruckWeightKg,
+      speedKmh: avgSpeedKmh,
+      gradePct: avgGrade,
+      terrainMultiplier: terrainMultiplier,
+      elapsedSeconds: elapsedSeconds,
+    );
+
+    // HR-based calories if samples present
+    double hrCalories = 0.0;
+    if (heartRateSamples != null && heartRateSamples.isNotEmpty) {
+      hrCalories = calculateCaloriesWithHeartRateSamples(
+        heartRateSamples: heartRateSamples,
+        weightKg: userWeightKg,
+        age: age,
+        gender: (gender == 'female') ? 'female' : 'male',
+      );
+    }
+
+    // MET path retained (for comparison and fallback)
     final metValue = calculateRuckingMetByGrade(
       speedMph: avgSpeedMph,
       grade: avgGrade,
       ruckWeightLbs: ruckWeightLbs,
     );
-
-    double durationMinutes = elapsedSeconds / 60.0;
-    
-    // Calculate base calories using MET formula
-    double baseCalories = calculateCaloriesBurned(
+    final baseCalories = calculateCaloriesBurned(
       weightKg: userWeightKg + ruckWeightKg,
-      durationMinutes: durationMinutes,
+      durationMinutes: elapsedSeconds / 60.0,
       metValue: metValue,
-    );
-    
-    // Apply terrain multiplier for surface type energy cost
-    double terrainAdjustedCalories = baseCalories * terrainMultiplier;
-    
-    debugPrint('Terrain-adjusted calories: ${terrainAdjustedCalories.toStringAsFixed(2)} ' +
-              '(base: ${baseCalories.toStringAsFixed(2)}, terrain multiplier: ${terrainMultiplier.toStringAsFixed(2)})');
-    
-    // Apply gender-based adjustment for more accurate calculations
-    // Female and male bodies metabolize calories differently due to body composition differences
-    double genderAdjustedCalories = terrainAdjustedCalories;
-    if (gender == 'female') {
-      // Female adjustment: approx. 15-20% lower calorie burn due to
-      // differences in body composition (more fat, less muscle)
-      // and lower basal metabolic rate
-      genderAdjustedCalories = terrainAdjustedCalories * 0.85; // 15% reduction
-      
-      debugPrint('Gender-adjusted calories (female): ${genderAdjustedCalories.toStringAsFixed(2)} ' +
-                'from terrain-adjusted: ${terrainAdjustedCalories.toStringAsFixed(2)}');
-    } else if (gender == 'male') {
-      // Male baseline - no adjustment needed as the formulas are typically
-      // based on male physiological data
-      genderAdjustedCalories = terrainAdjustedCalories;
-      
-      debugPrint('Gender-adjusted calories (male): ${genderAdjustedCalories.toStringAsFixed(2)} ' +
-                'from terrain-adjusted: ${terrainAdjustedCalories.toStringAsFixed(2)}');
-    } else {
-      // If gender is not specified, use a middle ground (7.5% reduction)
-      genderAdjustedCalories = terrainAdjustedCalories * 0.925;
-      
-      debugPrint('Gender-adjusted calories (unspecified): ${genderAdjustedCalories.toStringAsFixed(2)} ' +
-                'from terrain-adjusted: ${terrainAdjustedCalories.toStringAsFixed(2)}');
+    ) * terrainMultiplier;
+
+    // Choose method
+    if (calorieMethod == 'mechanical') {
+      return mechanicalCalories;
+    } else if (calorieMethod == 'hr') {
+      return (hrCalories > 0) ? hrCalories : baseCalories;
     }
-    
-    return genderAdjustedCalories;
+
+    // Fusion (recommended): confidence-weighted blend of HR and mechanical
+    double fusion = mechanicalCalories;
+    if (hrCalories > 0) {
+      // Estimate HR coverage: assume downsample ~20s between saved samples
+      final expectedSamples = (elapsedSeconds / 20.0).clamp(1.0, 1e9);
+      final coverage = (heartRateSamples!.length / expectedSamples).clamp(0.0, 1.0);
+      final wHr = (0.4 + 0.6 * coverage).clamp(0.4, 1.0); // 0.4→1.0 based on coverage
+      final wMech = 1.0 - wHr;
+      fusion = wHr * hrCalories + wMech * mechanicalCalories;
+    }
+
+    // Apply a small sex adjustment post‑fusion (only if unspecified)
+    if (gender == null) fusion *= 0.925; // mid‑way when sex unknown
+
+    // Subtract resting energy if activeOnly enabled
+    if (activeOnly && elapsedSeconds > 0) {
+      final durationHours = elapsedSeconds / 3600.0;
+      final bmrPerHour = _estimateBmrKcalPerDay(weightKg: userWeightKg, age: age, gender: gender ?? 'male') / 24.0;
+      final restingKcal = bmrPerHour * durationHours;
+      fusion = (fusion - restingKcal).clamp(0.0, double.infinity);
+    }
+
+    return fusion;
+  }
+
+  /// Pandolf/Givoni–Goldman inspired mechanical energy estimate (terrain & grade aware)
+  static double _calculateMechanicalCaloriesPandolf({
+    required double userWeightKg,
+    required double ruckWeightKg,
+    required double speedKmh,
+    required double gradePct,
+    required double terrainMultiplier,
+    required int elapsedSeconds,
+  }) {
+    // Convert units
+    final v = (speedKmh / 3.6).clamp(0.0, 3.0); // m/s typical walking speeds up to ~3 m/s
+    final W = userWeightKg;
+    final L = ruckWeightKg;
+    final G = gradePct; // percent
+    final eta = terrainMultiplier.clamp(0.8, 1.3); // surface factor
+
+    // Pandolf (1977) baseline (approximation; coefficients tuned for walking):
+    // M (W) = 1.5W + 2.0(W+L)(L/W)^2 + eta*(W+L)*(1.5 v^2 + 0.35 v G)
+    // Ensure safe division
+    final lw = (W > 0) ? (L / W) : 0.0;
+    final termLoad = 2.0 * (W + L) * (lw * lw);
+    final termSpeedGrade = eta * (W + L) * (1.5 * v * v + 0.35 * v * G.clamp(-20.0, 30.0));
+    double M = 1.5 * W + termLoad + termSpeedGrade; // Watts
+
+    // Clamp to reasonable range (walking with load)
+    M = M.clamp(50.0, 800.0);
+
+    // Convert W→kcal
+    final kcalPerSec = (M / 4186.0); // 1 kcal ≈ 4186 J; per second
+    double kcal = kcalPerSec * elapsedSeconds;
+
+    // Safety: if speed is near zero but distance > 0 (GPS noise), scale by distance fraction
+    if (speedKmh < 0.5 && elapsedSeconds > 0) {
+      final minRate = 0.2; // prevent total collapse
+      kcal *= minRate;
+    }
+
+    return kcal;
+  }
+
+  /// Rough BMR estimate (kcal/day) using Mifflin–St Jeor with height fallback
+  static double _estimateBmrKcalPerDay({
+    required double weightKg,
+    required int age,
+    String gender = 'male',
+    double? heightCm,
+  }) {
+    // If height unknown, use average 175 cm male / 162 cm female
+    final h = heightCm ?? (gender == 'female' ? 162.0 : 175.0);
+    final w = weightKg;
+    final a = age.clamp(10, 100);
+    final s = (gender == 'female') ? -161.0 : 5.0;
+    final bmr = (10.0 * w) + (6.25 * h) - (5.0 * a) + s; // kcal/day
+    return bmr.clamp(900.0, 3000.0);
   }
 }

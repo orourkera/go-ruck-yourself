@@ -95,6 +95,11 @@ class AuthUpdateProfileRequested extends AuthEvent {
   final bool? allowRuckSharing;
   final String? gender;
   final String? avatarUrl;
+  final String? dateOfBirth;
+  final int? restingHr;
+  final int? maxHr;
+  final String? calorieMethod;
+  final bool? calorieActiveOnly;
 
   const AuthUpdateProfileRequested({
     this.username,
@@ -104,10 +109,15 @@ class AuthUpdateProfileRequested extends AuthEvent {
     this.allowRuckSharing,
     this.gender,
     this.avatarUrl,
+    this.dateOfBirth,
+    this.restingHr,
+    this.maxHr,
+    this.calorieMethod,
+    this.calorieActiveOnly,
   });
 
   @override
-  List<Object?> get props => [username, weightKg, heightCm, preferMetric, allowRuckSharing, gender, avatarUrl];
+  List<Object?> get props => [username, weightKg, heightCm, preferMetric, allowRuckSharing, gender, avatarUrl, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly];
 }
 
 /// Event to update user notification preferences

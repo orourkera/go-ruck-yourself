@@ -597,7 +597,7 @@ class RuckSessionResource(Resource):
             if not data:
                 return {'message': 'No data provided'}, 400
 
-            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public', 'splits']
+            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public', 'splits', 'calorie_method']
             update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
             if not update_data:
@@ -941,6 +941,8 @@ class RuckSessionCompleteResource(Resource):
                 update_data['ruck_weight_kg'] = data['ruck_weight_kg']
             if 'calories_burned' in data:
                 update_data['calories_burned'] = data['calories_burned']
+            if 'calorie_method' in data and data['calorie_method'] in ['fusion','mechanical','hr']:
+                update_data['calorie_method'] = data['calorie_method']
             if 'elevation_gain_m' in data:
                 update_data['elevation_gain_m'] = data['elevation_gain_m']
             if 'elevation_loss_m' in data:

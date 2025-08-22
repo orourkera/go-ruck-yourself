@@ -12,6 +12,7 @@ import FirebaseCore
     private let watchHealthChannelName = "com.getrucky.gfy/watch_health"
     private let userPrefsChannelName = "com.getrucky.gfy/user_preferences"
     private let eventChannelName = "com.getrucky.gfy/heartRateStream"
+    private let queuedMessagesKey = "WCQueuedMessages"
     
     override func application(
         _ application: UIApplication,
@@ -101,6 +102,10 @@ import FirebaseCore
                 } else {
                     result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
                 }
+            case "getQueuedWatchMessages":
+                // Return and clear any queued WCSession userInfo messages collected while Flutter wasn't ready
+                let queued = self.dequeueAllQueuedMessages()
+                result(queued)
             default:
                 print("[WATCH] Method not implemented: \(call.method)")
                 result(FlutterMethodNotImplemented)
@@ -315,6 +320,24 @@ import FirebaseCore
             print("[WATCH] Received command: \(command)")
 
             switch command {
+            case "startSessionFromWatch":
+                // Background-safe: create and start session using REST when Flutter not ready
+                // Expect optional fields: ruckWeight (Double), startedAt (epoch seconds), tempId (String)
+                let ruckWeight = (message["ruckWeight"] as? Double) ?? 10.0
+                let tempId = (message["tempId"] as? String) ?? UUID().uuidString
+                // Defer to Flutter when UI is present; otherwise make a minimal REST call if you have a direct client here.
+                if let controller = self.window?.rootViewController as? FlutterViewController {
+                    let chan = FlutterMethodChannel(name: self.watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                    chan.invokeMethod("onWatchSessionUpdated", arguments: [
+                        "command": "startSession",
+                        "ruckWeight": ruckWeight,
+                        "tempId": tempId
+                    ]) { _ in }
+                } else {
+                    // Queue for Flutter to process on next launch
+                    self.enqueueMessage(["command": "startSession", "ruckWeight": ruckWeight, "tempId": tempId])
+                }
+                replyHandler?(["status": "accepted", "tempId": tempId])
             case "sessionStarted":
                 print("[WATCH] Session started from Watch")
             case "sessionEnded":
@@ -375,12 +398,51 @@ import FirebaseCore
         }
     }
 
+    // Queue WCSession userInfo for later delivery to Flutter if Flutter is not yet ready
+    private func enqueueMessage(_ message: [String: Any]) {
+        var list = UserDefaults.standard.array(forKey: queuedMessagesKey) as? [[String: Any]] ?? []
+        list.append(message)
+        UserDefaults.standard.set(list, forKey: queuedMessagesKey)
+    }
+    private func dequeueAllQueuedMessages() -> [[String: Any]] {
+        let list = UserDefaults.standard.array(forKey: queuedMessagesKey) as? [[String: Any]] ?? []
+        UserDefaults.standard.removeObject(forKey: queuedMessagesKey)
+        return list
+    }
+
     // Handle application context updates from Watch
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
         print("[WATCH] Received application context from Watch (raw): \(applicationContext)")
         DispatchQueue.main.async {
             print("[WATCH] Processing application context on main thread: \(applicationContext)")
             self.processWatchMessage(message: applicationContext, replyHandler: nil) // No reply handler for context updates
+        }
+    }
+
+    // Handle userInfo transfers (background-queued messages)
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any]) {
+        print("[WATCH] Received userInfo from Watch: \(userInfo)")
+        DispatchQueue.main.async {
+            // If we have a Flutter engine ready, forward immediately; otherwise queue
+            if let controller = self.window?.rootViewController as? FlutterViewController {
+                // Heart rate batches
+                if let type = userInfo["type"] as? String, type == "hr_sample" {
+                    if let bpm = userInfo["bpm"] as? Double {
+                        HeartRateStreamHandler.sendHeartRate(bpm)
+                    }
+                }
+                // Command-based messages
+                if let _ = userInfo["command"] as? String {
+                    let watchSessionChannel = FlutterMethodChannel(name: self.watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                    watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: userInfo) { _ in }
+                } else {
+                    // Queue unknown payloads for Flutter to query later
+                    self.enqueueMessage(userInfo)
+                }
+            } else {
+                // No Flutter controller – queue for later retrieval
+                self.enqueueMessage(userInfo)
+            }
         }
     }
     

@@ -64,6 +64,7 @@ import 'package:rucking_app/features/profile/presentation/screens/notification_s
 import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/screens/followers_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/advanced_calorie_settings_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -546,6 +547,10 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                       case '/notification_settings':
                         return MaterialPageRoute(
                           builder: (_) => const NotificationSettingsScreen(),
+                        );
+                      case '/advanced_calorie_settings':
+                        return MaterialPageRoute(
+                          builder: (_) => const AdvancedCalorieSettingsScreen(),
                         );
                       case '/post_session_upsell':
                         final args = settings.arguments;

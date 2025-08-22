@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Analytics Tag -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYLNW662H0"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);} 
+    gtag('js', new Date());
+    gtag('config', 'G-PYLNW662H0');
+  </script>
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ post.title }} - Get Rucky Blog</title>
+  <meta name="description" content="{{ post.description }}" />
+  <link rel="canonical" href="https://getrucky.com/blog/{{ post.slug }}" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <meta property="og:title" content="{{ post.title }} - Get Rucky Blog" />
+  <meta property="og:description" content="{{ post.description }}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://getrucky.com/blog/{{ post.slug }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://getrucky.com/blog/{{ post.slug }}"
+    },
+    "headline": "{{ post.title|e }}",
+    "description": "{{ post.description|e }}",
+    "author": {"@type": "Person", "name": "{{ post.author|e }}"},
+    "datePublished": "{{ post.date }}",
+    "dateModified": "{{ post.date }}",
+    "publisher": {"@type": "Organization", "name": "Get Rucky"}
+    {% if post.tags %},
+    "keywords": "{{ post.tags|join(', ')|e }}"
+    {% endif %}
+  }
+  </script>
+</head>
+<body>
+  <main class="content-container">
+    <article>
+      <header style="margin-bottom: .75rem;">
+        <p style="margin:0; color:#6b7280; font-size:.95rem;">Get Rucky Blog</p>
+        <h1 style="margin:.1rem 0 .25rem 0;">{{ post.title }}</h1>
+        <p style="color:#777; font-size: .95rem;">
+          <time datetime="{{ post.date }}">{{ post.date[:10] }}</time> · {{ post.read_time }} min read · {{ post.author }}
+        </p>
+        {% if post.tags %}
+        <p style="margin:.35rem 0 0 0; color:#888; font-size:.9rem;">
+          {% for tag in post.tags %}
+            <span style="background:#f2f2f2; color:#333; padding:.15rem .5rem; border-radius:999px; margin-right:.35rem;">#{{ tag }}</span>
+          {% endfor %}
+        </p>
+        {% endif %}
+      </header>
+
+      <section class="prose" style="line-height:1.6; font-size:1.05rem;">
+        {% include post.template %}
+      </section>
+
+      <hr style="margin:2rem 0; border:none; border-top:1px solid #eee;" />
+      <p style="color:#666;">Enjoyed this guide? Download the app to track your rucks, calories, and progress:
+        <a href="https://apps.apple.com/us/app/go-ruck-yourself/id6744974620" target="_blank" rel="noopener">iOS</a> ·
+        <a href="https://play.google.com/store/apps/details?id=com.ruck.app" target="_blank" rel="noopener">Android</a>
+      </p>
+    </article>
+  </main>
+
+  <footer class="footer-pinned">
+    <div class="footer-links">
+      <a href="/">Home</a> |
+      <a href="/blog">Blog</a> | <a href="/rucking-calorie-calculator">Rucking Calorie Calculator</a> |
+      <a href="/privacy">Privacy Policy</a> |
+      <a href="/terms">Terms of Service</a> |
+      <a href="/support">Support</a>
+    </div>
+    <div class="copyright">
+      &copy; 2025 Get Rucky, Inc. All rights reserved.
+    </div>
+  </footer>
+</body>
+</html>

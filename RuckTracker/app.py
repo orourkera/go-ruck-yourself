@@ -14,6 +14,7 @@ from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from .supabase_client import get_supabase_client, get_supabase_admin_client # Relative import for supabase_client within RuckTracker package
 from .services.redis_cache_service import get_cache_service # Add Redis cache service
+from RuckTracker.blog import blog_bp, BLOG_POSTS
 
 # Load environment variables from .env file
 load_dotenv()
@@ -250,6 +251,9 @@ app.register_blueprint(cache_monitor_bp)
 # Import and register users blueprint
 from RuckTracker.api.users import users_bp
 app.register_blueprint(users_bp, url_prefix='/api/users')
+
+# Register blog blueprint (public web routes)
+app.register_blueprint(blog_bp)
 
 # Ensure higher rate limit for user public profile endpoint now that blueprint is registered
 try:
@@ -605,6 +609,55 @@ api.add_resource(WellKnownResource, '/.well-known/<string:filename>')
 @app.route('/')
 def landing():
     return render_template('landing.html')
+
+# SEO: robots.txt
+@app.route('/robots.txt')
+def robots_txt():
+    return render_template('robots.txt'), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+# SEO: sitemap.xml
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    base = 'https://getrucky.com'
+    pages = [
+        {"loc": f"{base}/", "changefreq": "weekly", "priority": "0.8"},
+        {"loc": f"{base}/privacy", "changefreq": "yearly", "priority": "0.3"},
+        {"loc": f"{base}/terms", "changefreq": "yearly", "priority": "0.3"},
+        {"loc": f"{base}/support", "changefreq": "yearly", "priority": "0.2"},
+        {"loc": f"{base}/rucking-calorie-calculator", "changefreq": "monthly", "priority": "0.5"},
+        {"loc": f"{base}/blog", "changefreq": "daily", "priority": "0.6"},
+    ]
+    for p in BLOG_POSTS:
+        pages.append({
+            "loc": f"{base}/blog/{p['slug']}",
+            "lastmod": p.get("date"),
+            "changefreq": "monthly",
+            "priority": "0.5"
+        })
+    return render_template('sitemap.xml', pages=pages), 200, {"Content-Type": "application/xml; charset=utf-8"}
+
+# GEO: llm.txt and ai.txt endpoints
+@app.route('/llm.txt')
+def llm_txt():
+    base = 'https://getrucky.com'
+    last_updated = datetime.utcnow().date().isoformat()
+    return render_template('llm.txt', base=base, last_updated=last_updated, posts=BLOG_POSTS), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+@app.route('/.well-known/llm.txt')
+def llm_txt_wellknown():
+    # Serve the same content from a well-known location
+    return llm_txt()
+
+@app.route('/ai.txt')
+@app.route('/.well-known/ai.txt')
+def ai_txt():
+    # Serve the same content as llm.txt for maximum compatibility
+    return llm_txt()
+
+# Public: Rucking Calorie Calculator page
+@app.route('/rucking-calorie-calculator')
+def rucking_calorie_calculator():
+    return render_template('calorie_calculator.html')
 
 # Debug route to list all registered routes
 @app.route('/debug/routes')

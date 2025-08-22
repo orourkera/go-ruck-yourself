@@ -6,6 +6,8 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/watch_service.dart';
@@ -66,6 +68,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   
   // Store completion data to pass to lifecycle manager
   Map<String, dynamic>? _sessionCompletionData;
+  String? _lastCalorieMethod;
   
   // Store planned route for navigation
   List<latlong.LatLng>? _plannedRoute;
@@ -464,6 +467,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       _sessionCompletionData = {
         'distance_km': finalDistance,
         'calories_burned': finalCalories,
+        if (_lastCalorieMethod != null) 'calorie_method': _lastCalorieMethod,
         'elevation_gain_m': finalElevationGain,
         'elevation_loss_m': finalElevationLoss,
         'duration_seconds': lifecycleState.duration.inSeconds,
@@ -556,17 +560,45 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Calculate terrain multiplier from terrain segments
     final terrainMultiplier = _calculateTerrainMultiplier();
     
-    // Get user's gender from auth service for more accurate calculation
+    // Get user's profile fields for calorie calculation
     String? gender;
+    String? dateOfBirth;
+    int? restingHr;
+    int? maxHr;
+    String? calorieMethod;
+    bool activeOnly = false;
     try {
-      // This is async but we'll use a fallback for now
-      // TODO: Consider making this method async to get user's gender
-      gender = null; // Will use default calculation
+      final authState = GetIt.instance<AuthBloc>().state;
+      if (authState is Authenticated) {
+        final user = authState.user;
+        gender = user.gender;
+        dateOfBirth = user.dateOfBirth;
+        restingHr = user.restingHr;
+        maxHr = user.maxHr;
+        calorieMethod = user.calorieMethod;
+        activeOnly = user.calorieActiveOnly ?? false;
+      }
     } catch (e) {
-      AppLogger.warning('[COORDINATOR] Could not get user gender for calorie calculation: $e');
+      AppLogger.warning('[COORDINATOR] Could not get user profile for calorie calculation: $e');
+    }
+
+    // Derive age from birthdate if available
+    int age = 30;
+    if (dateOfBirth != null) {
+      try {
+        final dob = DateTime.tryParse(dateOfBirth);
+        if (dob != null) {
+          final now = DateTime.now();
+          age = now.year - dob.year - ((now.month < dob.month || (now.month == dob.month && now.day < dob.day)) ? 1 : 0);
+          if (age < 10 || age > 100) {
+            age = 30; // sanity bounds
+          }
+        }
+      } catch (_) {}
     }
     
     // Use MetCalculator for sophisticated calorie calculation
+    _lastCalorieMethod = (calorieMethod ?? 'fusion');
     final calories = MetCalculator.calculateRuckingCalories(
       userWeightKg: userWeightKg,
       ruckWeightKg: ruckWeightKg,
@@ -576,6 +608,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       elevationLoss: elevationLoss,
       gender: gender,
       terrainMultiplier: terrainMultiplier,
+      calorieMethod: _lastCalorieMethod!,
+      heartRateSamples: _heartRateManager.heartRateSampleObjects,
+      age: age,
+      activeOnly: activeOnly,
     );
     
     AppLogger.debug('[COORDINATOR] CALORIE_CALCULATION: '

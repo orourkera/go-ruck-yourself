@@ -373,6 +373,42 @@ class HealthService {
       return null;
     }
   }
+
+  /// Read total walking/running distance (meters) between start and end
+  Future<double> getDistanceMetersBetween(DateTime start, DateTime end) async {
+    if (!Platform.isIOS) {
+      return 0.0;
+    }
+    try {
+      // Ensure authorization
+      if (!_isAuthorized) {
+        final ok = await requestAuthorization();
+        if (!ok) return 0.0;
+      }
+      final List<HealthDataPoint> points = await _health.getHealthDataFromTypes(
+        startTime: start,
+        endTime: end,
+        types: [HealthDataType.DISTANCE_WALKING_RUNNING],
+      );
+      double totalMeters = 0.0;
+      for (final p in points) {
+        final dynamic raw = p.value;
+        if (raw is NumericHealthValue) {
+          final v = raw.numericValue?.toDouble() ?? 0.0;
+          totalMeters += v;
+        } else if (raw is num) {
+          totalMeters += raw.toDouble();
+        } else {
+          final parsed = double.tryParse(raw.toString());
+          if (parsed != null) totalMeters += parsed;
+        }
+      }
+      return totalMeters;
+    } catch (e) {
+      AppLogger.error('Error reading distance between $start and $end: $e');
+      return 0.0;
+    }
+  }
   
   /// Update heart rate from Watch (called from native code)
   void updateHeartRate(double heartRate) {

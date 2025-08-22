@@ -36,6 +36,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     
     // Published user's metric preference (true = metric, false = imperial)
     @Published var isMetric: Bool = true
+    @Published var lastRuckWeightKg: Double = 10.0
+    @Published var lastUserWeightKg: Double = 80.0
     
     var statusText: String {
         // Status now contains the timer
@@ -112,6 +114,16 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                             print("[WATCH] Failed to start workout: \(error.localizedDescription)")
                         } else {
                             // Workout session started successfully
+                            // Send start payload with timestamp for backfill
+                            let startTs = Date().timeIntervalSince1970
+                            let payload: [String: Any] = [
+                                "command": "startSessionFromWatch",
+                                "startedAt": startTs,
+                                "tempId": UUID().uuidString,
+                                "ruckWeightKg": self.lastRuckWeightKg,
+                                "userWeightKg": self.lastUserWeightKg
+                            ]
+                            self.sendMessage(payload)
                         }
                     }
                 }
@@ -140,21 +152,18 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     
     func sendMessage(_ message: [String: Any]) {
         guard session.activationState == .activated else {
-            // Session not activated, message not sent.
+            // Queue if session isn't fully activated yet
+            session.transferUserInfo(message)
             return
         }
-        
-        // Ensure message has proper type format for Dart side casting
-        // This ensures the message is always a Dictionary with String keys and valid JSON values
-        if var sanitizedMessage = message as? [String: Any] {
-            // Log the message being sent for debugging
-            // SessionManager sending message
-
-            session.sendMessage(sanitizedMessage, replyHandler: nil) { error in
-                print("Error sending message: \(error.localizedDescription)")
+        if session.isReachable {
+            session.sendMessage(message, replyHandler: nil) { error in
+                print("[WATCH] sendMessage error: \(error.localizedDescription). Falling back to transferUserInfo")
+                self.session.transferUserInfo(message)
             }
         } else {
-            // Error: Could not sanitize message to proper format
+            // Not reachable - queue for delivery
+            session.transferUserInfo(message)
         }
     }
     
@@ -171,8 +180,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 print("[WATCH] Error sending heart rate: \(error.localizedDescription)")
             }
         } else {
-            // Fallback to regular send which might be less reliable
-            sendMessage(message)
+            // Queue as user info for background delivery
+            session.transferUserInfo(["type": "hr_sample", "bpm": heartRate, "timestamp": Date().timeIntervalSince1970])
         }
     }
     
@@ -435,6 +444,13 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 self.updateMetricsFromData(metricsData)
                 // Heart rate metrics updated
             }
+        }
+        // Update last-known settings when pushed from phone
+        if let ruckKg = message["ruckWeightKg"] as? Double {
+            self.lastRuckWeightKg = ruckKg
+        }
+        if let userKg = message["userWeightKg"] as? Double {
+            self.lastUserWeightKg = userKg
         }
     }
     

@@ -245,6 +245,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               value: user.email,
                             ),
                             const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.local_fire_department_outlined,
+                              label: 'Advanced Calorie Tracking',
+                              subtitle: 'Birthdate, resting/max HR, method selection',
+                              onTap: () {
+                                Navigator.pushNamed(context, '/advanced_calorie_settings');
+                              },
+                            ),
+                            const Divider(),
                             _buildInfoItem(
                               icon: Icons.monitor_weight_outlined,
                               label: 'Weight',

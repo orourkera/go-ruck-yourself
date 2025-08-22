@@ -100,6 +100,11 @@ class AuthRepositoryImpl implements AuthRepository {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
   }) async {
     return await _authService.updateProfile(
       username: username,
@@ -113,6 +118,11 @@ class AuthRepositoryImpl implements AuthRepository {
       notificationBuddies: notificationBuddies,
       notificationEvents: notificationEvents,
       notificationDuels: notificationDuels,
+      dateOfBirth: dateOfBirth,
+      restingHr: restingHr,
+      maxHr: maxHr,
+      calorieMethod: calorieMethod,
+      calorieActiveOnly: calorieActiveOnly,
     );
   }
 

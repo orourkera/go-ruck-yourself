@@ -21,6 +21,18 @@ class User extends Equatable {
   /// User's date of birth in ISO 8601 format
   final String? dateOfBirth;
   
+  /// User's resting heart rate in bpm
+  final int? restingHr;
+  
+  /// User's max heart rate in bpm
+  final int? maxHr;
+  
+  /// Preferred calorie method: 'fusion', 'mechanical', or 'hr'
+  final String? calorieMethod;
+  
+  /// Whether to report active calories only (subtract resting)
+  final bool? calorieActiveOnly;
+  
   /// User's account creation date
   final String? createdAt;
   
@@ -53,6 +65,10 @@ class User extends Equatable {
     this.weightKg,
     this.heightCm,
     this.dateOfBirth,
+    this.restingHr,
+    this.maxHr,
+    this.calorieMethod,
+    this.calorieActiveOnly,
     this.createdAt,
     required this.preferMetric,
     this.allowRuckSharing = true,
@@ -73,6 +89,10 @@ class User extends Equatable {
     double? weightKg,
     double? heightCm,
     String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
     String? createdAt,
     bool? preferMetric,
     bool? allowRuckSharing,
@@ -91,6 +111,10 @@ class User extends Equatable {
       weightKg: weightKg ?? this.weightKg,
       heightCm: heightCm ?? this.heightCm,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      restingHr: restingHr ?? this.restingHr,
+      maxHr: maxHr ?? this.maxHr,
+      calorieMethod: calorieMethod ?? this.calorieMethod,
+      calorieActiveOnly: calorieActiveOnly ?? this.calorieActiveOnly,
       createdAt: createdAt ?? this.createdAt,
       preferMetric: preferMetric ?? this.preferMetric,
       allowRuckSharing: allowRuckSharing ?? this.allowRuckSharing,
@@ -136,6 +160,10 @@ class User extends Equatable {
       weightKg: safeParseNum(json['weight_kg'])?.toDouble(),
       heightCm: safeParseNum(json['height_cm'])?.toDouble(),
       dateOfBirth: json['date_of_birth'] as String?,
+      restingHr: safeParseNum(json['resting_hr'])?.toInt(),
+      maxHr: safeParseNum(json['max_hr'])?.toInt(),
+      calorieMethod: json['calorie_method'] as String?,
+      calorieActiveOnly: json['calorie_active_only'] as bool?,
       createdAt: json['created_at'] as String?,
       preferMetric: json['prefer_metric'] as bool? ?? false, // Default to imperial/standard for US users
       allowRuckSharing: json['allow_ruck_sharing'] as bool? ?? true,
@@ -168,6 +196,10 @@ class User extends Equatable {
     if (weightKg != null) data['weight_kg'] = weightKg;
     if (heightCm != null) data['height_cm'] = heightCm;
     if (dateOfBirth != null) data['date_of_birth'] = dateOfBirth;
+    if (restingHr != null) data['resting_hr'] = restingHr;
+    if (maxHr != null) data['max_hr'] = maxHr;
+    if (calorieMethod != null) data['calorie_method'] = calorieMethod;
+    if (calorieActiveOnly != null) data['calorie_active_only'] = calorieActiveOnly;
     if (createdAt != null) data['created_at'] = createdAt;
     if (gender != null) data['gender'] = gender;
     if (avatarUrl != null) data['avatar_url'] = avatarUrl;
@@ -181,7 +213,7 @@ class User extends Equatable {
   
   @override
   List<Object?> get props => [
-    userId, email, username, weightKg, heightCm, dateOfBirth, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, stats
+    userId, email, username, weightKg, heightCm, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, stats
   ];
 }
 
