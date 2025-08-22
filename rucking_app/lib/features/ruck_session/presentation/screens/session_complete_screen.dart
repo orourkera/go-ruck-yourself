@@ -48,6 +48,8 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/widgets/stat_card.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/core/services/share_service.dart';
 import 'package:rucking_app/core/services/strava_service.dart';
@@ -946,6 +948,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               StyledSnackBar.show(context: context, message: 'Discarding session...');
             } else if (state is SessionDeleteSuccess) {
               StyledSnackBar.showSuccess(context: context, message: 'Session discarded');
+              // CRITICAL: Clear any locally persisted active session to prevent auto-recovery
+              try {
+                final storage = GetIt.instance<ActiveSessionStorage>();
+                storage.clearSessionData();
+              } catch (_) {}
+              // Also reset active session bloc state to avoid re-entry
+              try {
+                context.read<ActiveSessionBloc>().add(SessionReset());
+              } catch (_) {}
               Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
             } else if (state is SessionOperationFailure) {
               StyledSnackBar.showError(context: context, message: 'Error: ${state.message}');
