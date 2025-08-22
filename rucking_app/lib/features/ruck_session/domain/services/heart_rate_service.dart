@@ -75,12 +75,13 @@ class HeartRateService {
     
     AppLogger.info('HeartRateService: Starting heart rate monitoring...');
     
-    // Ensure HealthKit permissions are granted once per app session
+    // Ensure HealthKit permissions are granted once per app session.
+    // IMPORTANT: Even if HealthKit is denied, we still start the Watch feed.
     if (!_healthService.isAuthorized) {
       final granted = await _healthService.requestAuthorization();
       if (!granted) {
-        AppLogger.warning('HeartRateService: Health authorization denied – heart-rate stream disabled');
-        return; // Do not start subscription without permission
+        AppLogger.warning('HeartRateService: Health authorization denied – proceeding with Watch-only heart-rate stream');
+        // Continue; we will skip HealthKit subscription but keep Watch updates.
       }
     }
     
@@ -90,8 +91,12 @@ class HeartRateService {
     // Set up watch subscription with auto-reconnect capability
     _setupWatchHeartRateSubscription();
     
-    // Subscribe to HealthKit heart rate updates
-    _setupHealthKitHeartRateSubscription();
+    // Subscribe to HealthKit heart rate updates only if authorized
+    if (_healthService.isAuthorized) {
+      _setupHealthKitHeartRateSubscription();
+    } else {
+      AppLogger.info('HeartRateService: Skipping HealthKit heart rate subscription (not authorized)');
+    }
     
     // Set up check to detect and recover from lost connections
     _startConnectionWatchdog();

@@ -205,9 +205,17 @@ class PushNotificationService:
         success_count = 0
         failure_count = 0
         
-        # Idempotency check
+        # Idempotency check (dedupe per event/user, not globally)
         notif_type = notification_data.get('type', 'generic')
-        event_id = notification_data.get('session_id') or notification_data.get('duel_id') or notification_data.get('event_id') or 'global'
+        event_id = (
+            notification_data.get('session_id')
+            or notification_data.get('ruck_id')
+            or notification_data.get('like_id')
+            or notification_data.get('duel_id')
+            or notification_data.get('event_id')
+            or notification_data.get('recipient_id')
+            or 'global'
+        )
         notif_id = f"{notif_type}_{event_id}"
         if cache_get(f"notif_sent:{notif_id}"):
             logger.warning(f"Duplicate notification skipped: {notif_id}")
@@ -261,6 +269,16 @@ class PushNotificationService:
                 
             except messaging.UnregisteredError:
                 logger.warning(f"⚠️ Device token is unregistered (invalid): {token[:20]}...")
+                # Deactivate invalid token in DB
+                try:
+                    from RuckTracker.supabase_client import get_supabase_admin_client
+                    admin_client = get_supabase_admin_client()
+                    admin_client.table('user_device_tokens') \
+                        .update({'is_active': False}) \
+                        .eq('fcm_token', token) \
+                        .execute()
+                except Exception as deact_err:
+                    logger.error(f"Failed to deactivate invalid token: {deact_err}")
                 failure_count += 1
             except messaging.SenderIdMismatchError:
                 logger.error(f"❌ Sender ID mismatch for token: {token[:20]}...")
@@ -351,6 +369,35 @@ class PushNotificationService:
             'click_action': 'FLUTTER_NOTIFICATION_CLICK'
         }
         
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=data
+        )
+
+    def send_ruck_participant_activity_notification(
+        self,
+        device_tokens: List[str],
+        actor_name: str,
+        ruck_id: str,
+        activity_type: str
+    ) -> bool:
+        """Notify prior participants of new activity (like/comment) on a ruck they interacted with."""
+        if activity_type not in ("like", "comment"):
+            activity_type = "activity"
+        title = "New activity on a ruck"
+        verb = "liked" if activity_type == "like" else ("commented on" if activity_type == "comment" else "updated")
+        body = f"{actor_name} {verb} a ruck you interacted with"
+
+        data = {
+            'type': 'ruck_activity',
+            'activity': activity_type,
+            'ruck_id': ruck_id,
+            'actor_name': actor_name,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+        }
+
         return self.send_notification(
             device_tokens=device_tokens,
             title=title,

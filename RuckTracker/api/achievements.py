@@ -368,7 +368,22 @@ class CheckSessionAchievementsResource(Resource):
             unit_pref = achievement.get('unit_preference')
             
             if criteria_type == 'first_ruck':
-                return True  # If we're checking, this must be their first completed ruck
+                # Award only if this is the user's first completed ruck (by started_at)
+                try:
+                    started_at = session.get('started_at')
+                    if not started_at:
+                        return False
+                    # Count completed sessions up to and including this session's start time
+                    resp = supabase.table('ruck_session').select('id', count='exact') \
+                        .eq('user_id', user_id) \
+                        .eq('status', 'completed') \
+                        .lte('started_at', started_at) \
+                        .execute()
+                    total = getattr(resp, 'count', None) or 0
+                    return total == 1
+                except Exception as e:
+                    logger.error(f"Error checking first_ruck: {e}")
+                    return False
             
             elif criteria_type == 'single_session_distance':
                 target = criteria.get('target', 0)
@@ -436,7 +451,11 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'pace_faster_than':
                 target = criteria.get('target', 999999)
-                pace = session.get('average_pace')
+                pace_raw = session.get('average_pace')
+                try:
+                    pace = float(pace_raw) if pace_raw is not None else None
+                except (ValueError, TypeError):
+                    pace = None
                 
                 # Check if pace is None or invalid
                 if pace is None:
@@ -487,7 +506,11 @@ class CheckSessionAchievementsResource(Resource):
         
             elif criteria_type == 'pace_slower_than':
                 target = criteria.get('target', 0)
-                pace = session.get('average_pace')
+                pace_raw = session.get('average_pace')
+                try:
+                    pace = float(pace_raw) if pace_raw is not None else None
+                except (ValueError, TypeError):
+                    pace = None
                 
                 # Check if pace is None or invalid
                 if pace is None:
@@ -622,13 +645,31 @@ class CheckSessionAchievementsResource(Resource):
                 current_month = datetime.utcnow().month
                 
                 try:
-                    monthly_distance_response = supabase.rpc('get_user_monthly_distance', {
-                        'p_user_id': user_id,
-                        'p_year': current_year,
-                        'p_month': current_month
-                    }).execute()
-                    
-                    monthly_distance = monthly_distance_response.data or 0
+                    try:
+                        monthly_distance_response = supabase.rpc('get_user_monthly_distance', {
+                            'p_user_id': user_id,
+                            'p_year': current_year,
+                            'p_month': current_month
+                        }).execute()
+                        monthly_distance = monthly_distance_response.data or 0
+                    except Exception:
+                        # Fallback: sum distances in current month
+                        month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                        if current_month == 12:
+                            next_month_start = month_start.replace(year=current_year+1, month=1)
+                        else:
+                            next_month_start = month_start.replace(month=current_month+1)
+                        resp = supabase.table('ruck_session').select('distance_km') \
+                            .eq('user_id', user_id).eq('status', 'completed') \
+                            .gte('started_at', month_start.isoformat()) \
+                            .lt('started_at', next_month_start.isoformat()) \
+                            .execute()
+                        monthly_distance = 0.0
+                        for row in resp.data or []:
+                            try:
+                                monthly_distance += float(row.get('distance_km') or 0)
+                            except (ValueError, TypeError):
+                                continue
                     # Convert target to km if achievement is in standard (miles)
                     target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
                     logger.debug(f"Monthly distance check: {monthly_distance}km >= {target_km}km (orig={target} {'miles' if unit_pref=='standard' else 'km'}) = {monthly_distance >= target_km}")
@@ -644,13 +685,35 @@ class CheckSessionAchievementsResource(Resource):
                 current_quarter = (datetime.utcnow().month - 1) // 3 + 1
                 
                 try:
-                    quarterly_distance_response = supabase.rpc('get_user_quarterly_distance', {
-                        'p_user_id': user_id,
-                        'p_year': current_year,
-                        'p_quarter': current_quarter
-                    }).execute()
-                    
-                    quarterly_distance = quarterly_distance_response.data or 0
+                    try:
+                        quarterly_distance_response = supabase.rpc('get_user_quarterly_distance', {
+                            'p_user_id': user_id,
+                            'p_year': current_year,
+                            'p_quarter': current_quarter
+                        }).execute()
+                        quarterly_distance = quarterly_distance_response.data or 0
+                    except Exception:
+                        # Fallback: sum distances in quarter
+                        month = datetime.utcnow().month
+                        q_start_month = ((month - 1) // 3) * 3 + 1
+                        quarter_start = datetime.utcnow().replace(month=q_start_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+                        # next quarter start
+                        next_q_month = q_start_month + 3
+                        if next_q_month > 12:
+                            next_quarter_start = quarter_start.replace(year=current_year+1, month=((next_q_month-1)%12)+1)
+                        else:
+                            next_quarter_start = quarter_start.replace(month=next_q_month)
+                        resp = supabase.table('ruck_session').select('distance_km') \
+                            .eq('user_id', user_id).eq('status', 'completed') \
+                            .gte('started_at', quarter_start.isoformat()) \
+                            .lt('started_at', next_quarter_start.isoformat()) \
+                            .execute()
+                        quarterly_distance = 0.0
+                        for row in resp.data or []:
+                            try:
+                                quarterly_distance += float(row.get('distance_km') or 0)
+                            except (ValueError, TypeError):
+                                continue
                     # Convert target to km if achievement is in standard (miles)
                     target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
                     logger.debug(f"Quarterly distance check: {quarterly_distance}km >= {target_km}km (orig={target} {'miles' if unit_pref=='standard' else 'km'}) = {quarterly_distance >= target_km}")
@@ -860,9 +923,8 @@ class CheckSessionAchievementsResource(Resource):
     def _count_likes_given(self, supabase, user_id: str) -> int:
         """Count total likes given by user"""
         try:
-            # This would require likes table
-            # TODO: Implement when likes system is available
-            return 0
+            resp = supabase.table('ruck_likes').select('id', count='exact').eq('user_id', user_id).execute()
+            return getattr(resp, 'count', None) or 0
         except Exception as e:
             logger.error(f"Error counting likes given: {str(e)}")
             return 0
@@ -870,9 +932,14 @@ class CheckSessionAchievementsResource(Resource):
     def _count_likes_received(self, supabase, user_id: str) -> int:
         """Count total likes received by user"""
         try:
-            # This would require likes table
-            # TODO: Implement when likes system is available
-            return 0
+            # Join via ruck_session to count likes on user's rucks
+            # Supabase postgrest cannot do complex joins easily; fetch ruck ids then count likes
+            ruck_resp = supabase.table('ruck_session').select('id').eq('user_id', user_id).execute()
+            ruck_ids = [r['id'] for r in (ruck_resp.data or [])]
+            if not ruck_ids:
+                return 0
+            likes_resp = supabase.table('ruck_likes').select('id', count='exact').in_('ruck_id', ruck_ids).execute()
+            return getattr(likes_resp, 'count', None) or 0
         except Exception as e:
             logger.error(f"Error counting likes received: {str(e)}")
             return 0

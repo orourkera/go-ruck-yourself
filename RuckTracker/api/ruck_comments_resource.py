@@ -222,6 +222,40 @@ class RuckCommentsResource(Resource):
                             ruck_id=ruck_id,
                             comment_id=str(created_comment['id'])
                         )
+                # Notify other prior participants (likers) besides commenters and owner
+                try:
+                    participant_ids = set()
+                    # previous likers excluding current commenter and owner
+                    if ruck_response.data:
+                        ruck_owner_id = ruck_response.data[0]['user_id']
+                    else:
+                        ruck_owner_id = None
+
+                    ruck_likes = supabase.table('ruck_likes') \
+                        .select('user_id') \
+                        .eq('ruck_id', ruck_id) \
+                        .neq('user_id', user_id) \
+                        .order('created_at', desc=True) \
+                        .limit(200) \
+                        .execute()
+                    if ruck_likes.data:
+                        for like in ruck_likes.data:
+                            uid = like['user_id']
+                            if ruck_owner_id and uid == ruck_owner_id:
+                                continue
+                            participant_ids.add(uid)
+
+                    if participant_ids:
+                        tokens = get_user_device_tokens(list(participant_ids))
+                        if tokens:
+                            push_service.send_ruck_participant_activity_notification(
+                                device_tokens=tokens,
+                                actor_name=user_profile['username'],
+                                ruck_id=str(ruck_id),
+                                activity_type='comment'
+                            )
+                except Exception as e:
+                    logger.error(f"Failed to notify prior participants about comment: {e}")
                         
             except Exception as e:
                 logger.error(f"Failed to send comment notifications: {e}")

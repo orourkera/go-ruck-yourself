@@ -264,6 +264,48 @@ class RuckLikesResource(Resource):
                             ruck_id=ruck_id
                         )
                         logger.info(f"🔔 PUSH NOTIFICATION: Like notification sent successfully, result: {result}")
+
+                    # Notify other prior participants (commenters and likers) except owner and current liker
+                    try:
+                        prior_participants = set()
+                        # prior commenters
+                        prev_comments = supabase.table('ruck_comments') \
+                            .select('user_id') \
+                            .eq('ruck_id', ruck_id) \
+                            .neq('user_id', user_id) \
+                            .order('created_at', desc=True) \
+                            .limit(100) \
+                            .execute()
+                        if prev_comments.data:
+                            for c in prev_comments.data:
+                                if c['user_id'] != ruck_owner_id:
+                                    prior_participants.add(c['user_id'])
+
+                        # prior likers
+                        prev_likes = supabase.table('ruck_likes') \
+                            .select('user_id') \
+                            .eq('ruck_id', ruck_id) \
+                            .neq('user_id', user_id) \
+                            .order('created_at', desc=True) \
+                            .limit(200) \
+                            .execute()
+                        if prev_likes.data:
+                            for l in prev_likes.data:
+                                if l['user_id'] != ruck_owner_id:
+                                    prior_participants.add(l['user_id'])
+
+                        if prior_participants:
+                            logger.info(f"🔔 PUSH NOTIFICATION: Notifying {len(prior_participants)} prior participants of like activity")
+                            tokens_pp = get_user_device_tokens(list(prior_participants))
+                            if tokens_pp:
+                                push_service.send_ruck_participant_activity_notification(
+                                    device_tokens=tokens_pp,
+                                    actor_name=liker_name,
+                                    ruck_id=str(ruck_id),
+                                    activity_type='like'
+                                )
+                    except Exception as e:
+                        logger.error(f"🔔 PUSH NOTIFICATION: Failed notifying prior participants: {e}")
                     else:
                         logger.warning(f"🔔 PUSH NOTIFICATION: No device tokens found for user {ruck_owner_id}")
                 else:

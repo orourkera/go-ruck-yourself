@@ -51,11 +51,28 @@ class SessionCompletionDetectionService {
   int _stationaryTimeThreshold = 300; // 5 minutes in seconds
   int _confirmationTimeThreshold = 420; // 7 minutes in seconds
   int _autoCompleteTimeThreshold = 600; // 10 minutes in seconds
+  final Duration _minSessionDurationForIdle = const Duration(minutes: 10); // avoid early prompts
+
+  // Smoothed GPS speed (EWMA) and sampling for robust idle detection
+  double _speedEwmaMs = 0.0;
+  static const double _ewmaAlpha = 0.2; // smoothing factor
+  DateTime? _lastDistanceSampleTime;
+  double? _lastDistanceSampleKm;
+
+  // Require consecutive stationary windows to engage detection
+  int _consecutiveStationaryWindows = 0;
+  final int _requiredStationaryWindows = 3; // 3 x 30s = 90s stability before prompting
   
   // Notification state
   bool _hasShownInitialPrompt = false;
   bool _hasShownConfirmationPrompt = false;
   DateTime? _firstDetectionTime;
+
+  // Hysteresis/cooldown to prevent over-triggering
+  DateTime? _lastPromptAt;
+  final Duration _promptCooldown = const Duration(minutes: 10);
+  bool _rearmRequired = false; // require movement/distance before next prompt
+  double? _distanceAtLastPrompt;
 
   /// Start monitoring for session completion
   Future<void> startMonitoring() async {
@@ -170,6 +187,18 @@ class SessionCompletionDetectionService {
       // Update GPS data
       await _updateGPSData();
       
+      // Update smoothed speed from distance deltas
+      _updateSmoothedSpeed(now);
+
+      // Avoid idle prompts early in the session
+      if (_sessionStartTime != null) {
+        final sessionAge = now.difference(_sessionStartTime!);
+        if (sessionAge < _minSessionDurationForIdle) {
+          _resetDetectionState();
+          return;
+        }
+      }
+
       // Check movement criteria
       final isStationary = _checkMovementCriteria(now);
       
@@ -188,8 +217,27 @@ class SessionCompletionDetectionService {
       
       AppLogger.debug('[SESSION_COMPLETION] Detection confidence: $detectionConfidence');
       
+      // Require consecutive stability windows to avoid flapping
+      if (isStationary && gpsIndicatesStationary) {
+        _consecutiveStationaryWindows = (_consecutiveStationaryWindows + 1).clamp(0, 1000);
+      } else {
+        _consecutiveStationaryWindows = 0;
+      }
+
+      // Cooldown / rearm gating to avoid over-triggering
+      final inCooldown = _lastPromptAt != null && now.difference(_lastPromptAt!).compareTo(_promptCooldown) < 0;
+      if (_rearmRequired) {
+        // Rearm when distance increases meaningfully after last prompt
+        final double distanceSincePrompt = _distanceAtLastPrompt == null ? 0.0 : (session.distanceKm - _distanceAtLastPrompt!);
+        if (distanceSincePrompt >= 0.05) { // 50 meters
+          _rearmRequired = false;
+          _resetDetectionState();
+        }
+      }
+
       // Handle detection state transitions
-      if (detectionConfidence >= 0.6) {
+      final hasStableWindows = _consecutiveStationaryWindows >= _requiredStationaryWindows;
+      if (!inCooldown && !_rearmRequired && hasStableWindows && detectionConfidence >= 0.6) {
         await _handleDetectionStateChange(now, detectionConfidence, session.distanceKm);
       } else {
         // Reset detection if conditions no longer met
@@ -260,11 +308,41 @@ class SessionCompletionDetectionService {
       // Update for next check
       _totalDistanceAtLastCheck = currentDistance;
       
-      // No significant distance change indicates stationary
-      return distanceChange < 0.01; // Less than 10 meters change
+      // No significant distance change indicates stationary (less than 10m per 30s)
+      final distanceStopped = distanceChange < 0.01;
+      // Also require smoothed speed below threshold to reduce false positives
+      final speedStopped = _speedEwmaMs < 0.5; // < 0.5 m/s (~1.1 mph)
+      return distanceStopped && speedStopped;
     }
     
     return false;
+  }
+
+  /// Update smoothed speed using EWMA of distance deltas
+  void _updateSmoothedSpeed(DateTime now) {
+    try {
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      final currentState = activeSessionBloc.state;
+      if (currentState is! ActiveSessionRunning) return;
+
+      final currentKm = currentState.distanceKm;
+      if (_lastDistanceSampleTime != null && _lastDistanceSampleKm != null) {
+        final dt = now.difference(_lastDistanceSampleTime!).inMilliseconds / 1000.0;
+        if (dt >= 5.0) { // only sample when >=5s elapsed to reduce noise
+          final dk = (currentKm - _lastDistanceSampleKm!) * 1000.0; // meters
+          final instSpeed = dk > 0 && dt > 0 ? (dk / dt) : 0.0; // m/s
+          _speedEwmaMs = _ewmaAlpha * instSpeed + (1 - _ewmaAlpha) * _speedEwmaMs;
+          _lastDistanceSampleTime = now;
+          _lastDistanceSampleKm = currentKm;
+          return;
+        }
+      }
+      // Initialize sampling
+      _lastDistanceSampleTime ??= now;
+      _lastDistanceSampleKm ??= currentKm;
+    } catch (_) {
+      // best-effort; ignore errors
+    }
   }
 
   /// Calculate overall detection confidence (0.0 - 1.0)
@@ -386,6 +464,11 @@ class SessionCompletionDetectionService {
       );
       
       AppLogger.info('[SESSION_COMPLETION] Showed $promptType notification');
+
+      // Record cooldown and require rearm before next prompt
+      _lastPromptAt = DateTime.now();
+      _rearmRequired = true;
+      _distanceAtLastPrompt = distance;
       
     } catch (e) {
       AppLogger.error('[SESSION_COMPLETION] Failed to show notification: $e');
@@ -412,6 +495,7 @@ class SessionCompletionDetectionService {
     _hasShownInitialPrompt = false;
     _hasShownConfirmationPrompt = false;
     _firstDetectionTime = null;
+    // Note: do not clear _lastPromptAt or _rearmRequired here; cooldown spans detection windows
   }
 
   /// Update heart rate data (to be called by health integration)
