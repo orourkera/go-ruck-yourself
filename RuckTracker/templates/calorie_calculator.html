@@ -45,9 +45,12 @@
   </script>
   <style>
     .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    /* Make the results card wider on larger screens to reduce wrapping */
+    @media (min-width: 900px) { .grid { grid-template-columns: 0.8fr 1.2fr; } }
     .card { padding: 1rem; border-radius: 8px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
-    .muted { color: #666; font-size: .9rem; }
+    /* Darker descriptive text */
+    .muted { color: #444; font-size: .9rem; }
+    .subtitle { color: #444; }
     .row { display:flex; gap: .75rem; }
     .row > div { flex: 1; }
     label { font-weight: 600; display:block; margin-bottom: .25rem; }
@@ -145,17 +148,17 @@
             <tr>
               <td>Mechanical (Pandolf)</td>
               <td id="mechOut">—</td>
-              <td class="muted">Terrain & grade aware</td>
+              <td class="muted">Terrain & grade aware. Models load, speed, and slope to approximate mechanical work when HR isn't available.</td>
             </tr>
             <tr>
               <td>MET-based</td>
               <td id="metOut">—</td>
-              <td class="muted">Speed, grade, load; terrain factor</td>
+              <td class="muted">Speed, grade, load; terrain factor. Uses standardized metabolic equivalents and is simpler but less individualized.</td>
             </tr>
             <tr>
               <td>HR-based</td>
               <td id="hrOut">—</td>
-              <td class="muted">Keytel equation using avg HR</td>
+              <td class="muted">Keytel equation using avg HR. Most personal if HR data is accurate, but can vary with stress, heat, and caffeine.</td>
             </tr>
           </tbody>
         </table>

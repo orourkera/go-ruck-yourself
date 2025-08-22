@@ -478,7 +478,13 @@ class UserProfileResource(Resource):
                  
             update_data = {}
             # Assuming these fields exist in the new 'user' model
-            allowed_fields = ['username', 'weight_kg', 'prefer_metric', 'height_cm', 'allow_ruck_sharing', 'gender', 'date_of_birth', 'avatar_url', 'notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels']
+            # Include advanced calorie fields
+            allowed_fields = [
+                'username', 'weight_kg', 'prefer_metric', 'height_cm',
+                'allow_ruck_sharing', 'gender', 'date_of_birth', 'avatar_url',
+                'notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels',
+                'resting_hr', 'max_hr', 'calorie_method', 'calorie_active_only'
+            ]
             for field in allowed_fields:
                 if field == 'prefer_metric': # Check for snake_case field name
                     # Expect camelCase 'preferMetric' in the incoming JSON data for updates too
@@ -503,6 +509,36 @@ class UserProfileResource(Resource):
                         update_data['allow_ruck_sharing'] = data['allowRuckSharing']
                     elif 'allow_ruck_sharing' in data:  # Also check for snake_case
                         update_data['allow_ruck_sharing'] = data['allow_ruck_sharing']
+                # Handle advanced calorie fields and aliases
+                elif field == 'resting_hr':
+                    # Accept either resting_hr or restingHr
+                    if 'resting_hr' in data:
+                        update_data['resting_hr'] = data['resting_hr']
+                    elif 'restingHr' in data:
+                        update_data['resting_hr'] = data['restingHr']
+                elif field == 'max_hr':
+                    if 'max_hr' in data:
+                        update_data['max_hr'] = data['max_hr']
+                    elif 'maxHr' in data:
+                        update_data['max_hr'] = data['maxHr']
+                elif field == 'calorie_active_only':
+                    if 'calorie_active_only' in data:
+                        update_data['calorie_active_only'] = data['calorie_active_only']
+                    elif 'calorieActiveOnly' in data:
+                        update_data['calorie_active_only'] = data['calorieActiveOnly']
+                elif field == 'calorie_method':
+                    # Validate value if provided (accept camelCase alias calorieMethod)
+                    method_val = None
+                    if 'calorie_method' in data:
+                        method_val = data['calorie_method']
+                    elif 'calorieMethod' in data:
+                        method_val = data['calorieMethod']
+                    if method_val is not None:
+                        allowed_methods = {'fusion', 'mechanical', 'hr'}
+                        if method_val not in allowed_methods:
+                            logger.warning(f"Invalid calorie_method '{method_val}' provided for user {g.user.id}")
+                            return {'message': "Invalid calorie_method. Allowed: 'fusion', 'mechanical', 'hr'"}, 400
+                        update_data['calorie_method'] = method_val
                 # Handle notification preferences (all expect snake_case keys)
                 elif field in ['notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels']:
                     if field in data:

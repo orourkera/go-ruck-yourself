@@ -153,9 +153,9 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
               const SizedBox(height: 24),
               Text('Calorie Method', style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF728C69) : AppColors.textDark)),
               const SizedBox(height: 12),
-              _methodTile('Fusion (Recommended)', 'fusion', 'Blends HR and mechanical, terrain- and grade-aware.'),
-              _methodTile('Mechanical (Load & Grade)', 'mechanical', 'Pandolf/Givoni–Goldman inspired energy model.'),
-              _methodTile('HR-based', 'hr', 'Uses heart rate samples and profile age/sex.'),
+              _methodTile('Fusion (Recommended)', 'fusion', 'Blends HR and mechanical, terrain- and grade-aware. Weights HR more when coverage is good, and leans mechanical when it is not.'),
+              _methodTile('Mechanical (Load & Grade)', 'mechanical', 'Pandolf/Givoni–Goldman inspired energy model. Accounts for load, speed, slope, and surface to approximate mechanical work.'),
+              _methodTile('HR-based', 'hr', 'Uses heart rate samples and profile age/sex. Most personal when sensor data is clean; can vary with heat, fatigue, or caffeine.'),
               const SizedBox(height: 24),
               Row(
                 children: [

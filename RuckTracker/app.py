@@ -7,7 +7,7 @@ from dotenv import load_dotenv # Import load_dotenv
 from flask import Flask, render_template, Blueprint, g, jsonify, request, redirect
 from flask_restful import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_sqlalchemy import SQLAlchemy
+from .extensions import db
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -65,8 +65,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 # Create Flask app
 app = Flask(__name__)
 
-# Initialize SQLAlchemy and Migrate *after* imports
-db = SQLAlchemy()
+# Initialize Migrate (db comes from RuckTracker.extensions)
 migrate = Migrate(directory='RuckTracker/migrations')
 
 # Ensure secret key is set in environment

@@ -62,7 +62,11 @@
       </header>
 
       <section class="prose" style="line-height:1.6; font-size:1.05rem;">
-        {% include post.template %}
+        {% if post.template %}
+          {% include post.template %}
+        {% else %}
+          <p>No template specified for this post.</p>
+        {% endif %}
       </section>
 
       <hr style="margin:2rem 0; border:none; border-top:1px solid #eee;" />
