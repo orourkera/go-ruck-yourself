@@ -262,6 +262,26 @@ struct ContentView: View {
                             .cornerRadius(8)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        
+                        // Stop/End button
+                        Button(action: {
+                            sessionManager.endSession()
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.red)
+                                
+                                Text("End")
+                                    .font(.headline)
+                                    .foregroundColor(.red)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.black.opacity(0.2))
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.top, 2)

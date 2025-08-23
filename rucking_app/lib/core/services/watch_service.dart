@@ -332,10 +332,15 @@ class WatchService {
   /// Handle a session ended from the watch
   Future<void> _handleSessionEndedFromWatch(Map<String, dynamic> data) async {
     try {
-      // Handle session end from watch
+      AppLogger.info('[WATCH] Session ended from watch, completing session...');
+      
+      // Update local state
+      _isSessionActive = false;
+      _isPaused = false;
+      
       // Save heart rate samples to storage
       await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
-      // Heart rate samples sent successfully
+      
       // Attempt a final distance backfill from watch start to now
       if (_watchStartedAt != null) {
         final activeBloc = GetIt.I.isRegistered<ActiveSessionBloc>() ? GetIt.I<ActiveSessionBloc>() : null;
@@ -348,7 +353,20 @@ class WatchService {
             endedAt: DateTime.now().toUtc(),
           );
         }
+        
+        // Dispatch session completion event to ActiveSessionBloc
+        if (activeBloc != null && currentState is ActiveSessionRunning) {
+          AppLogger.info('[WATCH] Completing session from watch with ID: $sessionId');
+          activeBloc.add(SessionCompleted(
+            sessionId: int.parse(sessionId),
+            source: SessionActionSource.watch,
+          ));
+        }
       }
+      
+      // Reset heart rate sampling variables
+      _resetHeartRateSamplingVariables();
+      
     } catch (e) {
       AppLogger.error('[WATCH] Failed to handle session end from Watch: $e');
     }

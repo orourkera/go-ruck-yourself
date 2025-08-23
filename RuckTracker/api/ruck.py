@@ -1165,30 +1165,76 @@ class RuckSessionCompleteResource(Resource):
             if 'heart_rate_samples' in data and isinstance(data['heart_rate_samples'], list):
                 try:
                     samples = data['heart_rate_samples']
-                    logger.info(f"[HR_DEBUG] Processing {len(samples)} heart rate samples for session {ruck_id} on completion")
+                    total_incoming = len(samples)
+                    logger.info(f"[HR_DEBUG] Processing {total_incoming} heart rate samples for session {ruck_id} on completion")
+
                     # Delete existing samples to replace with latest set
                     supabase.table('heart_rate_sample') \
                         .delete() \
                         .eq('session_id', ruck_id) \
                         .execute()
 
+                    # Normalize and coerce
+                    def _normalize_ts(ts_val):
+                        try:
+                            # If numeric -> epoch ms or seconds
+                            if isinstance(ts_val, (int, float)):
+                                # Assume ms if large
+                                sec = ts_val / 1000.0 if ts_val > 1e12 else ts_val
+                                return datetime.fromtimestamp(sec, tz=tz.tzutc()).isoformat()
+                            if isinstance(ts_val, str):
+                                # Pass through if ISO, else attempt parse
+                                try:
+                                    return datetime.fromisoformat(ts_val.replace('Z', '+00:00')).isoformat()
+                                except Exception:
+                                    # Fallback: let DB attempt to coerce
+                                    return ts_val
+                        except Exception:
+                            return None
+
+                    def _coerce_bpm(v):
+                        try:
+                            return int(round(float(v)))
+                        except Exception:
+                            return None
+
                     hr_rows = []
+                    dropped = 0
                     for s in samples:
-                        bpm = s.get('bpm')
-                        if bpm is None:
-                            bpm = s.get('heart_rate')
+                        bpm = s.get('bpm', s.get('heart_rate'))
                         ts = s.get('timestamp')
-                        if bpm is None or ts is None:
+                        bpm_i = _coerce_bpm(bpm)
+                        ts_norm = _normalize_ts(ts)
+                        if bpm_i is None or ts_norm is None:
+                            dropped += 1
                             continue
                         hr_rows.append({
-                            'session_id': ruck_id,
-                            'timestamp': ts,
-                            'bpm': bpm
+                            'session_id': int(ruck_id),
+                            'timestamp': ts_norm,
+                            'bpm': bpm_i,
                         })
-                    if hr_rows:
-                        ins = supabase.table('heart_rate_sample').insert(hr_rows).execute()
-                        if not ins.data:
-                            logger.warning(f"[HR_DEBUG] Failed to insert heart rate samples for session {ruck_id}")
+
+                    logger.info(f"[HR_DEBUG] Prepared {len(hr_rows)} rows (dropped {dropped} invalid) for session {ruck_id}")
+
+                    # Chunked insert to avoid payload limits
+                    inserted_total = 0
+                    CHUNK = 500
+                    for i in range(0, len(hr_rows), CHUNK):
+                        chunk = hr_rows[i:i+CHUNK]
+                        ins = supabase.table('heart_rate_sample').insert(chunk).execute()
+                        if ins.error:
+                            logger.warning(f"[HR_DEBUG] Insert chunk {i//CHUNK} failed for session {ruck_id}: {ins.error}")
+                        else:
+                            # Some clients return data=None on bulk insert; rely on count verification after
+                            inserted_total += len(chunk)
+
+                    # Verify count from DB
+                    count_resp = supabase.table('heart_rate_sample') \
+                        .select('id', count='exact') \
+                        .eq('session_id', ruck_id) \
+                        .execute()
+                    db_count = (count_resp.count if hasattr(count_resp, 'count') else None)
+                    logger.info(f"[HR_DEBUG] Inserted ~{inserted_total} rows. DB now has {db_count if db_count is not None else 'unknown'} rows for session {ruck_id}")
 
                     # Compute HR stats from DB and update session
                     stats_resp = supabase.table('heart_rate_sample') \
@@ -1873,22 +1919,52 @@ class RuckSessionHeartRateChunkResource(Resource):
                 logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
                 return {'message': f"Session not completed (status: {session_data['status']}). Heart rate chunks can only be uploaded to completed sessions."}, 400
             
-            # Insert heart rate samples
+            # Insert heart rate samples (accept 'bpm' or 'heart_rate')
+            def _normalize_ts(ts_val):
+                try:
+                    # If numeric -> epoch ms or seconds
+                    if isinstance(ts_val, (int, float)):
+                        sec = ts_val / 1000.0 if ts_val > 1e12 else ts_val
+                        return datetime.fromtimestamp(sec, tz=tz.tzutc()).isoformat()
+                    if isinstance(ts_val, str):
+                        try:
+                            return datetime.fromisoformat(ts_val.replace('Z', '+00:00')).isoformat()
+                        except Exception:
+                            return ts_val
+                except Exception:
+                    return None
+
+            def _coerce_bpm(v):
+                try:
+                    return int(round(float(v)))
+                except Exception:
+                    return None
+
+            incoming = data['heart_rate_samples']
             heart_rate_rows = []
-            for sample in data['heart_rate_samples']:
-                if 'timestamp' not in sample or 'bpm' not in sample:
+            dropped = 0
+            for sample in incoming:
+                ts = sample.get('timestamp')
+                bpm_raw = sample.get('bpm', sample.get('heart_rate'))
+                ts_norm = _normalize_ts(ts)
+                bpm = _coerce_bpm(bpm_raw)
+                if ts_norm is None or bpm is None:
+                    dropped += 1
                     continue
                 heart_rate_rows.append({
-                    'session_id': ruck_id,
-                    'timestamp': sample['timestamp'],
-                    'bpm': sample['bpm']
+                    'session_id': int(ruck_id),
+                    'timestamp': ts_norm,
+                    'bpm': bpm
                 })
-            
+
             if not heart_rate_rows:
+                logger.warning(f"[HR_CHUNK] No valid heart rate samples in chunk (dropped={dropped}) for session {ruck_id}")
                 return {'message': 'No valid heart rate samples in chunk'}, 400
-            
+
+            logger.info(f"[HR_CHUNK] Inserting {len(heart_rate_rows)} HR samples (dropped={dropped}) for session {ruck_id}")
             insert_resp = supabase.table('heart_rate_sample').insert(heart_rate_rows).execute()
-            if not insert_resp.data:
+            if not insert_resp.data and insert_resp.error:
+                logger.error(f"[HR_CHUNK] Failed to insert heart rate samples for session {ruck_id}: {insert_resp.error}")
                 return {'message': 'Failed to insert heart rate samples'}, 500
             
             # Clear cache for this user's sessions

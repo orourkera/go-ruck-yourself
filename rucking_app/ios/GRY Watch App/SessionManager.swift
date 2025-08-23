@@ -244,6 +244,43 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
     }
     
+    // End the session from the watch
+    func endSession() {
+        // Emit a debug tap signal to the phone so we can confirm the watch button was pressed
+        sendMessage(["command": "debug_watchEndTapped"])  // DEBUG ONLY
+        
+        guard isSessionActive else { 
+            print("[DEBUG] Cannot end: session not active")
+            return 
+        }
+        
+        print("[DEBUG] Ending session from watch")
+        
+        // Send end command to the iPhone app
+        let message = ["command": "endSession"] as [String: Any]
+        
+        print("[DEBUG] Sending end command to iPhone: \(message)")
+        
+        // Using WatchConnectivity for end command
+        if session.activationState == .activated && session.isReachable {
+            session.sendMessage(message, replyHandler: { reply in
+                // End command acknowledged by iPhone
+                DispatchQueue.main.async {
+                    self.isSessionActive = false
+                    self.isPaused = false
+                    print("[DEBUG] End confirmed by iPhone, session stopped")
+                }
+            }, errorHandler: { error in
+                print("[WATCH] Error sending end command: \(error.localizedDescription)")
+            })
+        } else {
+            // Fallback to regular message channel
+            sendMessage(message)
+        }
+        
+        // End command sent to iPhone
+    }
+    
     // Resume the session from the watch
     func resumeSession() {
         // Emit a debug tap signal to the phone so we can confirm the watch button was pressed.

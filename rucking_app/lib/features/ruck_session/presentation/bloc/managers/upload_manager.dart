@@ -490,14 +490,14 @@ class UploadManager implements SessionManager {
   /// Upload heart rate batch to server
   Future<void> _uploadHeartRateBatch(List<Map<String, dynamic>> heartRateData) async {
     if (_activeSessionId == null || heartRateData.isEmpty) return;
-    
+  
     AppLogger.info('[UPLOAD_MANAGER] Uploading ${heartRateData.length} heart rate samples');
-    
-    await _apiClient.post('/rucks/$_activeSessionId/heart-rate-batch', {
+  
+    await _apiClient.post('/rucks/$_activeSessionId/heart-rate-chunk', {
       'heart_rate_samples': heartRateData,
       'batch_timestamp': DateTime.now().toIso8601String(),
     });
-    
+  
     AppLogger.info('[UPLOAD_MANAGER] Heart rate batch uploaded successfully');
   }
   

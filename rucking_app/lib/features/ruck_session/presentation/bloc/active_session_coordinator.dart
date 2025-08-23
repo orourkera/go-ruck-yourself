@@ -749,6 +749,24 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
     AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
     
+    // Fallback: If live steps were not tracked, compute total steps once at completion
+    try {
+      if (_currentSteps == null) {
+        final startTime = _lifecycleManager.currentState.startTime;
+        if (startTime != null) {
+          final computedSteps = await _healthService.getStepsBetween(startTime, DateTime.now());
+          _currentSteps = computedSteps;
+          AppLogger.info('[COORDINATOR] Computed steps at completion: $_currentSteps');
+        } else {
+          AppLogger.debug('[COORDINATOR] No startTime available to compute steps at completion');
+        }
+      } else {
+        AppLogger.debug('[COORDINATOR] Skipping step recompute; live steps already present: $_currentSteps');
+      }
+    } catch (e) {
+      AppLogger.warning('[COORDINATOR] Failed to compute steps at completion: $e');
+    }
+
     // Stop the timer by pausing first
     AppLogger.info('[COORDINATOR] Pausing session first');
     add(const SessionPaused());

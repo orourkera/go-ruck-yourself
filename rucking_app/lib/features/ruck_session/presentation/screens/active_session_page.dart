@@ -878,8 +878,16 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
                       
                       if (state is SessionPhotosLoadedForId) {
-                        // Photos loaded state - just show a simple loading indicator
-                        // This happens when photos are being processed during discard/complete flow
+                        // Photos loaded state - automatically transition back to initial state after brief delay
+                        // This prevents the UI from getting stuck on "Processing photos..."
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          Future.delayed(const Duration(milliseconds: 500), () {
+                            if (mounted && context.read<ActiveSessionBloc>().state is SessionPhotosLoadedForId) {
+                              context.read<ActiveSessionBloc>().add(const SessionReset());
+                            }
+                          });
+                        });
+                        
                         return Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -887,7 +895,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               const CircularProgressIndicator(),
                               const SizedBox(height: 24),
                               Text(
-                                'Processing photos...',
+                                'Photos loaded!',
                                 style: AppTextStyles.headlineMedium,
                                 textAlign: TextAlign.center,
                               ),
