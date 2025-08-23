@@ -54,6 +54,7 @@ import 'package:rucking_app/shared/widgets/photo/photo_carousel.dart';
 import 'package:rucking_app/core/services/share_service.dart';
 import 'package:rucking_app/core/services/strava_service.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
 import 'package:rucking_app/shared/widgets/stat_row.dart';
@@ -190,6 +191,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         completionData['avg_heart_rate'] = (heartRates.reduce((a, b) => a + b) / heartRates.length).round();
         completionData['max_heart_rate'] = heartRates.reduce((a, b) => a > b ? a : b);
         completionData['min_heart_rate'] = heartRates.reduce((a, b) => a < b ? a : b);
+        try {
+          // Compute time-in-zones and snapshot
+          List<({int min, int max, Color color, String name})>? zones;
+          final authState = context.read<AuthBloc>().state;
+          if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
+            zones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+          }
+          if (zones != null) {
+            final dist = HeartRateZoneService.timeInZonesSeconds(samples: widget.heartRateSamples!, zones: zones);
+            completionData['time_in_zones'] = dist;
+            completionData['hr_zone_snapshot'] = zones.map((z) => {'name': z.name, 'min_bpm': z.min, 'max_bpm': z.max, 'color': z.color.value}).toList();
+          }
+        } catch (_) {}
       }
 
       // Include splits data if available
@@ -1271,6 +1285,50 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   ),
                 ),
           ),
+          const SizedBox(height: 12),
+          // Time-in-Zone distribution (compute from profile if snapshot not available)
+          Builder(builder: (context) {
+            if (!hasHeartRateData) return const SizedBox.shrink();
+            // Attempt to load zones from user profile
+            List<({int min, int max, Color color, String name})>? zones;
+            try {
+              final authState = context.read<AuthBloc>().state;
+              if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
+                zones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+              }
+            } catch (_) {}
+            if (zones == null) return const SizedBox.shrink();
+            final dist = HeartRateZoneService.timeInZonesSeconds(samples: _heartRateSamples!, zones: zones!);
+            final total = dist.values.fold<int>(0, (sum, v) => sum + v);
+            if (total <= 0) return const SizedBox.shrink();
+            final zoneOrder = ['Z1','Z2','Z3','Z4','Z5'];
+            final zoneMap = {for (final z in zones!) z.name: z};
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('TIME IN ZONES', style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: zoneOrder.map((name) {
+                    final seconds = dist[name] ?? 0;
+                    final pct = seconds / total;
+                    final color = zoneMap[name]?.color ?? Colors.grey;
+                    return Expanded(
+                      child: Column(
+                        children: [
+                          Container(height: 8, margin: const EdgeInsets.symmetric(horizontal: 3), decoration: BoxDecoration(color: color.withOpacity(0.85), borderRadius: BorderRadius.circular(4))),
+                          const SizedBox(height: 4),
+                          Text('${(pct*100).round()}%', style: AppTextStyles.bodySmall),
+                          Text(name, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          }),
         ],
       ),
     );

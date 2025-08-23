@@ -49,6 +49,8 @@ class RuckSession {
     String? plannedRuckId,
     Route? route,
     int? steps,
+    Map<String, int>? timeInZones,
+    List<Map<String, dynamic>>? hrZoneSnapshot,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -83,6 +85,8 @@ class RuckSession {
       plannedRuckId: plannedRuckId ?? this.plannedRuckId,
       route: route ?? this.route,
       steps: steps ?? this.steps,
+      timeInZones: timeInZones ?? this.timeInZones,
+      hrZoneSnapshot: hrZoneSnapshot ?? this.hrZoneSnapshot,
     );
   }
 
@@ -121,6 +125,8 @@ class RuckSession {
   final String? plannedRuckId; // ID of the planned ruck that was completed
   final Route? route; // Full route data (loaded separately)
   final int? steps; // Optional step count
+  final Map<String, int>? timeInZones; // Optional HR zone distribution
+  final List<Map<String, dynamic>>? hrZoneSnapshot; // Optional snapshot of zone thresholds
 
   RuckSession({
     this.id,
@@ -155,6 +161,8 @@ class RuckSession {
     this.plannedRuckId,
     this.route,
     this.steps,
+    this.timeInZones,
+    this.hrZoneSnapshot,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -333,6 +341,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
             ? Route.fromJson(json['route'] as Map<String, dynamic>)
             : null,
         steps: (json['steps'] as num?)?.toInt(),
+        timeInZones: (json['time_in_zones'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
+        hrZoneSnapshot: (json['hr_zone_snapshot'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -393,6 +403,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'planned_ruck_id': plannedRuckId,
       'route': route?.toJson(),
       if (steps != null) 'steps': steps,
+      if (timeInZones != null) 'time_in_zones': timeInZones,
+      if (hrZoneSnapshot != null) 'hr_zone_snapshot': hrZoneSnapshot,
     };
   }
 }

@@ -24,6 +24,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     @Published var paceValue: Double = 0.0
     @Published var isPaused: Bool = false
     @Published var isSessionActive: Bool = false
+    @Published var currentZone: String? = nil
     
     // Split notification properties
     @Published var showingSplitNotification: Bool = false
@@ -420,6 +421,11 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 // Update current metrics from the phone
                 if let distance = message["distance"] as? Double {
                     self.distanceValue = distance
+                }
+                if let metrics = message["metrics"] as? [String: Any] {
+                    if let zone = metrics["hrZone"] as? String {
+                        DispatchQueue.main.async { self.currentZone = zone }
+                    }
                 }
                 
                 if let pace = message["pace"] as? Double {

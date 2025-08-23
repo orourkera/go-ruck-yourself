@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 /// User model representing a user of the app
 class User extends Equatable {
@@ -57,6 +58,9 @@ class User extends Equatable {
   /// User stats information
   final UserStats? stats;
 
+  /// User's heart rate zones (null if not set)
+  final List<HRZone>? hrZones;
+
   /// Creates a new user instance
   const User({
     required this.userId,
@@ -79,6 +83,7 @@ class User extends Equatable {
     this.notificationEvents,
     this.notificationDuels,
     this.stats,
+    this.hrZones,
   });
   
   /// Creates a copy of this user with the given fields replaced with new values
@@ -103,6 +108,7 @@ class User extends Equatable {
     bool? notificationEvents,
     bool? notificationDuels,
     UserStats? stats,
+    List<HRZone>? hrZones,
   }) {
     return User(
       userId: userId ?? this.userId,
@@ -125,6 +131,7 @@ class User extends Equatable {
       notificationEvents: notificationEvents ?? this.notificationEvents,
       notificationDuels: notificationDuels ?? this.notificationDuels,
       stats: stats ?? this.stats,
+      hrZones: hrZones ?? this.hrZones,
     );
   }
   
@@ -176,6 +183,9 @@ class User extends Equatable {
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
+      hrZones: json['hr_zones'] != null
+          ? (json['hr_zones'] as List).map((z) => HRZone.fromJson(z)).toList()
+          : null,
     );
     
     // --- Add Logging ---
@@ -208,12 +218,13 @@ class User extends Equatable {
     if (notificationEvents != null) data['notification_events'] = notificationEvents;
     if (notificationDuels != null) data['notification_duels'] = notificationDuels;
     if (stats != null) data['stats'] = stats!.toJson();
+    if (hrZones != null) data['hr_zones'] = hrZones!.map((z) => z.toJson()).toList();
     return data;
   }
   
   @override
   List<Object?> get props => [
-    userId, email, username, weightKg, heightCm, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, stats
+    userId, email, username, weightKg, heightCm, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, stats, hrZones
   ];
 }
 
@@ -312,4 +323,35 @@ class MonthlyStats extends Equatable {
   
   @override
   List<Object?> get props => [rucks, distanceKm, calories];
+} 
+
+class HRZone extends Equatable {
+  final int minBpm;
+  final int maxBpm;
+  final String name;
+  final Color color;
+
+  const HRZone({
+    required this.minBpm,
+    required this.maxBpm,
+    required this.name,
+    required this.color,
+  });
+
+  factory HRZone.fromJson(Map<String, dynamic> json) => HRZone(
+    minBpm: json['min_bpm'],
+    maxBpm: json['max_bpm'],
+    name: json['name'],
+    color: Color(json['color']),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'min_bpm': minBpm,
+    'max_bpm': maxBpm,
+    'name': name,
+    'color': color.value,
+  };
+
+  @override
+  List<Object?> get props => [minBpm, maxBpm, name, color];
 } 

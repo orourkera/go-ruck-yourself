@@ -951,6 +951,11 @@ class RuckSessionCompleteResource(Resource):
                     logger.warning(f"Invalid steps value provided: {data.get('steps')}")
             if 'calorie_method' in data and data['calorie_method'] in ['fusion','mechanical','hr']:
                 update_data['calorie_method'] = data['calorie_method']
+            # Heart rate zones: snapshot of thresholds and per-zone time (seconds)
+            if 'hr_zone_snapshot' in data and isinstance(data['hr_zone_snapshot'], dict):
+                update_data['hr_zone_snapshot'] = data['hr_zone_snapshot']
+            if 'time_in_zones' in data and isinstance(data['time_in_zones'], dict):
+                update_data['time_in_zones'] = data['time_in_zones']
             if 'elevation_gain_m' in data:
                 update_data['elevation_gain_m'] = data['elevation_gain_m']
             if 'elevation_loss_m' in data:

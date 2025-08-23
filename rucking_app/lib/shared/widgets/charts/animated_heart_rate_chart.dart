@@ -16,6 +16,7 @@ class AnimatedHeartRateChart extends StatefulWidget {
   final int? minHeartRate;
   final Color Function(BuildContext) getLadyModeColor;
   final Duration? totalDuration;
+  final List<({int min, int max, Color color, String name})>? zones;
 
   const AnimatedHeartRateChart({
     super.key,
@@ -25,6 +26,7 @@ class AnimatedHeartRateChart extends StatefulWidget {
     this.minHeartRate,
     required this.getLadyModeColor,
     this.totalDuration,
+    this.zones,
   });
 
   @override
@@ -158,6 +160,23 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
                 labelResolver: (_) => 'Max: ${widget.maxHeartRate} bpm',
               ),
             ),
+          // Zone boundary lines and labels
+          if (widget.zones != null)
+            ...widget.zones!.expand((z) => [
+              HorizontalLine(y: z.min.toDouble(), color: z.color.withOpacity(0.12), strokeWidth: 2),
+              HorizontalLine(
+                y: z.max.toDouble(),
+                color: z.color.withOpacity(0.12),
+                strokeWidth: 2,
+                label: HorizontalLineLabel(
+                  show: true,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 6),
+                  style: TextStyle(color: z.color.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.w600),
+                  labelResolver: (_) => z.name,
+                ),
+              ),
+            ]),
         ],
       ),
     );

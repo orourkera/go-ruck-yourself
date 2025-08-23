@@ -485,6 +485,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'completed_at': DateTime.now().toIso8601String(),
         'average_pace': finalDistance > 0 ? (lifecycleState.duration.inMinutes / finalDistance) : 0.0,
         if (_currentSteps != null) 'steps': _currentSteps,
+        // Heart rate zones: snapshot thresholds and time in zones
+        ..._computeHrZonesPayload(),
       };
       AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
     } else if (lifecycleState.sessionId != null && (lifecycleState.isActive || (_lifecycleManager.isPaused && !lifecycleState.isSaving))) {
@@ -634,6 +636,39 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'finalCalories=${calories.toStringAsFixed(0)}');
     
     return calories;
+  }
+
+  Map<String, dynamic> _computeHrZonesPayload() {
+    try {
+      // Pull user profile for resting/max HR
+      int? restingHr;
+      int? maxHr;
+      final authState = GetIt.instance<AuthBloc>().state;
+      if (authState is Authenticated) {
+        restingHr = authState.user.restingHr;
+        maxHr = authState.user.maxHr;
+      }
+      final samples = _heartRateManager.heartRateSampleObjects;
+      if (samples.isEmpty || restingHr == null || maxHr == null) return {};
+      if (maxHr <= restingHr) return {};
+
+      final zones = HeartRateZoneService.zonesFromProfile(restingHr: restingHr, maxHr: maxHr);
+      final timeIn = HeartRateZoneService.timeInZonesSeconds(samples: samples, zones: zones);
+      final snapshot = zones
+          .map((z) => {
+                'name': z.name,
+                'min_bpm': z.min,
+                'max_bpm': z.max,
+                'color': z.color.value,
+              })
+          .toList();
+      return {
+        'hr_zone_snapshot': snapshot,
+        'time_in_zones': timeIn,
+      };
+    } catch (_) {
+      return {};
+    }
   }
   
   /// Calculates the aggregate terrain multiplier based on terrain segments

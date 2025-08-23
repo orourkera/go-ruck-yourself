@@ -182,11 +182,22 @@ struct ContentView: View {
                                 .foregroundColor(.gray)
                         }
                         .padding(.top, 2)
-                        Text(sessionManager.heartRateText)
-                            .font(.system(size: 24, weight: .bold, design: .default))
-                            .foregroundColor(.red)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                        HStack(spacing: 6) {
+                            Text(sessionManager.heartRateText)
+                                .font(.system(size: 24, weight: .bold, design: .default))
+                                .foregroundColor(.red)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                            // Zone tag
+                            if let zone = sessionManager.currentZone, !zone.isEmpty {
+                                Text(zone)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(Color.red.opacity(0.2))
+                                    .cornerRadius(4)
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity, minHeight: 70)
                     .background(Color.black.opacity(0.1))

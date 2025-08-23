@@ -37,6 +37,7 @@ import 'package:rucking_app/shared/widgets/charts/heart_rate_graph.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/photo_upload_section.dart';
 import 'package:rucking_app/core/services/service_locator.dart'; // For 'getIt' variable
 import 'package:rucking_app/shared/widgets/charts/animated_heart_rate_chart.dart'; // Added import for AnimatedHeartRateChart
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
 import 'package:rucking_app/core/services/share_service.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
@@ -927,6 +928,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 int? avgHeartRate = widget.session.avgHeartRate;
                                 int? maxHeartRate = widget.session.maxHeartRate;
                                 int? minHeartRate = widget.session.minHeartRate;
+                                Map<String, int>? timeInZones = widget.session.timeInZones;
+                                List<Map<String, dynamic>>? zoneSnapshot = widget.session.hrZoneSnapshot;
                                 
                                 if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
                                   if (state.session.heartRateSamples != null && state.session.heartRateSamples!.isNotEmpty) {
@@ -934,11 +937,31 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                     avgHeartRate = state.session.avgHeartRate;
                                     maxHeartRate = state.session.maxHeartRate;
                                     minHeartRate = state.session.minHeartRate;
+                                    timeInZones = state.session.timeInZones ?? timeInZones;
+                                    zoneSnapshot = state.session.hrZoneSnapshot ?? zoneSnapshot;
                                   }
                                 }
                                 
                                 final List<HeartRateSample> safeHeartRateSamples = heartRateSamples ?? [];
                                 final bool showHeartRateGraph = widget.session.id == 744 || safeHeartRateSamples.isNotEmpty;
+
+                                // Build zones for chart overlays
+                                List<({int min, int max, Color color, String name})>? zones;
+                                try {
+                                  if (zoneSnapshot != null && zoneSnapshot!.isNotEmpty) {
+                                    zones = zoneSnapshot!.map((z) => (
+                                      min: (z['min_bpm'] as num).toInt(),
+                                      max: (z['max_bpm'] as num).toInt(),
+                                      color: Color((z['color'] as num).toInt()),
+                                      name: (z['name'] as String?) ?? 'Z',
+                                    )).toList();
+                                  } else {
+                                    final authState = context.read<AuthBloc>().state;
+                                    if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
+                                      zones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+                                    }
+                                  }
+                                } catch (_) {}
                                 
                                 return Column(
                                   children: [
@@ -967,6 +990,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                             minHeartRate: minHeartRate,
                                             totalDuration: widget.session.duration,
                                             getLadyModeColor: (context) => Theme.of(context).primaryColor,
+                                            zones: zones,
                                           ),
                                         ),
                                       )
@@ -997,6 +1021,44 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 );
                               },
                             ),
+                            const SizedBox(height: 16),
+                            // Time-in-Zone distribution
+                            Builder(builder: (context) {
+                              Map<String, int> distribution = timeInZones ?? {};
+                              if (distribution.isEmpty && safeHeartRateSamples.isNotEmpty && zones != null) {
+                                distribution = HeartRateZoneService.timeInZonesSeconds(samples: safeHeartRateSamples, zones: zones!);
+                              }
+                              if (distribution.isEmpty) return const SizedBox.shrink();
+                              final total = distribution.values.fold<int>(0, (sum, v) => sum + v);
+                              if (total <= 0) return const SizedBox.shrink();
+                              final zoneOrder = ['Z1','Z2','Z3','Z4','Z5'];
+                              final zoneMap = {for (final z in zones ?? []) z.name: z};
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('TIME IN ZONES', style: AppTextStyles.displaySmall.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.red : const Color(0xFF3E2723))),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: zoneOrder.map((name) {
+                                      final seconds = distribution[name] ?? 0;
+                                      final pct = seconds / total;
+                                      final color = zoneMap[name]?.color ?? Colors.grey;
+                                      return Expanded(
+                                        child: Column(
+                                          children: [
+                                            Container(height: 8, margin: const EdgeInsets.symmetric(horizontal: 3), decoration: BoxDecoration(color: color.withOpacity(0.8), borderRadius: BorderRadius.circular(4))),
+                                            const SizedBox(height: 4),
+                                            Text('${(pct*100).round()}%', style: AppTextStyles.bodySmall),
+                                            Text(name, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey)),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              );
+                            }),
                           ],
                         ),
                       );

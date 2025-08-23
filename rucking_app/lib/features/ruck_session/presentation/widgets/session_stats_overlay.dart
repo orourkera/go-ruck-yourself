@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -323,6 +325,21 @@ class _HeartRateTile extends StatelessWidget {
   const _HeartRateTile({Key? key, required this.preferMetric, this.isCardLayout = false}) : super(key: key);
 
   Color _determineHrColor(int bpm) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        final user = authState.user;
+        if (user.restingHr != null && user.maxHr != null && user.maxHr! > user.restingHr!) {
+          final zones = HeartRateZoneService.zonesFromProfile(restingHr: user.restingHr!, maxHr: user.maxHr!);
+          for (final z in zones) {
+            if (bpm >= z.min && bpm <= z.max) return z.color;
+          }
+          // Fallback to nearest zone color
+          if (bpm < zones.first.min) return zones.first.color;
+          return zones.last.color;
+        }
+      }
+    } catch (_) {}
     if (bpm < 100) return AppColors.success;
     if (bpm < 140) return AppColors.warning;
     return AppColors.error;
@@ -341,11 +358,7 @@ class _HeartRateTile extends StatelessWidget {
         final int currentBpm = latestHeartRate ?? 0;
         if (!isCardLayout) {
           if (currentBpm > 0) {
-            return _StatTile(
-              label: 'HR',
-              value: '$currentBpm bpm',
-              color: _determineHrColor(currentBpm),
-            );
+            return _StatTile(label: 'HR', value: '$currentBpm bpm', color: _determineHrColor(currentBpm));
           }
           return const SizedBox.shrink();
         }

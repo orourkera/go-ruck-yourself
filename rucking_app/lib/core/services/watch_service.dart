@@ -17,6 +17,8 @@ import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'rucking_api_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 
 /// Service for managing communication with Apple Watch companion app
 class WatchService {
@@ -544,12 +546,35 @@ class WatchService {
           'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
           'isMetric': isMetric, // Embed unit preference in nested metrics map as well
           if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
+          if (_currentHeartRate != null) 'hrZone': _inferZoneLabel(_currentHeartRate!),
         },
       });
       AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}');
     } catch (e) {
       AppLogger.error('[WATCH] Failed to send metrics to watch: $e');
     }
+  }
+
+  /// Infer Z1..Z5 label from current HR using user profile thresholds if available
+  String _inferZoneLabel(double hr) {
+    try {
+      final authBloc = GetIt.instance<AuthBloc>();
+      final state = authBloc.state;
+      if (state is Authenticated && state.user.restingHr != null && state.user.maxHr != null && state.user.maxHr! > state.user.restingHr!) {
+        final zones = HeartRateZoneService.zonesFromProfile(restingHr: state.user.restingHr!, maxHr: state.user.maxHr!);
+        for (final z in zones) {
+          if (hr >= z.min && hr <= z.max) return z.name;
+        }
+        if (hr < zones.first.min) return zones.first.name;
+        return zones.last.name;
+      }
+    } catch (_) {}
+    // Fallback with simple bands
+    if (hr < 100) return 'Z1';
+    if (hr < 120) return 'Z2';
+    if (hr < 140) return 'Z3';
+    if (hr < 160) return 'Z4';
+    return 'Z5';
   }
 
   /// Send updated session metrics to the watch.
