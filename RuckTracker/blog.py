@@ -1,5 +1,6 @@
 import datetime
-from flask import Blueprint, render_template, abort
+import os
+from flask import Blueprint, render_template, abort, current_app
 
 blog_bp = Blueprint('blog', __name__)
 
@@ -199,7 +200,16 @@ def _sorted_posts():
 @blog_bp.route('/blog')
 @blog_bp.route('/blog/')
 def blog_index():
-    return render_template('blog/index.html', posts=_sorted_posts())
+    posts = _sorted_posts()
+    # Ensure images exist; if not, fall back to a safe placeholder that exists
+    static_root = os.path.join(current_app.root_path, 'static')
+    safe_default = 'og_preview.png'
+    for p in posts:
+        img_rel = p.get('image') or ''
+        img_path = os.path.join(static_root, img_rel) if img_rel else ''
+        if not img_rel or not os.path.exists(img_path):
+            p['image'] = safe_default
+    return render_template('blog/index.html', posts=posts)
 
 
 @blog_bp.route('/blog/<slug>')
