@@ -917,8 +917,14 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
                               bloc: activeSessionBloc, // Provide the bloc instance
                               buildWhen: (previous, current) {
+                                // Rebuild when the viewed session is loaded into state OR when a summary is generated
+                                if (current is ActiveSessionInitial) {
+                                  return current.viewedSession?.id == widget.session.id &&
+                                      (current.viewedSession?.heartRateSamples?.isNotEmpty ?? false);
+                                }
                                 if (current is SessionSummaryGenerated) {
-                                  return current.session.heartRateSamples != null;
+                                  return current.session.id == widget.session.id &&
+                                      (current.session.heartRateSamples?.isNotEmpty ?? false);
                                 }
                                 return false;
                               },
@@ -930,8 +936,19 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 int? minHeartRate = widget.session.minHeartRate;
                                 Map<String, int>? timeInZones = widget.session.timeInZones;
                                 List<Map<String, dynamic>>? zoneSnapshot = widget.session.hrZoneSnapshot;
-                                
-                                if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
+
+                                // Prefer heart rate data from viewedSession when available
+                                if (state is ActiveSessionInitial && state.viewedSession?.id == widget.session.id) {
+                                  final vs = state.viewedSession!;
+                                  if (vs.heartRateSamples != null && vs.heartRateSamples!.isNotEmpty) {
+                                    heartRateSamples = vs.heartRateSamples;
+                                    avgHeartRate = vs.avgHeartRate;
+                                    maxHeartRate = vs.maxHeartRate;
+                                    minHeartRate = vs.minHeartRate;
+                                    timeInZones = vs.timeInZones ?? timeInZones;
+                                    zoneSnapshot = vs.hrZoneSnapshot ?? zoneSnapshot;
+                                  }
+                                } else if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
                                   if (state.session.heartRateSamples != null && state.session.heartRateSamples!.isNotEmpty) {
                                     heartRateSamples = state.session.heartRateSamples;
                                     avgHeartRate = state.session.avgHeartRate;
@@ -941,7 +958,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                     zoneSnapshot = state.session.hrZoneSnapshot ?? zoneSnapshot;
                                   }
                                 }
-                                
+
                                 final List<HeartRateSample> safeHeartRateSamples = heartRateSamples ?? [];
                                 final bool showHeartRateGraph = widget.session.id == 744 || safeHeartRateSamples.isNotEmpty;
 

@@ -597,16 +597,20 @@ class RuckSessionResource(Resource):
             if not data:
                 return {'message': 'No data provided'}, 400
 
-            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public', 'splits', 'calorie_method']
+            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public', 'splits', 'calorie_method', 'hr_zone_snapshot', 'time_in_zones', 'steps']
             update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
             if not update_data:
-                return {'message': 'No valid fields to update'}, 400
+                # We may still allow heart rate samples updates even if no other fields
+                if 'heart_rate_samples' not in data:
+                    return {'message': 'No valid fields to update'}, 400
 
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Handle splits separately since they need to be inserted into session_splits table
             splits_data = update_data.pop('splits', None)
+            # Handle heart rate samples separately
+            hr_samples = data.get('heart_rate_samples')
             
             # Update the main session data
             update_resp = supabase.table('ruck_session') \
@@ -650,6 +654,56 @@ class RuckSessionResource(Resource):
                         
                         if not insert_resp.data:
                             logger.warning(f"Failed to insert splits for session {ruck_id}")
+
+            # Handle heart rate samples if provided
+            if isinstance(hr_samples, list):
+                try:
+                    logger.info(f"[HR_DEBUG] Updating {len(hr_samples)} heart rate samples for session {ruck_id} via PATCH")
+                    # Delete existing samples for this session
+                    supabase.table('heart_rate_sample') \
+                        .delete() \
+                        .eq('session_id', ruck_id) \
+                        .execute()
+
+                    rows = []
+                    for s in hr_samples:
+                        # Support keys: bpm or heart_rate
+                        bpm = s.get('bpm')
+                        if bpm is None:
+                            bpm = s.get('heart_rate')
+                        ts = s.get('timestamp')
+                        if bpm is None or ts is None:
+                            continue
+                        rows.append({
+                            'session_id': ruck_id,
+                            'timestamp': ts,
+                            'bpm': bpm
+                        })
+                    if rows:
+                        insert_resp = supabase.table('heart_rate_sample').insert(rows).execute()
+                        if not insert_resp.data:
+                            logger.warning(f"[HR_DEBUG] Failed to insert heart rate samples for session {ruck_id}")
+
+                        # Compute HR stats and update session
+                        stats_resp = supabase.table('heart_rate_sample') \
+                            .select('bpm') \
+                            .eq('session_id', ruck_id) \
+                            .limit(50000) \
+                            .execute()
+                        if stats_resp.data:
+                            bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
+                            if bpm_values:
+                                avg_hr = sum(bpm_values) / len(bpm_values)
+                                min_hr = min(bpm_values)
+                                max_hr = max(bpm_values)
+                                supabase.table('ruck_session').update({
+                                    'avg_heart_rate': round(avg_hr, 1),
+                                    'min_heart_rate': int(min_hr),
+                                    'max_heart_rate': int(max_hr)
+                                }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
+                                logger.info(f"[HR_DEBUG] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr}")
+                except Exception as hr_err:
+                    logger.error(f"[HR_DEBUG] Error updating heart rate samples for session {ruck_id}: {hr_err}")
 
             return update_resp.data[0], 200
         except Exception as e:
@@ -1106,7 +1160,62 @@ class RuckSessionCompleteResource(Resource):
                 return {'message': 'Failed to end session'}, 500
         
             completed_session = update_resp.data[0]
-        
+
+            # Handle heart rate samples if provided in completion payload
+            if 'heart_rate_samples' in data and isinstance(data['heart_rate_samples'], list):
+                try:
+                    samples = data['heart_rate_samples']
+                    logger.info(f"[HR_DEBUG] Processing {len(samples)} heart rate samples for session {ruck_id} on completion")
+                    # Delete existing samples to replace with latest set
+                    supabase.table('heart_rate_sample') \
+                        .delete() \
+                        .eq('session_id', ruck_id) \
+                        .execute()
+
+                    hr_rows = []
+                    for s in samples:
+                        bpm = s.get('bpm')
+                        if bpm is None:
+                            bpm = s.get('heart_rate')
+                        ts = s.get('timestamp')
+                        if bpm is None or ts is None:
+                            continue
+                        hr_rows.append({
+                            'session_id': ruck_id,
+                            'timestamp': ts,
+                            'bpm': bpm
+                        })
+                    if hr_rows:
+                        ins = supabase.table('heart_rate_sample').insert(hr_rows).execute()
+                        if not ins.data:
+                            logger.warning(f"[HR_DEBUG] Failed to insert heart rate samples for session {ruck_id}")
+
+                    # Compute HR stats from DB and update session
+                    stats_resp = supabase.table('heart_rate_sample') \
+                        .select('bpm') \
+                        .eq('session_id', ruck_id) \
+                        .limit(50000) \
+                        .execute()
+                    if stats_resp.data:
+                        bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
+                        if bpm_values:
+                            avg_hr = sum(bpm_values) / len(bpm_values)
+                            min_hr = min(bpm_values)
+                            max_hr = max(bpm_values)
+                            supabase.table('ruck_session').update({
+                                'avg_heart_rate': round(avg_hr, 1),
+                                'min_heart_rate': int(min_hr),
+                                'max_heart_rate': int(max_hr)
+                            }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
+                            # Also reflect into completed_session for response
+                            completed_session['avg_heart_rate'] = round(avg_hr, 1)
+                            completed_session['min_heart_rate'] = int(min_hr)
+                            completed_session['max_heart_rate'] = int(max_hr)
+                            logger.info(f"[HR_DEBUG] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr}")
+                except Exception as hr_err:
+                    logger.error(f"[HR_DEBUG] Error handling heart rate samples for session {ruck_id}: {hr_err}")
+                    # Do not fail completion on HR errors
+
             # Handle splits data if provided
             if 'splits' in data and data['splits']:
                 splits_data = data['splits']
