@@ -974,8 +974,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                     )).toList();
                                   } else {
                                     final authState = context.read<AuthBloc>().state;
-                                    if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
-                                      zones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+                                    if (authState is Authenticated) {
+                                      zones = HeartRateZoneService.zonesFromUserFields(
+                                        restingHr: authState.user.restingHr,
+                                        maxHr: authState.user.maxHr,
+                                        dateOfBirth: authState.user.dateOfBirth,
+                                        gender: authState.user.gender,
+                                      );
                                     }
                                   }
                                 } catch (_) {}
@@ -1054,8 +1059,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                   )).toList();
                                 } else {
                                   final authState = context.read<AuthBloc>().state;
-                                  if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
-                                    localZones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+                                  if (authState is Authenticated) {
+                                    localZones = HeartRateZoneService.zonesFromUserFields(
+                                      restingHr: authState.user.restingHr,
+                                      maxHr: authState.user.maxHr,
+                                      dateOfBirth: authState.user.dateOfBirth,
+                                      gender: authState.user.gender,
+                                    );
                                   }
                                 }
                               } catch (_) {}

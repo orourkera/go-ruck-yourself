@@ -1892,10 +1892,18 @@ class RuckSessionRouteChunkResource(Resource):
 
 class RuckSessionHeartRateChunkResource(Resource):
     def post(self, ruck_id):
-        """Upload heart rate data chunk for completed session (POST /api/rucks/<ruck_id>/heart-rate-chunk)"""
+        """Upload heart rate data chunk for a session (POST /api/rucks/<ruck_id>/heart-rate-chunk)
+
+        Accepted session statuses: 'in_progress', 'completed'.
+        """
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
+            
+            # Normalize ruck_id to integer for database operations
+            ruck_id = validate_ruck_id(ruck_id)
+            if ruck_id is None:
+                return {'message': 'Invalid ruck session ID format'}, 400
             
             data = request.get_json()
             if not data or 'heart_rate_samples' not in data or not isinstance(data['heart_rate_samples'], list):
@@ -1915,9 +1923,10 @@ class RuckSessionHeartRateChunkResource(Resource):
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
-            if session_data['status'] != 'completed':
-                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
-                return {'message': f"Session not completed (status: {session_data['status']}). Heart rate chunks can only be uploaded to completed sessions."}, 400
+            # Allow HR samples for both in-progress and completed sessions
+            if session_data['status'] not in ('in_progress', 'completed'):
+                logger.warning(f"[HR_CHUNK] Session {ruck_id} has invalid status '{session_data['status']}' for HR upload")
+                return {'message': f"Invalid session status for HR upload: {session_data['status']}"}, 400
             
             # Insert heart rate samples (accept 'bpm' or 'heart_rate')
             def _normalize_ts(ts_val):

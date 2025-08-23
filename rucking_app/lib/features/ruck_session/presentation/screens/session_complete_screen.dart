@@ -195,8 +195,13 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           // Compute time-in-zones and snapshot
           List<({int min, int max, Color color, String name})>? zones;
           final authState = context.read<AuthBloc>().state;
-          if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
-            zones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+          if (authState is Authenticated) {
+            zones = HeartRateZoneService.zonesFromUserFields(
+              restingHr: authState.user.restingHr,
+              maxHr: authState.user.maxHr,
+              dateOfBirth: authState.user.dateOfBirth,
+              gender: authState.user.gender,
+            );
           }
           if (zones != null) {
             final dist = HeartRateZoneService.timeInZonesSeconds(samples: widget.heartRateSamples!, zones: zones);
@@ -1293,8 +1298,13 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             List<({int min, int max, Color color, String name})>? zones;
             try {
               final authState = context.read<AuthBloc>().state;
-              if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
-                zones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+              if (authState is Authenticated) {
+                zones = HeartRateZoneService.zonesFromUserFields(
+                  restingHr: authState.user.restingHr,
+                  maxHr: authState.user.maxHr,
+                  dateOfBirth: authState.user.dateOfBirth,
+                  gender: authState.user.gender,
+                );
               }
             } catch (_) {}
             if (zones == null) return const SizedBox.shrink();

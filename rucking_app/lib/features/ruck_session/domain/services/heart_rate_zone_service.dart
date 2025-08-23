@@ -24,6 +24,55 @@ class HeartRateZoneService {
     ];
   }
 
+  /// Infer zones using available user fields. If `restingHr` or `maxHr` are missing,
+  /// they are inferred using age (from `dateOfBirth`) and gender defaults.
+  /// Returns null if we still cannot compute sensible values.
+  static List<({int min, int max, Color color, String name})>? zonesFromUserFields({
+    int? restingHr,
+    int? maxHr,
+    String? dateOfBirth,
+    String? gender,
+  }) {
+    // Infer age from dateOfBirth (ISO 8601), fallback to 40 if unknown
+    int inferredAge = 40;
+    if (dateOfBirth != null && dateOfBirth.isNotEmpty) {
+      try {
+        final dob = DateTime.parse(dateOfBirth);
+        final now = DateTime.now();
+        int age = now.year - dob.year - ((now.month < dob.month || (now.month == dob.month && now.day < dob.day)) ? 1 : 0);
+        if (age.isFinite && age > 5 && age < 100) inferredAge = age;
+      } catch (_) {
+        // keep default age 40
+      }
+    }
+
+    // If maxHr is missing, infer via Tanaka (2001): 208 - 0.7*age
+    int inferredMax = maxHr ?? (208 - (0.7 * inferredAge)).round();
+
+    // If restingHr is missing, choose gender-weighted default
+    int inferredResting;
+    final g = (gender ?? '').toLowerCase();
+    if (restingHr != null) {
+      inferredResting = restingHr;
+    } else if (g == 'female' || g == 'woman' || g == 'f') {
+      inferredResting = 70; // slightly higher typical resting HR
+    } else if (g == 'male' || g == 'man' || g == 'm') {
+      inferredResting = 65;
+    } else {
+      inferredResting = 67;
+    }
+
+    // Sanity clamps
+    inferredResting = inferredResting.clamp(40, 90);
+    inferredMax = inferredMax.clamp(inferredResting + 10, 210);
+
+    try {
+      return zonesFromProfile(restingHr: inferredResting, maxHr: inferredMax);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Compute seconds spent in each zone based on consecutive sample intervals.
   /// Returns a map of zone name to seconds.
   static Map<String, int> timeInZonesSeconds({

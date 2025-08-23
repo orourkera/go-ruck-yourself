@@ -82,9 +82,18 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             return "--"
         }
         
+        // paceValue comes from Flutter in seconds per km
+        var adjustedPace = paceValue
+        
+        // If using imperial units, convert from seconds/km to seconds/mile
+        if !self.isMetric {
+            // Convert from seconds per km to seconds per mile (1 mile = 1.609344 km)
+            adjustedPace = paceValue * 1.609344
+        }
+        
         // Convert seconds to minutes:seconds format
-        let minutes = Int(paceValue) / 60
-        let seconds = Int(paceValue) % 60
+        let minutes = Int(adjustedPace) / 60
+        let seconds = Int(adjustedPace) % 60
         
         // Format as MM:SS (no unit since label will indicate it's pace)
         return String(format: "%d:%02d", minutes, seconds)

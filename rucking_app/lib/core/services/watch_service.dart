@@ -357,10 +357,7 @@ class WatchService {
         // Dispatch session completion event to ActiveSessionBloc
         if (activeBloc != null && currentState is ActiveSessionRunning) {
           AppLogger.info('[WATCH] Completing session from watch with ID: $sessionId');
-          activeBloc.add(SessionCompleted(
-            sessionId: int.parse(sessionId),
-            source: SessionActionSource.watch,
-          ));
+          activeBloc.add(const SessionCompleted());
         }
       }
       
