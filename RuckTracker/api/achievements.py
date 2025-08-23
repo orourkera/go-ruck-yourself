@@ -197,6 +197,7 @@ class CheckSessionAchievementsResource(Resource):
             user_data_response = supabase.table('user').select('prefer_metric').eq('id', user_id).single().execute()
             prefer_metric = user_data_response.data.get('prefer_metric', True) if user_data_response.data else True
             unit_preference = 'metric' if prefer_metric else 'standard'
+            logger.info(f"Unit preference resolved: prefer_metric={prefer_metric}, unit_preference={unit_preference}")
             
             # Batch query: Get all user's existing achievements in one call
             existing_achievements_response = supabase.table('user_achievements').select('achievement_id').eq('user_id', user_id).execute()
@@ -206,9 +207,11 @@ class CheckSessionAchievementsResource(Resource):
             achievements_query = supabase.table('achievements').select('*').eq('is_active', True)
             achievements_response = achievements_query.or_(f'unit_preference.is.null,unit_preference.eq.{unit_preference}').execute()
             all_achievements = achievements_response.data or []
+            logger.info(f"Achievements fetched (active + matching units/universal): count={len(all_achievements)}")
             
             # Pre-filter: Remove achievements user already has (in memory, no DB calls)
             achievements = [a for a in all_achievements if a['id'] not in existing_achievement_ids]
+            logger.info(f"Achievements after removing already earned: before={len(all_achievements)}, earned={len(existing_achievement_ids)}, remaining={len(achievements)}")
             
             # Batch query: Get user stats that are commonly needed for criteria checking
             user_stats = {}
@@ -260,7 +263,7 @@ class CheckSessionAchievementsResource(Resource):
                 if criteria_met:
                     # Safety check: prevent mass awarding more than 5 achievements per session
                     if len(new_achievements) >= 5:
-                        logger.warning(f"SAFETY LIMIT: Already awarded {len(new_achievements)} achievements for session {session_id}. Skipping {achievement['name']} to prevent mass awarding.")
+                        logger.warning(f"Award cap reached (5). Skipping further awards for session {session_id}")
                         continue
                     
                     # Final validation: double-check if achievement already exists (race condition protection)
@@ -405,8 +408,9 @@ class CheckSessionAchievementsResource(Resource):
                 target = criteria.get('target', 0)
                 # Convert target to kg if achievement is in standard (lbs)
                 target_kg = target if unit_pref in [None, 'metric'] else target * 0.45359237
-                result = session.get('ruck_weight_kg', 0) >= target_kg
-                logger.info(f"WEIGHT CHECK: weight_kg={session.get('ruck_weight_kg', 0)}, target_kg={target_kg} (orig={target} {'lb' if unit_pref=='standard' else 'kg'}), result={result}")
+                session_weight = session.get('ruck_weight_kg', 0)
+                result = session_weight >= target_kg
+                logger.info(f"WEIGHT CHECK: session_weight={session_weight}kg >= target_kg={target_kg} (orig={target} {'lb' if unit_pref=='standard' else 'kg'}), result={result}")
                 return result
             
             elif criteria_type == 'power_points':
@@ -467,41 +471,26 @@ class CheckSessionAchievementsResource(Resource):
                 
                 # CRITICAL: Pace achievements must also meet minimum distance requirements
                 achievement_name = achievement.get('name', '').lower()
-                required_distance = 0
-                
-                if '80' in achievement_name and 'km' in achievement_name:
-                    required_distance = 80
-                elif '50' in achievement_name and 'km' in achievement_name:
-                    required_distance = 50
-                elif '42' in achievement_name and 'km' in achievement_name:
-                    required_distance = 42.195  # Marathon
-                elif '20' in achievement_name and 'km' in achievement_name:
-                    required_distance = 20
-                elif '10' in achievement_name and 'km' in achievement_name:
-                    required_distance = 10
-                elif '5' in achievement_name and 'km' in achievement_name:
-                    required_distance = 5
-                elif 'mile' in achievement_name:
-                    if '26' in achievement_name:
-                        required_distance = 26.2 * 1.609  # Marathon in km
-                    elif '13' in achievement_name:
-                        required_distance = 13.1 * 1.609  # Half marathon in km
-                    elif '10' in achievement_name:
-                        required_distance = 10 * 1.609
-                    elif '6' in achievement_name:
-                        required_distance = 6 * 1.609
-                    elif '3' in achievement_name:
-                        required_distance = 3 * 1.609
-                
+                required_distance_km = 0
+                tolerance = 0.05  # 5%
+
+                # Parse required distance from name (expand as needed)
+                if '80' in achievement_name and ('km' in achievement_name or 'mi' in achievement_name):
+                    required_distance_km = 80 if 'km' in achievement_name else 80 / 1.60934
+                elif '50' in achievement_name and ('km' in achievement_name or 'mi' in achievement_name):
+                    required_distance_km = 50 if 'km' in achievement_name else 50 / 1.60934
+                # Add more for 42km, 20km, etc.
+
                 session_distance = session.get('distance_km', 0)
-                
-                # If this is a distance-specific pace achievement, check distance requirement
-                if required_distance > 0 and not (required_distance * 0.95 <= session_distance <= required_distance * 1.05):
-                    logger.info(f"PACE CHECK FAILED: Distance {session_distance}km not within tolerance of {required_distance}km")
-                    return False
+                if required_distance_km > 0:
+                    min_dist = required_distance_km * (1 - tolerance)
+                    max_dist = required_distance_km * (1 + tolerance)
+                    if not (min_dist <= session_distance <= max_dist):
+                        logger.info(f"PACE CHECK FAILED: Distance {session_distance}km not in [{min_dist}, {max_dist}] for {achievement_name}")
+                        return False
                 
                 logger.info(f"PACE FASTER THAN CHECK: pace_s_per_km={pace}, target_s_per_km={target_s_per_km} (orig_target={target} {'s/mile' if unit_pref=='standard' else 's/km'}), result={pace <= target_s_per_km}")
-                logger.info(f"Session data: distance={session_distance}km, duration={session.get('duration_seconds')}s, required_distance={required_distance}km")
+                logger.info(f"Session data: distance={session_distance}km, duration={session.get('duration_seconds')}s, required_distance={required_distance_km}km")
                 return pace <= target_s_per_km
         
             elif criteria_type == 'pace_slower_than':

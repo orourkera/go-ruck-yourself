@@ -27,11 +27,12 @@ class EventCommentsResource(Resource):
             current_user_id = get_user_id()
             admin_client = get_supabase_admin_client()
             
-            # Check if user can view comments (must be participant or creator)
+            # Check if user can view comments (must be participant in any status or creator)
             participant_check = admin_client.table('event_participants').select('status').eq('event_id', event_id).eq('user_id', current_user_id).execute()
             event_check = admin_client.table('events').select('creator_user_id').eq('id', event_id).execute()
             
-            is_participant = participant_check.data and participant_check.data[0]['status'] == 'approved'
+            # Allow viewing for any participant (approved or pending) or the event creator
+            is_participant = bool(participant_check.data)
             is_creator = event_check.data and event_check.data[0]['creator_user_id'] == current_user_id
             
             if not (is_participant or is_creator):

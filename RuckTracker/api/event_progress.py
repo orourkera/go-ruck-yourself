@@ -29,7 +29,7 @@ class EventProgressResource(Resource):
             
             logger.info(f"Getting progress for event {event_id}, user {current_user_id}")
             
-            # Check if user can view progress (must be participant or creator)
+            # Check if user can view progress (must be participant in any status or creator)
             participant_check = admin_client.table('event_participants').select('status').eq('event_id', event_id).eq('user_id', current_user_id).execute()
             event_check = admin_client.table('events').select('creator_user_id').eq('id', event_id).execute()
             
@@ -37,7 +37,8 @@ class EventProgressResource(Resource):
                 logger.warning(f"Event {event_id} not found")
                 return {'error': 'Event not found'}, 404
             
-            is_participant = participant_check.data and participant_check.data[0]['status'] == 'approved'
+            # Allow any participant (approved or pending) to view
+            is_participant = bool(participant_check.data)
             is_creator = event_check.data[0]['creator_user_id'] == current_user_id
             
             logger.info(f"User {current_user_id}: is_participant={is_participant}, is_creator={is_creator}")
