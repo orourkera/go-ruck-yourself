@@ -47,10 +47,48 @@
             background-color: var(--bs-danger);
             color: var(--bs-light);
         }
+
+        /* Decorative side images (Strava-like) */
+        .side-images {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0; /* behind main content */
+        }
+        .side-image {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            max-width: 28vw;
+            width: 420px;
+            opacity: 0.18;
+            filter: drop-shadow(0 8px 24px rgba(0,0,0,0.6));
+            transition: opacity .2s ease;
+        }
+        .side-image.left { left: 0; margin-left: -2vw; }
+        .side-image.right { right: 0; margin-right: -2vw; }
+        .side-image img { width: 100%; height: auto; border-radius: 16px; }
+
+        /* Raise stacking context for content */
+        .content-container { position: relative; z-index: 1; }
+
+        /* Hide on small screens */
+        @media (max-width: 992px) {
+            .side-image { display: none; }
+        }
     </style>
 </head>
 <body>
-    <div class="container my-5">
+    <!-- Decorative side images -->
+    <div class="side-images" aria-hidden="true">
+        <div class="side-image left">
+            <img src="{{ url_for('static', filename='images/blog/cool.jpg') }}" alt="" loading="lazy">
+        </div>
+        <div class="side-image right">
+            <img src="{{ url_for('static', filename='images/blog/ruckers.jpg') }}" alt="" loading="lazy">
+        </div>
+    </div>
+    <div class="container my-5 content-container">
         <header class="mb-5">
             <h1 class="display-4">Rucking App API</h1>
             <p class="lead">A RESTful API backend for a rucking app that allows tracking, analyzing, and storing workout data.</p>

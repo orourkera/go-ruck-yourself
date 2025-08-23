@@ -34,7 +34,7 @@ class ClubDeeplinkResource(Resource):
     <meta name="description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
     <meta name="author" content="Ruck App">
     <meta name="robots" content="index, follow">
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
@@ -63,7 +63,7 @@ class ClubDeeplinkResource(Resource):
             margin: 30px 0; 
         }
         .message h2 { 
-            font-family: 'Bangers', cursive;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 36px; 
             margin-bottom: 16px; 
             color: white;
@@ -166,7 +166,7 @@ class EventDeeplinkResource(Resource):
     <meta name="description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
     <meta name="author" content="Ruck App">
     <meta name="robots" content="index, follow">
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
@@ -192,7 +192,7 @@ class EventDeeplinkResource(Resource):
             margin: 0 auto; 
         }
         .logo { 
-            font-family: 'Bangers', cursive;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 48px; 
             margin-bottom: 20px; 
             color: white;
@@ -202,7 +202,7 @@ class EventDeeplinkResource(Resource):
             margin: 30px 0; 
         }
         .message h2 { 
-            font-family: 'Bangers', cursive;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 36px; 
             margin-bottom: 16px; 
             color: white;
