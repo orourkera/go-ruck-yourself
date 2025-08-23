@@ -17,6 +17,17 @@
   <link rel="canonical" href="https://getrucky.com/rucking-calorie-calculator" />
   <link rel="stylesheet" href="/static/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --brand-green: #00AA55;
+      --bg-offwhite: #FAF9F7;
+      --text: #111;
+      --content-max: 1200px;
+    }
+    body { background: var(--bg-offwhite) !important; color: var(--text) !important; }
+    .site-header { max-width: var(--content-max); margin: 24px auto 8px; padding: 0 16px; display: flex; align-items: center; height: 56px; }
+    .brand { color: var(--brand-green); font-weight: 800; font-size: 1.25rem; letter-spacing: .5px; text-decoration: none; }
+  </style>
   <meta property="og:title" content="Rucking Calorie Calculator" />
   <meta property="og:description" content="Compare rucking calories with Mechanical (Pandolf), MET-based, and HR-based methods." />
   <meta property="og:type" content="website" />
@@ -63,6 +74,9 @@
   </style>
 </head>
 <body>
+  <header class="site-header">
+    <a class="brand" href="/">RUCK</a>
+  </header>
   <main class="content-container">
     <header style="margin-bottom: 1rem;">
       <h1 style="margin-bottom: .25rem;">Rucking Calorie Calculator</h1>

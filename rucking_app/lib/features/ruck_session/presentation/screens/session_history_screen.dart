@@ -148,7 +148,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
           children: [
             CircularProgressIndicator(),
             SizedBox(width: 16),
-            Text('Deleting session...'),
+            Text('Loading session...'),
           ],
         ),
       ),

@@ -18,35 +18,48 @@
   <link rel="stylesheet" href="/static/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Strava Stories–style grid */
-    .content-container { padding-inline: 1rem; max-width: 1200px; margin-inline: auto; }
-    .subtitle { color: #aaa; }
-    .stories-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; }
-    .story-card { position: relative; grid-column: span 6; }
-    .story-card.featured { grid-column: 1 / -1; }
-    .story-link { display: block; color: inherit; text-decoration: none; }
-    .story-media { position: relative; overflow: hidden; border-radius: 16px; margin: 0; background: #111; }
-    .story-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    /* Aspect ratios */
-    .story-media::before { content: ""; display: block; padding-bottom: 66.666%; }
-    .story-card.featured .story-media::before { padding-bottom: 42.5%; }
-    .story-media > img, .story-media > picture { position: absolute; inset: 0; }
-    .story-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; gap: .35rem; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 80%); }
-    .story-tag { align-self: flex-start; background: rgba(255,255,255,.15); color: #fff; backdrop-filter: blur(2px); padding: .15rem .5rem; border-radius: 999px; font-size: .8rem; }
-    .story-title { margin: 0; font-size: clamp(1.1rem, 2vw, 1.5rem); line-height: 1.15; }
-    .story-card.featured .story-title { font-size: clamp(1.4rem, 3vw, 2rem); }
-    .story-meta { margin: 0; color: #ddd; font-size: .9rem; }
-    .story-excerpt { display: none; color: #eee; margin: 0; }
-    .story-card.featured .story-excerpt { display: block; }
-    /* Hover */
-    .story-media img { transition: transform .35s ease, opacity .35s ease; }
-    .story-card:hover .story-media img { transform: scale(1.04); opacity: .96; }
-    /* Responsive */
-    @media (max-width: 992px) {
-      .stories-grid { grid-template-columns: repeat(6, 1fr); }
-      .story-card { grid-column: 1 / -1; }
-      .story-card.featured .story-title { font-size: clamp(1.25rem, 4vw, 1.6rem); }
+    :root{
+      --brand-green: #00AA55; /* adjust if needed */
+      --bg-offwhite: #FAF9F7;
+      --text: #111;
+      --muted: #5A5A5A;
+      --content-max: 1200px;
+      --gap: 24px;
     }
+
+    /* Override site background/colors for blog index */
+    body { background: var(--bg-offwhite) !important; color: var(--text) !important; }
+
+    /* Header with left-aligned brand */
+    .site-header { max-width: var(--content-max); margin: 24px auto 8px; padding: 0 16px; display: flex; align-items: center; height: 56px; }
+    .brand { color: var(--brand-green); font-weight: 800; font-size: 1.25rem; letter-spacing: 0.5px; text-decoration: none; }
+
+    /* Container */
+    .content-container { padding-inline: 16px; max-width: var(--content-max); margin-inline: auto; }
+    .subtitle { color: var(--muted); margin: 4px 0 20px; }
+
+    /* Grid like Strava Stories */
+    .stories-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--gap); }
+    .story-card { grid-column: span 4; }
+    @media (max-width: 1024px) { .story-card { grid-column: span 6; } }
+    @media (max-width: 640px)  { .story-card { grid-column: span 12; } }
+
+    /* Card link */
+    .story-link { display: block; color: inherit; text-decoration: none; }
+
+    /* Image smaller, no rounded corners */
+    .story-media { position: relative; overflow: hidden; margin: 0; background: #eaeaea; }
+    .story-media::before { content: ""; display: block; padding-bottom: 56.25%; } /* 16:9 */
+    .story-media > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+
+    /* Text below image */
+    .story-text { margin-top: 10px; }
+    .story-title { margin: 0 0 6px; font-size: 1.1rem; line-height: 1.25; font-weight: 800; }
+    .story-meta { color: var(--muted); margin: 0 0 4px; font-size: .9rem; }
+    .story-excerpt { color: var(--muted); margin: 0; font-size: .95rem; line-height: 1.5; }
+
+    /* Remove any previous overlay styles if cached */
+    .story-overlay { display: none !important; }
   </style>
   <meta property="og:title" content="Ruck! Blog - Rucking Guides, Tips, and Training" />
   <meta property="og:description" content="Learn everything about rucking: how to start, how many calories you burn, ideal ruck weight, and whether rucking is better than running." />
@@ -75,15 +88,18 @@
 </script>
 </head>
 <body>
+  <header class="site-header">
+    <a class="brand" href="/">RUCK</a>
+  </header>
   <main class="content-container">
-    <header style="margin-bottom: 1rem;">
-      <h1 style="margin-bottom: .25rem;">Ruck! Blog</h1>
+    <header style="margin-bottom: 0.5rem;">
+      <h1 style="margin: 0;">Ruck! Blog</h1>
       <p class="subtitle">Actionable rucking guides, science-backed tips, and training advice.</p>
     </header>
 
     <section aria-label="Latest articles" class="stories-grid">
       {% for post in posts %}
-      <article class="story-card {% if loop.first %}featured{% endif %}">
+      <article class="story-card">
         <a class="story-link" href="/blog/{{ post.slug }}" aria-label="{{ post.title }}">
           <figure class="story-media">
             {% if post.image %}
@@ -91,20 +107,15 @@
             {% else %}
               <img src="{{ url_for('static', filename='images/blog/gear.jpg') }}" alt="{{ post.title }}" loading="lazy">
             {% endif %}
-            <figcaption class="story-overlay">
-              {% if post.tags and post.tags[0] %}
-                <span class="story-tag">#{{ post.tags[0] }}</span>
-              {% endif %}
-              <h2 class="story-title">{{ post.title }}</h2>
-              <p class="story-meta">
-                <time datetime="{{ post.date }}">{{ post.date[:10] }}</time>
-                · {{ post.read_time }} min read
-              </p>
-              {% if loop.first %}
-                <p class="story-excerpt">{{ post.description }}</p>
-              {% endif %}
-            </figcaption>
           </figure>
+          <div class="story-text">
+            <h2 class="story-title">{{ post.title }}</h2>
+            <p class="story-meta">
+              <time datetime="{{ post.date }}">{{ post.date[:10] }}</time>
+              · {{ post.read_time }} min read
+            </p>
+            <p class="story-excerpt">{{ post.description }}</p>
+          </div>
         </a>
       </article>
       {% endfor %}

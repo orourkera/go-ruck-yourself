@@ -17,6 +17,20 @@
   <link rel="canonical" href="https://getrucky.com/blog/{{ post.slug }}" />
   <link rel="stylesheet" href="/static/style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --brand-green: #00AA55;
+      --bg-offwhite: #FAF9F7;
+      --text: #111;
+      --muted: #5A5A5A;
+      --content-max: 1200px;
+    }
+    body { background: var(--bg-offwhite) !important; color: var(--text) !important; }
+    .site-header { max-width: var(--content-max); margin: 24px auto 8px; padding: 0 16px; display: flex; align-items: center; height: 56px; }
+    .brand { color: var(--brand-green); font-weight: 800; font-size: 1.25rem; letter-spacing: .5px; text-decoration: none; }
+    .content-container { max-width: 760px; margin: 24px auto 80px; padding: 24px; }
+    .prose img { width: 100%; height: auto; border-radius: 0 !important; display: block; }
+  </style>
   <meta property="og:title" content="{{ post.title }} - Ruck! Blog" />
   <meta property="og:description" content="{{ post.description }}" />
   <meta property="og:type" content="article" />
@@ -43,6 +57,9 @@
   </script>
 </head>
 <body>
+  <header class="site-header">
+    <a class="brand" href="/">RUCK</a>
+  </header>
   <main class="content-container">
     <article>
       <header style="margin-bottom: .75rem;">
