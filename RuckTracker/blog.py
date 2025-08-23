@@ -14,7 +14,7 @@ BLOG_POSTS = [
         "tags": ["rucking", "beginner", "fitness"],
         "read_time": 8,
         "template": "blog/posts/what-is-rucking.html",
-        "image": "images/blog/ruckers.jpg",
+        "image": "images/blog/more8.jpg",
     },
     {
         "slug": "rucking-vs-running",
@@ -69,7 +69,7 @@ BLOG_POSTS = [
         "tags": ["weighted vest", "ruck weight", "beginner"],
         "read_time": 6,
         "template": "blog/posts/beginner-weighted-vest-how-much-weight.html",
-        "image": "images/blog/lady.jpg",
+        "image": "images/blog/more6.jpg",
     },
     {
         "slug": "calories-weighted-vest-walking-vs-rucking",
@@ -80,7 +80,7 @@ BLOG_POSTS = [
         "tags": ["calories", "weighted vest", "metrics"],
         "read_time": 8,
         "template": "blog/posts/calories-weighted-vest-walking-vs-rucking.html",
-        "image": "images/blog/cool.jpg",
+        "image": "images/blog/more2.jpg",
     },
     {
         "slug": "rucking-and-knee-back-safety",
@@ -91,7 +91,7 @@ BLOG_POSTS = [
         "tags": ["injury prevention", "knees", "back"],
         "read_time": 7,
         "template": "blog/posts/rucking-and-knee-back-safety.html",
-        "image": "images/blog/girl.jpg",
+        "image": "images/blog/more10.jpg",
     },
     {
         "slug": "backpack-vs-weighted-vest-load-distribution",
@@ -102,7 +102,7 @@ BLOG_POSTS = [
         "tags": ["weighted vest", "rucking", "gear"],
         "read_time": 6,
         "template": "blog/posts/backpack-vs-weighted-vest-load-distribution.html",
-        "image": "images/blog/gear.jpg",
+        "image": "images/blog/more3.jpg",
     },
     {
         "slug": "best-pace-distance-weight-loss-rucking",
@@ -113,7 +113,7 @@ BLOG_POSTS = [
         "tags": ["weight loss", "training", "programming"],
         "read_time": 7,
         "template": "blog/posts/best-pace-distance-weight-loss-rucking.html",
-        "image": "images/blog/girl.jpg",
+        "image": "images/blog/more11.jpg",
     },
     {
         "slug": "weighted-vest-bone-density-evidence",
@@ -124,7 +124,7 @@ BLOG_POSTS = [
         "tags": ["bone density", "health", "older adults"],
         "read_time": 6,
         "template": "blog/posts/weighted-vest-bone-density-evidence.html",
-        "image": "images/blog/lady.jpg",
+        "image": "images/blog/more7.jpg",
     },
     {
         "slug": "rucking-gear-and-weighted-vest-gear",
@@ -135,7 +135,7 @@ BLOG_POSTS = [
         "tags": ["gear", "ruck", "weighted vest"],
         "read_time": 6,
         "template": "blog/posts/rucking-gear-and-weighted-vest-gear.html",
-        "image": "images/blog/gear.jpg",
+        "image": "images/blog/more4.jpg",
     },
     {
         "slug": "combine-rucking-with-running-strength",
@@ -168,7 +168,7 @@ BLOG_POSTS = [
         "tags": ["treadmill", "indoor", "workouts"],
         "read_time": 6,
         "template": "blog/posts/indoor-treadmill-vest-ruck-guide.html",
-        "image": "images/blog/lady.jpg",
+        "image": "images/blog/more9.jpg",
     },
     {
         "slug": "weighted-vest-form-and-fitting",
@@ -179,7 +179,7 @@ BLOG_POSTS = [
         "tags": ["fit", "technique", "gear"],
         "read_time": 5,
         "template": "blog/posts/weighted-vest-form-and-fitting.html",
-        "image": "images/blog/gear.jpg",
+        "image": "images/blog/more5.jpg",
     },
 ]
 

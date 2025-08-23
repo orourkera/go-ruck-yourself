@@ -4,12 +4,12 @@ import 'package:rucking_app/core/models/user.dart';
 
 /// Service for detecting AI Cheerleader triggers and assembling context
 class AICheerleaderService {
-  static const int _milestoneIntervalMeters = 1000; // Every 1km
-  static const int _timeCheckIntervalSeconds = 600; // Every 10 minutes
-  static const double _slowPaceThreshold = 0.7; // 70% of average pace = slow
-  static const int _minimumTriggerIntervalSeconds = 120; // Min 2 minutes between triggers
+  static const int _milestoneIntervalMeters = 2000; // Every 2km (reduced frequency)
+  static const int _timeCheckIntervalSeconds = 1200; // Every 20 minutes (reduced frequency)
+  static const double _slowPaceThreshold = 0.6; // 60% of average pace = slow (more conservative)
+  static const int _minimumTriggerIntervalSeconds = 240; // Min 4 minutes between triggers (reduced frequency)
   static const int _hrSpikeMinElapsedSeconds = 180; // Wait 3 minutes before HR analysis
-  static const int _hrSpikeCooldownSeconds = 300; // 5 minutes per HR spike
+  static const int _hrSpikeCooldownSeconds = 600; // 10 minutes per HR spike (reduced frequency)
   static const double _hrSpikePercent = 0.20; // 20% above baseline considered spike
   static const int _hrSpikeAbsoluteBpm = 150; // or absolute threshold
   
@@ -74,30 +74,34 @@ class AICheerleaderService {
   /// Check for distance milestone achievements
   CheerleaderTrigger? _checkDistanceMilestone(ActiveSessionRunning state) {
     final distanceKm = state.distanceKm;
-    
-    // First milestone at 1km
-    if (_lastDistance == null && distanceKm >= 1) {
-      _lastDistance = distanceKm;
-      return CheerleaderTrigger(
-        type: TriggerType.milestone,
-        data: {'distance': distanceKm, 'milestone': 1},
-      );
-    }
-    
-    // Subsequent milestones
-    if (_lastDistance != null) {
-      final lastMilestone = (_lastDistance! / 1).floor();
-      final currentMilestone = (distanceKm / 1).floor();
-      
-      if (currentMilestone > lastMilestone) {
+    final distanceMeters = distanceKm * 1000.0;
+    final interval = _milestoneIntervalMeters;
+
+    // Handle first milestone when interval reached (e.g., 2km)
+    if (_lastDistance == null) {
+      if (distanceMeters >= interval) {
         _lastDistance = distanceKm;
+        final currentMilestone = (distanceMeters ~/ interval);
         return CheerleaderTrigger(
           type: TriggerType.milestone,
           data: {'distance': distanceKm, 'milestone': currentMilestone},
         );
       }
+      return null;
     }
-    
+
+    // Subsequent milestones based on the configured interval
+    final lastMilestone = (((_lastDistance! * 1000).toInt()) ~/ interval);
+    final currentMilestone = (distanceMeters.toInt() ~/ interval);
+
+    if (currentMilestone > lastMilestone) {
+      _lastDistance = distanceKm;
+      return CheerleaderTrigger(
+        type: TriggerType.milestone,
+        data: {'distance': distanceKm, 'milestone': currentMilestone},
+      );
+    }
+
     return null;
   }
 
