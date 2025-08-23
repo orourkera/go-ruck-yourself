@@ -1024,15 +1024,34 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             const SizedBox(height: 16),
                             // Time-in-Zone distribution
                             Builder(builder: (context) {
-                              Map<String, int> distribution = timeInZones ?? {};
-                              if (distribution.isEmpty && safeHeartRateSamples.isNotEmpty && zones != null) {
-                                distribution = HeartRateZoneService.timeInZonesSeconds(samples: safeHeartRateSamples, zones: zones!);
+                              // Build samples and zones in this scope
+                              final List<HeartRateSample> samples = widget.session.heartRateSamples ?? [];
+                              List<({int min, int max, Color color, String name})>? localZones;
+                              try {
+                                if (widget.session.hrZoneSnapshot != null && widget.session.hrZoneSnapshot!.isNotEmpty) {
+                                  localZones = widget.session.hrZoneSnapshot!.map((z) => (
+                                    min: (z['min_bpm'] as num).toInt(),
+                                    max: (z['max_bpm'] as num).toInt(),
+                                    color: Color((z['color'] as num).toInt()),
+                                    name: (z['name'] as String?) ?? 'Z',
+                                  )).toList();
+                                } else {
+                                  final authState = context.read<AuthBloc>().state;
+                                  if (authState is Authenticated && authState.user.restingHr != null && authState.user.maxHr != null) {
+                                    localZones = HeartRateZoneService.zonesFromProfile(restingHr: authState.user.restingHr!, maxHr: authState.user.maxHr!);
+                                  }
+                                }
+                              } catch (_) {}
+
+                              Map<String, int> distribution = widget.session.timeInZones ?? {};
+                              if (distribution.isEmpty && samples.isNotEmpty && localZones != null) {
+                                distribution = HeartRateZoneService.timeInZonesSeconds(samples: samples, zones: localZones!);
                               }
                               if (distribution.isEmpty) return const SizedBox.shrink();
                               final total = distribution.values.fold<int>(0, (sum, v) => sum + v);
                               if (total <= 0) return const SizedBox.shrink();
                               final zoneOrder = ['Z1','Z2','Z3','Z4','Z5'];
-                              final zoneMap = {for (final z in zones ?? []) z.name: z};
+                              final zoneMap = {for (final z in (localZones ?? [])) z.name: z};
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [

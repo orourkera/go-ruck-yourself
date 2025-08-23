@@ -31,6 +31,7 @@ import 'managers/memory_pressure_manager.dart';
 import 'models/manager_states.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 
 /// Main coordinator that orchestrates all session managers
 class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionState> {

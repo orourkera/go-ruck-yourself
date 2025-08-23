@@ -324,7 +324,7 @@ class _HeartRateTile extends StatelessWidget {
 
   const _HeartRateTile({Key? key, required this.preferMetric, this.isCardLayout = false}) : super(key: key);
 
-  Color _determineHrColor(int bpm) {
+  Color _determineHrColor(BuildContext context, int bpm) {
     try {
       final authState = context.read<AuthBloc>().state;
       if (authState is Authenticated) {
@@ -358,7 +358,7 @@ class _HeartRateTile extends StatelessWidget {
         final int currentBpm = latestHeartRate ?? 0;
         if (!isCardLayout) {
           if (currentBpm > 0) {
-            return _StatTile(label: 'HR', value: '$currentBpm bpm', color: _determineHrColor(currentBpm));
+            return _StatTile(label: 'HR', value: '$currentBpm bpm', color: _determineHrColor(context, currentBpm));
           }
           return const SizedBox.shrink();
         }
