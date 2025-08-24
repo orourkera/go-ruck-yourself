@@ -1526,10 +1526,25 @@ class RuckSessionHeartRateChunkResource(Resource):
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
+            current_status = session_data['status']
+            
+            # Auto-start session if it's in 'created' status and receiving first HR data
+            if current_status == 'created':
+                logger.info(f"Auto-starting session {ruck_id} on first HR data upload")
+                try:
+                    supabase.table('ruck_session').update({
+                        'status': 'in_progress',
+                        'started_at': datetime.now(tz.tzutc()).isoformat(),
+                    }).eq('id', ruck_id).execute()
+                    current_status = 'in_progress'
+                except Exception as e:
+                    logger.error(f"Failed to auto-start session {ruck_id} for HR: {e}")
+                    return {'message': f"Failed to start session for HR: {str(e)}"}, 500
+            
             # Allow HR samples for both in-progress and completed sessions
-            if session_data['status'] not in ('in_progress', 'completed'):
-                logger.warning(f"[HR_CHUNK] Session {ruck_id} has invalid status '{session_data['status']}' for HR upload")
-                return {'message': f"Invalid session status for HR upload: {session_data['status']}"}, 400
+            if current_status not in ('in_progress', 'completed'):
+                logger.warning(f"[HR_CHUNK] Session {ruck_id} has invalid status '{current_status}' for HR upload")
+                return {'message': f"Invalid session status for HR upload: {current_status}"}, 400
             
             # Insert heart rate samples (accept 'bpm' or 'heart_rate')
             def _normalize_ts(ts_val):
