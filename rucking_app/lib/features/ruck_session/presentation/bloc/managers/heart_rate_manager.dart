@@ -370,24 +370,33 @@ class HeartRateManager implements SessionManager {
   }
   
   /// Process heart rate upload queue
-  /// Note: Heart rate uploads are now handled by the ActiveSessionBloc which
-  /// periodically sends HeartRateBatchUploadRequested events to the coordinator.
-  /// This method is kept for compatibility but mainly handles local state.
   void _processHeartRateUploadQueue() {
     if (_pendingHeartRateUploads.isEmpty || _activeSessionId == null) return;
     
     final batch = _pendingHeartRateUploads.toList();
     _pendingHeartRateUploads.clear();
     
-    AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_QUEUE: Processing batch of ${batch.length} heart rate samples (local state only)');
+    AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_QUEUE: Processing batch of ${batch.length} heart rate samples');
     
-    // Mark as uploaded locally - actual server upload is handled by ActiveSessionBloc
+    // Convert to HeartRateSample objects for the upload request
+    final samples = batch.map((sample) {
+      final timestamp = DateTime.tryParse(sample['timestamp'] as String) ?? DateTime.now();
+      return HeartRateSample(
+        bpm: sample['bpm'] as int,
+        timestamp: timestamp,
+      );
+    }).toList();
+    
+    // Send HeartRateBatchUploadRequested event to trigger actual upload
+    _emitEvent(HeartRateBatchUploadRequested(samples: samples));
+    
+    // Mark as uploaded locally
     _onHeartRateUploadSuccess(batch.length);
     
     // Update tracking indices
     _lastUploadedSampleIndex = _heartRateSamples.length;
     
-    AppLogger.info('[HEART_RATE_MANAGER] Heart rate batch marked as processed locally');
+    AppLogger.info('[HEART_RATE_MANAGER] Heart rate batch sent for upload to backend');
   }
   
   /// Handle successful heart rate upload
@@ -468,6 +477,19 @@ class HeartRateManager implements SessionManager {
   Future<void> clearCrashRecoveryData() async {
     // No-op: This manager doesn't handle crash recovery data
     return;
+  }
+  
+  /// Emit events to the parent bloc
+  void Function(ActiveSessionEvent)? _eventEmitter;
+  
+  /// Set the event emitter callback
+  void setEventEmitter(void Function(ActiveSessionEvent) emitter) {
+    _eventEmitter = emitter;
+  }
+  
+  /// Emit an event to the parent bloc
+  void _emitEvent(ActiveSessionEvent event) {
+    _eventEmitter?.call(event);
   }
   
   // Getters for other managers

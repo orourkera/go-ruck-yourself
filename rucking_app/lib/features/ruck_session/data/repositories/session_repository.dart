@@ -138,6 +138,37 @@ class SessionRepository {
   SessionRepository({required ApiClient apiClient})
       : _apiClient = apiClient;
 
+  /// Upload heart rate samples for a session
+  Future<bool> uploadHeartRateSamples(String sessionId, List<Map<String, dynamic>> samples) async {
+    try {
+      if (samples.isEmpty) {
+        AppLogger.debug('[HEARTRATE UPLOAD] No samples to upload');
+        return true;
+      }
+
+      AppLogger.info('[HEARTRATE UPLOAD] Uploading ${samples.length} heart rate samples for session: $sessionId');
+      
+      final payload = {
+        'heart_rate_samples': samples,
+      };
+      
+      // Use the heart-rate-chunk endpoint for batch uploads
+      final response = await _apiClient.post('/rucks/$sessionId/heart-rate-chunk', payload);
+      
+      if (response != null) {
+        AppLogger.info('[HEARTRATE UPLOAD] Successfully uploaded ${samples.length} heart rate samples');
+        return true;
+      } else {
+        AppLogger.error('[HEARTRATE UPLOAD] Failed to upload heart rate samples - null response');
+        return false;
+      }
+      
+    } catch (e) {
+      AppLogger.error('[HEARTRATE UPLOAD] Error uploading heart rate samples: $e');
+      return false;
+    }
+  }
+
   /// Fetch heart rate samples for a session by its ID.
   /// This method specifically requests heart rate data from the server.
   /// Uses caching to avoid hitting rate limits (50 per hour).

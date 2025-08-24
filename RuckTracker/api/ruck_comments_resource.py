@@ -174,20 +174,25 @@ class RuckCommentsResource(Resource):
                     ruck_owner_id = ruck_response.data[0]['user_id']
                     users_to_notify.add(ruck_owner_id)
                 
-                # Get all previous commenters on this ruck (excluding current commenter)
+                # Get all previous commenters on this ruck (excluding current commenter and the just-created comment)
                 # Limit to 50 most recent to avoid timeout on popular rucks
                 previous_comments = supabase.table('ruck_comments') \
                     .select('user_id') \
                     .eq('ruck_id', ruck_id) \
                     .neq('user_id', user_id) \
+                    .neq('id', created_comment['id']) \
                     .order('created_at', desc=True) \
                     .limit(50) \
                     .execute()
                 
                 if previous_comments.data:
                     # Add all unique commenters to notification list
+                    logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Found {len(previous_comments.data)} previous commenters")
                     for comment in previous_comments.data:
                         users_to_notify.add(comment['user_id'])
+                        logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Added previous commenter {comment['user_id']} to notification list")
+                else:
+                    logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: No previous commenters found")
                 
                 # Get all users who liked this ruck (excluding current commenter)
                 # Limit to 100 most recent to avoid timeout on popular rucks
@@ -201,15 +206,21 @@ class RuckCommentsResource(Resource):
                 
                 if ruck_likes.data:
                     # Add all users who liked the ruck to notification list
+                    logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Found {len(ruck_likes.data)} previous likers")
                     for like in ruck_likes.data:
                         users_to_notify.add(like['user_id'])
+                        logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Added previous liker {like['user_id']} to notification list")
+                else:
+                    logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: No previous likers found")
                 
                 # Send notifications to all users who should be notified
+                logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Final users_to_notify set: {list(users_to_notify)}")
                 if users_to_notify:
                     commenter_name = user_profile['username']
                     
                     # Send push notification
-                    logger.info(f"🔔 PUSH NOTIFICATION: Notifying {len(users_to_notify)} users about new comment")
+                    logger.info(f"🔔 PUSH NOTIFICATION: Notifying {len(users_to_notify)} users about new comment from {commenter_name} on ruck {ruck_id}")
+                    logger.info(f"🔔 PUSH NOTIFICATION: User IDs to notify: {list(users_to_notify)}")
                     
                     device_tokens = get_user_device_tokens(list(users_to_notify))
                     logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens")
@@ -222,6 +233,9 @@ class RuckCommentsResource(Resource):
                             ruck_id=ruck_id,
                             comment_id=str(created_comment['id'])
                         )
+                else:
+                    logger.warning(f"🔔 COMMENT NOTIFICATION DEBUG: No users to notify for comment on ruck {ruck_id} by {user_profile.get('username', 'unknown')}")
+                    
                 # Notify other prior participants (likers) besides commenters and owner
                 try:
                     participant_ids = set()

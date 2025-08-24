@@ -324,7 +324,7 @@ class _HeartRateTile extends StatelessWidget {
 
   const _HeartRateTile({Key? key, required this.preferMetric, this.isCardLayout = false}) : super(key: key);
 
-  Color _determineHrColor(BuildContext context, int bpm) {
+  ({Color color, String zone}) _determineHrColorAndZone(BuildContext context, int bpm) {
     try {
       final authState = context.read<AuthBloc>().state;
       if (authState is Authenticated) {
@@ -332,17 +332,18 @@ class _HeartRateTile extends StatelessWidget {
         if (user.restingHr != null && user.maxHr != null && user.maxHr! > user.restingHr!) {
           final zones = HeartRateZoneService.zonesFromProfile(restingHr: user.restingHr!, maxHr: user.maxHr!);
           for (final z in zones) {
-            if (bpm >= z.min && bpm <= z.max) return z.color;
+            if (bpm >= z.min && bpm <= z.max) return (color: z.color, zone: z.name);
           }
-          // Fallback to nearest zone color
-          if (bpm < zones.first.min) return zones.first.color;
-          return zones.last.color;
+          // Fallback to nearest zone
+          if (bpm < zones.first.min) return (color: zones.first.color, zone: zones.first.name);
+          return (color: zones.last.color, zone: zones.last.name);
         }
       }
     } catch (_) {}
-    if (bpm < 100) return AppColors.success;
-    if (bpm < 140) return AppColors.warning;
-    return AppColors.error;
+    // Fallback zones without user profile
+    if (bpm < 100) return (color: AppColors.success, zone: 'Z1');
+    if (bpm < 140) return (color: AppColors.warning, zone: 'Z3');
+    return (color: AppColors.error, zone: 'Z5');
   }
 
   @override
@@ -358,7 +359,12 @@ class _HeartRateTile extends StatelessWidget {
         final int currentBpm = latestHeartRate ?? 0;
         if (!isCardLayout) {
           if (currentBpm > 0) {
-            return _StatTile(label: 'HR', value: '$currentBpm bpm', color: _determineHrColor(context, currentBpm));
+            final hrData = _determineHrColorAndZone(context, currentBpm);
+            return _StatTile(
+              label: 'HR', 
+              value: '$currentBpm bpm • ${hrData.zone}', 
+              color: hrData.color
+            );
           }
           return const SizedBox.shrink();
         }
