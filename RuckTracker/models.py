@@ -145,7 +145,9 @@ class RuckSession(db.Model):
         }
         if include_points:
             result['location_points'] = [point.to_dict() for point in self.location_points]
-            result['heart_rate_samples'] = [sample.to_dict() for sample in self.heart_rate_samples]
+        
+        # Always include heart rate samples for heart rate widget functionality
+        result['heart_rate_samples'] = [sample.to_dict() for sample in self.heart_rate_samples]
         return result
 
 
