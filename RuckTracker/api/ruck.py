@@ -1054,10 +1054,38 @@ class RuckSessionCompleteResource(Resource):
             if 'calorie_method' in data and data['calorie_method'] in ['fusion','mechanical','hr']:
                 update_data['calorie_method'] = data['calorie_method']
             # Heart rate zones: snapshot of thresholds and per-zone time (seconds)
-            if 'hr_zone_snapshot' in data and isinstance(data['hr_zone_snapshot'], dict):
+            if 'hr_zone_snapshot' in data and isinstance(data['hr_zone_snapshot'], (dict, list)):
                 update_data['hr_zone_snapshot'] = data['hr_zone_snapshot']
+                logger.info(f"[HR_ZONES] Saving hr_zone_snapshot for session {ruck_id}: {data['hr_zone_snapshot']}")
             if 'time_in_zones' in data and isinstance(data['time_in_zones'], dict):
                 update_data['time_in_zones'] = data['time_in_zones']
+                logger.info(f"[HR_ZONES] Saving time_in_zones for session {ruck_id}: {data['time_in_zones']}")
+                
+                # If we have time_in_zones but no hr_zone_snapshot, try to reconstruct zones from user profile
+                if 'hr_zone_snapshot' not in data or not data['hr_zone_snapshot']:
+                    try:
+                        user_resp = supabase.table('user_profile').select('resting_hr, max_hr, date_of_birth, gender').eq('id', g.user.id).single().execute()
+                        if user_resp.data:
+                            user_data = user_resp.data
+                            if user_data.get('resting_hr') and user_data.get('max_hr'):
+                                # Calculate zones using the same logic as Flutter
+                                from datetime import datetime
+                                resting_hr = user_data['resting_hr']
+                                max_hr = user_data['max_hr']
+                                
+                                # Basic 5-zone calculation
+                                hr_reserve = max_hr - resting_hr
+                                zones = [
+                                    {'name': 'Z1', 'min_bpm': resting_hr, 'max_bpm': int(resting_hr + hr_reserve * 0.6), 'color': 0xFF81C784},
+                                    {'name': 'Z2', 'min_bpm': int(resting_hr + hr_reserve * 0.6), 'max_bpm': int(resting_hr + hr_reserve * 0.7), 'color': 0xFF4FC3F7},
+                                    {'name': 'Z3', 'min_bpm': int(resting_hr + hr_reserve * 0.7), 'max_bpm': int(resting_hr + hr_reserve * 0.8), 'color': 0xFFFFB74D},
+                                    {'name': 'Z4', 'min_bpm': int(resting_hr + hr_reserve * 0.8), 'max_bpm': int(resting_hr + hr_reserve * 0.9), 'color': 0xFFFF8A65},
+                                    {'name': 'Z5', 'min_bpm': int(resting_hr + hr_reserve * 0.9), 'max_bpm': max_hr, 'color': 0xFFE57373}
+                                ]
+                                update_data['hr_zone_snapshot'] = zones
+                                logger.info(f"[HR_ZONES] Reconstructed hr_zone_snapshot for session {ruck_id} from user profile")
+                    except Exception as zone_err:
+                        logger.warning(f"[HR_ZONES] Could not reconstruct hr_zone_snapshot for session {ruck_id}: {zone_err}")
             if 'elevation_gain_m' in data:
                 update_data['elevation_gain_m'] = data['elevation_gain_m']
             if 'elevation_loss_m' in data:
