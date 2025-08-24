@@ -146,7 +146,7 @@ class HeartRateService {
     
     _watchHeartRateSubscription = _watchService.onHeartRateUpdate.listen(
       (heartRate) {
-        AppLogger.info('HeartRateService: Raw heart rate from watch: $heartRate');
+        AppLogger.debug('HeartRateService: [HR_DEBUG] Raw heart rate from watch: $heartRate');
         // Validate heart rate before processing
         if (heartRate <= 0) {
           AppLogger.warning('HeartRateService: Invalid heart rate received from watch: $heartRate');

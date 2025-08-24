@@ -188,16 +188,14 @@ class HeartRateManager implements SessionManager {
           if (sample.bpm > 0) {
             _heartRateSampleObjects.add(sample);
             
+            // CRITICAL FIX: Emit HeartRateUpdated event to trigger UI updates
+            _emitEvent(HeartRateUpdated(heartRate: sample.bpm, timestamp: sample.timestamp));
+            
             // CRITICAL FIX: Trigger frequent uploads for crash resilience
             _triggerHeartRateUploadIfNeeded();
             
             // Manage memory pressure for sample objects
             _manageHeartRateMemoryPressure();
-            
-            handleEvent(HeartRateUpdated(
-              heartRate: sample.bpm,
-              timestamp: sample.timestamp,
-            ));
           }
         },
         onError: (error) {

@@ -100,51 +100,28 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     }
     
     func startSession() {
-        // Leave status as "--" for cleaner UI
-        
-        // Set up heart rate handler to send heart rate updates to the phone
-        workoutManager.setHeartRateHandler { [weak self] (heartRate: Double) in
-            guard let self = self else { return }
-            // Update UI with heart rate
-            DispatchQueue.main.async {
-                self.heartRate = Int(heartRate)
-            }
-            // Send heart rate to iOS app silently
-            self.sendHeartRate(heartRate)
-        }
-        
-        // Request HealthKit permissions
-        workoutManager.requestAuthorization { success, error in
-            if success {
-                // HealthKit authorization successful
-                // Start workout session to get heart rate
-                DispatchQueue.main.async {
-                    self.workoutManager.startWorkout { error in
-                        if let error = error {
-                            print("[WATCH] Failed to start workout: \(error.localizedDescription)")
-                        } else {
-                            // Workout session started successfully
-                            print("[WATCH] Workout started successfully, setting isSessionActive = true")
-                            
-                            // CRITICAL: Set session as active to show pause/stop buttons
-                            self.isSessionActive = true
-                            self.isPaused = false
-                            
-                            // Send start payload with timestamp for backfill
-                            let startTs = Date().timeIntervalSince1970
-                            let payload: [String: Any] = [
-                                "command": "startSessionFromWatch",
-                                "startedAt": startTs,
-                                "tempId": UUID().uuidString,
-                                "ruckWeightKg": self.lastRuckWeightKg,
-                                "userWeightKg": self.lastUserWeightKg
-                            ]
-                            self.sendMessage(payload)
-                        }
-                    }
-                }
-            } else if let error = error {
-                print("[ERROR] HealthKit authorization failed: \(error.localizedDescription)")
+        // Start workout session (permissions already requested in init)
+        workoutManager.startWorkout { error in
+            if let error = error {
+                print("[WATCH] Failed to start workout: \(error.localizedDescription)")
+            } else {
+                // Workout session started successfully
+                print("[WATCH] Workout started successfully")
+                
+                // CRITICAL: Set session as active to show pause/stop buttons
+                self.isSessionActive = true
+                self.isPaused = false
+                
+                // Send start payload with timestamp for backfill
+                let startTs = Date().timeIntervalSince1970
+                let payload: [String: Any] = [
+                    "command": "startSessionFromWatch",
+                    "startedAt": startTs,
+                    "tempId": UUID().uuidString,
+                    "ruckWeightKg": self.lastRuckWeightKg,
+                    "userWeightKg": self.lastUserWeightKg
+                ]
+                self.sendMessage(payload)
             }
         }
     }
@@ -164,6 +141,32 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
         // Ensure we receive callbacks when the workout ends
         workoutManager.delegate = self
+        
+        // Request HealthKit permissions immediately when app opens
+        // This ensures we're ready for heart rate monitoring when sessions start from phone
+        requestHealthKitPermissions()
+    }
+    
+    private func requestHealthKitPermissions() {
+        // Set up heart rate handler first
+        workoutManager.setHeartRateHandler { [weak self] (heartRate: Double) in
+            guard let self = self else { return }
+            // Update UI with heart rate
+            DispatchQueue.main.async {
+                self.heartRate = Int(heartRate)
+            }
+            // Send heart rate to iOS app
+            self.sendHeartRate(heartRate)
+        }
+        
+        // Request HealthKit permissions
+        workoutManager.requestAuthorization { success, error in
+            if success {
+                // HealthKit authorization successful - ready for heart rate monitoring
+            } else if let error = error {
+                print("[WATCH] HealthKit authorization failed: \(error.localizedDescription)")
+            }
+        }
     }
     
     func sendMessage(_ message: [String: Any]) {
@@ -367,24 +370,17 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 processSessionStartAlert(message)
                 
             case "startSession", "workoutStarted":
-                print("[SessionManager] Received workoutStarted command")
-                print("[SessionManager] Full message received: \(message)")
-                print("[SessionManager] isMetric from message: \(message["isMetric"] ?? "NOT_FOUND")")
-                
                 // Start the session if not already active
                 if !isSessionActive {
                     // Check for unit preference in the message
                     if let unitPref = message["isMetric"] as? Bool {
                         self.isMetric = unitPref
-                        print("Setting unit preference to \(unitPref ? "metric" : "standard")")
-                        print("[SessionManager] Set isMetric to: \(self.isMetric)")
                     } else {
                         // Default to metric if not specified
                         self.isMetric = true
-                        print("[SessionManager] Defaulted isMetric to: \(self.isMetric) (value not found or wrong type)")
                     }
                     
-                    // Starting session from phone command
+                    // Starting session from phone command - need to start HealthKit workout
                     DispatchQueue.main.async {
                         self.isSessionActive = true
                         self.isPaused = false

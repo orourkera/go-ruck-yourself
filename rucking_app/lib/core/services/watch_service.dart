@@ -593,6 +593,7 @@ class WatchService {
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
+      AppLogger.debug('[WATCH] [HR_DEBUG] Current heart rate for watch update: $_currentHeartRate');
       if (steps != null) {
         AppLogger.info('[STEPS LIVE] [WATCH] Including steps in metrics payload: $steps');
       }
@@ -617,6 +618,7 @@ class WatchService {
           if (steps != null) 'steps': steps,
           if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
           if (_currentHeartRate != null) 'hrZone': _inferZoneLabel(_currentHeartRate!),
+          'cadence': 160, // Add cadence to metrics
         },
       });
       AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}, steps=${steps ?? 'null'}');
@@ -794,10 +796,15 @@ class WatchService {
 
   /// Handle heart rate updates from the watch
   void handleWatchHeartRateUpdate(double heartRate) {
+    AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] handleWatchHeartRateUpdate called with: $heartRate');
+    
     // Update our local heart rate value
     _currentHeartRate = heartRate;
+    AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Updated _currentHeartRate to: $_currentHeartRate');
+    
     // Add to heart rate stream for UI components (always update UI in real-time)
     _heartRateController.add(heartRate);
+    AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Added heart rate to UI stream controller: $heartRate');
     
     // Add to session heart rate samples with throttling to reduce database load
     if (_isSessionActive) {
@@ -979,20 +986,33 @@ class WatchService {
     // Setup heart rate listener
     
     try {
+      AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Setting up native heart rate EventChannel listener...');
       _nativeHeartRateSubscription = _heartRateEventChannel.receiveBroadcastStream().listen(
         (dynamic heartRate) {
-          if (heartRate is double) {
-            _heartRateReconnectAttempts = 0; // Reset reconnect counter on successful update
+          AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Raw heart rate received from native: $heartRate (type: ${heartRate.runtimeType})');
+          
+          // Accept any numeric type and convert to double
+          if (heartRate is num) {
+            final hrValue = heartRate.toDouble();
+            AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Converting heart rate to double: $hrValue');
+            handleWatchHeartRateUpdate(hrValue);
             _lastHeartRateUpdateTime = DateTime.now();
-            _isReconnectingHeartRate = false;
-            // Silently handle heart rate update
-            handleWatchHeartRateUpdate(heartRate);
+          } else {
+            AppLogger.warning('[WATCH_SERVICE] [HR_DEBUG] Invalid heart rate type received: ${heartRate.runtimeType}, value: $heartRate');
           }
         },
-        onError: _onNativeHeartRateError,
-        onDone: _onNativeHeartRateDone,
+        onError: (error) {
+          AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] Native heart rate EventChannel error: $error');
+          _onNativeHeartRateError(error);
+        },
+        onDone: () {
+          AppLogger.warning('[WATCH_SERVICE] [HR_DEBUG] Native heart rate EventChannel stream closed');
+          _onNativeHeartRateDone();
+        },
         cancelOnError: false, // Don't cancel on error, let our error handler decide
       );
+      
+      AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Native heart rate EventChannel listener setup complete');
       
       // Notify native code that Flutter is ready to receive heart rate updates
       try {

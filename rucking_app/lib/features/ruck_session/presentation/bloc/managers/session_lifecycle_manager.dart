@@ -576,9 +576,13 @@ class SessionLifecycleManager implements SessionManager {
       // CRITICAL: Validate session exists in backend before recovery
       try {
         AppLogger.info('[RECOVERY] Validating session $sessionId exists in backend...');
-        final response = await _apiClient.get('/rucks/$sessionId');
-        if (response.statusCode != 200) {
-          throw Exception('Session validation failed: ${response.statusCode}');
+        final resp = await _apiClient.get('/rucks/$sessionId');
+        // ApiClient throws on non-2xx. If we reach here, just sanity-check shape.
+        if (resp == null) {
+          throw Exception('Session validation failed: null response');
+        }
+        if (resp is Map && resp.isEmpty) {
+          throw Exception('Session validation failed: empty payload');
         }
         AppLogger.info('[RECOVERY] ✅ Session $sessionId validated in backend');
       } catch (e) {

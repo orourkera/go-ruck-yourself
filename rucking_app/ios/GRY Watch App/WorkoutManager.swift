@@ -64,13 +64,35 @@ public class WorkoutManager: NSObject {
             self.workoutSession = session
             self.workoutBuilder = builder
             
-            // Start the workout session and builder
+            // Start the workout session first
             session.startActivity(with: Date())
+            
+            // Then start data collection
             builder.beginCollection(withStart: Date()) { (success, error) in
+                if success {
+                    // Force heart rate data collection to start immediately
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        // Manually trigger data collection check
+                        self.requestHeartRateUpdate()
+                    }
+                }
                 completion(error)
             }
         } catch {
             completion(error)
+        }
+    }
+    
+    // Force request heart rate update
+    private func requestHeartRateUpdate() {
+        guard let builder = workoutBuilder else { return }
+        
+        // Check if we have any heart rate data available
+        if let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+           let statistics = builder.statistics(for: heartRateType),
+           let mostRecent = statistics.mostRecentQuantity() {
+            let heartRate = mostRecent.doubleValue(for: HKUnit(from: "count/min"))
+            heartRateHandler?(heartRate)
         }
     }
     
@@ -140,15 +162,32 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
 // MARK: - HKLiveWorkoutBuilderDelegate
 extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
     public func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        print("[WORKOUT_MANAGER] didCollectDataOf called with types: \(collectedTypes)")
+        
         for type in collectedTypes {
+            print("[WORKOUT_MANAGER] Processing collected type: \(type)")
+            
             guard let quantityType = type as? HKQuantityType,
-                  let statistics = workoutBuilder.statistics(for: quantityType) else { continue }
+                  let statistics = workoutBuilder.statistics(for: quantityType) else { 
+                print("[WORKOUT_MANAGER] Failed to get quantityType or statistics for type: \(type)")
+                continue 
+            }
             
             // Handle heart rate data
             if quantityType == HKQuantityType.quantityType(forIdentifier: .heartRate) {
-                if let value = statistics.mostRecentQuantity()?.doubleValue(for: HKUnit(from: "count/min")),
-                   let handler = heartRateHandler {
-                    handler(value)
+                print("[WORKOUT_MANAGER] Processing heart rate data...")
+                
+                if let value = statistics.mostRecentQuantity()?.doubleValue(for: HKUnit(from: "count/min")) {
+                    print("[WORKOUT_MANAGER] Got heart rate value: \(value) BPM")
+                    
+                    if let handler = heartRateHandler {
+                        print("[WORKOUT_MANAGER] Calling heart rate handler with value: \(value)")
+                        handler(value)
+                    } else {
+                        print("[WORKOUT_MANAGER] ERROR: Heart rate handler is nil!")
+                    }
+                } else {
+                    print("[WORKOUT_MANAGER] No recent heart rate quantity available")
                 }
             }
         }

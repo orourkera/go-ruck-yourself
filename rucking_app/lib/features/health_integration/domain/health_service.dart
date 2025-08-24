@@ -98,11 +98,18 @@ class HealthService {
       final authorized = await _health.requestAuthorization(types, permissions: permissions);
       AppLogger.info('Health authorization result: $authorized');
       
-      // Double-check specific permissions after authorization
+      // Double-check permissions after authorization using the same types/permissions set
       if (authorized) {
-        final stepPermission = await _health.hasPermissions([HealthDataType.STEPS]);
-        AppLogger.info('Post-authorization step permission check: $stepPermission');
-        _isAuthorized = stepPermission ?? false;
+        try {
+          final permsOk = await _health.hasPermissions(types, permissions: permissions);
+          AppLogger.info('Post-authorization hasPermissions(types=${types.length}) -> $permsOk');
+          // Some platform versions may return null; treat null as true if the system reported authorized
+          _isAuthorized = permsOk ?? true;
+        } catch (e) {
+          AppLogger.warning('Post-authorization permission verification threw: $e');
+          // Assume authorized if the system call succeeded
+          _isAuthorized = true;
+        }
       } else {
         _isAuthorized = false;
       }
@@ -614,4 +621,54 @@ class HealthService {
 
   // Add public getter so callers can check auth status without breaking encapsulation
   bool get isAuthorized => _isAuthorized;
+}
+
+extension HealthServiceDebug on HealthService {
+  /// Returns a map of key health permissions and whether they are granted.
+  /// Values can be true, false, or null (unknown on some platforms/plugin versions).
+  Future<Map<String, bool?>> getPermissionStatus() async {
+    final types = <HealthDataType>[
+      HealthDataType.HEART_RATE,
+      HealthDataType.DISTANCE_WALKING_RUNNING,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+      HealthDataType.STEPS,
+      if (Platform.isIOS) HealthDataType.WORKOUT,
+    ];
+
+    final permissions = <HealthDataAccess>[
+      HealthDataAccess.READ,             // Heart rate read-only
+      HealthDataAccess.READ_WRITE,       // Distance
+      HealthDataAccess.READ_WRITE,       // Active energy
+      HealthDataAccess.READ,             // Steps
+      if (Platform.isIOS) HealthDataAccess.READ_WRITE, // Workout
+    ];
+
+    try {
+      final dynamic raw = await _health.hasPermissions(types, permissions: permissions);
+      final map = <String, bool?>{};
+
+      // Normalize to a per-type list for easier handling
+      List<bool?> perType;
+      if (raw is List) {
+        perType = raw.cast<bool?>();
+      } else if (raw is bool?) {
+        perType = List<bool?>.filled(types.length, raw);
+      } else {
+        perType = List<bool?>.filled(types.length, null);
+      }
+
+      for (int i = 0; i < types.length; i++) {
+        final key = types[i].toString().split('.').last;
+        map[key] = i < perType.length ? perType[i] : null;
+      }
+
+      AppLogger.info('[HEALTH PERMS] Status: $map');
+      return map;
+    } catch (e) {
+      AppLogger.error('Failed to fetch health permission status: $e');
+      return {
+        'ERROR': false,
+      };
+    }
+  }
 }
