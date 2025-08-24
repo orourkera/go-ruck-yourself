@@ -263,6 +263,11 @@ class SessionLifecycleManager implements SessionManager {
           
           AppLogger.info('[LIFECYCLE] SUCCESS: Enhanced completion data from coordinator with ${completionData.keys.length} fields');
           AppLogger.info('[LIFECYCLE] Final completion data: $completionData');
+          // Explicit HR metrics visibility for debugging
+          final avgHr = completionData['avg_heart_rate'];
+          final minHr = completionData['min_heart_rate'];
+          final maxHr = completionData['max_heart_rate'];
+          AppLogger.info('[LIFECYCLE] HR_METRICS in payload -> avg: ${avgHr}, min: ${minHr}, max: ${maxHr}');
         } else {
           AppLogger.warning('[LIFECYCLE] No completion data available from coordinator - using basic completion data');
         }

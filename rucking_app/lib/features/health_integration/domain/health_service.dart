@@ -485,6 +485,27 @@ class HealthService {
       return 0;
     }
   }
+
+  /// Estimate steps based on distance and user height when health data unavailable
+  /// Formula: Step length ≈ Height × 0.415 (for walking/rucking)
+  /// Steps = Distance ÷ Step length
+  int estimateStepsFromDistance(double distanceKm, {double? userHeightCm}) {
+    if (distanceKm <= 0) return 0;
+    
+    // Use provided height or fall back to average adult height (170cm)
+    final heightCm = userHeightCm ?? 170.0;
+    
+    // Step length formula for walking/rucking (in meters)
+    final stepLengthM = (heightCm / 100) * 0.415; // Convert cm to m, then apply factor
+    
+    // Convert distance to meters and calculate steps
+    final distanceM = distanceKm * 1000;
+    final estimatedSteps = (distanceM / stepLengthM).round();
+    
+    AppLogger.debug('[STEPS FALLBACK] Distance: ${distanceKm}km, height: ${heightCm}cm, stepLength: ${stepLengthM}m, estimatedSteps: $estimatedSteps');
+    
+    return estimatedSteps;
+  }
   
   // Live steps polling
   StreamController<int>? _stepsController;

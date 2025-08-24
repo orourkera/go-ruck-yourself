@@ -68,20 +68,18 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   // Manager state subscriptions
   final List<StreamSubscription> _managerSubscriptions = [];
   
-  // Aggregated state
+  // State tracking
   ActiveSessionState _currentAggregatedState = const ActiveSessionInitial();
-  
-  // Store completion data to pass to lifecycle manager
   Map<String, dynamic>? _sessionCompletionData;
+  int? _currentSteps;
+  StreamSubscription<int>? _stepsSub;
   String? _lastCalorieMethod;
+  double? _recoveredCalories; // Calories from crash recovery
   
   // Store planned route for navigation
   List<latlong.LatLng>? _plannedRoute;
   double? _plannedRouteDistance;
   int? _plannedRouteDuration;
-  // Steps tracking
-  StreamSubscription<int>? _stepsSub;
-  int? _currentSteps;
   
   ActiveSessionCoordinator({
     required SessionRepository sessionRepository,
@@ -507,6 +505,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         if (_currentSteps != null) 'steps': _currentSteps,
         // Heart rate zones: snapshot thresholds and time in zones
         ..._computeHrZonesPayload(),
+        // Heart rate aggregates expected by backend
+        'avg_heart_rate': _heartRateManager.currentState.averageHeartRate,
+        'min_heart_rate': _heartRateManager.currentState.minHeartRate,
+        'max_heart_rate': _heartRateManager.currentState.maxHeartRate,
       };
       AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
     } else if (lifecycleState.sessionId != null && (lifecycleState.isActive || (_lifecycleManager.isPaused && !lifecycleState.isSaving))) {
@@ -656,6 +658,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       isRaining: isRaining,
     );
     
+    // Add recovered calories as baseline for crash recovery sessions
+    final totalCalories = calories + (_recoveredCalories ?? 0.0);
+  
     AppLogger.debug('[COORDINATOR] CALORIE_CALCULATION: '
         'distance=${distanceKm.toStringAsFixed(2)}km, '
         'duration=${duration.inMinutes.toStringAsFixed(1)}min, '
@@ -665,9 +670,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'elevationLoss=${elevationLoss.toStringAsFixed(1)}m, '
         'terrainMultiplier=${terrainMultiplier.toStringAsFixed(2)}x, '
         'weather=[temp=${temperature?.toStringAsFixed(1)}°C, wind=${windSpeed?.toStringAsFixed(1)}kmh, humidity=${humidity?.toStringAsFixed(0)}%, rain=$isRaining], '
-        'finalCalories=${calories.toStringAsFixed(0)}');
-    
-    return calories;
+        'sessionCalories=${calories.toStringAsFixed(0)}, recoveredCalories=${(_recoveredCalories ?? 0.0).toStringAsFixed(0)}, totalCalories=${totalCalories.toStringAsFixed(0)}');
+  
+    return totalCalories;
   }
 
   Map<String, dynamic> _computeHrZonesPayload() {
@@ -797,6 +802,21 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
           final computedSteps = await _healthService.getStepsBetween(startTime, DateTime.now());
           _currentSteps = computedSteps;
           AppLogger.info('[COORDINATOR] Computed steps at completion: $_currentSteps');
+          // Fallback to estimation if no steps from health kit
+          if (computedSteps == 0) {
+            // Safely derive distance: use running state's distanceKm if available,
+            // otherwise fall back to LocationTrackingManager's totalDistance
+            final double distance = (_currentAggregatedState is ActiveSessionRunning)
+                ? ( _currentAggregatedState as ActiveSessionRunning ).distanceKm
+                : _locationManager.currentState.totalDistance;
+            double? heightCm;
+            final authState = GetIt.instance<AuthBloc>.state;
+            if (authState is Authenticated && authState.user.heightCm != null) {
+              heightCm = authState.user.heightCm;
+            }
+            _currentSteps = _healthService.estimateStepsFromDistance(distance, userHeightCm: heightCm);
+            AppLogger.info('[COORDINATOR] Estimated steps at completion: $_currentSteps');
+          }
         } else {
           AppLogger.debug('[COORDINATOR] No startTime available to compute steps at completion');
         }
@@ -1119,6 +1139,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
           elevationGainM: elevationGain,
           elevationLossM: elevationLoss,
         );
+        
+        // Store recovered calories so they persist through session completion
+        _recoveredCalories = calories;
+        AppLogger.info('[COORDINATOR] Stored recovered calories: ${calories} for session completion');
         
       } else {
         // Regular recovery callback - don't override live calculations

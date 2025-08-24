@@ -1108,6 +1108,13 @@ class RuckSessionCompleteResource(Resource):
                 update_data['elevation_gain_m'] = data['elevation_gain_m']
             if 'elevation_loss_m' in data:
                 update_data['elevation_loss_m'] = data['elevation_loss_m']
+            if 'avg_heart_rate' in data:
+                update_data['avg_heart_rate'] = data['avg_heart_rate']
+            if 'min_heart_rate' in data:
+                update_data['min_heart_rate'] = data['min_heart_rate']
+            if 'max_heart_rate' in data:
+                update_data['max_heart_rate'] = data['max_heart_rate']
+
             # Always set completed_at to now (UTC) when completing session
             update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
 

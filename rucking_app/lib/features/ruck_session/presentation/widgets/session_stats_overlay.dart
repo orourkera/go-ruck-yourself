@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
@@ -156,11 +157,15 @@ class SessionStatsOverlay extends StatelessWidget {
                 ],
               ),
             ),
-            // HR Zones Timeline Bar - COMPLETELY REMOVED FOR NOW
-            const SizedBox(height: 8), // Just add some spacing
           ],
         ),
-        const SizedBox(height: 0.0),
+        const SizedBox(height: 8.0),
+        // HR Zones Timeline Bar moved outside of Row so it can take full width
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: _HRZonesTimelineBar(state: state),
+        ),
+        const SizedBox(height: 4.0),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -570,42 +575,196 @@ class _HRZonesTimelineBar extends StatelessWidget {
 
   const _HRZonesTimelineBar({Key? key, required this.state}) : super(key: key);
 
+  // Format seconds as a compact human-readable string for the legend
+  String _formatZoneTime(int seconds) {
+    if (seconds <= 0) return '0s';
+    final int h = seconds ~/ 3600;
+    final int m = (seconds % 3600) ~/ 60;
+    final int s = seconds % 60;
+    if (h > 0) return '${h}h ${m}m';
+    if (m > 0) return s > 0 ? '${m}m ${s}s' : '${m}m';
+    return '${s}s';
+  }
+
   @override
   Widget build(BuildContext context) {
     print('[HR ZONES BAR DEBUG] build() called with state: ${state.runtimeType}');
-    
+
     // Only show for running sessions
     if (state is! ActiveSessionRunning) {
       print('[HR ZONES BAR DEBUG] Not ActiveSessionRunning, hiding bar');
       return const SizedBox.shrink();
     }
-    
+
     final runningState = state as ActiveSessionRunning;
     final currentBpm = runningState.latestHeartRate ?? 0;
     final elapsedSeconds = runningState.elapsedSeconds;
-    
-    print('[HR ZONES BAR DEBUG] currentBpm: $currentBpm, elapsedSeconds: $elapsedSeconds');
-    
-    // Show after 10 seconds (reduced from 30) and always show even without HR data for now
+    final samples = runningState.heartRateSamples;
+
+    print('[HR ZONES BAR DEBUG] currentBpm: $currentBpm, elapsedSeconds: $elapsedSeconds, samples: ${samples.length}');
+
+    // Require at least some time and some HR samples to render
     if (elapsedSeconds < 10) {
       print('[HR ZONES BAR DEBUG] Not enough elapsed time ($elapsedSeconds < 10), hiding bar');
       return const SizedBox.shrink();
     }
-    
-    // Show bar even without HR data for debugging
-    print('[HR ZONES BAR DEBUG] Showing HR zones bar');
 
-    // TEMPORARY: Return a simple visible widget to test if the issue is with the BlocBuilder
-    return Container(
-      width: double.infinity,
-      height: 50,
-      color: Colors.purple,
-      child: Center(
-        child: Text(
-          'HR ZONES BAR TEST - BPM: $currentBpm',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        int? restingHr;
+        int? maxHr;
+        if (authState is Authenticated) {
+          restingHr = authState.user.restingHr;
+          maxHr = authState.user.maxHr;
+        }
+
+        if (restingHr == null || maxHr == null || maxHr <= restingHr) {
+          print('[HR ZONES BAR DEBUG] Missing/invalid user HR profile, hiding bar');
+          return const SizedBox.shrink();
+        }
+
+        if (samples.isEmpty) {
+          print('[HR ZONES BAR DEBUG] No heart rate samples yet, hiding bar');
+          return const SizedBox.shrink();
+        }
+
+        // Build zones from profile and compute time spent in each zone
+        final zones = HeartRateZoneService.zonesFromProfile(restingHr: restingHr, maxHr: maxHr);
+        final timeIn = HeartRateZoneService.timeInZonesSeconds(samples: samples, zones: zones);
+        // Convert map (zoneName -> seconds) to list aligned with zones order for UI rendering
+        final List<int> timeInList = [for (final z in zones) (timeIn[z.name] ?? 0)];
+
+        final total = timeInList.fold<int>(0, (a, b) => a + b);
+        if (total <= 0) {
+          print('[HR ZONES BAR DEBUG] Computed total time is 0, hiding bar');
+          return const SizedBox.shrink();
+        }
+
+        // Find current zone for outline/label
+        Color currentZoneColor = Colors.grey;
+        String currentZoneName = zones.first.name;
+        if (currentBpm > 0) {
+          for (final z in zones) {
+            if (currentBpm >= z.min && currentBpm <= z.max) {
+              currentZoneColor = z.color;
+              currentZoneName = z.name;
+              break;
+            }
+          }
+        }
+
+        print('[HR ZONES BAR DEBUG] totalSeconds=$total, timeInList=$timeInList, currentZone=$currentZoneName');
+
+        return Container(
+          width: double.infinity,
+          height: 112,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: currentZoneColor.withOpacity(0.8), width: 1.5),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Timeline segmented bar
+              SizedBox(
+                height: 32,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (int i = 0; i < zones.length; i++)
+                      if (timeInList[i] > 0)
+                        Expanded(
+                          flex: timeInList[i],
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Container(
+                                margin: EdgeInsets.only(left: i == 0 ? 0 : 1),
+                                decoration: BoxDecoration(
+                                  color: zones[i].color.withOpacity(0.9),
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: Radius.circular(i == 0 ? 6 : 0),
+                                    right: Radius.circular(i == zones.length - 1 ? 6 : 0),
+                                  ),
+                                ),
+                              ),
+                              if (zones[i].name == currentZoneName)
+                                Builder(builder: (context) {
+                                  // Simple pulse driven by elapsedSeconds
+                                  final double pulse = 0.6 + 0.4 * (0.5 * (1 + math.sin(2 * math.pi * (elapsedSeconds % 2) / 2)));
+                                  return Container(
+                                    margin: EdgeInsets.only(left: i == 0 ? 0 : 1),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.horizontal(
+                                        left: Radius.circular(i == 0 ? 6 : 0),
+                                        right: Radius.circular(i == zones.length - 1 ? 6 : 0),
+                                      ),
+                                      border: Border.all(color: Colors.white.withOpacity(0.6 * pulse), width: 1.5),
+                                      color: Colors.white.withOpacity(0.12 * pulse),
+                                    ),
+                                  );
+                                }),
+                            ],
+                          ),
+                        ),
+                    // In case all timeIn are 0 (should be handled above), fallback thin bar
+                    if (timeInList.every((t) => t == 0))
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Labels row with zone names and time spent per zone
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (int i = 0; i < zones.length; i++)
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(width: 8, height: 8, decoration: BoxDecoration(color: zones[i].color, shape: BoxShape.circle)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  (() { final name = zones[i].name; return (name.startsWith('Z') && name.length > 1) ? 'Zone ${name.substring(1)}' : name; })(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _formatZoneTime(timeInList[i]),
+                              style: const TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
   /// Build HR zones bar with proper layout constraints
@@ -613,7 +772,7 @@ class _HRZonesTimelineBar extends StatelessWidget {
     if (state is! ActiveSessionRunning) {
       return Container(
         width: double.infinity,
-        height: 50, // Fixed height
+        height: 100, // Doubled height
         color: Colors.grey.withOpacity(0.2),
         child: Center(child: Text("No active session", style: TextStyle(color: Colors.grey))),
       );

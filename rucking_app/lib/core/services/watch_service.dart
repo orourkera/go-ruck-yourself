@@ -219,6 +219,32 @@ class WatchService {
         'ruckWeight': ruckWeight,
       });
 
+      // Dispatch SessionStarted to ActiveSessionBloc so the phone app reflects the watch-initiated start
+      try {
+        if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+          final userWeightForStart = userWeightKg ?? _lastUserWeightKg ?? 80.0;
+          AppLogger.info('[WATCH] Dispatching SessionStarted to ActiveSessionBloc from watch (sessionId: $sessionId)');
+          GetIt.I<ActiveSessionBloc>().add(SessionStarted(
+            ruckWeightKg: ruckWeightKg ?? ruckWeight,
+            userWeightKg: userWeightForStart,
+            notes: 'Started from Apple Watch',
+            plannedDuration: null,
+            initialLocation: null,
+            eventId: null,
+            plannedRoute: null,
+            plannedRouteDistance: null,
+            plannedRouteDuration: null,
+            aiCheerleaderEnabled: false,
+            aiCheerleaderPersonality: null,
+            aiCheerleaderExplicitContent: false,
+          ));
+        } else {
+          AppLogger.warning('[WATCH] ActiveSessionBloc not registered; cannot dispatch SessionStarted');
+        }
+      } catch (e) {
+        AppLogger.error('[WATCH] Failed to dispatch SessionStarted to ActiveSessionBloc: $e');
+      }
+
       // Update app state
       _isSessionActive = true;
       _ruckWeight = ruckWeightKg ?? ruckWeight;
@@ -363,6 +389,21 @@ class WatchService {
       
       // Reset heart rate sampling variables
       _resetHeartRateSamplingVariables();
+
+      // Proactively sync final state to the watch and send a stop signal
+      try {
+        await _sendMessageToWatch({
+          'command': 'updateSessionState',
+          'isPaused': false,
+          'isMetric': true, // safe default; watch will override on next metrics push
+        });
+        await _sendMessageToWatch({
+          // Any of these are handled by the watch to terminate UI; prefer a clear end signal
+          'command': 'sessionEnded',
+        });
+      } catch (e) {
+        AppLogger.debug('[WATCH] Skipped/failed sending final stop/state-sync to watch: $e');
+      }
       
     } catch (e) {
       AppLogger.error('[WATCH] Failed to handle session end from Watch: $e');
@@ -828,6 +869,13 @@ class WatchService {
 
     // Update local flag after dispatching
     _isPaused = true;
+
+    // Acknowledge pause to the watch so UI toggles immediately
+    try {
+      await _sendMessageToWatch({'command': 'pauseConfirmed'});
+    } catch (e) {
+      AppLogger.debug('[WATCH] Failed to send pauseConfirmed to watch: $e');
+    }
   }
 
   /// Callback when session is resumed from the watch
@@ -845,6 +893,13 @@ class WatchService {
     }
 
     _isPaused = false;
+
+    // Acknowledge resume to the watch so UI toggles immediately
+    try {
+      await _sendMessageToWatch({'command': 'resumeConfirmed'});
+    } catch (e) {
+      AppLogger.debug('[WATCH] Failed to send resumeConfirmed to watch: $e');
+    }
   }
 
   void endSessionFromWatchCallback(int duration, double distance, double calories) {
