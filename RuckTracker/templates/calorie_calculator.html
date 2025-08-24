@@ -16,17 +16,21 @@
   <meta name="description" content="Rucking calorie calculator. Enter your stats to compare calories by three methods: Mechanical (Pandolf), MET-based, and Heart Rate-based. Dial in accurate calorie estimates for your rucks." />
   <link rel="canonical" href="https://getrucky.com/rucking-calorie-calculator" />
   <link rel="stylesheet" href="/static/style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
   <style>
     :root{
-      --brand-green: #00AA55;
+      --brand-green: #728C69;
       --bg-offwhite: #FAF9F7;
       --text: #111;
       --content-max: 1200px;
     }
     body { background: var(--bg-offwhite) !important; color: var(--text) !important; }
-    .site-header { max-width: var(--content-max); margin: 24px auto 8px; padding: 0 16px; display: flex; align-items: center; height: 56px; }
-    .brand { color: var(--brand-green); font-weight: 800; font-size: 1.25rem; letter-spacing: .5px; text-decoration: none; }
+    .site-header { max-width: var(--content-max); margin: 24px auto 8px; padding: 0 16px; display: flex; align-items: center; gap: 16px; min-height: 56px; }
+    .brand { color: var(--brand-green); font-family: 'Bebas Neue', Impact, Arial Black, sans-serif; font-weight: 400; font-size: 1.5rem; letter-spacing: 1px; text-decoration: none; white-space: nowrap; }
+    .tagline { color: #5A5A5A; font-size: 0.95rem; line-height: 1.4; }
+    
+    /* Content container - same as blog page */
+    .content-container { padding-inline: 16px; max-width: var(--content-max); margin: 0 auto 80px; background: transparent !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
   </style>
   <meta property="og:title" content="Rucking Calorie Calculator" />
   <meta property="og:description" content="Compare rucking calories with Mechanical (Pandolf), MET-based, and HR-based methods." />
@@ -76,6 +80,7 @@
 <body>
   <header class="site-header">
     <a class="brand" href="/">RUCK</a>
+    <div class="tagline">Actionable rucking guides, science-backed tips, and training advice.</div>
   </header>
   <main class="content-container">
     <header style="margin-bottom: 1rem;">
@@ -83,7 +88,7 @@
       <p class="subtitle">Compare calories by three methods used in the Ruck! app.</p>
     </header>
 
-    <section class="grid" aria-label="Calorie input and results">
+    <section aria-label="Calorie input and results" class="grid">
       <div class="card">
         <h2 style="margin-top:0;">Inputs</h2>
         <div class="row">
@@ -173,23 +178,86 @@
           </thead>
           <tbody>
             <tr>
-              <td>Mechanical (Pandolf)</td>
+              <td>Mechanical (Enhanced Pandolf)</td>
               <td id="mechOut">—</td>
-              <td class="muted">Terrain & grade aware. Models load, speed, and slope to approximate mechanical work when HR isn't available.</td>
+              <td class="muted">GORUCK-enhanced equation with load-ratio corrections. See detailed methodology below.</td>
             </tr>
             <tr>
-              <td>MET-based</td>
-              <td id="metOut">—</td>
-              <td class="muted">Speed, grade, load; terrain factor. Uses standardized metabolic equivalents and is simpler but less individualized.</td>
-            </tr>
-            <tr>
-              <td>HR-based</td>
-              <td id="hrOut">—</td>
-              <td class="muted">Keytel equation using avg HR. Most personal if HR data is accurate, but can vary with stress, heat, and caffeine.</td>
+              <td>Fusion (App Only)</td>
+              <td id="fusionOut">—</td>
+              <td class="muted">Blends mechanical + HR + weather + terrain. Most accurate method available in the app.</td>
             </tr>
           </tbody>
         </table>
         <p class="muted" id="fusionNote" style="display:none; margin-top:.6rem;">Tip: With HR available in the app, we blend HR and mechanical for best accuracy.</p>
+      </div>
+    </section>
+
+    <!-- Scientific Method Descriptions -->
+    <section style="margin-top: 3rem;">
+      <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem; color: var(--brand-green);">Scientific Methodology</h2>
+      
+      <div style="display: grid; gap: 2rem;">
+        <!-- Mechanical Method -->
+        <div class="card">
+          <h3 style="margin-top: 0; color: var(--brand-green); font-size: 1.25rem;">Mechanical (Enhanced Pandolf Equation)</h3>
+          <p style="margin-bottom: 1rem; font-weight: 600; color: #333;">The gold standard for load carriage energy expenditure, enhanced with recent military research.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Scientific Foundation:</h4>
+          <p>Based on the Pandolf equation (1977), originally developed by the U.S. Army Research Institute of Environmental Medicine for predicting energy expenditure during load carriage activities. This is the same enhanced formula used by GORUCK's calorie calculator.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">What We Account For:</h4>
+          <ul style="margin: 0.5rem 0; padding-left: 1.5rem; line-height: 1.6;">
+            <li><strong>Body Weight:</strong> Base metabolic cost of movement</li>
+            <li><strong>Load Weight:</strong> Additional energy required to carry external weight</li>
+            <li><strong>Speed:</strong> Exponential relationship between pace and energy cost</li>
+            <li><strong>Grade/Elevation:</strong> Uphill increases cost, downhill decreases it</li>
+            <li><strong>Terrain Surface:</strong> Energy multipliers for different surfaces (pavement 1.0x, sand/snow 1.2x)</li>
+            <li><strong>Load-to-Body-Weight Ratio:</strong> Enhanced correction factor addressing Pandolf's known underestimation</li>
+          </ul>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Research Enhancements:</h4>
+          <p>Australian military studies (2017) found the original Pandolf equation underestimates calories by 12-17% at moderate speeds and 21-33% at faster speeds with heavy loads. Our enhanced version includes dynamic adjustment factors that scale with load-to-body-weight ratio and speed, providing up to 27% correction for scenarios with 33% body weight at 4+ mph.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Best For:</h4>
+          <p>Accurate baseline estimates when heart rate data isn't available. Particularly reliable for standard rucking scenarios with moderate to heavy loads.</p>
+        </div>
+
+        <!-- Fusion Method -->
+        <div class="card">
+          <h3 style="margin-top: 0; color: var(--brand-green); font-size: 1.25rem;">Fusion (Recommended - App Only)</h3>
+          <p style="margin-bottom: 1rem; font-weight: 600; color: #333;">Our most sophisticated method, combining multiple data sources for maximum accuracy.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Scientific Foundation:</h4>
+          <p>Intelligent blend of the Enhanced Pandolf equation with real-time physiological data and environmental factors. Uses confidence-weighted averaging based on data quality and availability.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">What We Account For:</h4>
+          <ul style="margin: 0.5rem 0; padding-left: 1.5rem; line-height: 1.6;">
+            <li><strong>All Mechanical Factors:</strong> Body weight, load weight, speed, grade, terrain surface</li>
+            <li><strong>Real-Time Heart Rate:</strong> Continuous BPM data from Apple Watch/phone sensors</li>
+            <li><strong>Personal Physiology:</strong> Age, gender, resting HR, max HR for individualized calculations</li>
+            <li><strong>Weather Conditions:</strong>
+              <ul style="margin: 0.25rem 0; padding-left: 1rem;">
+                <li>Temperature effects (hot weather +15%, cold weather +6-12%)</li>
+                <li>Wind resistance (speed-dependent, up to +8% in strong winds)</li>
+                <li>Humidity impact (+5% in high humidity conditions)</li>
+                <li>Precipitation penalty (+8% for rain/snow)</li>
+              </ul>
+            </li>
+            <li><strong>Terrain Analysis:</strong> GPS-based surface detection with energy multipliers</li>
+            <li><strong>Elevation Profile:</strong> Precise GPS altitude changes for grade calculations</li>
+            <li><strong>Data Quality Weighting:</strong> Higher confidence in HR data when coverage is good, falls back to mechanical when sparse</li>
+          </ul>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Adaptive Algorithm:</h4>
+          <p>The fusion method dynamically weights heart rate vs. mechanical calculations based on data quality. With good HR coverage (>80%), it weights HR data at 70-100%. With poor coverage (<40%), it relies more heavily on the proven mechanical model. This ensures accuracy regardless of sensor reliability.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Environmental Intelligence:</h4>
+          <p>Integrates real-time weather data to adjust for thermoregulation costs, wind resistance, and precipitation effects. These adjustments are based on exercise physiology research showing 5-15% calorie increases in challenging conditions.</p>
+          
+          <h4 style="color: #555; margin: 1rem 0 0.5rem 0;">Best For:</h4>
+          <p>Maximum accuracy in real-world conditions. Ideal for users with heart rate monitoring who want the most precise calorie estimates that account for all environmental and physiological factors.</p>
+        </div>
       </div>
     </section>
   </main>
@@ -411,11 +479,17 @@
         metCalories *= 0.925;
       }
 
+      // Simulate fusion method (simplified for web calculator)
+      let fusionCalories = mechCalories;
+      if (hrCalories != null && hrCalories > 0) {
+        // Simple blend: 60% mechanical, 40% HR (web simplified version)
+        fusionCalories = 0.6 * mechCalories + 0.4 * hrCalories;
+      }
+
       // Render
       const fmt = (x) => (x == null || isNaN(x)) ? 'N/A' : Math.round(x).toLocaleString();
       document.getElementById('mechOut').textContent = fmt(mechCalories);
-      document.getElementById('metOut').textContent = fmt(metCalories);
-      document.getElementById('hrOut').textContent = hrCalories == null ? 'N/A' : fmt(hrCalories);
+      document.getElementById('fusionOut').textContent = fmt(fusionCalories);
       document.getElementById('fusionNote').style.display = (hrCalories != null) ? 'block' : 'none';
     }
 

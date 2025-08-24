@@ -125,9 +125,6 @@ struct ContentView: View {
             }
         }
         .edgesIgnoringSafeArea(.bottom)
-        .onAppear {
-            sessionManager.startSession()
-        }
     }
     
     // Extracted view for active session UI

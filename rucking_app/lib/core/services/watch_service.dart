@@ -146,13 +146,15 @@ class WatchService {
         // Get the command type from the message
         final command = data['command'] as String?;
         
-        if (command == 'startSession') {
+        if (command == 'startSession' || command == 'startSessionFromWatch' || command == 'workoutStarted') {
+          AppLogger.info('[WATCH] Start command received: $command');
           await _handleSessionStartedFromWatch(data);
         } else if (command == 'pauseSession') {
           await pauseSessionFromWatchCallback();
         } else if (command == 'resumeSession') {
           await resumeSessionFromWatchCallback();
-        } else if (command == 'endSession') {
+        } else if (command == 'endSession' || command == 'sessionEnded' || command == 'workoutStopped') {
+          AppLogger.info('[WATCH] End command received: $command');
           await _handleSessionEndedFromWatch(data);
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
@@ -367,24 +369,29 @@ class WatchService {
       // Save heart rate samples to storage
       await HeartRateSampleStorage.saveSamples(_currentSessionHeartRateSamples);
       
-      // Attempt a final distance backfill from watch start to now
-      if (_watchStartedAt != null) {
-        final activeBloc = GetIt.I.isRegistered<ActiveSessionBloc>() ? GetIt.I<ActiveSessionBloc>() : null;
-        final currentState = activeBloc?.state;
-        final String? sessionId = (currentState is ActiveSessionRunning) ? currentState.sessionId?.toString() : null;
-        if (sessionId != null) {
-          await backfillDistanceFromHealth(
-            sessionId: sessionId,
-            startedAt: _watchStartedAt!,
-            endedAt: DateTime.now().toUtc(),
-          );
-        }
-        
-        // Dispatch session completion event to ActiveSessionBloc
-        if (activeBloc != null && currentState is ActiveSessionRunning) {
-          AppLogger.info('[WATCH] Completing session from watch with ID: $sessionId');
-          activeBloc.add(const SessionCompleted());
-        }
+      // Resolve ActiveSessionBloc and current state/sessionId
+      final activeBloc = GetIt.I.isRegistered<ActiveSessionBloc>() ? GetIt.I<ActiveSessionBloc>() : null;
+      final currentState = activeBloc?.state;
+      final String? sessionId = (currentState is ActiveSessionRunning) ? currentState.sessionId?.toString() : null;
+
+      // Attempt a final distance backfill from watch start to now (only when we know watch start time and sessionId)
+      if (_watchStartedAt != null && sessionId != null) {
+        AppLogger.info('[WATCH] Performing Health distance backfill before completion (sessionId=$sessionId, startedAt=$_watchStartedAt)');
+        await backfillDistanceFromHealth(
+          sessionId: sessionId,
+          startedAt: _watchStartedAt!,
+          endedAt: DateTime.now().toUtc(),
+        );
+      } else {
+        AppLogger.debug('[WATCH] Skipping Health backfill: _watchStartedAt=${_watchStartedAt != null}, sessionId=${sessionId != null}');
+      }
+
+      // Always dispatch session completion to ActiveSessionBloc so phone ends the session
+      if (activeBloc != null) {
+        AppLogger.info('[WATCH] Dispatching SessionCompleted to ActiveSessionBloc (currentState=${currentState?.runtimeType}, sessionId=$sessionId)');
+        activeBloc.add(const SessionCompleted());
+      } else {
+        AppLogger.warning('[WATCH] ActiveSessionBloc not registered; cannot dispatch SessionCompleted');
       }
       
       // Reset heart rate sampling variables
