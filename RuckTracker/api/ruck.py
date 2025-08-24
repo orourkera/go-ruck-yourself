@@ -276,7 +276,19 @@ class RuckSessionCompleteResource(Resource):
                 return {'message': 'Session not found'}, 404
             current_status = session_check.data[0]['status']
             started_at_str = session_check.data[0].get('started_at')
-            if current_status not in ['in_progress', 'paused', 'completed']:
+            # Allow 'created' sessions to be completed (auto-start them first)
+            if current_status == 'created':
+                logger.info(f"Auto-starting session {ruck_id} for completion")
+                try:
+                    supabase.table('ruck_session').update({
+                        'status': 'in_progress',
+                        'started_at': started_at_str or datetime.now(tz.tzutc()).isoformat(),
+                    }).eq('id', ruck_id).execute()
+                    current_status = 'in_progress'
+                except Exception as e:
+                    logger.error(f"Failed to auto-start session {ruck_id} for completion: {e}")
+                    return {'message': f"Failed to start session for completion: {str(e)}"}, 500
+            elif current_status not in ['in_progress', 'paused', 'completed']:
                 return {'message': f'Session not in valid state for completion (current status: {current_status})'}, 400
             
             # Check if this is a manual session being updated after auto-completion
@@ -1094,9 +1106,23 @@ class RuckSessionLocationResource(Resource):
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
-            if session_data['status'] != 'in_progress':
-                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'in_progress'")
-                return {'message': f"Session not in progress (status: {session_data['status']})"}, 400
+            current_status = session_data['status']
+            
+            # Auto-start session if it's in 'created' status and receiving first location/HR data
+            if current_status == 'created':
+                logger.info(f"Auto-starting session {ruck_id} on first data upload")
+                try:
+                    supabase.table('ruck_session').update({
+                        'status': 'in_progress',
+                        'started_at': datetime.now(tz.tzutc()).isoformat(),
+                    }).eq('id', ruck_id).execute()
+                    current_status = 'in_progress'
+                except Exception as e:
+                    logger.error(f"Failed to auto-start session {ruck_id}: {e}")
+                    return {'message': f"Failed to start session: {str(e)}"}, 500
+            elif current_status != 'in_progress':
+                logger.warning(f"Session {ruck_id} status is '{current_status}', not 'in_progress'")
+                return {'message': f"Session not in progress (status: {current_status})"}, 400
             
             # Insert location points (like heart rate samples)
             location_rows = []
@@ -1365,9 +1391,23 @@ class HeartRateSampleUploadResource(Resource):
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
-            if session_data['status'] != 'in_progress':
-                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'in_progress'")
-                return {'message': f"Session not in progress (status: {session_data['status']})"}, 400
+            current_status = session_data['status']
+            
+            # Auto-start session if it's in 'created' status and receiving first location/HR data
+            if current_status == 'created':
+                logger.info(f"Auto-starting session {ruck_id} on first data upload")
+                try:
+                    supabase.table('ruck_session').update({
+                        'status': 'in_progress',
+                        'started_at': datetime.now(tz.tzutc()).isoformat(),
+                    }).eq('id', ruck_id).execute()
+                    current_status = 'in_progress'
+                except Exception as e:
+                    logger.error(f"Failed to auto-start session {ruck_id}: {e}")
+                    return {'message': f"Failed to start session: {str(e)}"}, 500
+            elif current_status != 'in_progress':
+                logger.warning(f"Session {ruck_id} status is '{current_status}', not 'in_progress'")
+                return {'message': f"Session not in progress (status: {current_status})"}, 400
             
             # Insert heart rate samples
             heart_rate_rows = []
