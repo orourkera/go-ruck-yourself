@@ -108,11 +108,11 @@ class LeaderboardTable extends StatelessWidget {
       // Only show stats columns
       return Row(
         children: [
+          _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 100, isPowerPoints: true),
           _buildStatColumn(user.stats.totalRucks.toString(), width: 80, isRucks: true),
           _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
           _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
           _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
-          _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 100, isPowerPoints: true),
         ],
       );
     } else {

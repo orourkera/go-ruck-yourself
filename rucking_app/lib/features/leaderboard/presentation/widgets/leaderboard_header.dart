@@ -56,11 +56,11 @@ class LeaderboardHeader extends StatelessWidget {
               physics: const ClampingScrollPhysics(),
               child: Row(
                 children: [
+                  _buildPowerPointsColumn(context),
                   _buildSortableColumn(context, 'RUCKS', 'totalRucks', width: 80),
                   _buildSortableColumn(context, 'DISTANCE', 'distanceKm', width: 100),
                   _buildSortableColumn(context, 'ELEVATION', 'elevationGainMeters', width: 100),
                   _buildSortableColumn(context, 'CALORIES', 'caloriesBurned', width: 100),
-                  _buildPowerPointsColumn(context),
                 ],
               ),
             ),

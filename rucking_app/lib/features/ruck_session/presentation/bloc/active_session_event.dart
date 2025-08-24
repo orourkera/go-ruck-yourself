@@ -29,6 +29,7 @@ class SessionStarted extends ActiveSessionEvent {
   final bool aiCheerleaderEnabled; // AI Cheerleader feature toggle
   final String? aiCheerleaderPersonality; // Selected personality type
   final bool aiCheerleaderExplicitContent; // Explicit language preference
+  final String? sessionId; // Optional session identifier for propagation
   
   const SessionStarted({
     required this.ruckWeightKg,
@@ -43,10 +44,11 @@ class SessionStarted extends ActiveSessionEvent {
     required this.aiCheerleaderEnabled, // Required AI Cheerleader toggle
     this.aiCheerleaderPersonality, // Optional personality selection
     required this.aiCheerleaderExplicitContent, // Required explicit content preference
+    this.sessionId, // Optional sessionId for watch-initiated or recovered sessions
   });
   
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId, plannedRoute, plannedRouteDistance, plannedRouteDuration, aiCheerleaderEnabled, aiCheerleaderPersonality, aiCheerleaderExplicitContent];
+  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId, plannedRoute, plannedRouteDistance, plannedRouteDuration, aiCheerleaderEnabled, aiCheerleaderPersonality, aiCheerleaderExplicitContent, sessionId];
 }
 
 class SessionRecoveryRequested extends ActiveSessionEvent {
@@ -85,18 +87,20 @@ class BatchLocationUpdated extends ActiveSessionEvent {
 
 class SessionPaused extends ActiveSessionEvent {
   final SessionActionSource source;
-  const SessionPaused({this.source = SessionActionSource.unknown});
+  final String? sessionId; // Optional session identifier for propagation
+  const SessionPaused({this.source = SessionActionSource.unknown, this.sessionId});
 
   @override
-  List<Object?> get props => [source];
+  List<Object?> get props => [source, sessionId];
 }
 
 class SessionResumed extends ActiveSessionEvent {
   final SessionActionSource source;
-  const SessionResumed({this.source = SessionActionSource.unknown});
+  final String? sessionId; // Optional session identifier for propagation
+  const SessionResumed({this.source = SessionActionSource.unknown, this.sessionId});
 
   @override
-  List<Object?> get props => [source];
+  List<Object?> get props => [source, sessionId];
 }
 
 class SessionCompleted extends ActiveSessionEvent {
@@ -107,6 +111,7 @@ class SessionCompleted extends ActiveSessionEvent {
   final int? pausedDurationSeconds;
   final String? notes;
   final int? rating;
+  final String? sessionId; // Optional session identifier for propagation
   
   const SessionCompleted({
     this.notes,
@@ -116,6 +121,7 @@ class SessionCompleted extends ActiveSessionEvent {
     this.weightKg,
     this.plannedDurationMinutes,
     this.pausedDurationSeconds,
+    this.sessionId,
   });
   
   @override
@@ -127,6 +133,7 @@ class SessionCompleted extends ActiveSessionEvent {
     weightKg,
     plannedDurationMinutes,
     pausedDurationSeconds,
+    sessionId,
   ];
 }
 

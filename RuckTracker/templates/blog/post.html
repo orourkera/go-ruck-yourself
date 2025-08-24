@@ -19,7 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
   <style>
     :root{
-      --brand-green: #00AA55;
+      --brand-green: #728C69;
       --bg-offwhite: #FAF9F7;
       --text: #111;
       --muted: #5A5A5A;
@@ -32,7 +32,14 @@
     .content-container { padding-inline: 16px; max-width: var(--content-max); margin: 0 auto 80px; background: transparent !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
     .footer-pinned { background: transparent; color: #555; }
     .footer-pinned .footer-links a { color: #336; }
-    .prose img { width: 100%; height: auto; border-radius: 0 !important; display: block; }
+    .prose img { width: 33%; height: auto; border-radius: 0 !important; display: block; margin: 1rem 0; }
+    
+    /* Override any global h1 styling */
+    article h1 { 
+      font-size: 1.8rem !important; 
+      text-shadow: none !important; 
+      font-weight: 700 !important;
+    }
   </style>
   <meta property="og:title" content="{{ post.title }} - Ruck! Blog" />
   <meta property="og:description" content="{{ post.description }}" />
@@ -67,7 +74,7 @@
   <main class="content-container">
     <article>
       <header style="margin-bottom: .75rem;">
-        <h1 style="margin:0 0 .25rem 0;">{{ post.title }}</h1>
+        <h1 style="margin:0 0 .25rem 0; font-size: 1.8rem; text-shadow: none;">{{ post.title }}</h1>
         <p style="color:#777; font-size: .95rem;">
           <time datetime="{{ post.date }}">{{ post.date[:10] }}</time> · {{ post.read_time }} min read · {{ post.author }}
         </p>

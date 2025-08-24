@@ -501,11 +501,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       ),
                       child: Row(
                         children: [
+                          _buildPowerPointsHeader(120), // Moved to first position
                           _buildHeaderColumn('RUCKS', 'totalRucks', 80),
                           _buildHeaderColumn('DISTANCE', 'distanceKm', 100),
                           _buildHeaderColumn('ELEVATION', 'elevationGainMeters', 100),
                           _buildHeaderColumn('CALORIES', 'caloriesBurned', 100),
-                          _buildPowerPointsHeader(120), // Shrunk down from 280 to 120px
                         ],
                       ),
                     ),
@@ -531,11 +531,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Row(
                             children: [
+                              _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 120, isPowerPoints: true), // Moved to first position
                               _buildStatColumn(user.stats.totalRucks.toString(), width: 80),
                               _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
                               _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
                               _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
-                              _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 120, isPowerPoints: true), // Shrunk down from 280 to 120px
                             ],
                           ),
                         ),

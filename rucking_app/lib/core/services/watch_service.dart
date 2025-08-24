@@ -239,6 +239,7 @@ class WatchService {
             aiCheerleaderEnabled: false,
             aiCheerleaderPersonality: null,
             aiCheerleaderExplicitContent: false,
+            sessionId: sessionId,
           ));
         } else {
           AppLogger.warning('[WATCH] ActiveSessionBloc not registered; cannot dispatch SessionStarted');
@@ -372,7 +373,7 @@ class WatchService {
       // Resolve ActiveSessionBloc and current state/sessionId
       final activeBloc = GetIt.I.isRegistered<ActiveSessionBloc>() ? GetIt.I<ActiveSessionBloc>() : null;
       final currentState = activeBloc?.state;
-      final String? sessionId = (currentState is ActiveSessionRunning) ? currentState.sessionId?.toString() : null;
+      final String? sessionId = (currentState is ActiveSessionRunning) ? currentState.sessionId : null;
 
       // Attempt a final distance backfill from watch start to now (only when we know watch start time and sessionId)
       if (_watchStartedAt != null && sessionId != null) {
@@ -389,7 +390,7 @@ class WatchService {
       // Always dispatch session completion to ActiveSessionBloc so phone ends the session
       if (activeBloc != null) {
         AppLogger.info('[WATCH] Dispatching SessionCompleted to ActiveSessionBloc (currentState=${currentState?.runtimeType}, sessionId=$sessionId)');
-        activeBloc.add(const SessionCompleted());
+        activeBloc.add(SessionCompleted(sessionId: sessionId));
       } else {
         AppLogger.warning('[WATCH] ActiveSessionBloc not registered; cannot dispatch SessionCompleted');
       }
@@ -869,7 +870,10 @@ class WatchService {
 
     // Dispatch pause event to ActiveSessionBloc if available
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
-      GetIt.I<ActiveSessionBloc>().add(const SessionPaused(source: SessionActionSource.watch));
+      final bloc = GetIt.I<ActiveSessionBloc>();
+      final currState = bloc.state;
+      final String? sessionId = (currState is ActiveSessionRunning) ? currState.sessionId : null;
+      bloc.add(SessionPaused(source: SessionActionSource.watch, sessionId: sessionId));
     } else {
       AppLogger.warning('[WATCH_SERVICE] ActiveSessionBloc not ready in GetIt for pauseSessionFromWatchCallback');
     }
@@ -894,7 +898,10 @@ class WatchService {
 
     // Dispatch resume event regardless of local _isPaused – Bloc will ignore if necessary
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
-      GetIt.I<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.watch));
+      final bloc = GetIt.I<ActiveSessionBloc>();
+      final currState = bloc.state;
+      final String? sessionId = (currState is ActiveSessionRunning) ? currState.sessionId : null;
+      bloc.add(SessionResumed(source: SessionActionSource.watch, sessionId: sessionId));
     } else {
       AppLogger.warning('[WATCH_SERVICE] ActiveSessionBloc not ready in GetIt for resumeSessionFromWatchCallback');
     }
