@@ -549,7 +549,7 @@ class UserProfileResource(Resource):
             if not update_data:
                  return {'message': 'No valid fields provided for update'}, 400
 
-            logger.error(f"[PROFILE_UPDATE] Authenticated user id: {g.user.id}")
+            logger.info(f"[PROFILE_UPDATE] Authenticated user id: {g.user.id}")
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # First check if user profile exists
@@ -592,20 +592,20 @@ class UserProfileResource(Resource):
                 profile_data = fetch_after_insert.data[0]
             else:
                 # User profile exists - update it
-                logger.error(f"[PROFILE_UPDATE] Updating profile {g.user.id} with fields: {list(update_data.keys())}")
+                logger.info(f"[PROFILE_UPDATE] Updating profile {g.user.id} with fields: {list(update_data.keys())}")
                 update_exec = supabase.table('user') \
                     .update(update_data) \
                     .eq('id', str(g.user.id)) \
                     .execute()
                 # Explicitly fetch updated row (supabase-py does not support .select() after update)
                 response = supabase.table('user').select('*').eq('id', str(g.user.id)).execute()
-                logger.error(f"[PROFILE_UPDATE] Update fetch returned {len(response.data) if response and hasattr(response, 'data') and response.data else 0} rows")
+                logger.info(f"[PROFILE_UPDATE] Update fetch returned {len(response.data) if response and hasattr(response, 'data') and response.data else 0} rows")
                 if not response.data or len(response.data) == 0:
                     logger.error(f"Profile update seemed successful but failed to fetch updated data for user ID {g.user.id}")
                     return {'message': 'Profile update may have succeeded, but failed to retrieve updated data.'}, 500
                 profile_data = response.data[0]
             
-            logger.error(f"[PROFILE_UPDATE] Final profile keys: {list(profile_data.keys())}")
+            logger.debug(f"[PROFILE_UPDATE] Final profile keys: {list(profile_data.keys())}")
             
             # Ensure email from auth is included if missing
             if 'email' not in profile_data or not profile_data['email']:
@@ -717,6 +717,45 @@ class UserProfileResource(Resource):
         except Exception as e:
             logger.error(f"Error creating user profile: {str(e)}", exc_info=True)
             return {'message': f'Error creating user profile: {str(e)}'}, 500
+
+
+class InternalMailjetSyncResource(Resource):
+    def post(self):
+        """
+        Internal endpoint for database trigger to sync users to Mailjet
+        This endpoint is called by the handle_new_user() database trigger
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return {'message': 'No data provided'}, 400
+            
+            email = data.get('email')
+            username = data.get('username', '')
+            user_metadata = data.get('user_metadata', {})
+            
+            if not email:
+                return {'message': 'Email is required'}, 400
+            
+            logger.info(f"📧 INTERNAL MAILJET SYNC REQUEST: {email}")
+            
+            # Use the existing Mailjet sync function
+            mailjet_success = sync_user_to_mailjet(
+                email=email,
+                username=username,
+                user_metadata=user_metadata
+            )
+            
+            if mailjet_success:
+                logger.info(f"✅ Internal Mailjet sync successful: {email}")
+                return {'message': 'Mailjet sync successful', 'email': email}, 200
+            else:
+                logger.warning(f"⚠️ Internal Mailjet sync failed: {email}")
+                return {'message': 'Mailjet sync failed', 'email': email}, 500
+                
+        except Exception as e:
+            logger.error(f"❌ Internal Mailjet sync error: {e}", exc_info=True)
+            return {'message': f'Internal Mailjet sync error: {str(e)}'}, 500
 
 
 class UserAvatarUploadResource(Resource):

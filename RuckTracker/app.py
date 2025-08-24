@@ -306,6 +306,7 @@ from .api.auth import (
     RefreshTokenResource,
     ForgotPasswordResource,
     UserProfileResource,
+    InternalMailjetSyncResource,
     UserAvatarUploadResource,
     StravaConnectResource,
     StravaCallbackResource,
@@ -423,6 +424,7 @@ api.add_resource(SignOutResource, '/api/auth/signout', '/api/auth/logout')
 api.add_resource(RefreshTokenResource, '/api/auth/refresh')
 api.add_resource(ForgotPasswordResource, '/api/auth/forgot-password', '/api/auth/password-reset')
 api.add_resource(UserProfileResource, '/api/auth/profile', '/api/users/profile')
+api.add_resource(InternalMailjetSyncResource, '/api/internal/mailjet-sync')
 api.add_resource(UserAvatarUploadResource, '/api/auth/avatar')
 
 # Strava integration endpoints
