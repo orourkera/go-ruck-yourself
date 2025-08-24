@@ -9,7 +9,7 @@ import os
 
 from ..supabase_client import get_supabase_client
 from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
-from ..goals import _compute_window_bounds, _km_to_mi
+from .goals import _compute_window_bounds, _km_to_mi
 from ..utils.auth_helper import get_current_user_id
 from ..utils.api_response import check_auth_and_respond
 from ..services.push_notification_service import PushNotificationService, get_user_device_tokens
