@@ -960,7 +960,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 }
 
                                 final List<HeartRateSample> safeHeartRateSamples = heartRateSamples ?? [];
-                                final bool showHeartRateGraph = widget.session.id == 744 || safeHeartRateSamples.isNotEmpty;
+                                final bool showHeartRateGraph = safeHeartRateSamples.isNotEmpty;
 
                                 // Build zones for chart overlays
                                 List<({int min, int max, Color color, String name})>? zones;

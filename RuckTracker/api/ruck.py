@@ -623,6 +623,25 @@ class RuckSessionResource(Resource):
             else:
                 session['photos'] = []
             
+            # Fetch heart rate samples (always include for session details)
+            try:
+                hr_resp = supabase.table('heart_rate_sample') \
+                    .select('bpm,timestamp') \
+                    .eq('session_id', ruck_id) \
+                    .order('timestamp') \
+                    .limit(10000) \
+                    .execute()
+                
+                if hr_resp.data:
+                    session['heart_rate_samples'] = hr_resp.data
+                    logger.info(f"[HR_DEBUG] Included {len(hr_resp.data)} heart rate samples in detail response for session {ruck_id}")
+                else:
+                    session['heart_rate_samples'] = []
+                    logger.info(f"[HR_DEBUG] No heart rate samples found for session {ruck_id}")
+            except Exception as hr_fetch_error:
+                logger.error(f"Error fetching heart rate samples for session {ruck_id}: {hr_fetch_error}")
+                session['heart_rate_samples'] = []  # Ensure field exists even if fetch fails
+            
             # Clean up user data before returning
             if 'user' in session:
                 del session['user']
