@@ -164,6 +164,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       watchService: _watchService,
     );
     
+    // Set event emitter callback for heart rate manager
+    _heartRateManager.setEventEmitter((event) {
+      add(event);
+    });
+    
     // Initialize photo manager
     _photoManager = PhotoManager(
       sessionRepository: _sessionRepository,
@@ -304,7 +309,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     if (finalManagerEvent is manager_events.SessionStartRequested ||
         finalManagerEvent is manager_events.SessionStopRequested ||
         finalManagerEvent is manager_events.SessionReset ||
-        finalManagerEvent is manager_events.BatchLocationUpdated) {
+        finalManagerEvent is manager_events.BatchLocationUpdated ||
+        finalManagerEvent is manager_events.HeartRateBatchUploadRequested) {
       await _uploadManager.handleEvent(finalManagerEvent);
     }
     

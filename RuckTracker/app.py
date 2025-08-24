@@ -475,7 +475,7 @@ app.logger.info(f"Setting RuckSessionListResource rate limit to: 18000 per hour 
 RuckSessionListResource.get = conditional_rate_limit("300 per minute", key_func=get_user_id)(RuckSessionListResource.get)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<int:ruck_id>')
-api.add_resource(RuckSessionStartResource, '/api/rucks/start')
+api.add_resource(RuckSessionStartResource, '/api/rucks/<int:ruck_id>/start')
 api.add_resource(RuckSessionPauseResource, '/api/rucks/<int:ruck_id>/pause')
 api.add_resource(RuckSessionResumeResource, '/api/rucks/<int:ruck_id>/resume')
 api.add_resource(RuckSessionCompleteResource, '/api/rucks/<int:ruck_id>/complete')
