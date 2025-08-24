@@ -810,7 +810,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
                 ? ( _currentAggregatedState as ActiveSessionRunning ).distanceKm
                 : _locationManager.currentState.totalDistance;
             double? heightCm;
-            final authState = GetIt.instance<AuthBloc>.state;
+            final authState = GetIt.instance<AuthBloc>().state;
             if (authState is Authenticated && authState.user.heightCm != null) {
               heightCm = authState.user.heightCm;
             }

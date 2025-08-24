@@ -50,6 +50,48 @@ struct CompactWorkoutView: View {
                 metricRow(value: sessionManager.elevationText, labelLines: [" ", " "]) // Unit embedded in value
 
                 Spacer()
+
+                // Controls: Pause/Resume and End buttons
+                VStack(spacing: 8) {
+                    // Play/Pause toggle
+                    Button(action: {
+                        sessionManager.togglePauseResume()
+                    }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(sessionManager.isPaused ? .green : .orange)
+                            Text(sessionManager.isPaused ? "Resume" : "Pause")
+                                .font(.headline)
+                                .foregroundColor(sessionManager.isPaused ? .green : .orange)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.2))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    // End button
+                    Button(action: {
+                        sessionManager.endSession()
+                    }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.red)
+                            Text("End")
+                                .font(.headline)
+                                .foregroundColor(.red)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.2))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(.top, 8)
             }
             .padding(.horizontal, 4)
         }
