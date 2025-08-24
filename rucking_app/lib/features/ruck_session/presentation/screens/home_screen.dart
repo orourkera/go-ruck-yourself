@@ -55,6 +55,8 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -314,6 +316,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
   Map<String, dynamic> _monthlySummaryStats = {};
   bool _isLoading = true;
   bool _isRefreshing = false;
+  bool _navigatedToActiveSession = false;
+  bool _navigatedToSessionComplete = false;
   ApiClient? _apiClient;
   final SessionCacheService _cacheService = SessionCacheService();
   final RouteObserver<ModalRoute> _routeObserver = RouteObserver<ModalRoute>();
@@ -715,15 +719,103 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is Unauthenticated) {
-          Navigator.of(context).pushNamedAndRemoveUntil(
-              '/login',
-              (route) => false,
-            );
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is Unauthenticated) {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/login',
+                (route) => false,
+              );
+            }
+          },
+        ),
+        BlocListener<ActiveSessionBloc, ActiveSessionState>(
+          listenWhen: (prev, curr) => curr is ActiveSessionRunning,
+          listener: (context, state) {
+            if (!mounted || _navigatedToActiveSession) return;
+            if (state is ActiveSessionRunning) {
+              // Construct ActiveSessionArgs from running state
+              final args = ActiveSessionArgs(
+                ruckWeight: state.ruckWeightKg,
+                userWeightKg: state.userWeightKg,
+                notes: state.notes,
+                plannedDuration: state.plannedDuration,
+                eventId: state.eventId,
+                plannedRoute: state.plannedRoute,
+                plannedRouteDistance: state.plannedRouteDistance,
+                plannedRouteDuration: state.plannedRouteDuration,
+                // These are only used when starting a session from this screen.
+                // Since we're navigating to an already running session, safe defaults are fine.
+                aiCheerleaderEnabled: false,
+                aiCheerleaderExplicitContent: false,
+              );
+
+              _navigatedToActiveSession = true;
+              // Use pushNamed to navigate to active session screen
+              Navigator.of(context).pushNamed(
+                '/active_session',
+                arguments: args,
+              ).then((_) {
+                // Reset flag when returning to home so further watch starts can navigate again
+                if (mounted) {
+                  _navigatedToActiveSession = false;
+                }
+              });
+            }
+          },
+        ),
+        // Navigate to session complete when summary is generated (e.g., watch ended the session)
+        BlocListener<ActiveSessionBloc, ActiveSessionState>(
+          listenWhen: (prev, curr) => curr is SessionSummaryGenerated,
+          listener: (context, state) {
+            if (!mounted || _navigatedToSessionComplete) return;
+            // Only navigate from Home if this route is currently visible to user
+            final currentRoute = ModalRoute.of(context);
+            if (currentRoute == null || currentRoute.isCurrent != true) {
+              return;
+            }
+            if (state is SessionSummaryGenerated) {
+              final endTime = state.session.endTime ?? DateTime.now();
+              final ruckId = state.session.id ?? '';
+              final duration = state.session.duration ?? Duration.zero;
+              final distance = state.session.distance ?? 0.0;
+              final caloriesBurned = state.session.caloriesBurned ?? 0;
+              final elevationGain = state.session.elevationGain ?? 0.0;
+              final elevationLoss = state.session.elevationLoss ?? 0.0;
+              final ruckWeightKg = state.session.ruckWeightKg ?? 0.0;
+              final notes = state.session.notes;
+              final heartRateSamples = state.session.heartRateSamples;
+              final splits = state.session.splits;
+
+              _navigatedToSessionComplete = true;
+              Navigator.of(context).pushNamed(
+                '/session_complete',
+                arguments: {
+                  'completedAt': endTime,
+                  'ruckId': ruckId,
+                  'duration': duration,
+                  'distance': distance,
+                  'caloriesBurned': caloriesBurned,
+                  'elevationGain': elevationGain,
+                  'elevationLoss': elevationLoss,
+                  'ruckWeight': ruckWeightKg,
+                  'initialNotes': notes,
+                  'heartRateSamples': heartRateSamples,
+                  'splits': splits,
+                  // From Home we may not have terrain segments; pass empty list
+                  'terrainSegments': const <dynamic>[],
+                },
+              ).then((_) {
+                if (mounted) {
+                  _navigatedToSessionComplete = false;
+                }
+              });
+            }
+          },
+        ),
+      ],
       child: Scaffold(
         body: SafeArea(
           child: RefreshIndicator(

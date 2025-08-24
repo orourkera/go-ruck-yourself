@@ -60,10 +60,11 @@
   </script>
   <style>
     /* Modern form styling */
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin: 2rem 0; }
-    .form-section { }
-    .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
-    .form-row > div { flex: 1; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; margin: 2rem 0; }
+    .form-section { max-width: 800px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem; align-items: start; }
+    .form-row.single { grid-template-columns: 1fr; }
+    .form-row > div { min-width: 0; }
     
     label { 
       font-weight: 600; 
@@ -83,6 +84,8 @@
       font-size: 1rem; 
       transition: border-color 0.2s ease;
       background: white;
+      box-sizing: border-box;
+      min-height: 48px;
     }
     
     input:focus, select:focus { 
@@ -189,7 +192,15 @@
     /* Responsive design */
     @media (max-width: 768px) {
       .form-grid { grid-template-columns: 1fr; gap: 1rem; }
-      .form-row { flex-direction: column; gap: 0.5rem; }
+      .form-row { grid-template-columns: 1fr; gap: 1rem; }
+      .form-row.single { grid-template-columns: 1fr; }
+      .form-section { max-width: 100%; }
+      
+      /* Stack intro section on mobile */
+      section[style*="grid-template-columns: 1fr 300px"] {
+        grid-template-columns: 1fr !important;
+        gap: 2rem !important;
+      }
     }
   </style>
 </head>
@@ -201,11 +212,18 @@
   <main class="content-container">
     
     <!-- Introduction -->
-    <section style="margin-bottom: 3rem;">
-      <h1 style="margin: 0 0 1rem 0; font-size: 2.5rem; color: var(--brand-green);">Rucking Calorie Calculator</h1>
-      <p style="font-size: 1.1rem; line-height: 1.6; color: #555; max-width: 800px;">
-        Rucking burns calories differently than regular walking or running. The added weight, varied terrain, and load distribution create unique metabolic demands that standard fitness trackers often underestimate. Our calculator uses two scientifically-backed methods specifically designed for load carriage activities to give you accurate calorie estimates.
-      </p>
+    <section style="margin-bottom: 3rem; display: grid; grid-template-columns: 1fr 300px; gap: 3rem; align-items: start;">
+      <div>
+        <h1 style="margin: 0 0 1rem 0; font-size: 2.5rem; color: var(--brand-green); text-shadow: none !important;">Rucking Calorie Calculator</h1>
+        <p style="font-size: 1.1rem; line-height: 1.6; color: #555;">
+          Rucking burns calories differently than regular walking or running. The added weight, varied terrain, and load distribution create unique metabolic demands that standard fitness trackers often underestimate. Our calculator uses two scientifically-backed methods specifically designed for load carriage activities to give you accurate calorie estimates.
+        </p>
+      </div>
+      <div style="text-align: right;">
+        <img src="{{ url_for('static', filename='images/blog/caloriepage.jpg') }}" 
+             alt="Rucking calorie calculation visualization" 
+             style="width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);">
+      </div>
     </section>
 
     <!-- Input Form -->
@@ -213,33 +231,32 @@
       <div class="form-section">
         <h2 style="margin: 0 0 1.5rem 0; color: var(--brand-green); font-size: 1.5rem;">Input Your Data</h2>
         
-        <div class="form-row">
+        <div class="form-row single">
           <div>
             <label>Units</label>
             <div class="units-toggle">
-              <button id="unitsMetric" type="button" aria-pressed="true">Metric</button>
-              <button id="unitsImperial" type="button" aria-pressed="false">Imperial</button>
+              <button id="unitsMetric" type="button" aria-pressed="false">Metric</button>
+              <button id="unitsImperial" type="button" aria-pressed="true">Imperial</button>
             </div>
-            <input id="unitSystem" type="hidden" value="metric" />
-          </div>
-          <div></div>
-        </div>
-        
-        <div class="form-row">
-          <div>
-            <label for="weightKg">Body weight (<span id="unitWeight">kg</span>)</label>
-            <input id="weightKg" type="number" min="20" max="250" step="0.1" value="80" />
-          </div>
-          <div>
-            <label for="ruckKg">Ruck weight (<span id="unitRuck">kg</span>)</label>
-            <input id="ruckKg" type="number" min="0" max="60" step="0.1" value="10" />
+            <input id="unitSystem" type="hidden" value="imperial" />
           </div>
         </div>
         
         <div class="form-row">
           <div>
-            <label for="distanceKm">Distance (<span id="unitDistance">km</span>)</label>
-            <input id="distanceKm" type="number" min="0" max="100" step="0.01" value="5" />
+            <label for="weightKg">Body weight (<span id="unitWeight">lb</span>)</label>
+            <input id="weightKg" type="number" min="20" max="250" step="0.1" value="175" />
+          </div>
+          <div>
+            <label for="ruckKg">Ruck weight (<span id="unitRuck">lb</span>)</label>
+            <input id="ruckKg" type="number" min="0" max="60" step="0.1" value="20" />
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div>
+            <label for="distanceKm">Distance (<span id="unitDistance">mi</span>)</label>
+            <input id="distanceKm" type="number" min="0" max="100" step="0.01" value="3" />
           </div>
           <div>
             <label for="duration">Duration (hh:mm)</label>
@@ -618,8 +635,19 @@
         fusionCalories = 0.6 * mechCalories + 0.4 * hrCalories;
       }
 
-      // Render
-      const fmt = (x) => (x == null || isNaN(x)) ? 'N/A' : Math.round(x).toLocaleString();
+      // Render - use different formatting based on units
+      const fmt = (x) => {
+        if (x == null || isNaN(x)) return 'N/A';
+        const rounded = Math.round(x);
+        const unit = getUnitSystem();
+        if (unit === 'imperial') {
+          // Use period separator for imperial (US format)
+          return rounded.toLocaleString('en-US');
+        } else {
+          // Use comma separator for metric (international format)
+          return rounded.toLocaleString('en-GB');
+        }
+      };
       document.getElementById('mechOut').textContent = fmt(mechCalories);
       document.getElementById('fusionOut').textContent = fmt(fusionCalories);
       document.getElementById('fusionNote').style.display = (hrCalories != null) ? 'block' : 'none';
@@ -634,7 +662,7 @@
       const unitHidden = document.getElementById('unitSystem');
       const btnMetric = document.getElementById('unitsMetric');
       const btnImperial = document.getElementById('unitsImperial');
-      let last = unitHidden?.value || 'metric';
+      let last = unitHidden?.value || 'imperial';
       function setActive(next){
         if (!unitHidden) return;
         convertInputs(last, next);
