@@ -358,6 +358,7 @@ from .api.gpx_export import (
 )
 from .api.weather import WeatherResource
 from .api.ai_cheerleader import AICheerleaderLogResource
+from .api.goals import GoalsListResource, GoalResource, GoalParseResource, GoalEvaluateResource
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
@@ -618,6 +619,19 @@ api.add_resource(WeatherResource, '/api/weather')
 
 # AI Cheerleader Endpoints
 api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader/log')
+
+# Goals Endpoints
+app.logger.info("Setting Goals API rate limits")
+GoalsListResource.get = conditional_rate_limit("1000 per hour", key_func=get_user_id)(GoalsListResource.get)
+GoalsListResource.post = conditional_rate_limit("100 per hour", key_func=get_user_id)(GoalsListResource.post)
+GoalResource.patch = conditional_rate_limit("300 per hour", key_func=get_user_id)(GoalResource.patch)
+GoalParseResource.post = conditional_rate_limit("60 per hour", key_func=get_user_id)(GoalParseResource.post)
+GoalEvaluateResource.post = conditional_rate_limit("300 per hour", key_func=get_user_id)(GoalEvaluateResource.post)
+
+api.add_resource(GoalsListResource, '/api/goals')
+api.add_resource(GoalResource, '/api/goals/<string:goal_id>')
+api.add_resource(GoalParseResource, '/api/goals/parse')
+api.add_resource(GoalEvaluateResource, '/api/goals/<string:goal_id>/evaluate')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
