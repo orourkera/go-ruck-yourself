@@ -1092,14 +1092,14 @@ class RuckSessionCompleteResource(Resource):
                                 resting_hr = user_data['resting_hr']
                                 max_hr = user_data['max_hr']
                                 
-                                # Basic 5-zone calculation
+                                # Basic 5-zone calculation (no colors - Flutter will handle that)
                                 hr_reserve = max_hr - resting_hr
                                 zones = [
-                                    {'name': 'Z1', 'min_bpm': resting_hr, 'max_bpm': int(resting_hr + hr_reserve * 0.6), 'color': 0xFF81C784},
-                                    {'name': 'Z2', 'min_bpm': int(resting_hr + hr_reserve * 0.6), 'max_bpm': int(resting_hr + hr_reserve * 0.7), 'color': 0xFF4FC3F7},
-                                    {'name': 'Z3', 'min_bpm': int(resting_hr + hr_reserve * 0.7), 'max_bpm': int(resting_hr + hr_reserve * 0.8), 'color': 0xFFFFB74D},
-                                    {'name': 'Z4', 'min_bpm': int(resting_hr + hr_reserve * 0.8), 'max_bpm': int(resting_hr + hr_reserve * 0.9), 'color': 0xFFFF8A65},
-                                    {'name': 'Z5', 'min_bpm': int(resting_hr + hr_reserve * 0.9), 'max_bpm': max_hr, 'color': 0xFFE57373}
+                                    {'name': 'Z1', 'min_bpm': resting_hr, 'max_bpm': int(resting_hr + hr_reserve * 0.6)},
+                                    {'name': 'Z2', 'min_bpm': int(resting_hr + hr_reserve * 0.6), 'max_bpm': int(resting_hr + hr_reserve * 0.7)},
+                                    {'name': 'Z3', 'min_bpm': int(resting_hr + hr_reserve * 0.7), 'max_bpm': int(resting_hr + hr_reserve * 0.8)},
+                                    {'name': 'Z4', 'min_bpm': int(resting_hr + hr_reserve * 0.8), 'max_bpm': int(resting_hr + hr_reserve * 0.9)},
+                                    {'name': 'Z5', 'min_bpm': int(resting_hr + hr_reserve * 0.9), 'max_bpm': max_hr}
                                 ]
                                 update_data['hr_zone_snapshot'] = zones
                                 logger.info(f"[HR_ZONES] Reconstructed hr_zone_snapshot for session {ruck_id} from user profile")

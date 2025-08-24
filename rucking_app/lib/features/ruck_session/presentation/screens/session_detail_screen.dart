@@ -258,29 +258,40 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   }
 
   Widget _buildHeartRateStatCard(String label, String value, String unit) {
-    return Card(
-      color: Theme.of(context).primaryColor.withOpacity(0.08),
-      elevation: 0,
-      // Double the size of the heart rate stat cards with larger padding
+    return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        width: 90, // Make the cards wider
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Column(
           children: [
-            Text(label, style: AppTextStyles.bodySmall),
+            Text(label, style: AppTextStyles.bodyMedium.copyWith(color: Colors.grey[600])),
             const SizedBox(height: 4),
-            Text(
-              value, 
-              style: AppTextStyles.displaySmall.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(unit, style: AppTextStyles.bodySmall),
+            Text(value, style: AppTextStyles.headlineMedium.copyWith(fontWeight: FontWeight.bold)),
+            Text(unit, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
           ],
         ),
       ),
     );
+  }
+
+  Color _getZoneColor(String zoneName) {
+    switch (zoneName.toUpperCase()) {
+      case 'Z1':
+        return const Color(0xFF81C784); // Light green
+      case 'Z2':
+        return const Color(0xFF4FC3F7); // Light blue
+      case 'Z3':
+        return const Color(0xFFFFB74D); // Orange
+      case 'Z4':
+        return const Color(0xFFFF8A65); // Deep orange
+      case 'Z5':
+        return const Color(0xFFE57373); // Red
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -966,12 +977,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 List<({int min, int max, Color color, String name})>? zones;
                                 try {
                                   if (zoneSnapshot != null && zoneSnapshot!.isNotEmpty) {
-                                    zones = zoneSnapshot!.map((z) => (
-                                      min: (z['min_bpm'] as num).toInt(),
-                                      max: (z['max_bpm'] as num).toInt(),
-                                      color: Color((z['color'] as num).toInt()),
-                                      name: (z['name'] as String?) ?? 'Z',
-                                    )).toList();
+                                    zones = zoneSnapshot!.map((z) {
+                                      final name = (z['name'] as String?) ?? 'Z';
+                                      final color = _getZoneColor(name);
+                                      return (
+                                        min: (z['min_bpm'] as num).toInt(),
+                                        max: (z['max_bpm'] as num).toInt(),
+                                        color: color,
+                                        name: name,
+                                      );
+                                    }).toList();
                                   } else {
                                     final authState = context.read<AuthBloc>().state;
                                     if (authState is Authenticated) {

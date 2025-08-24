@@ -206,7 +206,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           if (zones != null) {
             final dist = HeartRateZoneService.timeInZonesSeconds(samples: widget.heartRateSamples!, zones: zones);
             completionData['time_in_zones'] = dist;
-            completionData['hr_zone_snapshot'] = zones.map((z) => {'name': z.name, 'min_bpm': z.min, 'max_bpm': z.max, 'color': z.color.value}).toList();
+            completionData['hr_zone_snapshot'] = zones.map((z) => {'name': z.name, 'min_bpm': z.min, 'max_bpm': z.max}).toList();
           }
         } catch (_) {}
       }
