@@ -1088,7 +1088,6 @@ class RuckSessionCompleteResource(Resource):
                             user_data = user_resp.data
                             if user_data.get('resting_hr') and user_data.get('max_hr'):
                                 # Calculate zones using the same logic as Flutter
-                                from datetime import datetime
                                 resting_hr = user_data['resting_hr']
                                 max_hr = user_data['max_hr']
                                 

@@ -739,15 +739,24 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     try {
       final prefs = GetIt.instance<SharedPreferences>();
       final enabled = prefs.getBool('live_step_tracking') ?? false;
+      AppLogger.info('[COORDINATOR] Live step tracking preference: $enabled');
+      
       if (enabled) {
         final startTime = DateTime.now();
+        AppLogger.info('[COORDINATOR] Starting live step tracking from: $startTime');
         _stepsSub?.cancel();
         _stepsSub = _healthService.startLiveSteps(startTime).listen((total) {
+          AppLogger.info('[COORDINATOR] Received step update: $total');
           _currentSteps = total;
           add(const StateAggregationRequested());
         });
+        AppLogger.info('[COORDINATOR] Live step tracking subscription created');
+      } else {
+        AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences');
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Error setting up live step tracking: $e');
+    }
     
     // Store planned route data for navigation
     _plannedRoute = event.plannedRoute;

@@ -325,22 +325,46 @@ class _HeartRateTile extends StatelessWidget {
   const _HeartRateTile({Key? key, required this.preferMetric, this.isCardLayout = false}) : super(key: key);
 
   ({Color color, String zone}) _determineHrColorAndZone(BuildContext context, int bpm) {
+    print('[HR ZONE DEBUG] _determineHrColorAndZone called with bpm: $bpm');
+    
     try {
       final authState = context.read<AuthBloc>().state;
+      print('[HR ZONE DEBUG] Auth state type: ${authState.runtimeType}');
+      
       if (authState is Authenticated) {
         final user = authState.user;
+        print('[HR ZONE DEBUG] User resting HR: ${user.restingHr}, max HR: ${user.maxHr}');
+        
         if (user.restingHr != null && user.maxHr != null && user.maxHr! > user.restingHr!) {
           final zones = HeartRateZoneService.zonesFromProfile(restingHr: user.restingHr!, maxHr: user.maxHr!);
+          print('[HR ZONE DEBUG] Generated ${zones.length} zones');
+          
           for (final z in zones) {
-            if (bpm >= z.min && bpm <= z.max) return (color: z.color, zone: z.name);
+            print('[HR ZONE DEBUG] Zone ${z.name}: ${z.min}-${z.max} BPM');
+            if (bpm >= z.min && bpm <= z.max) {
+              print('[HR ZONE DEBUG] Found matching zone: ${z.name}, color: ${z.color}');
+              return (color: z.color, zone: z.name);
+            }
           }
           // Fallback to nearest zone
-          if (bpm < zones.first.min) return (color: zones.first.color, zone: zones.first.name);
+          if (bpm < zones.first.min) {
+            print('[HR ZONE DEBUG] BPM below range, using first zone: ${zones.first.name}');
+            return (color: zones.first.color, zone: zones.first.name);
+          }
+          print('[HR ZONE DEBUG] BPM above range, using last zone: ${zones.last.name}');
           return (color: zones.last.color, zone: zones.last.name);
+        } else {
+          print('[HR ZONE DEBUG] User missing resting HR or max HR data');
         }
+      } else {
+        print('[HR ZONE DEBUG] User not authenticated');
       }
-    } catch (_) {}
+    } catch (e) {
+      print('[HR ZONE DEBUG] Exception in HR zone calculation: $e');
+    }
+    
     // Fallback zones without user profile
+    print('[HR ZONE DEBUG] Using fallback zones');
     if (bpm < 100) return (color: AppColors.success, zone: 'Z1');
     if (bpm < 140) return (color: AppColors.warning, zone: 'Z3');
     return (color: AppColors.error, zone: 'Z5');
@@ -357,19 +381,55 @@ class _HeartRateTile extends StatelessWidget {
       },
       builder: (context, latestHeartRate) {
         final int currentBpm = latestHeartRate ?? 0;
+        print('[HR ZONE DEBUG] Heart rate tile builder called with BPM: $currentBpm, isCardLayout: $isCardLayout');
+        
         if (!isCardLayout) {
           if (currentBpm > 0) {
+            print('[HR ZONE DEBUG] Building HR tile with BPM: $currentBpm');
             final hrData = _determineHrColorAndZone(context, currentBpm);
+            print('[HR ZONE DEBUG] HR data: zone=${hrData.zone}, color=${hrData.color}');
             return _StatTile(
               label: 'HR', 
               value: '$currentBpm bpm • ${hrData.zone}', 
               color: hrData.color
             );
+          } else {
+            print('[HR ZONE DEBUG] No heart rate data (BPM = 0), showing empty widget');
           }
           return const SizedBox.shrink();
         }
+        
+        // Card layout with HR zones
+        if (currentBpm > 0) {
+          print('[HR ZONE DEBUG] Building card layout HR with BPM: $currentBpm');
+          final hrData = _determineHrColorAndZone(context, currentBpm);
+          print('[HR ZONE DEBUG] Card HR data: zone=${hrData.zone}, color=${hrData.color}');
+          
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$currentBpm',
+                style: AppTextStyles.timerDisplay.copyWith(
+                  color: hrData.color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 36,
+                ),
+              ),
+              Text(
+                hrData.zone,
+                style: TextStyle(
+                  color: hrData.color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          );
+        }
+        
         return Text(
-          currentBpm > 0 ? '$currentBpm' : '--',
+          '--',
           style: AppTextStyles.timerDisplay.copyWith(
             color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,

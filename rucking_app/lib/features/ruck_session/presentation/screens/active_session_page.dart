@@ -965,6 +965,17 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     const int minTimeSeconds = 60; // 1 minute
     const double minDistanceKm = 0.2; // 200 meters
 
+    // DEBUG: Log pace calculation details
+    print('[PACE DEBUG] elapsedSeconds: $elapsedSeconds');
+    print('[PACE DEBUG] distanceKm: $distanceKm');
+    print('[PACE DEBUG] pace: $pace');
+    print('[PACE DEBUG] pace type: ${pace.runtimeType}');
+    if (pace != null) {
+      print('[PACE DEBUG] pace.isFinite: ${pace.isFinite}');
+      print('[PACE DEBUG] pace > 0: ${pace > 0}');
+      print('[PACE DEBUG] pace <= 3600: ${pace <= 3600}');
+    }
+
     // Determine if pace should be shown and is valid
     final bool canShowPace = 
         elapsedSeconds >= minTimeSeconds && 
@@ -973,6 +984,11 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
         pace.isFinite && 
         pace > 0 && 
         pace <= 3600; // Corresponds to 60 min/km or 60 min/mi
+
+    print('[PACE DEBUG] elapsedSeconds >= minTimeSeconds: ${elapsedSeconds >= minTimeSeconds}');
+    print('[PACE DEBUG] distanceKm >= minDistanceKm: ${distanceKm >= minDistanceKm}');
+    print('[PACE DEBUG] pace != null: ${pace != null}');
+    print('[PACE DEBUG] canShowPace: $canShowPace');
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,

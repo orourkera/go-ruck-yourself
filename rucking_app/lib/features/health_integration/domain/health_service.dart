@@ -423,31 +423,64 @@ class HealthService {
   
   /// Read total steps between start and end
   Future<int> getStepsBetween(DateTime start, DateTime end) async {
-    if (!Platform.isIOS && !Platform.isAndroid) return 0;
+    AppLogger.info('[STEPS DEBUG] getStepsBetween called: $start to $end');
+    
+    if (!Platform.isIOS && !Platform.isAndroid) {
+      AppLogger.warning('[STEPS DEBUG] Not iOS/Android platform, returning 0');
+      return 0;
+    }
+    
     try {
+      AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
+      
       if (!_isAuthorized) {
+        AppLogger.info('[STEPS DEBUG] Not authorized, requesting authorization...');
         final ok = await requestAuthorization();
-        if (!ok) return 0;
+        AppLogger.info('[STEPS DEBUG] Authorization request result: $ok');
+        if (!ok) {
+          AppLogger.error('[STEPS DEBUG] Authorization failed, returning 0');
+          return 0;
+        }
       }
+      
+      AppLogger.info('[STEPS DEBUG] Calling health.getHealthDataFromTypes...');
       final List<HealthDataPoint> points = await _health.getHealthDataFromTypes(
         startTime: start,
         endTime: end,
         types: [HealthDataType.STEPS],
       );
+      
+      AppLogger.info('[STEPS DEBUG] Retrieved ${points.length} health data points');
+      
       int total = 0;
-      for (final p in points) {
+      for (int i = 0; i < points.length; i++) {
+        final p = points[i];
         final dynamic raw = p.value;
+        AppLogger.debug('[STEPS DEBUG] Point $i: ${p.dateFrom} to ${p.dateTo}, value type: ${raw.runtimeType}, raw: $raw');
+        
         if (raw is NumericHealthValue) {
-          total += (raw.numericValue ?? 0).toInt();
+          final value = (raw.numericValue ?? 0).toInt();
+          total += value;
+          AppLogger.debug('[STEPS DEBUG] NumericHealthValue: $value, total now: $total');
         } else if (raw is num) {
-          total += raw.toInt();
+          final value = raw.toInt();
+          total += value;
+          AppLogger.debug('[STEPS DEBUG] num value: $value, total now: $total');
         } else {
           final parsed = int.tryParse(raw.toString());
-          if (parsed != null) total += parsed;
+          if (parsed != null) {
+            total += parsed;
+            AppLogger.debug('[STEPS DEBUG] Parsed value: $parsed, total now: $total');
+          } else {
+            AppLogger.warning('[STEPS DEBUG] Could not parse value: $raw');
+          }
         }
       }
+      
+      AppLogger.info('[STEPS DEBUG] Final total steps: $total');
       return total;
     } catch (e) {
+      AppLogger.error('[STEPS DEBUG] Exception in getStepsBetween: $e');
       AppLogger.error('Error reading steps between $start and $end: $e');
       return 0;
     }

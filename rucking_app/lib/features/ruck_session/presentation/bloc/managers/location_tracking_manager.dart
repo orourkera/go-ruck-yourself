@@ -1186,10 +1186,15 @@ double _calculateTotalDistanceWithValidation() {
 }  
 
   double _calculateCurrentPace(double speedMs) {
+    // DEBUG: Log pace calculation inputs
+    AppLogger.debug('[PACE DEBUG] _calculateCurrentPace called with speedMs: $speedMs');
+    
     // VERSION 2.5: Don't show pace for the first minute of the session
     if (_sessionStartTime != null) {
       final elapsedTime = DateTime.now().difference(_sessionStartTime!);
+      AppLogger.debug('[PACE DEBUG] Session elapsed time: ${elapsedTime.inSeconds} seconds');
       if (elapsedTime.inSeconds < 60) {
+        AppLogger.debug('[PACE DEBUG] Returning 0.0 - session less than 60 seconds old');
         return 0.0; // No pace for first minute
       }
     }
@@ -1199,14 +1204,64 @@ double _calculateTotalDistanceWithValidation() {
     if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
       final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
       if (timeSinceLastCalc < 5) {
+        AppLogger.debug('[PACE DEBUG] Returning cached pace: $_cachedCurrentPace');
         return _cachedCurrentPace!;
       }
     }
 
     double rawPace = 0.0;
 
-    // VERSION 2.6: Simple distance-based calculation between last two GPS points
-    if (_locationPoints.length >= 2) {
+    // VERSION 2.7: Multi-point pace calculation with GPS noise filtering
+    if (_locationPoints.length >= 5) {
+      // Use last 5 points for more stable pace calculation
+      final recentPoints = _locationPoints.sublist(_locationPoints.length - 5);
+      double totalDistance = 0.0;
+      int totalTime = 0;
+      
+      AppLogger.debug('[PACE DEBUG] Using last 5 points for pace calculation');
+      
+      for (int i = 1; i < recentPoints.length; i++) {
+        final prevPoint = recentPoints[i - 1];
+        final currentPoint = recentPoints[i];
+        
+        final segmentDistance = _haversineDistance(
+          prevPoint.latitude, prevPoint.longitude,
+          currentPoint.latitude, currentPoint.longitude,
+        );
+        final segmentTime = currentPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+        
+        // Only include segments with meaningful movement (>5 meters)
+        if (segmentDistance > 0.005 && segmentTime > 0) { // 0.005km = 5 meters
+          totalDistance += segmentDistance;
+          totalTime += segmentTime;
+        }
+      }
+      
+      AppLogger.debug('[PACE DEBUG] Total distance over 5 points: ${totalDistance}km');
+      AppLogger.debug('[PACE DEBUG] Total time over 5 points: ${totalTime} seconds');
+      
+      if (totalTime > 0 && totalDistance > 0.01) { // Require at least 10 meters total
+        final paceMinutesPerKm = (totalTime / 60) / (totalDistance / 1000);
+        rawPace = paceMinutesPerKm * 60; // Convert to seconds per km
+        
+        AppLogger.debug('[PACE DEBUG] Multi-point paceMinutesPerKm: $paceMinutesPerKm');
+        AppLogger.debug('[PACE DEBUG] Multi-point rawPace: $rawPace seconds/km');
+        
+        // SANITY CHECK: Cap pace at reasonable values
+        if (rawPace > 3600) { // More than 60 minutes per km is unrealistic
+          AppLogger.debug('[PACE DEBUG] Pace too slow ($rawPace), capping at 3600 seconds/km');
+          rawPace = 3600;
+        } else if (rawPace < 120) { // Less than 2 minutes per km is unrealistic for rucking
+          AppLogger.debug('[PACE DEBUG] Pace too fast ($rawPace), capping at 120 seconds/km');
+          rawPace = 120;
+        }
+      } else {
+        AppLogger.debug('[PACE DEBUG] Insufficient meaningful movement, using fallback method');
+        // Fallback to average pace if recent movement is too small
+        rawPace = _calculateAveragePace(_lastKnownTotalDistance);
+      }
+    } else if (_locationPoints.length >= 2) {
+      // Fallback: Original 2-point method for early session
       final lastPoint = _locationPoints.last;
       final secondLastPoint = _locationPoints[_locationPoints.length - 2];
       
@@ -1216,10 +1271,21 @@ double _calculateTotalDistanceWithValidation() {
       );
       
       final timeDiff = lastPoint.timestamp.difference(secondLastPoint.timestamp).inSeconds;
-      if (timeDiff > 0 && distance > 0) {
-        // Calculate pace in seconds per km (convert from minutes per km)
+      
+      AppLogger.debug('[PACE DEBUG] Fallback 2-point method: distance=${distance}km, time=${timeDiff}s');
+      
+      if (timeDiff > 0 && distance > 0.005) { // Require at least 5 meters
         final paceMinutesPerKm = (timeDiff / 60) / (distance / 1000);
-        rawPace = paceMinutesPerKm * 60; // Convert to seconds per km
+        rawPace = paceMinutesPerKm * 60;
+        
+        // Apply stricter caps for 2-point method (more noise-prone)
+        if (rawPace > 2400 || rawPace < 180) { // 40 min/km max, 3 min/km min
+          AppLogger.debug('[PACE DEBUG] 2-point pace out of range ($rawPace), using average pace');
+          rawPace = _calculateAveragePace(_lastKnownTotalDistance);
+        }
+      } else {
+        AppLogger.debug('[PACE DEBUG] Invalid 2-point data, using average pace');
+        rawPace = _calculateAveragePace(_lastKnownTotalDistance);
       }
     }
 
@@ -1242,6 +1308,7 @@ double _calculateTotalDistanceWithValidation() {
     _cachedCurrentPace = rawPace;
     _lastPaceCalculation = now;
 
+    AppLogger.debug('[PACE DEBUG] Final calculated pace: $rawPace seconds/km');
     return rawPace;
   }  
 
