@@ -56,7 +56,7 @@ BEGIN
         
         -- Sync to Mailjet via HTTP call to our Flask API
         BEGIN
-            -- Prepare Mailjet payload
+            -- Prepare Mailjet payload with proper first name extraction
             mailjet_payload := jsonb_build_object(
                 'email', NEW.email,
                 'username', username_value,
@@ -69,7 +69,11 @@ BEGIN
                         ELSE 'database_trigger'
                     END,
                     'name', username_value,
-                    'firstname', SPLIT_PART(username_value, ' ', 1)
+                    'firstname', CASE 
+                        WHEN position(' ' in username_value) > 0 THEN 
+                            substring(username_value from 1 for position(' ' in username_value) - 1)
+                        ELSE username_value
+                    END
                 )
             );
             
