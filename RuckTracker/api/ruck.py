@@ -1209,6 +1209,32 @@ class RuckSessionCompleteResource(Resource):
         
             completed_session = update_resp.data[0]
 
+            # Always check for heart rate samples and aggregate them (they may have been uploaded via chunk endpoints during session)
+            try:
+                stats_resp = supabase.table('heart_rate_sample') \
+                    .select('bpm') \
+                    .eq('session_id', ruck_id) \
+                    .limit(50000) \
+                    .execute()
+                if stats_resp.data:
+                    bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
+                    if bpm_values:
+                        avg_hr = sum(bpm_values) / len(bpm_values)
+                        min_hr = min(bpm_values)
+                        max_hr = max(bpm_values)
+                        supabase.table('ruck_session').update({
+                            'avg_heart_rate': round(avg_hr, 1),
+                            'min_heart_rate': int(min_hr),
+                            'max_heart_rate': int(max_hr)
+                        }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
+                        # Also reflect into completed_session for response
+                        completed_session['avg_heart_rate'] = round(avg_hr, 1)
+                        completed_session['min_heart_rate'] = int(min_hr)
+                        completed_session['max_heart_rate'] = int(max_hr)
+                        logger.info(f"[HR_AGGREGATE] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr} from {len(bpm_values)} samples")
+            except Exception as hr_agg_err:
+                logger.error(f"[HR_AGGREGATE] Error aggregating heart rate samples for session {ruck_id}: {hr_agg_err}")
+
             # Handle heart rate samples if provided in completion payload
             if 'heart_rate_samples' in data and isinstance(data['heart_rate_samples'], list):
                 try:

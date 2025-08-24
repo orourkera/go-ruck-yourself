@@ -14,6 +14,7 @@ import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
+import 'package:rucking_app/core/services/weather_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
@@ -393,6 +394,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       );
     } else if (mainEvent is SessionReset) {
       return const manager_events.SessionReset();
+    } else if (mainEvent is HeartRateBatchUploadRequested) {
+      return manager_events.HeartRateBatchUploadRequested(samples: mainEvent.samples);
     }
     
     // Return null for unmapped events
@@ -512,7 +515,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         duration: lifecycleState.duration,
         userWeightKg: userWeightKg,
         ruckWeightKg: ruckWeightKg,
-      );
+      ).round();
       
       // Update watch with calculated values from coordinator
       _locationManager.updateWatchWithCalculatedValues(
@@ -528,7 +531,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         distanceKm: locationState.totalDistance,
         ruckWeightKg: ruckWeightKg,
         userWeightKg: userWeightKg,
-        calories: calories,
+        calories: calories.toDouble(),
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
         isPaused: _lifecycleManager.isPaused,
@@ -618,6 +621,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       } catch (_) {}
     }
     
+    // Skip weather data for now to keep method synchronous
+    // Weather integration can be added later as an async enhancement
+    double? temperature;
+    double? windSpeed;
+    double? humidity;
+    bool isRaining = false;
+
     // Use MetCalculator for sophisticated calorie calculation
     _lastCalorieMethod = (calorieMethod ?? 'fusion');
     final calories = MetCalculator.calculateRuckingCalories(
@@ -633,6 +643,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       heartRateSamples: _heartRateManager.heartRateSampleObjects,
       age: age,
       activeOnly: activeOnly,
+      temperatureCelsius: temperature,
+      windSpeedKmh: windSpeed,
+      humidity: humidity,
+      isRaining: isRaining,
     );
     
     AppLogger.debug('[COORDINATOR] CALORIE_CALCULATION: '
@@ -643,6 +657,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'elevationGain=${elevationGain.toStringAsFixed(1)}m, '
         'elevationLoss=${elevationLoss.toStringAsFixed(1)}m, '
         'terrainMultiplier=${terrainMultiplier.toStringAsFixed(2)}x, '
+        'weather=[temp=${temperature?.toStringAsFixed(1)}°C, wind=${windSpeed?.toStringAsFixed(1)}kmh, humidity=${humidity?.toStringAsFixed(0)}%, rain=$isRaining], '
         'finalCalories=${calories.toStringAsFixed(0)}');
     
     return calories;
@@ -1107,5 +1122,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   /// Get stored completion data for lifecycle manager
   Map<String, dynamic>? getSessionCompletionData() {
     return _sessionCompletionData;
+  }
+
+  /// Helper function to check if weather condition code indicates rain
+  bool _isRainyWeather(int conditionCode) {
+    // OpenWeatherMap condition codes for rain/drizzle
+    return (conditionCode >= 200 && conditionCode < 600); // Thunderstorm, drizzle, rain
   }
 }

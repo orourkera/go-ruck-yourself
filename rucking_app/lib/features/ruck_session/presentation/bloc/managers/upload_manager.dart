@@ -129,9 +129,11 @@ class UploadManager implements SessionManager {
   }
   
   Future<void> _onHeartRateBatchUploadRequested(HeartRateBatchUploadRequested event) async {
+    AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] 🔥 HEART RATE UPLOAD REQUESTED: ${event.samples.length} samples, sessionId: $_activeSessionId');
+    
     if (_activeSessionId == null || _activeSessionId!.startsWith('offline_')) {
       // Save offline for later sync
-      AppLogger.debug('[UPLOAD_MANAGER] Offline session, skipping heart rate upload');
+      AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Offline session detected, skipping heart rate upload. SessionId: $_activeSessionId');
       return;
     }
     
@@ -153,7 +155,7 @@ class UploadManager implements SessionManager {
       pendingHeartRateSamples: _uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length,
     ));
     
-    AppLogger.debug('[UPLOAD_MANAGER] Added heart rate batch to queue. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
+    AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Added heart rate batch to queue. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
     
     // Trigger immediate upload for heart rate data (don't wait for timer)
     _processUploadQueue();
@@ -237,7 +239,7 @@ class UploadManager implements SessionManager {
             // Handle upload failure
             await _handleUploadFailure(upload, e);
             
-            AppLogger.warning('[UPLOAD_MANAGER] Upload failed: $e');
+            AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Upload failed: $e');
           }
         }
         
@@ -324,11 +326,11 @@ class UploadManager implements SessionManager {
         
         if (upload['retries'] < _maxRetries) {
           _uploadQueue.add(upload); // Re-add to queue
-          AppLogger.info('[UPLOAD_MANAGER] Retrying upload (${upload['retries']}/$_maxRetries)');
+          AppLogger.info('[AI_DEBUG][UPLOAD_MANAGER] Retrying upload (${upload['retries']}/$_maxRetries)');
         } else {
           // Save failed upload for manual retry later
           await _saveFailedUpload(upload);
-          AppLogger.warning('[UPLOAD_MANAGER] Max retries exceeded, saving for later: ${upload['type']}');
+          AppLogger.warning('[AI_DEBUG][UPLOAD_MANAGER] Max retries exceeded, saving for later: ${upload['type']}');
         }
         
         _updateState(_currentState.copyWith(
@@ -494,14 +496,20 @@ class UploadManager implements SessionManager {
   Future<void> _uploadHeartRateBatch(List<Map<String, dynamic>> heartRateData) async {
     if (_activeSessionId == null || heartRateData.isEmpty) return;
   
-    AppLogger.info('[UPLOAD_MANAGER] Uploading ${heartRateData.length} heart rate samples');
+    AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Uploading ${heartRateData.length} heart rate samples to session $_activeSessionId');
+    AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Heart rate data sample: ${heartRateData.take(3).toList()}');
   
-    await _apiClient.post('/rucks/$_activeSessionId/heart-rate-chunk', {
-      'heart_rate_samples': heartRateData,
-      'batch_timestamp': DateTime.now().toIso8601String(),
-    });
-  
-    AppLogger.info('[UPLOAD_MANAGER] Heart rate batch uploaded successfully');
+    try {
+      final response = await _apiClient.post('/rucks/$_activeSessionId/heart-rate-chunk', {
+        'heart_rate_samples': heartRateData,
+        'batch_timestamp': DateTime.now().toIso8601String(),
+      });
+      
+      AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Heart rate batch uploaded successfully: $response');
+    } catch (e, stackTrace) {
+      AppLogger.error('[AI_DEBUG][UPLOAD_MANAGER] Heart rate batch upload failed', exception: e, stackTrace: stackTrace);
+      rethrow;
+    }
   }
   
   /// Upload terrain segments to server

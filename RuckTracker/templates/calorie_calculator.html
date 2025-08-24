@@ -300,7 +300,7 @@
       return Math.max(0, metValue * weightKgTotal * hours);
     }
 
-    // Mechanical (Pandolf/Givoni–Goldman inspired) matching _calculateMechanicalCaloriesPandolf()
+    // Mechanical (Enhanced Pandolf with GORUCK-style load ratio adjustment)
     function calcMechanicalPandolf({userWeightKg, ruckWeightKg, speedKmh, gradePct, terrainMultiplier, elapsedSeconds}){
       const v = clamp(speedKmh / 3.6, 0.0, 3.0); // m/s
       const W = userWeightKg;
@@ -312,6 +312,27 @@
       const termSpeedGrade = eta * (W + L) * (1.5 * v * v + 0.35 * v * clamp(G, -20.0, 30.0));
       let M = 1.5 * W + termLoad + termSpeedGrade; // Watts
       M = clamp(M, 50.0, 800.0);
+      
+      // GORUCK-inspired load ratio adjustment to address Pandolf underestimation
+      // Research shows 12-33% underestimation, scaling with load/body weight ratio and speed
+      const loadRatio = lw; // L/W ratio (0.0 to ~0.33 for reasonable loads)
+      const speedMph = speedKmh * 0.621371;
+      
+      // Calculate adjustment factor based on load ratio and speed
+      // At 33% body weight + 4mph: ~27% increase (matches research)
+      // Scales down for lighter loads and slower speeds
+      let adjustmentFactor = 1.0;
+      if (loadRatio > 0 && speedMph > 2.0) {
+        // Base adjustment scales with load ratio (0-27% at max)
+        const baseAdjustment = Math.min(loadRatio * 0.82, 0.27); // Cap at 27%
+        // Speed factor: more adjustment at higher speeds (research shows this)
+        const speedFactor = Math.min((speedMph - 2.0) / 2.0, 1.0); // 0-1 factor for 2-4mph+
+        adjustmentFactor = 1.0 + (baseAdjustment * speedFactor);
+      }
+      
+      // Apply the research-based adjustment
+      M = M * adjustmentFactor;
+      
       const kcalPerSec = (M / 4186.0);
       let kcal = kcalPerSec * elapsedSeconds;
       if (speedKmh < 0.5 && elapsedSeconds > 0) kcal *= 0.2;

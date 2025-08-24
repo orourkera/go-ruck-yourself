@@ -175,6 +175,10 @@ class MetCalculator {
     List<dynamic>? heartRateSamples, // expects objects with bpm:int and timestamp:DateTime
     int age = 30,
     bool activeOnly = false,
+    double? temperatureCelsius,
+    double? windSpeedKmh,
+    double? humidity,
+    bool isRaining = false,
   }) {
     // Calculate average speed (km/h)
     double durationHours = elapsedSeconds / 3600.0;
@@ -191,13 +195,22 @@ class MetCalculator {
     }
     double ruckWeightLbs = ruckWeightKg * 2.20462;
 
+    // Calculate weather adjustment multiplier
+    final weatherMultiplier = _calculateWeatherMultiplier(
+      temperatureCelsius: temperatureCelsius,
+      windSpeedKmh: windSpeedKmh,
+      humidity: humidity,
+      isRaining: isRaining,
+      speedKmh: avgSpeedKmh,
+    );
+
     // Mechanical model (Pandolf/Givoni–Goldman inspired)
     final mechanicalCalories = _calculateMechanicalCaloriesPandolf(
       userWeightKg: userWeightKg,
       ruckWeightKg: ruckWeightKg,
       speedKmh: avgSpeedKmh,
       gradePct: avgGrade,
-      terrainMultiplier: terrainMultiplier,
+      terrainMultiplier: 1.0, // Pure Pandolf uses no terrain adjustment
       elapsedSeconds: elapsedSeconds,
     );
 
@@ -224,14 +237,17 @@ class MetCalculator {
       metValue: metValue,
     ) * terrainMultiplier;
 
-    // Choose method
+    // Choose method - only Fusion gets weather adjustments
     if (calorieMethod == 'mechanical') {
+      // Pure Pandolf with GORUCK load-ratio adjustment only
       return mechanicalCalories;
     } else if (calorieMethod == 'hr') {
-      return (hrCalories > 0) ? hrCalories : baseCalories;
+      // HR-based method deprecated for rucking - fallback to fusion
+      // (Keytel equation not appropriate for load carriage activities)
+      // Fall through to fusion method below
     }
 
-    // Fusion (recommended): confidence-weighted blend of HR and mechanical
+    // Fusion (recommended): confidence-weighted blend of HR and mechanical WITH weather
     double fusion = mechanicalCalories;
     if (hrCalories > 0) {
       // Estimate HR coverage: assume downsample ~20s between saved samples
@@ -241,6 +257,9 @@ class MetCalculator {
       final wMech = 1.0 - wHr;
       fusion = wHr * hrCalories + wMech * mechanicalCalories;
     }
+
+    // Apply weather and terrain adjustments ONLY to fusion method
+    fusion *= weatherMultiplier * terrainMultiplier;
 
     // Apply a small sex adjustment post‑fusion (only if unspecified)
     if (gender == null) fusion *= 0.925; // mid‑way when sex unknown
@@ -256,13 +275,71 @@ class MetCalculator {
     return fusion;
   }
 
-  /// Pandolf/Givoni–Goldman inspired mechanical energy estimate (terrain & grade aware)
+  /// Calculate weather adjustment multiplier based on environmental conditions
+  /// Research-based adjustments for temperature, wind, humidity, and precipitation
+  static double _calculateWeatherMultiplier({
+    double? temperatureCelsius,
+    double? windSpeedKmh,
+    double? humidity,
+    bool isRaining = false,
+    double speedKmh = 0.0,
+  }) {
+    double multiplier = 1.0;
+
+    // Temperature adjustments (research-based)
+    if (temperatureCelsius != null) {
+      final temp = temperatureCelsius;
+      if (temp > 30) {
+        // Hot weather: 10-20% increase due to thermoregulation
+        multiplier *= 1.15; // 15% increase for very hot conditions
+      } else if (temp > 25) {
+        // Warm weather: 5-10% increase
+        multiplier *= 1.07; // 7% increase for warm conditions
+      } else if (temp < 0) {
+        // Very cold: 10-15% increase for body warming
+        multiplier *= 1.12; // 12% increase for freezing conditions
+      } else if (temp < 5) {
+        // Cold weather: 5-10% increase
+        multiplier *= 1.06; // 6% increase for cold conditions
+      }
+      // Optimal range (5-25°C) has no adjustment (multiplier stays 1.0)
+    }
+
+    // Wind resistance adjustments (speed-dependent)
+    if (windSpeedKmh != null && windSpeedKmh > 10 && speedKmh > 3.0) {
+      // Wind resistance increases with speed squared, significant at higher speeds
+      final windFactor = (windSpeedKmh - 10) / 40.0; // 0-1 factor for 10-50kmh wind
+      final speedFactor = speedKmh / 6.0; // Speed factor (normalized to 6kmh)
+      final windAdjustment = windFactor * speedFactor * 0.08; // Up to 8% increase
+      multiplier *= (1.0 + windAdjustment.clamp(0.0, 0.08));
+    }
+
+    // Humidity adjustments (affects cooling efficiency)
+    if (humidity != null && temperatureCelsius != null && temperatureCelsius > 20) {
+      // High humidity reduces cooling efficiency in warm weather
+      if (humidity > 80) {
+        multiplier *= 1.05; // 5% increase for very humid conditions
+      } else if (humidity > 60) {
+        multiplier *= 1.02; // 2% increase for humid conditions
+      }
+    }
+
+    // Precipitation adjustments (affects footing and muscle stabilization)
+    if (isRaining) {
+      multiplier *= 1.04; // 4% increase for wet conditions
+    }
+
+    // Cap total weather adjustment at reasonable bounds
+    return multiplier.clamp(1.0, 1.25); // Max 25% increase from weather
+  }
+
+  /// Enhanced Pandolf equation with GORUCK load-ratio corrections (pure - no terrain/weather)
   static double _calculateMechanicalCaloriesPandolf({
     required double userWeightKg,
     required double ruckWeightKg,
     required double speedKmh,
     required double gradePct,
-    required double terrainMultiplier,
+    double terrainMultiplier = 1.0, // Default to 1.0 for pure Pandolf
     required int elapsedSeconds,
   }) {
     // Convert units
@@ -279,6 +356,26 @@ class MetCalculator {
     final termLoad = 2.0 * (W + L) * (lw * lw);
     final termSpeedGrade = eta * (W + L) * (1.5 * v * v + 0.35 * v * G.clamp(-20.0, 30.0));
     double M = 1.5 * W + termLoad + termSpeedGrade; // Watts
+
+    // GORUCK-inspired load ratio adjustment to address Pandolf underestimation
+    // Research shows 12-33% underestimation, scaling with load/body weight ratio and speed
+    final loadRatio = lw; // L/W ratio (0.0 to ~0.33 for reasonable loads)
+    final speedMph = speedKmh * 0.621371;
+    
+    // Calculate adjustment factor based on load ratio and speed
+    // At 33% body weight + 4mph: ~27% increase (matches Australian military research)
+    // Scales down for lighter loads and slower speeds
+    double adjustmentFactor = 1.0;
+    if (loadRatio > 0 && speedMph > 2.0) {
+      // Base adjustment scales with load ratio (0-27% at max)
+      final baseAdjustment = math.min(loadRatio * 0.82, 0.27); // Cap at 27%
+      // Speed factor: more adjustment at higher speeds (research shows this)
+      final speedFactor = math.min((speedMph - 2.0) / 2.0, 1.0); // 0-1 factor for 2-4mph+
+      adjustmentFactor = 1.0 + (baseAdjustment * speedFactor);
+    }
+    
+    // Apply the research-based adjustment
+    M = M * adjustmentFactor;
 
     // Clamp to reasonable range (walking with load)
     M = M.clamp(50.0, 800.0);

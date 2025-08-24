@@ -313,6 +313,9 @@ class HeartRateManager implements SessionManager {
   void _triggerHeartRateUploadIfNeeded() {
     final unuploadedSamples = _heartRateSamples.length - _lastUploadedSampleIndex;
     
+    // DEBUG: Always log the current state
+    AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_CHECK: ${unuploadedSamples} unuploaded samples (total: ${_heartRateSamples.length}, uploaded: $_lastUploadedSampleIndex, threshold: $_uploadTriggerThreshold, sessionId: $_activeSessionId)');
+    
     if (unuploadedSamples >= _uploadTriggerThreshold) {
       AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_TRIGGER: ${unuploadedSamples} unuploaded samples, triggering upload');
       _triggerImmediateHeartRateUpload();
@@ -325,7 +328,7 @@ class HeartRateManager implements SessionManager {
     _heartRateUploadTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       final unuploadedSamples = _heartRateSamples.length - _lastUploadedSampleIndex;
       if (unuploadedSamples > 0) {
-        AppLogger.info('[HEART_RATE_MANAGER] PERIODIC_UPLOAD: ${unuploadedSamples} unuploaded samples, triggering periodic upload');
+        AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] PERIODIC_UPLOAD: ${unuploadedSamples} unuploaded samples, triggering periodic upload');
         _triggerImmediateHeartRateUpload();
       }
     });
@@ -333,11 +336,19 @@ class HeartRateManager implements SessionManager {
   
   /// Trigger immediate heart rate upload to database
   void _triggerImmediateHeartRateUpload() {
-    if (_activeSessionId == null) return;
+    if (_activeSessionId == null) {
+      AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] Cannot trigger upload - no active session ID');
+      return;
+    }
     
     try {
       final unuploadedSamples = _heartRateSamples.length - _lastUploadedSampleIndex;
-      if (unuploadedSamples <= 0) return;
+      AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_TRIGGER: Total samples: ${_heartRateSamples.length}, Last uploaded index: $_lastUploadedSampleIndex, Unuploaded: $unuploadedSamples');
+      
+      if (unuploadedSamples <= 0) {
+        AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] No unuploaded samples to process');
+        return;
+      }
       
       final batchEndIndex = _heartRateSamples.length; // Upload all unuploaded samples
       final samplesToUpload = _heartRateSamples.sublist(_lastUploadedSampleIndex, batchEndIndex)
@@ -354,29 +365,36 @@ class HeartRateManager implements SessionManager {
         };
       }).toList();
       
+      AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_BATCH: Prepared ${samplesToUpload.length} samples for upload');
+      
       // Add to upload queue
       for (final sample in samplesToUpload) {
         _pendingHeartRateUploads.add(sample);
       }
       
+      AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_QUEUE: Added samples to queue, queue size: ${_pendingHeartRateUploads.length}');
+      
       // Process upload queue
       _processHeartRateUploadQueue();
       
-      AppLogger.info('[HEART_RATE_MANAGER] IMMEDIATE_UPLOAD: Queued ${samplesToUpload.length} heart rate samples for upload');
+      AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] IMMEDIATE_UPLOAD: Queued ${samplesToUpload.length} heart rate samples for upload');
       
     } catch (e) {
-      AppLogger.error('[HEART_RATE_MANAGER] Error during immediate heart rate upload: $e');
+      AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] Error during immediate heart rate upload: $e');
     }
   }
   
   /// Process heart rate upload queue
   void _processHeartRateUploadQueue() {
-    if (_pendingHeartRateUploads.isEmpty || _activeSessionId == null) return;
+    if (_pendingHeartRateUploads.isEmpty || _activeSessionId == null) {
+      AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_QUEUE: Skipping - queue empty (${_pendingHeartRateUploads.isEmpty}) or no session ($_activeSessionId == null)');
+      return;
+    }
     
     final batch = _pendingHeartRateUploads.toList();
     _pendingHeartRateUploads.clear();
     
-    AppLogger.info('[HEART_RATE_MANAGER] UPLOAD_QUEUE: Processing batch of ${batch.length} heart rate samples');
+    AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_QUEUE: Processing batch of ${batch.length} heart rate samples');
     
     // Convert to HeartRateSample objects for the upload request
     final samples = batch.map((sample) {
@@ -387,8 +405,13 @@ class HeartRateManager implements SessionManager {
       );
     }).toList();
     
+    AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_QUEUE: Converted ${samples.length} samples, emitting HeartRateBatchUploadRequested event');
+    AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] Event emitter available: ${_eventEmitter != null}');
+    
     // Send HeartRateBatchUploadRequested event to trigger actual upload
     _emitEvent(HeartRateBatchUploadRequested(samples: samples));
+    
+    AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_QUEUE: HeartRateBatchUploadRequested event emitted successfully');
     
     // Mark as uploaded locally
     _onHeartRateUploadSuccess(batch.length);
@@ -396,7 +419,7 @@ class HeartRateManager implements SessionManager {
     // Update tracking indices
     _lastUploadedSampleIndex = _heartRateSamples.length;
     
-    AppLogger.info('[HEART_RATE_MANAGER] Heart rate batch sent for upload to backend');
+    AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] Heart rate batch sent for upload to backend');
   }
   
   /// Handle successful heart rate upload
