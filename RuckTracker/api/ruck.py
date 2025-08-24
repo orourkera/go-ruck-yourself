@@ -58,6 +58,69 @@ class RuckSessionListResource(Resource):
             logger.error(f"Error listing ruck sessions: {e}")
             return {'message': f'Error listing ruck sessions: {str(e)}'}, 500
 
+    def post(self):
+        """Create a new ruck session (POST /api/rucks)"""
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        try:
+            data = request.get_json()
+            if not data:
+                return {'message': 'No data provided'}, 400
+
+            # Check for existing active session
+            existing_resp = (
+                supabase.table('ruck_session')
+                .select('id, status, started_at, ruck_weight_kg')
+                .eq('user_id', g.user.id)
+                .in_('status', ['in_progress', 'paused'])
+                .execute()
+            )
+
+            if existing_resp.data:
+                # Return existing active session info
+                active_session = existing_resp.data[0]
+                return {
+                    'has_active_session': True,
+                    'id': active_session['id'],
+                    'status': active_session['status'],
+                    'started_at': active_session['started_at'],
+                    'ruck_weight_kg': active_session['ruck_weight_kg']
+                }, 200
+
+            # Create new session
+            session_data = {
+                'user_id': g.user.id,
+                'ruck_weight_kg': data.get('ruck_weight_kg', 0.0),
+                'weight_kg': data.get('weight_kg'),
+                'is_manual': data.get('is_manual', False),
+                'status': 'created',
+                'created_at': datetime.utcnow().isoformat()
+            }
+
+            # Add optional fields
+            if data.get('event_id'):
+                session_data['event_id'] = data['event_id']
+            if data.get('route_id'):
+                session_data['route_id'] = data['route_id']
+            if data.get('planned_ruck_id'):
+                session_data['planned_ruck_id'] = data['planned_ruck_id']
+            if data.get('planned_duration_minutes'):
+                session_data['planned_duration_minutes'] = data['planned_duration_minutes']
+
+            resp = supabase.table('ruck_session').insert(session_data).execute()
+            
+            if not resp.data:
+                return {'message': 'Failed to create session'}, 500
+
+            return resp.data[0], 201
+
+        except Exception as e:
+            logger.error(f"Error creating ruck session: {e}")
+            return {'message': f'Error creating ruck session: {str(e)}'}, 500
+
 class RuckSessionResource(Resource):
     def get(self, ruck_id):
         """Get a single ruck session by ID for the authenticated user"""

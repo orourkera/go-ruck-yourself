@@ -165,9 +165,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     
     // Set event emitter callback for heart rate manager
     _heartRateManager.setEventEmitter((event) {
-      // Convert manager event to main bloc event
-      if (event is manager_events.HeartRateBatchUploadRequested) {
-        add(HeartRateBatchUploadRequested(samples: event.samples));
+      // Heart rate manager now emits main bloc events directly
+      if (event is HeartRateBatchUploadRequested) {
+        add(event);
+      } else {
+        add(event);
       }
     });
     

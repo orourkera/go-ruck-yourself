@@ -5,7 +5,8 @@ import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../domain/services/heart_rate_service.dart';
 import '../../../domain/models/heart_rate_sample.dart';
-import '../events/session_events.dart';
+import '../active_session_bloc.dart' as main_bloc;
+import '../events/session_events.dart' as manager_events;
 import '../models/manager_states.dart';
 import 'session_manager.dart';
 
@@ -59,23 +60,23 @@ class HeartRateManager implements SessionManager {
   HeartRateState get currentState => _currentState;
 
   @override
-  Future<void> handleEvent(ActiveSessionEvent event) async {
-    if (event is SessionStartRequested) {
+  Future<void> handleEvent(manager_events.ActiveSessionEvent event) async {
+    if (event is manager_events.SessionStartRequested) {
       await _onSessionStarted(event);
-    } else if (event is SessionStopRequested) {
+    } else if (event is manager_events.SessionStopRequested) {
       await _onSessionStopped(event);
-    } else if (event is SessionPaused) {
+    } else if (event is manager_events.SessionPaused) {
       await _onSessionPaused(event);
-    } else if (event is SessionResumed) {
+    } else if (event is manager_events.SessionResumed) {
       await _onSessionResumed(event);
-    } else if (event is HeartRateUpdated) {
+    } else if (event is manager_events.HeartRateUpdated) {
       await _onHeartRateUpdated(event);
-    } else if (event is MemoryPressureDetected) {
+    } else if (event is manager_events.MemoryPressureDetected) {
       await _onMemoryPressureDetected(event);
     }
   }
 
-  Future<void> _onSessionStarted(SessionStartRequested event) async {
+  Future<void> _onSessionStarted(manager_events.SessionStartRequested event) async {
     _activeSessionId = event.sessionId;
     _heartRateSamples.clear();
     _heartRateSampleObjects.clear();
@@ -104,7 +105,7 @@ class HeartRateManager implements SessionManager {
     ));
   }
 
-  Future<void> _onSessionStopped(SessionStopRequested event) async {
+  Future<void> _onSessionStopped(manager_events.SessionStopRequested event) async {
     await _stopHeartRateMonitoring();
     
     _activeSessionId = null;
@@ -123,17 +124,17 @@ class HeartRateManager implements SessionManager {
     _updateState(const HeartRateState());
   }
 
-  Future<void> _onSessionPaused(SessionPaused event) async {
+  Future<void> _onSessionPaused(manager_events.SessionPaused event) async {
     // Continue monitoring heart rate during pause
     AppLogger.info('[HEART_RATE_MANAGER] Session paused, continuing heart rate monitoring');
   }
 
-  Future<void> _onSessionResumed(SessionResumed event) async {
+  Future<void> _onSessionResumed(manager_events.SessionResumed event) async {
     AppLogger.info('[HEART_RATE_MANAGER] Session resumed');
   }
   
   /// Handle memory pressure detection by triggering aggressive cleanup
-  Future<void> _onMemoryPressureDetected(MemoryPressureDetected event) async {
+  Future<void> _onMemoryPressureDetected(manager_events.MemoryPressureDetected event) async {
     AppLogger.error('[HEART_RATE_MANAGER] MEMORY_PRESSURE: ${event.memoryUsageMb}MB detected, triggering aggressive cleanup');
     
     // Trigger aggressive memory cleanup
@@ -148,7 +149,7 @@ class HeartRateManager implements SessionManager {
     AppLogger.info('[HEART_RATE_MANAGER] MEMORY_PRESSURE: Aggressive cleanup completed');
   }
 
-  Future<void> _onHeartRateUpdated(HeartRateUpdated event) async {
+  Future<void> _onHeartRateUpdated(manager_events.HeartRateUpdated event) async {
     if (_activeSessionId == null) return;
     
     final heartRate = event.heartRate;
@@ -183,19 +184,24 @@ class HeartRateManager implements SessionManager {
     
     try {
       // Subscribe to heart rate updates from the service
+      AppLogger.info('[HEART_RATE_MANAGER] [HR_DEBUG] Subscribing to HeartRateService stream');
       _heartRateSubscription = _heartRateService.heartRateStream.listen(
         (sample) {
+          AppLogger.info('[HEART_RATE_MANAGER] [HR_DEBUG] Received heart rate from HeartRateService: ${sample.bpm} BPM');
           if (sample.bpm > 0) {
             _heartRateSampleObjects.add(sample);
             
             // CRITICAL FIX: Emit HeartRateUpdated event to trigger UI updates
-            _emitEvent(HeartRateUpdated(heartRate: sample.bpm, timestamp: sample.timestamp));
+            AppLogger.info('[HEART_RATE_MANAGER] [HR_DEBUG] Emitting HeartRateUpdated event: ${sample.bpm} BPM');
+            _emitEvent(main_bloc.HeartRateUpdated(sample));
             
             // CRITICAL FIX: Trigger frequent uploads for crash resilience
             _triggerHeartRateUploadIfNeeded();
             
             // Manage memory pressure for sample objects
             _manageHeartRateMemoryPressure();
+          } else {
+            AppLogger.warning('[HEART_RATE_MANAGER] [HR_DEBUG] Ignoring invalid heart rate: ${sample.bpm} BPM');
           }
         },
         onError: (error) {
@@ -407,7 +413,7 @@ class HeartRateManager implements SessionManager {
     AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] Event emitter available: ${_eventEmitter != null}');
     
     // Send HeartRateBatchUploadRequested event to trigger actual upload
-    _emitEvent(HeartRateBatchUploadRequested(samples: samples));
+    _emitEvent(main_bloc.HeartRateBatchUploadRequested(samples: samples));
     
     AppLogger.error('[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_QUEUE: HeartRateBatchUploadRequested event emitted successfully');
     
@@ -501,15 +507,15 @@ class HeartRateManager implements SessionManager {
   }
   
   /// Emit events to the parent bloc
-  void Function(ActiveSessionEvent)? _eventEmitter;
+  void Function(main_bloc.ActiveSessionEvent)? _eventEmitter;
   
   /// Set the event emitter callback
-  void setEventEmitter(void Function(ActiveSessionEvent) emitter) {
+  void setEventEmitter(void Function(main_bloc.ActiveSessionEvent) emitter) {
     _eventEmitter = emitter;
   }
   
   /// Emit an event to the parent bloc
-  void _emitEvent(ActiveSessionEvent event) {
+  void _emitEvent(main_bloc.ActiveSessionEvent event) {
     _eventEmitter?.call(event);
   }
   
