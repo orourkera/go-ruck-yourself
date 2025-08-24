@@ -6,6 +6,7 @@ import uuid
 import logging
 import json
 import os
+import math
 
 from ..supabase_client import get_supabase_client
 from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
@@ -25,6 +26,164 @@ def validate_ruck_id(ruck_id):
             return int(str(ruck_id).strip())
         except Exception:
             return None
+
+class RuckSessionListResource(Resource):
+    def get(self):
+        """List ruck sessions for the authenticated user (GET /api/rucks)"""
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        # Basic pagination
+        try:
+            limit = int(request.args.get('limit', 20))
+            offset = int(request.args.get('offset', 0))
+        except Exception:
+            limit, offset = 20, 0
+
+        # Return user's sessions ordered by completion/start time
+        try:
+            resp = (
+                supabase.table('ruck_session')
+                .select('*')
+                .eq('user_id', g.user.id)
+                .order('completed_at', desc=True, nulls_first=False)
+                .order('started_at', desc=True)
+                .range(offset, offset + max(limit - 1, 0))
+                .execute()
+            )
+            return resp.data or [], 200
+        except Exception as e:
+            logger.error(f"Error listing ruck sessions: {e}")
+            return {'message': f'Error listing ruck sessions: {str(e)}'}, 500
+
+class RuckSessionResource(Resource):
+    def get(self, ruck_id):
+        """Get a single ruck session by ID for the authenticated user"""
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        try:
+            # Allow self-owned session, or public session (read-only)
+            session_resp = (
+                supabase.table('ruck_session')
+                .select('*')
+                .eq('id', ruck_id)
+                .execute()
+            )
+            if not session_resp.data:
+                return {'message': 'Session not found'}, 404
+
+            session = session_resp.data[0]
+            if session.get('user_id') != g.user.id and not session.get('is_public'):
+                return {'message': 'Forbidden'}, 403
+
+            return session, 200
+        except Exception as e:
+            logger.error(f"Error fetching session {ruck_id}: {e}")
+            return {'message': f'Error fetching session: {str(e)}'}, 500
+
+class RuckSessionStartResource(Resource):
+    def post(self, ruck_id):
+        """Mark a ruck session as started (POST /api/rucks/<ruck_id>/start)"""
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        try:
+            update = {
+                'status': 'in_progress',
+                'started_at': datetime.now(tz.tzutc()).isoformat(),
+            }
+            resp = (
+                supabase.table('ruck_session')
+                .update(update)
+                .eq('id', ruck_id)
+                .eq('user_id', g.user.id)
+                .execute()
+            )
+            if not resp.data:
+                return {'message': 'Session not found or not owned by user'}, 404
+
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            return resp.data[0], 200
+        except Exception as e:
+            logger.error(f"Error starting session {ruck_id}: {e}")
+            return {'message': f'Error starting session: {str(e)}'}, 500
+
+class RuckSessionPauseResource(Resource):
+    def post(self, ruck_id):
+        """Pause an in-progress ruck session (POST /api/rucks/<ruck_id>/pause)"""
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        try:
+            update = {
+                'status': 'paused',
+                'paused_at': datetime.now(tz.tzutc()).isoformat(),
+            }
+            resp = (
+                supabase.table('ruck_session')
+                .update(update)
+                .eq('id', ruck_id)
+                .eq('user_id', g.user.id)
+                .execute()
+            )
+            if not resp.data:
+                return {'message': 'Session not found or not owned by user'}, 404
+
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            return resp.data[0], 200
+        except Exception as e:
+            logger.error(f"Error pausing session {ruck_id}: {e}")
+            return {'message': f'Error pausing session: {str(e)}'}, 500
+
+class RuckSessionResumeResource(Resource):
+    def post(self, ruck_id):
+        """Resume a paused ruck session (POST /api/rucks/<ruck_id>/resume)"""
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+        try:
+            update = {
+                'status': 'in_progress',
+                'resumed_at': datetime.now(tz.tzutc()).isoformat(),
+            }
+            resp = (
+                supabase.table('ruck_session')
+                .update(update)
+                .eq('id', ruck_id)
+                .eq('user_id', g.user.id)
+                .execute()
+            )
+            if not resp.data:
+                return {'message': 'Session not found or not owned by user'}, 404
+
+            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            return resp.data[0], 200
+        except Exception as e:
+            logger.error(f"Error resuming session {ruck_id}: {e}")
+            return {'message': f'Error resuming session: {str(e)}'}, 500
 
 class RuckSessionCompleteResource(Resource):
     def post(self, ruck_id):

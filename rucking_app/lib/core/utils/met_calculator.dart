@@ -358,17 +358,16 @@ class MetCalculator {
     double M = 1.5 * W + termLoad + termSpeedGrade; // Watts
 
     // GORUCK-inspired load ratio adjustment to address Pandolf underestimation
-    // Research shows 12-33% underestimation, scaling with load/body weight ratio and speed
+    // Research shows 12-33% underestimation, but need to be more conservative for civilian rucking
     final loadRatio = lw; // L/W ratio (0.0 to ~0.33 for reasonable loads)
     final speedMph = speedKmh * 0.621371;
     
     // Calculate adjustment factor based on load ratio and speed
-    // At 33% body weight + 4mph: ~27% increase (matches Australian military research)
-    // Scales down for lighter loads and slower speeds
+    // Reduced from military research values to better match civilian rucking reality
     double adjustmentFactor = 1.0;
     if (loadRatio > 0 && speedMph > 2.0) {
-      // Base adjustment scales with load ratio (0-27% at max)
-      final baseAdjustment = math.min(loadRatio * 0.82, 0.27); // Cap at 27%
+      // Base adjustment scales with load ratio (0-15% at max, reduced from 27%)
+      final baseAdjustment = math.min(loadRatio * 0.45, 0.15); // Cap at 15% instead of 27%
       // Speed factor: more adjustment at higher speeds (research shows this)
       final speedFactor = math.min((speedMph - 2.0) / 2.0, 1.0); // 0-1 factor for 2-4mph+
       adjustmentFactor = 1.0 + (baseAdjustment * speedFactor);
