@@ -357,7 +357,11 @@ from .api.gpx_export import (
     GPXExportBatchResource
 )
 from .api.weather import WeatherResource
-from .api.ai_cheerleader import AICheerleaderLogResource
+from .api.ai_cheerleader import (
+    AICheerleaderLogResource,
+    AICheerleaderLogsResource,
+    AICheerleaderUserHistoryResource,
+)
 from .api.goals import (
     GoalsListResource,
     GoalsWithProgressResource,
@@ -484,10 +488,7 @@ def get_user_id():
 api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration for DELETE
 
 # Ruck session endpoints (prefixed with /api)
-# Apply rate limit to RuckSessionListResource GET endpoint
-app.logger.info(f"Setting RuckSessionListResource rate limit to: 18000 per hour (300 per minute)")
-# Allow up to 300 requests per minute (18000 per hour) per user/IP - very generous for home screen
-RuckSessionListResource.get = conditional_rate_limit("300 per minute", key_func=get_user_id)(RuckSessionListResource.get)
+# Register RuckSessionListResource without modifying it (rate limiting was breaking POST method)
 api.add_resource(RuckSessionListResource, '/api/rucks')
 api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
 api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
@@ -631,6 +632,8 @@ api.add_resource(WeatherResource, '/api/weather')
 
 # AI Cheerleader Endpoints
 api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader/log')
+api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs')
+api.add_resource(AICheerleaderUserHistoryResource, '/api/ai-cheerleader/user-history')
 
 # Goals Endpoints
 app.logger.info("Setting Goals API rate limits")
