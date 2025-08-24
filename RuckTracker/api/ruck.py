@@ -332,7 +332,7 @@ class RuckSessionListResource(Resource):
                             .execute()
                         
                         # Delete associated heart rate samples (if not using CASCADE)  
-                        supabase.table('heart_rate_samples') \
+                        supabase.table('heart_rate_sample') \
                             .delete() \
                             .eq('session_id', active_session['id']) \
                             .execute()
@@ -1262,22 +1262,29 @@ class RuckSessionCompleteResource(Resource):
                     .eq('session_id', ruck_id) \
                     .limit(50000) \
                     .execute()
+                logger.info(f"[HR_AGGREGATE] Found {len(stats_resp.data) if stats_resp.data else 0} heart rate samples for session {ruck_id}")
                 if stats_resp.data:
                     bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
+                    logger.info(f"[HR_AGGREGATE] Filtered to {len(bpm_values)} valid BPM values")
                     if bpm_values:
                         avg_hr = sum(bpm_values) / len(bpm_values)
                         min_hr = min(bpm_values)
                         max_hr = max(bpm_values)
-                        supabase.table('ruck_session').update({
+                        hr_update_resp = supabase.table('ruck_session').update({
                             'avg_heart_rate': round(avg_hr, 1),
                             'min_heart_rate': int(min_hr),
                             'max_heart_rate': int(max_hr)
                         }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
+                        logger.info(f"[HR_AGGREGATE] HR update response: {hr_update_resp.data}")
                         # Also reflect into completed_session for response
                         completed_session['avg_heart_rate'] = round(avg_hr, 1)
                         completed_session['min_heart_rate'] = int(min_hr)
                         completed_session['max_heart_rate'] = int(max_hr)
                         logger.info(f"[HR_AGGREGATE] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr} from {len(bpm_values)} samples")
+                    else:
+                        logger.warning(f"[HR_AGGREGATE] No valid BPM values found for session {ruck_id}")
+                else:
+                    logger.info(f"[HR_AGGREGATE] No heart rate samples found for session {ruck_id}")
             except Exception as hr_agg_err:
                 logger.error(f"[HR_AGGREGATE] Error aggregating heart rate samples for session {ruck_id}: {hr_agg_err}")
 

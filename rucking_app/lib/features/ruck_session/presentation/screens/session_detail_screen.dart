@@ -61,7 +61,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   bool _isScrolledToTop = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _photosLoadAttemptedForThisSession = false; // Flag to prevent multiple fetches
+  RuckSession? _fullSession; // Store the complete session data
   Timer? _photoRefreshTimer;
+  
+  /// Get the session to use for display - prefers full session if available
+  RuckSession get currentSession => _fullSession ?? widget.session;
   bool _uploadInProgress = false;
   int _refreshAttempts = 0;
   final int _maxRefreshAttempts = 5;
@@ -102,10 +106,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       
       if (needsHeartRate || needsLocationPoints) {
         AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing: $needsHeartRate, location points missing: $needsLocationPoints');
-        context.read<ActiveSessionBloc>().add(LoadSessionForViewing(
-          sessionId: widget.session.id!, 
-          session: widget.session
-        ));
+        _loadFullSessionData();
       } else {
         AppLogger.debug('[SESSION DETAIL] Using provided session data - heart rate and location points already available');
       }
@@ -1464,6 +1465,36 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     // Directly dispatch the delete event to the injected SessionBloc
     AppLogger.info('DEBUGGING: Deleting session ${widget.session.id}');
     context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.session.id!));
+  }
+
+
+
+  /// Load full session data from API including heart rate samples
+  Future<void> _loadFullSessionData() async {
+    if (widget.session.id == null) return;
+    
+    try {
+      AppLogger.debug('[SESSION DETAIL] Fetching full session data from API for session ${widget.session.id}');
+      
+      // Get the session repository from SessionBloc
+      final sessionRepository = context.read<SessionBloc>().sessionRepository;
+      
+      // Fetch the complete session data
+      final fullSession = await sessionRepository.fetchSessionById(widget.session.id!);
+      
+      if (fullSession != null) {
+        // Store the complete session data in state
+        setState(() {
+          _fullSession = fullSession;
+        });
+        
+        AppLogger.debug('[SESSION DETAIL] Successfully loaded full session data - HR samples: ${fullSession.heartRateSamples?.length ?? 0}');
+      } else {
+        AppLogger.warning('[SESSION DETAIL] Failed to fetch full session data - session not found');
+      }
+    } catch (e) {
+      AppLogger.error('[SESSION DETAIL] Error loading full session data: $e');
+    }
   }
 
   void _showAddPhotoOptions(BuildContext context) {

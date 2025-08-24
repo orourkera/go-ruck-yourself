@@ -483,6 +483,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       );
       AppLogger.info('[COORDINATOR] Completion state built successfully');
       
+      // Calculate actual duration from timestamps to avoid corruption
+      final actualDuration = lifecycleState.startTime != null 
+        ? DateTime.now().difference(lifecycleState.startTime!)
+        : lifecycleState.duration;
+      
+      AppLogger.info('[COORDINATOR] Duration calculation: lifecycle=${lifecycleState.duration.inSeconds}s, actual=${actualDuration.inSeconds}s');
+      
       // Store completion data for lifecycle manager
       _sessionCompletionData = {
         'distance_km': finalDistance,
@@ -490,13 +497,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         if (_lastCalorieMethod != null) 'calorie_method': _lastCalorieMethod,
         'elevation_gain_m': finalElevationGain,
         'elevation_loss_m': finalElevationLoss,
-        'duration_seconds': lifecycleState.duration.inSeconds,
+        'duration_seconds': actualDuration.inSeconds, // Use calculated duration instead of lifecycle state
         'ruck_weight_kg': lifecycleState.ruckWeightKg,
         'user_weight_kg': lifecycleState.userWeightKg,
         'session_id': lifecycleState.sessionId,
         'start_time': lifecycleState.startTime?.toIso8601String(),
         'completed_at': DateTime.now().toIso8601String(),
-        'average_pace': finalDistance > 0 ? (lifecycleState.duration.inMinutes / finalDistance) : 0.0,
+        'average_pace': finalDistance > 0 ? (actualDuration.inMinutes / finalDistance) : 0.0,
         if (_currentSteps != null) 'steps': _currentSteps,
         // Heart rate zones: snapshot thresholds and time in zones
         ..._computeHrZonesPayload(),

@@ -124,6 +124,12 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                             print("[WATCH] Failed to start workout: \(error.localizedDescription)")
                         } else {
                             // Workout session started successfully
+                            print("[WATCH] Workout started successfully, setting isSessionActive = true")
+                            
+                            // CRITICAL: Set session as active to show pause/stop buttons
+                            self.isSessionActive = true
+                            self.isPaused = false
+                            
                             // Send start payload with timestamp for backfill
                             let startTs = Date().timeIntervalSince1970
                             let payload: [String: Any] = [

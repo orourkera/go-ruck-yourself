@@ -46,15 +46,32 @@
     @media (max-width: 640px)  { .story-card { grid-column: span 12; } }
 
     /* Card link - remove underlines throughout */
-    .story-link { display: block; color: inherit; text-decoration: none; }
+    .story-link { display: block; color: inherit; text-decoration: none !important; }
     .story-link h2,
     .story-link p,
     .story-link time { text-decoration: none !important; border-bottom: 0 !important; }
-    .story-link:hover .story-title { text-decoration: none; }
+    .story-link:hover .story-title { text-decoration: none !important; }
     .story-link:hover h2,
     .story-link:hover p,
     .story-link:hover time { text-decoration: none !important; }
     .story-link:hover { text-decoration: none !important; }
+    
+    /* Override main site CSS that adds underlines */
+    .content-container a,
+    .story-link,
+    .story-link:hover,
+    .story-link:focus,
+    .story-link:active { text-decoration: none !important; }
+    
+    /* Ensure no underlines on any blog content links */
+    a.story-link,
+    a.story-link:hover,
+    a.story-link:focus,
+    a.story-link:active,
+    .story-card a,
+    .story-card a:hover,
+    .story-card a:focus,
+    .story-card a:active { text-decoration: none !important; }
 
     /* Image smaller, no rounded corners */
     .story-media { position: relative; overflow: hidden; margin: 0; background: #eaeaea; }

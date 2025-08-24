@@ -114,7 +114,7 @@ class AuthServiceImpl implements AuthService {
   
   // Track consecutive refresh failures to detect deleted users
   static int _consecutiveRefreshFailures = 0;
-  static const int _maxRefreshFailures = 3;
+  static const int _maxRefreshFailures = 5; // Increased from 3 to 5 to be less aggressive
 
   // Profile request cache to avoid rapid successive calls
   static Future<User>? _profileRequestCache;

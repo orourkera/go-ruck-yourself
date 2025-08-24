@@ -156,6 +156,8 @@ class SessionStatsOverlay extends StatelessWidget {
                 ],
               ),
             ),
+            // HR Zones Timeline Bar - COMPLETELY REMOVED FOR NOW
+            const SizedBox(height: 8), // Just add some spacing
           ],
         ),
         const SizedBox(height: 0.0),
@@ -218,6 +220,102 @@ class SessionStatsOverlay extends StatelessWidget {
           _PlaceholderTile(label: 'ELEV'),
         ],
       ),
+    );
+  }
+
+  /// Build HR zones bar with proper layout constraints
+  Widget _buildHRZonesBar(ActiveSessionState state) {
+    if (state is! ActiveSessionRunning) {
+      return Container(
+        width: double.infinity,
+        height: 50, // Fixed height
+        color: Colors.grey.withOpacity(0.2),
+        child: Center(child: Text("No active session", style: TextStyle(color: Colors.grey))),
+      );
+    }
+    
+    final runningState = state as ActiveSessionRunning;
+    final currentBpm = runningState.latestHeartRate ?? 0;
+    
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        // Get users HR zones
+        List<({int min, int max, Color color, String name})> zones = [];
+        if (authState is Authenticated) {
+          final user = authState.user;
+          if (user.restingHr != null && user.maxHr != null && user.maxHr! > user.restingHr!) {
+            zones = HeartRateZoneService.zonesFromProfile(restingHr: user.restingHr!, maxHr: user.maxHr!);
+          }
+        }
+        
+        // Fallback zones
+        if (zones.isEmpty) {
+          zones = [
+            (name: 'Z1', min: 0, max: 99, color: AppColors.success),
+            (name: 'Z2', min: 100, max: 119, color: Colors.blue),
+            (name: 'Z3', min: 120, max: 139, color: AppColors.warning),
+            (name: 'Z4', min: 140, max: 159, color: Colors.orange),
+            (name: 'Z5', min: 160, max: 220, color: AppColors.error),
+          ];
+        }
+        
+        // Find current zone
+        Color currentZoneColor = Colors.grey;
+        String currentZoneName = 'Z1';
+        
+        if (currentBpm > 0) {
+          for (final zone in zones) {
+            if (currentBpm >= zone.min && currentBpm <= zone.max) {
+              currentZoneColor = zone.color;
+              currentZoneName = zone.name;
+              break;
+            }
+          }
+        }
+        
+        return Container(
+          width: double.infinity,
+          height: 50, // Fixed height
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [currentZoneColor.withOpacity(0.1), currentZoneColor.withOpacity(0.3)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: currentZoneColor, width: 2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "HR ZONE",
+                style: TextStyle(
+                  color: currentZoneColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                currentZoneName,
+                style: TextStyle(
+                  color: currentZoneColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                currentBpm > 0 ? "BPM: $currentBpm" : "No HR Data",
+                style: TextStyle(
+                  color: currentZoneColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -399,37 +497,9 @@ class _HeartRateTile extends StatelessWidget {
           return const SizedBox.shrink();
         }
         
-        // Card layout with HR zones
-        if (currentBpm > 0) {
-          print('[HR ZONE DEBUG] Building card layout HR with BPM: $currentBpm');
-          final hrData = _determineHrColorAndZone(context, currentBpm);
-          print('[HR ZONE DEBUG] Card HR data: zone=${hrData.zone}, color=${hrData.color}');
-          
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$currentBpm',
-                style: AppTextStyles.timerDisplay.copyWith(
-                  color: hrData.color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 36,
-                ),
-              ),
-              Text(
-                hrData.zone,
-                style: TextStyle(
-                  color: hrData.color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          );
-        }
-        
+        // Card layout - keep heart rate display simple
         return Text(
-          '--',
+          currentBpm > 0 ? '$currentBpm' : '--',
           style: AppTextStyles.timerDisplay.copyWith(
             color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,
@@ -488,6 +558,140 @@ class _ElapsedTimeDisplay extends StatelessWidget {
             color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,
             fontSize: 36,
+          ),
+        );
+      },
+    );
+  }
+}
+/// HR Zones Timeline Bar - shows time spent in each zone as a horizontal progress bar
+class _HRZonesTimelineBar extends StatelessWidget {
+  final ActiveSessionState state;
+
+  const _HRZonesTimelineBar({Key? key, required this.state}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    print('[HR ZONES BAR DEBUG] build() called with state: ${state.runtimeType}');
+    
+    // Only show for running sessions
+    if (state is! ActiveSessionRunning) {
+      print('[HR ZONES BAR DEBUG] Not ActiveSessionRunning, hiding bar');
+      return const SizedBox.shrink();
+    }
+    
+    final runningState = state as ActiveSessionRunning;
+    final currentBpm = runningState.latestHeartRate ?? 0;
+    final elapsedSeconds = runningState.elapsedSeconds;
+    
+    print('[HR ZONES BAR DEBUG] currentBpm: $currentBpm, elapsedSeconds: $elapsedSeconds');
+    
+    // Show after 10 seconds (reduced from 30) and always show even without HR data for now
+    if (elapsedSeconds < 10) {
+      print('[HR ZONES BAR DEBUG] Not enough elapsed time ($elapsedSeconds < 10), hiding bar');
+      return const SizedBox.shrink();
+    }
+    
+    // Show bar even without HR data for debugging
+    print('[HR ZONES BAR DEBUG] Showing HR zones bar');
+
+    // TEMPORARY: Return a simple visible widget to test if the issue is with the BlocBuilder
+    return Container(
+      width: double.infinity,
+      height: 50,
+      color: Colors.purple,
+      child: Center(
+        child: Text(
+          'HR ZONES BAR TEST - BPM: $currentBpm',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+  /// Build HR zones bar with proper layout constraints
+  Widget _buildHRZonesBar(ActiveSessionState state) {
+    if (state is! ActiveSessionRunning) {
+      return Container(
+        width: double.infinity,
+        height: 50, // Fixed height
+        color: Colors.grey.withOpacity(0.2),
+        child: Center(child: Text("No active session", style: TextStyle(color: Colors.grey))),
+      );
+    }
+    
+    final runningState = state as ActiveSessionRunning;
+    final currentBpm = runningState.latestHeartRate ?? 0;
+    final elapsedSeconds = runningState.elapsedSeconds;
+    
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        // Get users HR zones
+        List<({int min, int max, Color color, String name})> zones = [];
+        if (authState is Authenticated) {
+          final user = authState.user;
+          if (user.restingHr != null && user.maxHr != null && user.maxHr! > user.restingHr!) {
+            zones = HeartRateZoneService.zonesFromProfile(restingHr: user.restingHr!, maxHr: user.maxHr!);
+          }
+        }
+        
+        // Fallback zones if no user profile
+        if (zones.isEmpty) {
+          zones = [
+            (name: "Z1", min: 0, max: 99, color: AppColors.success),
+            (name: "Z2", min: 100, max: 119, color: Colors.blue),
+            (name: "Z3", min: 120, max: 139, color: AppColors.warning),
+            (name: "Z4", min: 140, max: 159, color: Colors.orange),
+            (name: "Z5", min: 160, max: 220, color: AppColors.error),
+          ];
+        }
+        
+        // Find current zone
+        Color currentZoneColor = Colors.grey;
+        String currentZoneName = "Z1";
+        if (currentBpm > 0) {
+          for (final zone in zones) {
+            if (currentBpm >= zone.min && currentBpm <= zone.max) {
+              currentZoneColor = zone.color;
+              currentZoneName = zone.name;
+              break;
+            }
+          }
+        }
+        
+        return Container(
+          width: double.infinity,
+          height: 50, // Fixed height
+          padding: EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Zone timeline bar
+              Expanded(
+                flex: 2,
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: currentZoneColor.withOpacity(0.6),
+                  ),
+                ),
+              ),
+              SizedBox(height: 4),
+              // Current zone text
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: Text(
+                    currentBpm > 0 ? "Current: $currentZoneName" : "No HR Data",
+                    style: TextStyle(
+                      color: currentZoneColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
