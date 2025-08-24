@@ -462,12 +462,12 @@ class RuckSessionListResource(Resource):
                 try:
                     logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Session created with in_progress status, sending notifications")
                     
-                    # Get user's display name
-                    user_response = supabase.table('user').select('username, display_name').eq('id', g.user.id).execute()
+                    # Get user's username (display_name column doesn't exist)
+                    user_response = supabase.table('user').select('username').eq('id', g.user.id).execute()
                     user_name = 'Someone'
                     if user_response.data:
                         user_data = user_response.data[0]
-                        user_name = user_data.get('display_name') or user_data.get('username') or 'Someone'
+                        user_name = user_data.get('username') or 'Someone'
                     
                     logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User name: {user_name}")
                     
@@ -822,9 +822,9 @@ class RuckSessionStartResource(Resource):
             try:
                 logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Starting notification process for user {g.user.id}")
                 
-                # Get user's display name for notification
-                user_profile = supabase.table('user').select('username, display_name').eq('id', g.user.id).single().execute()
-                user_name = user_profile.data.get('display_name') or user_profile.data.get('username') or 'Someone' if user_profile.data else 'Someone'
+                # Get user's username for notification (display_name column doesn't exist)
+                user_profile = supabase.table('user').select('username').eq('id', g.user.id).single().execute()
+                user_name = user_profile.data.get('username') or 'Someone' if user_profile.data else 'Someone'
                 logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User starting ruck: {user_name}")
                 
                 # Get followers (users who follow this user)

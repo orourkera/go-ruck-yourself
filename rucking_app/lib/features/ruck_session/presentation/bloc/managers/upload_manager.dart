@@ -154,6 +154,9 @@ class UploadManager implements SessionManager {
     ));
     
     AppLogger.debug('[UPLOAD_MANAGER] Added heart rate batch to queue. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
+    
+    // Trigger immediate upload for heart rate data (don't wait for timer)
+    _processUploadQueue();
   }
 
   Future<void> _onMemoryPressureDetected(MemoryPressureDetected event) async {
