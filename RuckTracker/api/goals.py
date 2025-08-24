@@ -374,6 +374,40 @@ class GoalsListResource(Resource):
             logger.error(f"GET /api/goals failed: {e}")
             return {"error": "Internal server error"}, 500
 
+    def post(self):
+        """Create a new user goal. Minimal validation; aligns with GoalCreateSchema fields."""
+        ok, err = _require_auth()
+        if not ok:
+            return err
+        try:
+            payload = request.get_json() or {}
+            # Allow only known fields to be set by clients
+            allowed = {
+                'title', 'description', 'metric', 'target_value', 'unit', 'window',
+                'constraints_json', 'start_at', 'end_at', 'deadline_at', 'status'
+            }
+            insert = {k: v for k, v in payload.items() if k in allowed}
+
+            # Basic required fields
+            if not insert.get('title') or not insert.get('metric') or insert.get('target_value') is None:
+                return {"error": "Missing required fields: title, metric, target_value"}, 400
+
+            # Default status
+            if 'status' not in insert:
+                insert['status'] = 'active'
+
+            client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            insert['user_id'] = g.user.id
+
+            res = client.table('user_custom_goals').insert(insert).execute()
+            row = res.data[0] if res and res.data else None
+            if not row:
+                return {"error": "Failed to create goal"}, 500
+            return {"goal": row}, 201
+        except Exception as e:
+            logger.error(f"POST /api/goals failed: {e}")
+            return {"error": "Internal server error"}, 500
+
 
 class GoalsWithProgressResource(Resource):
     """List user's goals with latest progress embedded to reduce client roundtrips."""
