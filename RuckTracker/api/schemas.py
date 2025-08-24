@@ -101,6 +101,70 @@ class AppleHealthStatusSchema(Schema):
     metrics_to_sync = fields.List(fields.Str(), validate=validate.ContainsOnly(['workouts', 'distance', 'elevation']))
     last_sync_time = fields.DateTime(allow_none=True)
 
+# ==============================
+# Custom Goals & AI Copy Schemas
+# ==============================
+
+SUPPORTED_METRICS = [
+    'distance_km_total',
+    'session_count',
+    'streak_days',
+    'elevation_gain_m_total',
+    'duration_minutes_total',
+    'steps_total',
+    'power_points_total',
+    'load_kg_min_sessions',
+]
+
+SUPPORTED_UNITS = ['km', 'mi', 'minutes', 'steps', 'm', 'kg', 'points']
+SUPPORTED_WINDOWS = ['7d', '30d', 'weekly', 'monthly', 'until_deadline']
+
+
+class GoalDraftSchema(Schema):
+    class Meta:
+        unknown = "exclude"
+
+    # Draft produced by AI parser before creation/confirmation
+    title = fields.Str(validate=validate.Length(min=1, max=200))
+    description = fields.Str()
+    metric = fields.Str(required=True, validate=validate.OneOf(SUPPORTED_METRICS))
+    target_value = fields.Float(required=True, validate=validate.Range(min=0))
+    unit = fields.Str(required=True, validate=validate.OneOf(SUPPORTED_UNITS))
+    window = fields.Str(allow_none=True, validate=validate.OneOf(SUPPORTED_WINDOWS))
+    constraints_json = fields.Dict(allow_none=True)
+    start_at = fields.DateTime(allow_none=True)
+    end_at = fields.DateTime(allow_none=True)
+    deadline_at = fields.DateTime(allow_none=True)
+
+
+class GoalCreateSchema(Schema):
+    class Meta:
+        unknown = "exclude"
+
+    # Payload client/backend uses to create a goal from a draft
+    title = fields.Str(required=True, validate=validate.Length(min=1, max=200))
+    description = fields.Str(allow_none=True)
+    metric = fields.Str(required=True, validate=validate.OneOf(SUPPORTED_METRICS))
+    target_value = fields.Float(required=True, validate=validate.Range(min=0))
+    unit = fields.Str(required=True, validate=validate.OneOf(SUPPORTED_UNITS))
+    window = fields.Str(allow_none=True, validate=validate.OneOf(SUPPORTED_WINDOWS))
+    constraints_json = fields.Dict(allow_none=True)
+    start_at = fields.DateTime(allow_none=True)
+    end_at = fields.DateTime(allow_none=True)
+    deadline_at = fields.DateTime(allow_none=True)
+
+
+class NotificationCopySchema(Schema):
+    class Meta:
+        unknown = "exclude"
+
+    title = fields.Str(required=True, validate=validate.Length(max=30))
+    body = fields.Str(required=True, validate=validate.Length(max=140))
+    category = fields.Str(required=True, validate=validate.OneOf([
+        'behind_pace', 'on_track', 'milestone', 'completion', 'deadline_urgent', 'inactivity'
+    ]))
+    uses_emoji = fields.Bool(required=True)
+
 class HeartRateSampleIn(BaseModel):
     timestamp: datetime
     bpm: int
@@ -108,3 +172,6 @@ class HeartRateSampleIn(BaseModel):
 # Create schema instances
 apple_health_sync_schema = AppleHealthSyncSchema()
 apple_health_status_schema = AppleHealthStatusSchema()
+goal_draft_schema = GoalDraftSchema()
+goal_create_schema = GoalCreateSchema()
+notification_copy_schema = NotificationCopySchema()
