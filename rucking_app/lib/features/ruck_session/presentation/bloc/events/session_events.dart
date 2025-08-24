@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/core/models/location_point.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:meta/meta.dart';
 
 /// Base class for all session events
@@ -167,7 +168,7 @@ class HeartRateMonitoringStopRequested extends ActiveSessionEvent {
 }
 
 class HeartRateBatchUploadRequested extends ActiveSessionEvent {
-  final List<dynamic> samples;
+  final List<HeartRateSample> samples;
   
   const HeartRateBatchUploadRequested({required this.samples});
   

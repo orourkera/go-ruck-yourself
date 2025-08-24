@@ -24,12 +24,12 @@ body {
   }
 }
 .landing-container {
-  min-height: 100vh;
+  /* Remove min-height: 100vh to let content flow naturally */
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 20px 16px 40px 16px; /* reduced bottom padding since footer is static */
+  /* Remove justify-content: center to prevent footer sticking */
+  padding: 60px 16px 40px 16px; /* increased top padding to center content visually */
   box-sizing: border-box;
   position: relative;
 }
