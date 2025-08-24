@@ -380,6 +380,27 @@ import FirebaseCore
                         }
                     }
                 }
+            case "endSession":
+                print("[DEBUG] Session end command received from Watch - forwarding to Flutter")
+                let controller = window?.rootViewController as! FlutterViewController
+                let watchSessionChannel = FlutterMethodChannel(name: watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: ["command": "endSession"] as [String: Any]) { result in
+                    if let error = result as? FlutterError {
+                        print("[ERROR] Error forwarding end command to Flutter: \(error.message ?? "unknown error")")
+                        replyHandler?(["error": error.message ?? "unknown error"])
+                    } else {
+                        print("[DEBUG] Successfully forwarded end command to Flutter")
+                        if let replyHandler = replyHandler {
+                            replyHandler(["status": "success", "command": "sessionEnded"])
+                        } else {
+                            // Notify watch that phone accepted end request
+                            self.sendMessageToWatch(["command": "sessionEnded"]) // also handled by watch cleanup switch
+                        }
+                    }
+                }
+            case "debug_watchEndTapped":
+                // Optional: log-only debug signal from watch to confirm tap
+                print("[DEBUG] Received debug_watchEndTapped from Watch")
             case "watchHeartRateUpdate":
                 if let heartRate = message["heartRate"] as? Double {
                     // Heart rate update received

@@ -404,6 +404,7 @@ class WatchService {
           'command': 'updateSessionState',
           'isPaused': false,
           'isMetric': true, // safe default; watch will override on next metrics push
+          'isSessionActive': false, // CRITICAL: tell watch to cleanup and terminate
         });
         await _sendMessageToWatch({
           // Any of these are handled by the watch to terminate UI; prefer a clear end signal
@@ -588,9 +589,13 @@ class WatchService {
     required double elevation,
     double? elevationLoss, // Optional parameter for elevation loss
     required bool isMetric, // Used to convert values before sending to watch
+    int? steps, // Optional step count to display on watch
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
+      if (steps != null) {
+        AppLogger.info('[STEPS LIVE] [WATCH] Including steps in metrics payload: $steps');
+      }
       AppLogger.info('[WATCH] Unit preference being sent: isMetric=$isMetric');
       // Send distance in km - watch handles unit conversion based on isMetric flag
       // No need to pre-convert since watch will convert km to user's preferred display unit
@@ -609,11 +614,12 @@ class WatchService {
           'elevationGain': elevation,
           'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
           'isMetric': isMetric, // Embed unit preference in nested metrics map as well
+          if (steps != null) 'steps': steps,
           if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
           if (_currentHeartRate != null) 'hrZone': _inferZoneLabel(_currentHeartRate!),
         },
       });
-      AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}');
+      AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}, steps=${steps ?? 'null'}');
     } catch (e) {
       AppLogger.error('[WATCH] Failed to send metrics to watch: $e');
     }
@@ -652,6 +658,7 @@ class WatchService {
     required double elevationGain,
     required double elevationLoss,
     required bool isMetric, // Add user's metric preference
+    int? steps, // Optional step count to include
   }) async {
     // Attempt to update session on watch
     
@@ -671,6 +678,7 @@ class WatchService {
         elevation: elevationGain,    // This is for backward compatibility
         elevationLoss: elevationLoss, // Pass elevation loss directly
         isMetric: isMetric, // Pass user's unit preference
+        steps: steps,
       );
       
       // Successfully sent metrics via WatchConnectivity

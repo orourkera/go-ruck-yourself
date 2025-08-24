@@ -27,6 +27,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/create_se
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_detail_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_history_screen.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_bloc.dart';
+import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -1300,17 +1301,43 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                               onTap: () {
                                 try {
                                   final sessionModel = RuckSession.fromJson(session);
-                                  // Navigate to detail screen and handle the result
-                                  Navigator.of(context).push<bool>(
-                                    MaterialPageRoute(
-                                      builder: (context) => SessionDetailScreen(session: sessionModel),
-                                    ),
-                                  ).then((refreshNeeded) {
-                                    // If returned with true (session deleted), refresh the data
-                                    if (refreshNeeded == true) {
-                                      _fetchFromNetwork();
+                                  // Pre-fetch full session details before navigation (mirror History behavior)
+                                  () async {
+                                    // Show loading dialog
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                                    );
+                                    try {
+                                      final repo = GetIt.instance<SessionRepository>();
+                                      final fullSession = await repo.fetchSessionById(sessionModel.id ?? '');
+                                      Navigator.of(context).pop(); // dismiss loading
+                                      if (fullSession != null) {
+                                        final refreshNeeded = await Navigator.of(context).push<bool>(
+                                          MaterialPageRoute(
+                                            builder: (context) => SessionDetailScreen(session: fullSession),
+                                          ),
+                                        );
+                                        if (refreshNeeded == true) {
+                                          _fetchFromNetwork();
+                                        }
+                                      } else {
+                                        // If fetch failed, fall back to navigating with parsed model
+                                        final refreshNeeded = await Navigator.of(context).push<bool>(
+                                          MaterialPageRoute(
+                                            builder: (context) => SessionDetailScreen(session: sessionModel),
+                                          ),
+                                        );
+                                        if (refreshNeeded == true) {
+                                          _fetchFromNetwork();
+                                        }
+                                      }
+                                    } catch (e) {
+                                      // Ensure dialog is closed on error
+                                      Navigator.of(context).pop();
                                     }
-                                  });
+                                  }();
                                 } catch (e) {
                                   // Ignore errors
                                 }

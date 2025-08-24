@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS user_custom_goals (
     )),
     target_value DOUBLE PRECISION NOT NULL CHECK (target_value >= 0),
     unit TEXT NOT NULL CHECK (unit IN ('km','mi','minutes','steps','m','kg','points')),
-    window TEXT CHECK (window IN ('7d','30d','weekly','monthly','until_deadline')),
+    "window" TEXT CHECK ("window" IN ('7d','30d','weekly','monthly','until_deadline')),
     constraints_json JSONB,
 
     -- Timing

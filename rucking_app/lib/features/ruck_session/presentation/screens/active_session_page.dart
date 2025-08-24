@@ -279,6 +279,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                             previous.calories != current.calories ||
                             previous.elevationGain != current.elevationGain ||
                             previous.elevationLoss != current.elevationLoss ||
+                            previous.steps != current.steps ||
                             previous.sessionId != current.sessionId; // Important for initial load
                       }
                       // For other state types or transitions, allow rebuild

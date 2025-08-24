@@ -59,50 +59,65 @@ class HealthService {
   
   /// Request authorization to access and write health data
   Future<bool> requestAuthorization() async {
-    if (!Platform.isIOS) {
-      AppLogger.warning('Health integration only available on iOS');
-      return false;
-    }
-    
     try {
       AppLogger.info('Starting health authorization request...');
       
-      // Updated to use proper health data types from the health package v12.1.0
-      final types = [
+      // Check if HealthKit is available first
+      if (Platform.isIOS) {
+        try {
+          final isAvailable = await Health().hasPermissions([HealthDataType.STEPS]);
+          AppLogger.info('HealthKit availability check result: $isAvailable');
+        } catch (e) {
+          AppLogger.error('HealthKit availability check failed: $e');
+          return false;
+        }
+      }
+      
+      // Use Health package types (cross‑platform). WORKOUT is iOS‑only.
+      final types = <HealthDataType>[
         HealthDataType.STEPS,
-        HealthDataType.DISTANCE_WALKING_RUNNING, 
-        HealthDataType.ACTIVE_ENERGY_BURNED,   
-        HealthDataType.HEART_RATE, // Added permission to read Heart Rate samples
+        HealthDataType.DISTANCE_WALKING_RUNNING,
+        HealthDataType.ACTIVE_ENERGY_BURNED,
+        HealthDataType.HEART_RATE,
         if (Platform.isIOS) HealthDataType.WORKOUT,
       ];
       
-      // Define permissions for each type: READ for steps, READ_WRITE for others
-      final permissions = [
+      // READ for steps and HR (HR read-only), READ_WRITE for distance/energy (iOS write; Android may ignore writes)
+      final permissions = <HealthDataAccess>[
         HealthDataAccess.READ,             // Steps
         HealthDataAccess.READ_WRITE,       // Distance
         HealthDataAccess.READ_WRITE,       // Active Energy Burned
-        HealthDataAccess.READ,             // Heart Rate (read only)
-        if (Platform.isIOS) HealthDataAccess.READ_WRITE, // Workout (includes writing)
+        HealthDataAccess.READ,             // Heart Rate
+        if (Platform.isIOS) HealthDataAccess.READ_WRITE, // Workout
       ];
       
-      // Ensure we're showing the system dialog by forcing a clean request
-      // This is important for iOS where sometimes the dialog doesn't appear
-      await Future.delayed(const Duration(milliseconds: 500)); // Small delay to ensure UI is ready
+      // Small delay to ensure any native UI is ready
+      await Future.delayed(const Duration(milliseconds: 500));
       
-      AppLogger.info('Calling health package requestAuthorization with ${types.length} types');
-      // Request authorization with specific permissions
+      AppLogger.info('Calling health.requestAuthorization (types=${types.length})');
       final authorized = await _health.requestAuthorization(types, permissions: permissions);
-      AppLogger.info('Health authorization request result: $authorized');
-      _isAuthorized = authorized;
+      AppLogger.info('Health authorization result: $authorized');
       
+      // Double-check specific permissions after authorization
       if (authorized) {
-        // If permissions granted, mark integration as enabled
-        await setHealthIntegrationEnabled(true);
+        final stepPermission = await _health.hasPermissions([HealthDataType.STEPS]);
+        AppLogger.info('Post-authorization step permission check: $stepPermission');
+        _isAuthorized = stepPermission ?? false;
+      } else {
+        _isAuthorized = false;
       }
       
-      return authorized;
+      if (_isAuthorized) {
+        await setHealthIntegrationEnabled(true);
+        AppLogger.info('Health integration enabled successfully');
+      } else {
+        AppLogger.warning('Health authorization failed or step permission denied');
+      }
+      
+      return _isAuthorized;
     } catch (e) {
       AppLogger.error('Failed to request health authorization: $e');
+      _isAuthorized = false;
       return false;
     }
   }
@@ -331,24 +346,25 @@ class HealthService {
     return prefs.getBool('${_userId}_$_hasAppleWatchKeyBase') ?? true; // Default to true if not set
   }
 
-  /// Read current heart rate from health store
+  /// Read current heart rate from health store (iOS: HealthKit, Android: Health Connect/Google Fit via health plugin)
   Future<double?> getHeartRate() async {
-    if (!Platform.isIOS) {
-      return null; // Heart rate reading currently only supported on iOS
-    }
-    
     try {
-      // Get heart rate data from the last 30 minutes (some watches batch-sync)
+      // Ensure authorization
+      if (!_isAuthorized) {
+        final ok = await requestAuthorization();
+        if (!ok) return null;
+      }
+      
+      // Fetch heart rate from the last 30 minutes
       final now = DateTime.now();
       final window = const Duration(minutes: 30);
       final startTime = now.subtract(window);
       AppLogger.info('Fetching heart rate from $startTime to $now');
       
-      // Use HealthDataType.HEART_RATE
-      List<HealthDataPoint> heartRateData = await _health.getHealthDataFromTypes(
+      final List<HealthDataPoint> heartRateData = await _health.getHealthDataFromTypes(
         startTime: startTime,
-        endTime: now, 
-        types: [HealthDataType.HEART_RATE],
+        endTime: now,
+        types: const [HealthDataType.HEART_RATE],
       );
       
       AppLogger.info('Fetched heart rate data points: ${heartRateData.length}');
@@ -357,23 +373,17 @@ class HealthService {
         return null;
       }
       
-      // Use the most recent heart rate
       heartRateData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
       final mostRecent = heartRateData.first;
       AppLogger.info('Most recent heart rate raw value: ${mostRecent.value} at ${mostRecent.dateFrom}');
       
-      // Extract heart rate value dynamically, handling NumericHealthValue
       final dynamic rawValue = mostRecent.value;
       double? heartRateValue;
-      
       if (rawValue is NumericHealthValue) {
-        // Convert num to double safely
         heartRateValue = rawValue.numericValue?.toDouble();
       } else if (rawValue is num) {
-        // Direct num type
         heartRateValue = rawValue.toDouble();
       } else {
-        // Try parsing as string
         heartRateValue = double.tryParse(rawValue.toString());
       }
       
@@ -433,8 +443,13 @@ class HealthService {
     try {
       AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
       
-      if (!_isAuthorized) {
-        AppLogger.info('[STEPS DEBUG] Not authorized, requesting authorization...');
+      // Always check authorization status fresh (don't rely on cached _isAuthorized)
+      final authStatuses = await _health.hasPermissions([HealthDataType.STEPS]);
+      final hasStepPermission = authStatuses ?? false;
+      AppLogger.info('[STEPS DEBUG] Fresh permission check for STEPS: $hasStepPermission');
+      
+      if (!hasStepPermission) {
+        AppLogger.info('[STEPS DEBUG] No step permission, requesting authorization...');
         final ok = await requestAuthorization();
         AppLogger.info('[STEPS DEBUG] Authorization request result: $ok');
         if (!ok) {
@@ -443,45 +458,78 @@ class HealthService {
         }
       }
       
-      AppLogger.info('[STEPS DEBUG] Calling health.getHealthDataFromTypes...');
-      final List<HealthDataPoint> points = await _health.getHealthDataFromTypes(
-        startTime: start,
-        endTime: end,
-        types: [HealthDataType.STEPS],
-      );
-      
-      AppLogger.info('[STEPS DEBUG] Retrieved ${points.length} health data points');
-      
-      int total = 0;
-      for (int i = 0; i < points.length; i++) {
-        final p = points[i];
-        final dynamic raw = p.value;
-        AppLogger.debug('[STEPS DEBUG] Point $i: ${p.dateFrom} to ${p.dateTo}, value type: ${raw.runtimeType}, raw: $raw');
-        
-        if (raw is NumericHealthValue) {
-          final value = (raw.numericValue ?? 0).toInt();
-          total += value;
-          AppLogger.debug('[STEPS DEBUG] NumericHealthValue: $value, total now: $total');
-        } else if (raw is num) {
-          final value = raw.toInt();
-          total += value;
-          AppLogger.debug('[STEPS DEBUG] num value: $value, total now: $total');
-        } else {
-          final parsed = int.tryParse(raw.toString());
-          if (parsed != null) {
-            total += parsed;
-            AppLogger.debug('[STEPS DEBUG] Parsed value: $parsed, total now: $total');
+      // Use a more robust approach - try multiple methods
+      if (Platform.isIOS) {
+        // Method 1: Try getTotalStepsInInterval (iOS specific)
+        try {
+          AppLogger.info('[STEPS DEBUG] Method 1: Calling health.getTotalStepsInInterval...');
+          final totalSteps = await _health.getTotalStepsInInterval(start, end);
+          if (totalSteps != null && totalSteps > 0) {
+            AppLogger.info('[STEPS DEBUG] getTotalStepsInInterval success: $totalSteps');
+            return totalSteps;
           } else {
-            AppLogger.warning('[STEPS DEBUG] Could not parse value: $raw');
+            AppLogger.warning('[STEPS DEBUG] getTotalStepsInInterval returned: $totalSteps');
           }
+        } catch (e) {
+          AppLogger.error('[STEPS DEBUG] getTotalStepsInInterval failed: $e');
+        }
+        
+        // Method 2: Try getHealthDataFromTypes with better error handling
+        try {
+          AppLogger.info('[STEPS DEBUG] Method 2: Calling health.getHealthDataFromTypes...');
+          final List<HealthDataPoint> points = await _health.getHealthDataFromTypes(
+            startTime: start,
+            endTime: end,
+            types: [HealthDataType.STEPS],
+          );
+          
+          AppLogger.info('[STEPS DEBUG] Retrieved ${points.length} health data points');
+          
+          if (points.isEmpty) {
+            AppLogger.warning('[STEPS DEBUG] No health data points returned - checking if Health app has data');
+            // This could mean: 1) No data in time range, 2) Permission denied, 3) Health app has no data
+            return 0;
+          }
+          
+          int total = 0;
+          for (int i = 0; i < points.length; i++) {
+            final p = points[i];
+            final dynamic raw = p.value;
+            AppLogger.debug('[STEPS DEBUG] Point $i: ${p.dateFrom} to ${p.dateTo}, value: $raw (${raw.runtimeType})');
+            
+            if (raw is NumericHealthValue) {
+              final value = (raw.numericValue ?? 0).toInt();
+              total += value;
+              AppLogger.debug('[STEPS DEBUG] NumericHealthValue: +$value, total: $total');
+            } else if (raw is num) {
+              final value = raw.toInt();
+              total += value;
+              AppLogger.debug('[STEPS DEBUG] num: +$value, total: $total');
+            } else {
+              final parsed = int.tryParse(raw.toString());
+              if (parsed != null) {
+                total += parsed;
+                AppLogger.debug('[STEPS DEBUG] parsed: +$parsed, total: $total');
+              } else {
+                AppLogger.warning('[STEPS DEBUG] Could not parse: $raw');
+              }
+            }
+          }
+          
+          AppLogger.info('[STEPS DEBUG] Final total from getHealthDataFromTypes: $total');
+          return total;
+          
+        } catch (e) {
+          AppLogger.error('[STEPS DEBUG] getHealthDataFromTypes failed: $e');
         }
       }
       
-      AppLogger.info('[STEPS DEBUG] Final total steps: $total');
-      return total;
+      // If we get here, all methods failed
+      AppLogger.warning('[STEPS DEBUG] All step retrieval methods failed, returning 0');
+      return 0;
+      
     } catch (e) {
       AppLogger.error('[STEPS DEBUG] Exception in getStepsBetween: $e');
-      AppLogger.error('Error reading steps between $start and $end: $e');
       return 0;
     }
   }
@@ -512,20 +560,45 @@ class HealthService {
   Timer? _stepsTimer;
   
   Stream<int> startLiveSteps(DateTime start) {
-    _stepsController?.close();
+    AppLogger.info('[STEPS LIVE] startLiveSteps called with start=$start');
+    try {
+      _stepsController?.close();
+    } catch (_) {}
     _stepsController = StreamController<int>.broadcast();
     _stepsTimer?.cancel();
+
+    // Emit immediately so UI has a value without waiting 10 seconds
+    (() async {
+      final now = DateTime.now();
+      AppLogger.debug('[STEPS LIVE] Immediate poll for window: $start → $now');
+      final total = await getStepsBetween(start, now);
+      AppLogger.info('[STEPS LIVE] Immediate emit total steps: $total');
+      if (_stepsController != null && !_stepsController!.isClosed) {
+        _stepsController!.add(total);
+      }
+    })();
+
     _stepsTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      final total = await getStepsBetween(start, DateTime.now());
-      _stepsController?.add(total);
+      final now = DateTime.now();
+      AppLogger.debug('[STEPS LIVE] Polling steps for window: $start → $now');
+      final total = await getStepsBetween(start, now);
+      AppLogger.info('[STEPS LIVE] Emitting total steps: $total');
+      if (_stepsController != null && !_stepsController!.isClosed) {
+        _stepsController!.add(total);
+      } else {
+        AppLogger.warning('[STEPS LIVE] Steps controller is null/closed; skipping emit');
+      }
     });
     return _stepsController!.stream;
   }
   
   void stopLiveSteps() {
+    AppLogger.info('[STEPS LIVE] stopLiveSteps invoked');
     _stepsTimer?.cancel();
     _stepsTimer = null;
-    _stepsController?.close();
+    try {
+      _stepsController?.close();
+    } catch (_) {}
     _stepsController = null;
   }
   

@@ -418,7 +418,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       _currentAggregatedState = ActiveSessionFailure(
         errorMessage: lifecycleState.errorMessage!,
       );
-    } else if (!lifecycleState.isActive && lifecycleState.sessionId != null && (!_lifecycleManager.isPaused || lifecycleState.isSaving)) {
+    } else if (!lifecycleState.isActive && lifecycleState.sessionId != null) {
       AppLogger.info('[COORDINATOR] Path: Completion state (not active, has session)');
       
       // Use values from the previous running state instead of recalculating
@@ -477,8 +477,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         completedAt: DateTime.now(),
         isOffline: false,
         ruckWeightKg: lifecycleState.ruckWeightKg,
-        steps: _currentSteps,
+        steps: _currentSteps ?? _estimateStepsFromDistance(finalDistance),
       );
+      // Log steps in completed state for UI verification
+      AppLogger.info('[STEPS UI] [COORDINATOR] Completed state steps: ${_currentSteps ?? _estimateStepsFromDistance(finalDistance)} (${_currentSteps != null ? 'live tracked' : 'estimated from distance'})');
       AppLogger.info('[COORDINATOR] Completion state built successfully');
       
       // Calculate actual duration from timestamps to avoid corruption
@@ -502,16 +504,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'start_time': lifecycleState.startTime?.toIso8601String(),
         'completed_at': DateTime.now().toIso8601String(),
         'average_pace': finalDistance > 0 ? (actualDuration.inMinutes / finalDistance) : 0.0,
-        if (_currentSteps != null) 'steps': _currentSteps,
+        'steps': _currentSteps ?? _estimateStepsFromDistance(finalDistance),
         // Heart rate zones: snapshot thresholds and time in zones
         ..._computeHrZonesPayload(),
         // Heart rate aggregates expected by backend
-        'avg_heart_rate': _heartRateManager.currentState.averageHeartRate,
+        'avg_heart_rate': _heartRateManager.currentState.averageHeartRate.round(),
         'min_heart_rate': _heartRateManager.currentState.minHeartRate,
         'max_heart_rate': _heartRateManager.currentState.maxHeartRate,
       };
       AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
-    } else if (lifecycleState.sessionId != null && (lifecycleState.isActive || (_lifecycleManager.isPaused && !lifecycleState.isSaving))) {
+    } else if (lifecycleState.sessionId != null && lifecycleState.isActive) {
       AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;
@@ -531,6 +533,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         calories: calories.round(),
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
+        steps: _currentSteps,
       );
       
       _currentAggregatedState = ActiveSessionRunning(
@@ -563,6 +566,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         plannedRouteDuration: _plannedRouteDuration, // Pass route duration
         steps: _currentSteps,
       );
+      // Log steps in running state for UI verification
+      AppLogger.info('[STEPS UI] [COORDINATOR] Running state steps: ${_currentSteps ?? 'null'}');
     } else {
       AppLogger.warning('[COORDINATOR] Unmatched state combination: isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
       // Default to initial state for unmatched combinations
@@ -708,6 +713,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     }
   }
   
+  /// Estimate steps from distance when live tracking is unavailable
+  /// Uses average step length of 0.75m (reasonable for rucking with weight)
+  int _estimateStepsFromDistance(double distanceKm) {
+    if (distanceKm <= 0) return 0;
+    const double stepLengthM = 0.75; // Conservative estimate for rucking with weight
+    final int estimatedSteps = ((distanceKm * 1000) / stepLengthM).round();
+    AppLogger.info('[STEPS] Estimated $estimatedSteps steps from ${distanceKm.toStringAsFixed(2)}km distance');
+    return estimatedSteps;
+  }
+
   /// Calculates the aggregate terrain multiplier based on terrain segments
   /// Uses distance-weighted average of energy multipliers
   double _calculateTerrainMultiplier() {
@@ -751,20 +766,20 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     try {
       final prefs = GetIt.instance<SharedPreferences>();
       final enabled = prefs.getBool('live_step_tracking') ?? false;
-      AppLogger.info('[COORDINATOR] Live step tracking preference: $enabled');
+      AppLogger.info('[STEPS LIVE] [COORDINATOR] Live step tracking preference: $enabled');
       
       if (enabled) {
         final startTime = DateTime.now();
-        AppLogger.info('[COORDINATOR] Starting live step tracking from: $startTime');
+        AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting live step tracking from: $startTime');
         _stepsSub?.cancel();
         _stepsSub = _healthService.startLiveSteps(startTime).listen((total) {
-          AppLogger.info('[COORDINATOR] Received step update: $total');
+          AppLogger.info('[STEPS LIVE] [COORDINATOR] Received step update: $total');
           _currentSteps = total;
           add(const StateAggregationRequested());
         });
         AppLogger.info('[COORDINATOR] Live step tracking subscription created');
       } else {
-        AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences');
+        AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences - will estimate steps from distance at session end');
       }
     } catch (e) {
       AppLogger.error('[COORDINATOR] Error setting up live step tracking: $e');

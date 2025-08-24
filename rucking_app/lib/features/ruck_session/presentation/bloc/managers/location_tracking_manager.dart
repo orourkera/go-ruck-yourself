@@ -120,7 +120,7 @@ class LocationTrackingManager implements SessionManager {
   static const Duration _inactivityThreshold = Duration(minutes: 12);
   static const Duration _inactivityCooldown = Duration(minutes: 20);
   static const double _movementDistanceMetersThreshold = 12.0; // 10–15m
-  static const double _movementSpeedThreshold = 0.3; // m/s
+  static const double _movementSpeedThreshold = 0.1; // m/s (lowered from 0.3 to reduce false idle detection)
 
   // Distance stall detection
   DateTime? _lastDistanceIncreaseTime;
@@ -490,7 +490,17 @@ class LocationTrackingManager implements SessionManager {
         return dMeters >= _movementDistanceMetersThreshold;
       })();
       final hasMeaningfulSpeed = (position.speed ?? 0.0) >= _movementSpeedThreshold;
-      if (hasMeaningfulDistance || hasMeaningfulSpeed) {
+      
+      // Also check heart rate as movement indicator (if HR is elevated, user is likely moving)
+      bool hasElevatedHeartRate = false;
+      final hr = _watchService.getCurrentHeartRate();
+      if (hr != null) {
+        final currentHR = hr.toInt();
+        // If HR is >100 BPM, assume user is moving (even if GPS doesn't detect it)
+        hasElevatedHeartRate = currentHR > 100;
+      }
+      
+      if (hasMeaningfulDistance || hasMeaningfulSpeed || hasElevatedHeartRate) {
         _lastMovementTime = DateTime.now();
         if (_inactiveNotified) {
           // Reset notification flag if user started moving again by 30m from last notified distance
@@ -1418,12 +1428,14 @@ double _calculateTotalDistanceWithValidation() {
     required int calories,
     required double elevationGain,
     required double elevationLoss,
+    int? steps,
   }) {
     _updateWatchWithSessionData(
       _currentState,
       caloriesFromCoordinator: calories,
       elevationGainFromCoordinator: elevationGain,
       elevationLossFromCoordinator: elevationLoss,
+      stepsFromCoordinator: steps,
     );
   }
   
@@ -1432,6 +1444,7 @@ double _calculateTotalDistanceWithValidation() {
     int? caloriesFromCoordinator,
     double? elevationGainFromCoordinator,
     double? elevationLossFromCoordinator,
+    int? stepsFromCoordinator,
   }) {
     // Note: activeSessionId check is done in callers (_onTick, etc.)
     try {
@@ -1454,7 +1467,11 @@ double _calculateTotalDistanceWithValidation() {
           'pace=${state.currentPace.toStringAsFixed(1)}s/km, '
           'calories=${estimatedCalories}cal, '
           'elevation_gain=${elevationGain.toStringAsFixed(1)}m, '
-          'elevation_loss=${elevationLoss.toStringAsFixed(1)}m');
+          'elevation_loss=${elevationLoss.toStringAsFixed(1)}m'
+          '${stepsFromCoordinator != null ? ", steps=$stepsFromCoordinator" : ""}');
+      if (stepsFromCoordinator != null) {
+        AppLogger.info('[STEPS LIVE] [LOCATION_MANAGER] Including steps in watch update: $stepsFromCoordinator');
+      }
       
       // Get user's metric preference
       _sendWatchUpdateWithUserPreferences(
@@ -1463,6 +1480,7 @@ double _calculateTotalDistanceWithValidation() {
         estimatedCalories: estimatedCalories,
         elevationGain: elevationGain,
         elevationLoss: elevationLoss,
+        steps: stepsFromCoordinator,
       );
       
     } catch (e) {
@@ -1477,6 +1495,7 @@ double _calculateTotalDistanceWithValidation() {
     required int estimatedCalories,
     required double elevationGain,
     required double elevationLoss,
+    int? steps,
   }) async {
     try {
       // Use cached metric preference to avoid API call on every location update  
@@ -1493,6 +1512,7 @@ double _calculateTotalDistanceWithValidation() {
         elevationGain: elevationGain,
         elevationLoss: elevationLoss,
         isMetric: isMetric,
+        steps: steps,
       );
       
       AppLogger.debug('[LOCATION_MANAGER] WATCH_UPDATE: Sent session data to watch - Distance: ${state.totalDistance.toStringAsFixed(2)}km, Duration: ${duration.inMinutes}min, Pace: ${state.currentPace.toStringAsFixed(2)}min/km, Metric: $isMetric');
@@ -1511,6 +1531,7 @@ double _calculateTotalDistanceWithValidation() {
           elevationGain: elevationGain,
           elevationLoss: elevationLoss,
           isMetric: true, // Fallback to metric
+          steps: steps,
         );
         AppLogger.debug('[LOCATION_MANAGER] WATCH_UPDATE: Sent fallback session data to watch (metric)');
       } catch (fallbackError) {

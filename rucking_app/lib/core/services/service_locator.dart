@@ -79,6 +79,7 @@ import 'package:rucking_app/features/events/presentation/bloc/event_progress_blo
 import 'package:rucking_app/core/services/feature_flags.dart';
 import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
+import 'package:rucking_app/core/services/goals_api_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_coordinator.dart';
 import 'package:rucking_app/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:rucking_app/features/profile/domain/repositories/profile_repository.dart';
@@ -115,6 +116,8 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<StorageService>(StorageServiceImpl(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()));
   final apiClient = ApiClient(getIt<StorageService>(), getIt<Dio>());
   getIt.registerSingleton<ApiClient>(apiClient);
+  // Goals API service
+  getIt.registerSingleton<GoalsApiService>(GoalsApiService(apiClient));
   // 🚩 FEATURE-FLAGGED AUTH SERVICE
   // This wrapper allows safe switching between legacy auth and simplified Supabase auth
   // Feature flags control which implementation is used - see feature_flags.dart

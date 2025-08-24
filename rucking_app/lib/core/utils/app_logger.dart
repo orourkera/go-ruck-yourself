@@ -192,6 +192,22 @@ class AppLogger {
 
   /// Whitelist AI debug messages so they show up in Debug builds without requiring VERBOSE_LOGS
   static bool _isAiDebug(String message) {
-    return message.contains('[AI_DEBUG]') || message.contains('[AI_CHEERLEADER_DEBUG]');
+    // Allow a set of diagnostic tags to bypass verbose gating in debug builds
+    // This ensures important dev diagnostics are visible without --dart-define=VERBOSE_LOGS
+    const tags = <String>[
+      '[AI_DEBUG]',
+      '[AI_CHEERLEADER_DEBUG]',
+      '[HR_CHART]',
+      '[HR_DEBUG]',
+      '[PACE DEBUG]',
+      '[PACE SMOOTH]',
+      '[STEPS DEBUG]',
+      '[STEPS LIVE]',
+      '[STEPS UI]',
+    ];
+    for (final t in tags) {
+      if (message.contains(t)) return true;
+    }
+    return false;
   }
 }

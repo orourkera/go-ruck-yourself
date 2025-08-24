@@ -17,6 +17,7 @@ class AnimatedHeartRateChart extends StatefulWidget {
   final Color Function(BuildContext) getLadyModeColor;
   final Duration? totalDuration;
   final List<({int min, int max, Color color, String name})>? zones;
+  final DateTime? sessionStartTime;
 
   const AnimatedHeartRateChart({
     super.key,
@@ -27,6 +28,7 @@ class AnimatedHeartRateChart extends StatefulWidget {
     required this.getLadyModeColor,
     this.totalDuration,
     this.zones,
+    this.sessionStartTime,
   });
 
   @override
@@ -66,22 +68,63 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
     // The check in build() method should ideally prevent this from being called with empty samples,
     // but as a safeguard, return empty data if it somehow still is.
     if (widget.heartRateSamples.isEmpty) return LineChartData();
-
-    final pointsToShow = (widget.heartRateSamples.length * animationValue).round().clamp(1, widget.heartRateSamples.length);
-    final visibleSamples = widget.heartRateSamples.sublist(0, pointsToShow);
-    final firstTimestamp = widget.heartRateSamples.first.timestamp.millisecondsSinceEpoch.toDouble();
-    final lastTimestamp = widget.heartRateSamples.last.timestamp.millisecondsSinceEpoch.toDouble();
+    
+    // Ensure samples are sorted by timestamp to avoid truncation or miscomputed range
+    final sortedSamples = [...widget.heartRateSamples]
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    // Base x-axis at the session start when available; otherwise fall back to first HR sample
+    final baseTimestamp = (widget.sessionStartTime ?? sortedSamples.first.timestamp).millisecondsSinceEpoch.toDouble();
+    final firstTimestamp = sortedSamples.first.timestamp.millisecondsSinceEpoch.toDouble();
+    final lastTimestamp = sortedSamples.last.timestamp.millisecondsSinceEpoch.toDouble();
         
-    final spots = visibleSamples.map((sample) {
-      final timeOffset = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
+    // Build spots for ALL samples first
+    final allSpots = sortedSamples.map((sample) {
+      final timeOffset = (sample.timestamp.millisecondsSinceEpoch - baseTimestamp) / (1000 * 60);
       return FlSpot(timeOffset, sample.bpm.toDouble());
     }).toList();
     
     // Calculate the actual time range of heart rate data
-    final double actualDataRangeMinutes = (lastTimestamp - firstTimestamp) / (1000 * 60);
+    // Range covered by the plotted samples relative to session start
+    final double actualDataRangeMinutes = (lastTimestamp - baseTimestamp) / (1000 * 60);
     
-    // Use the actual heart rate data range for x-axis with small buffer
-    final double safeMaxX = actualDataRangeMinutes + 2.0;
+    // If we have a totalDuration, use it exactly as the x-axis end to avoid a visual gap.
+    // Otherwise, base on data range and add a small buffer.
+    final double durationMinutes = (widget.totalDuration != null) ? widget.totalDuration!.inSeconds / 60.0 : 0.0;
+    final double safeMaxX = widget.totalDuration != null
+        ? durationMinutes
+        : (actualDataRangeMinutes + 2.0);
+
+    // Optionally extend the last point horizontally to reach the full totalDuration, using the last BPM value
+    final bool shouldExtendToTotal = durationMinutes > actualDataRangeMinutes + 0.01; // small epsilon
+    List<FlSpot> extendedSpots = List.of(allSpots);
+    // If sampling started after the session start, prepend a flat segment at x=0 with the first BPM
+    if (extendedSpots.isNotEmpty && extendedSpots.first.x > 0.01) {
+      extendedSpots.insert(0, FlSpot(0.0, extendedSpots.first.y));
+      // ignore: avoid_print
+      print('[HR_CHART] prepending flat start at 0.0m with bpm=${extendedSpots[1].y.toStringAsFixed(0)}');
+    }
+    if (shouldExtendToTotal && extendedSpots.isNotEmpty) {
+      extendedSpots.add(FlSpot(durationMinutes, extendedSpots.last.y));
+      // DEBUG: log extension
+      // ignore: avoid_print
+      print('[HR_CHART] extending line to totalDuration: lastX=${extendedSpots[extendedSpots.length - 2].x.toStringAsFixed(2)}m -> ${durationMinutes.toStringAsFixed(2)}m');
+    }
+
+    // Apply animation over the (possibly extended) set of points so that when animation completes, the line spans the full width
+    final int totalPoints = extendedSpots.length;
+    final int pointsToShow = (totalPoints * animationValue).round().clamp(1, totalPoints);
+    final spots = extendedSpots.sublist(0, pointsToShow);
+
+    // DEBUG: Log computed ranges and sample bounds to validate no truncation
+    try {
+      final firstDt = DateTime.fromMillisecondsSinceEpoch(firstTimestamp.toInt());
+      final lastDt = DateTime.fromMillisecondsSinceEpoch(lastTimestamp.toInt());
+      final baseDt = DateTime.fromMillisecondsSinceEpoch(baseTimestamp.toInt());
+      final latestSpotX = spots.isNotEmpty ? spots.last.x : 0.0;
+      print('[HR_CHART] samples=${sortedSamples.length} visible=${pointsToShow} anim=${animationValue.toStringAsFixed(2)}');
+      print('[HR_CHART] base(sessionStart)=${baseDt.toIso8601String()} firstSample=${firstDt.toIso8601String()} lastSample=${lastDt.toIso8601String()} ' 
+            'rangeMinFromBase=${actualDataRangeMinutes.toStringAsFixed(2)}m totalDur=${durationMinutes.toStringAsFixed(2)}m maxX=${safeMaxX.toStringAsFixed(2)}m lastSpotX=${latestSpotX.toStringAsFixed(2)}m');
+    } catch (_) {}
         
     // Ensure min and max Y values are proper doubles
     final double safeMinY = ((widget.minHeartRate != null) ? widget.minHeartRate!.toDouble() : 60.0) - 10.0;
@@ -163,16 +206,16 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart> with Si
           // Zone boundary lines and labels
           if (widget.zones != null)
             ...widget.zones!.expand((z) => [
-              HorizontalLine(y: z.min.toDouble(), color: z.color.withOpacity(0.12), strokeWidth: 2),
+              HorizontalLine(y: z.min.toDouble(), color: z.color.withOpacity(0.25), strokeWidth: 2),
               HorizontalLine(
                 y: z.max.toDouble(),
-                color: z.color.withOpacity(0.12),
+                color: z.color.withOpacity(0.25),
                 strokeWidth: 2,
                 label: HorizontalLineLabel(
                   show: true,
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.only(left: 6),
-                  style: TextStyle(color: z.color.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: z.color.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.w600),
                   labelResolver: (_) => z.name,
                 ),
               ),

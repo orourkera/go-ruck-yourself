@@ -53,6 +53,61 @@ class RemoteConfigService {
       _fetchFailed = true;
       _isInitialized = false;
     }
+  } // <--- Added closing brace here
+
+  /// Convenience: Get the AI Goal system prompt version.
+  /// This should be forwarded to the backend so it can select the appropriate
+  /// server-side system prompt without trusting client-provided prompt text.
+  int getAIGoalPromptVersion() {
+    return getInt('ai_goal_prompt_version', fallback: 1);
+  }
+
+  /// Convenience: Get the AI Notification (push copy) system prompt version.
+  /// Forward this to the backend to select the server-side notification prompt.
+  int getAINotificationPromptVersion() {
+    return getInt('ai_notification_prompt_version', fallback: 1);
+  }
+
+  /// Get the AI Goals system prompt (full text)
+  String getAIGoalSystemPrompt() {
+    return getString('ai_goal_system_prompt', fallback: '''You are an expert AI coach helping users set, track, and evaluate rucking goals.
+Your job:
+- Interpret user intent and preferences from structured inputs (user profile, history, unit preferences)
+- Propose clear, safe, and measurable rucking goals
+- Generate evaluation logic that can be run server-side against user activity
+
+Guidelines:
+- Keep goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound
+- Respect units (metric or imperial)
+- Avoid unsafe recommendations (excessive weight or volume spikes)
+- Prefer progressive overload and sustainable schedules
+- Provide concise titles and clear descriptions
+''');
+  }
+
+  /// Get the AI Notification system prompt (full text) used for goal-related push copy
+  String getAINotificationSystemPrompt() {
+    return getString('ai_notification_system_prompt', fallback: '''You are a concise, motivational copywriter for rucking goal notifications.
+Given structured context (goal details, progress deltas, streaks, time-of-day), craft short push messages:
+- Max ~90 characters ideal, 120 hard limit
+- Positive, actionable, non-repetitive
+- Reference recent progress when helpful
+- Never guilt or shame
+''');
+  }
+
+  /// Get the AI Cheerleader system prompt
+  String getAICheerleaderSystemPrompt() {
+    return getString('ai_cheerleader_system_prompt', fallback: '''You are an enthusiastic AI cheerleader for rucking workouts. 
+Analyze the provided context JSON: 
+- 'current_session': Real-time stats like distance, pace, duration.
+- 'historical': Past rucks, splits, achievements, user profile, notifications, and ai_cheerleader_history (your previous messages to this user).
+Generate personalized, motivational messages. Reference historical trends (e.g., 'Faster than your last 3 rucks!') and achievements (e.g., 'Building on your 10K badge!') to encourage based on current progress. Avoid repeating similar messages from your ai_cheerleader_history - be creative and vary your encouragement style. Keep responses under 150 words, positive, and action-oriented.''');
+  }
+
+  /// Get the AI Cheerleader user prompt template
+  String getAICheerleaderUserPromptTemplate() {
+    return getString('ai_cheerleader_user_prompt_template', fallback: 'Context data:\n{context}\nGenerate encouragement for this ongoing ruck session.');
   }
 
   /// Fetch latest config from Firebase and activate
@@ -102,6 +157,44 @@ class RemoteConfigService {
 
       // AI Cheerleader feature flags
       'ai_cheerleader_manual_trigger': kDebugMode, // Enable in debug for testing
+      
+      // AI Goals / Prompt selection
+      // Use a version number to select the server-side system prompt.
+      // This avoids shipping full prompt text from client while still enabling
+      // dynamic changes via Remote Config.
+      'ai_goal_prompt_version': 1,
+      'ai_notification_prompt_version': 1,
+      
+      // AI Cheerleader Prompts (full text stored in Remote Config)
+      'ai_cheerleader_system_prompt': '''You are an enthusiastic AI cheerleader for rucking workouts. 
+Analyze the provided context JSON: 
+- 'current_session': Real-time stats like distance, pace, duration.
+- 'historical': Past rucks, splits, achievements, user profile, notifications, and ai_cheerleader_history (your previous messages to this user).
+Generate personalized, motivational messages. Reference historical trends (e.g., 'Faster than your last 3 rucks!') and achievements (e.g., 'Building on your 10K badge!') to encourage based on current progress. Avoid repeating similar messages from your ai_cheerleader_history - be creative and vary your encouragement style. Keep responses under 150 words, positive, and action-oriented.''',
+      
+      'ai_cheerleader_user_prompt_template': 'Context data:\n{context}\nGenerate encouragement for this ongoing ruck session.',
+      
+      // AI Goals & Notifications Prompts (full text stored in Remote Config)
+      'ai_goal_system_prompt': '''You are an expert AI coach helping users set, track, and evaluate rucking goals.
+Your job:
+- Interpret user intent and preferences from structured inputs (user profile, history, unit preferences)
+- Propose clear, safe, and measurable rucking goals
+- Generate evaluation logic that can be run server-side against user activity
+
+Guidelines:
+- Keep goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound
+- Respect units (metric or imperial)
+- Avoid unsafe recommendations (excessive weight or volume spikes)
+- Prefer progressive overload and sustainable schedules
+- Provide concise titles and clear descriptions
+''',
+      'ai_notification_system_prompt': '''You are a concise, motivational copywriter for rucking goal notifications.
+Given structured context (goal details, progress deltas, streaks, time-of-day), craft short push messages:
+- Max ~90 characters ideal, 120 hard limit
+- Positive, actionable, non-repetitive
+- Reference recent progress when helpful
+- Never guilt or shame
+''',
     };
   }
 

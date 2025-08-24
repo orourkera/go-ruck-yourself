@@ -363,8 +363,29 @@ class SessionRepository {
       } else {
         AppLogger.info('DEBUGGING: No heart_rate_samples field in session response');
       }
-      // Return a session with samples attached
-      final resultSession = session.copyWith(heartRateSamples: heartRateSamples);
+      // Compute HR statistics if missing and samples are available
+      RuckSession resultSession = session.copyWith(heartRateSamples: heartRateSamples);
+      if (heartRateSamples.isNotEmpty &&
+          (resultSession.avgHeartRate == null || resultSession.maxHeartRate == null || resultSession.minHeartRate == null)) {
+        try {
+          // Ensure samples are sorted (not strictly required for stats, but keeps consistency)
+          final sorted = [...heartRateSamples]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          final bpmValues = sorted.map((s) => s.bpm).toList();
+          final int minBpm = bpmValues.reduce((a, b) => a < b ? a : b);
+          final int maxBpm = bpmValues.reduce((a, b) => a > b ? a : b);
+          final int avgBpm = (bpmValues.fold<int>(0, (sum, v) => sum + v) / bpmValues.length).round();
+
+          resultSession = resultSession.copyWith(
+            avgHeartRate: resultSession.avgHeartRate ?? avgBpm,
+            maxHeartRate: resultSession.maxHeartRate ?? maxBpm,
+            minHeartRate: resultSession.minHeartRate ?? minBpm,
+          );
+          AppLogger.debug('[HEARTRATE DEBUG] Computed HR stats - avg: ${resultSession.avgHeartRate}, max: ${resultSession.maxHeartRate}, min: ${resultSession.minHeartRate}');
+        } catch (e) {
+          AppLogger.warning('[HEARTRATE DEBUG] Failed computing HR stats from samples: $e');
+        }
+      }
+
       AppLogger.info('DEBUGGING: Returning session with ${resultSession.heartRateSamples?.length ?? 0} heart rate samples');
       
       // Cache the session details

@@ -313,20 +313,117 @@ class SessionValidationService {
   /// Get a suitable pace value (smoothed if needed)
   double getSmoothedPace(double currentPace, List<double> recentPaces) {
     // No smoothing needed if we don't have enough data
-    if (recentPaces.length < 3) return currentPace;
-    
-    // Calculate rolling average of the last several pace values
-    // excluding any outliers (very high or very low values)
-    final validPaces = [...recentPaces]..sort();
-    // Remove potential outliers (first and last value)
-    if (validPaces.length > 4) {
-      validPaces.removeAt(0);
-      validPaces.removeLast();
+    if (recentPaces.isEmpty) return currentPace;
+
+    // 1) Clamp obvious out-of-range values to sane bounds
+    //    Keep within [120s/km, 3600s/km]
+    double clampPace(double p) => p.clamp(120.0, 3600.0);
+    final clampedCurrent = clampPace(currentPace);
+
+    // Build a working window (last up to 5 samples)
+    final int n = recentPaces.length;
+    final int window = n >= 5 ? 5 : n;
+    final List<double> windowPaces = recentPaces.sublist(n - window, n).map(clampPace).toList();
+    if (windowPaces.length == 1) return windowPaces.first;
+
+    // Helper: median of a list
+    double _median(List<double> values) {
+      final sorted = [...values]..sort();
+      final mid = sorted.length >> 1;
+      if (sorted.length.isOdd) return sorted[mid];
+      return (sorted[mid - 1] + sorted[mid]) / 2.0;
     }
-    
-    // Calculate average
-    double sum = validPaces.fold(0, (a, b) => a + b);
-    return sum / validPaces.length;
+
+    // 2) Compute robust central tendency
+    final medianAll = _median(windowPaces);
+
+    // 3) Weighted moving average (heavier weight to recent samples)
+    //    weights: 1..window (normalized)
+    double _wma(List<double> values) {
+      double w = 0, s = 0;
+      for (int i = 0; i < values.length; i++) {
+        final weight = (i + 1).toDouble(); // oldest->1, newest->window
+        w += weight;
+        s += values[i] * weight;
+      }
+      return s / w;
+    }
+    final wmaAll = _wma(windowPaces);
+
+    // 4) Previous baseline: median of window excluding the newest value
+    final List<double> prevWindow = windowPaces.sublist(0, windowPaces.length - 1);
+    final prevMedian = _median(prevWindow);
+    final prevWma = _wma(prevWindow);
+
+    // 5) Short-stop hysteresis logic to avoid brief stop spikes
+    // Define thresholds (seconds per km)
+    const double verySlowThreshold = 1000.0; // ~16:40 / km
+    const double slowThreshold = 800.0; // ~13:20 / km
+
+    // Count how many of the last 3 samples are slow/very-slow
+    final int lastK = windowPaces.length >= 3 ? 3 : windowPaces.length;
+    final List<double> lastKVals = windowPaces.sublist(windowPaces.length - lastK);
+    final int slowCount = lastKVals.where((p) => p >= slowThreshold).length;
+    final int verySlowCount = lastKVals.where((p) => p >= verySlowThreshold).length;
+
+    // Base smoothed candidate is a blend of WMA and median
+    // Blend more towards median when newest looks like an outlier jump
+    double base;
+    final newest = windowPaces.last;
+    final jumpUp = newest - prevMedian; // positive = slowing down
+    final jumpDown = prevMedian - newest; // positive = speeding up
+
+    if (jumpUp > 120) {
+      // Big slow-down jump detected: lean towards historical center
+      base = (0.7 * prevWma) + (0.3 * medianAll);
+    } else if (jumpDown > 120) {
+      // Big speed-up: allow faster responsiveness but still smooth
+      base = (0.5 * wmaAll) + (0.5 * medianAll);
+    } else {
+      // Normal variation
+      base = (0.6 * wmaAll) + (0.4 * medianAll);
+    }
+
+    // 6) Apply hysteresis caps to limit per-update change
+    // More restrictive for slow-downs (to suppress brief-stop spikes)
+    // and moderately permissive for speed-ups to keep responsiveness.
+    double maxSlowdownStep; // maximum allowed increase in s/km
+    double maxSpeedupStep;  // maximum allowed decrease in s/km
+
+    if (verySlowCount >= 2) {
+      // Multiple consecutive very-slow readings: allow larger adjustment upward
+      maxSlowdownStep = 90.0;
+    } else if (slowCount >= 2) {
+      maxSlowdownStep = 60.0;
+    } else {
+      // Brief/isolated slow sample: clamp hard
+      maxSlowdownStep = 30.0;
+    }
+
+    // Speed-ups can be a bit more responsive
+    maxSpeedupStep = 45.0;
+
+    // Final target before per-step clamping
+    double target = base;
+
+    // Clamp relative to previous baseline (prevMedian is robust)
+    if (target > prevMedian) {
+      target = prevMedian + maxSlowdownStep;
+    } else if (target < prevMedian) {
+      target = prevMedian - maxSpeedupStep;
+    }
+
+    // Ensure final within absolute clamps and not wildly different from current
+    target = clampPace(target);
+
+    // Additional guard: if newest is extreme slow, but history is normal,
+    // and not sustained (slowCount < 2), ignore the spike almost entirely.
+    if (newest >= verySlowThreshold && slowCount < 2) {
+      target = min(target, prevMedian + 20.0);
+    }
+
+    AppLogger.debug('[PACE SMOOTH] window=${windowPaces.map((e)=>e.toStringAsFixed(0)).join(',')}, prevMed=${prevMedian.toStringAsFixed(0)}, base=${base.toStringAsFixed(0)}, target=${target.toStringAsFixed(0)}');
+    return target;
   }
 
   /// Calculate distance between two points in meters

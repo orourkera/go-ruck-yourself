@@ -659,6 +659,7 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
     required double? elevation,
     double? elevationLoss,
     required bool? isMetric,
+    int? steps,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -673,6 +674,7 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
             #elevation: elevation,
             #elevationLoss: elevationLoss,
             #isMetric: isMetric,
+            #steps: steps,
           },
         ),
         returnValue: _i6.Future<void>.value(),
@@ -689,6 +691,7 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
     required double? elevationGain,
     required double? elevationLoss,
     required bool? isMetric,
+    int? steps,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -703,6 +706,7 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
             #elevationGain: elevationGain,
             #elevationLoss: elevationLoss,
             #isMetric: isMetric,
+            #steps: steps,
           },
         ),
         returnValue: _i6.Future<bool>.value(false),

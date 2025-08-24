@@ -4,956 +4,27 @@ from datetime import datetime, timedelta
 from dateutil import tz
 import uuid
 import logging
-import math
+import json
 import os
 
-from RuckTracker.supabase_client import get_supabase_client
-from RuckTracker.services.redis_cache_service import cache_delete_pattern, cache_get, cache_set
-from RuckTracker.utils.auth_helper import get_current_user_id
-from RuckTracker.utils.api_response import check_auth_and_respond
-from RuckTracker.services.push_notification_service import PushNotificationService, get_user_device_tokens
+from ..supabase_client import get_supabase_client
+from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
+from ..goals import _compute_window_bounds, _km_to_mi
+from ..utils.auth_helper import get_current_user_id
+from ..utils.api_response import check_auth_and_respond
+from ..services.push_notification_service import PushNotificationService, get_user_device_tokens
 
 logger = logging.getLogger(__name__)
 
 def validate_ruck_id(ruck_id):
-    """Convert string ruck_id to integer for database operations"""
+    """Coerce a path parameter ruck_id into an int, or return None if invalid."""
     try:
         return int(ruck_id)
-    except (ValueError, TypeError):
-        logger.error(f"Invalid ruck_id format: {ruck_id}")
-        return None
-
-def haversine_distance(lat1, lon1, lat2, lon2):
-    """
-    Calculate the great circle distance between two points 
-    on the earth (specified in decimal degrees).
-    Returns distance in meters.
-    """
-    # Convert decimal degrees to radians
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-    
-    # Haversine formula
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    c = 2 * math.asin(math.sqrt(a))
-    
-    # Radius of earth in meters
-    r = 6371000
-    return c * r
-
-def clip_route_for_privacy(location_points):
-    """
-    Clips the first and last ~100m of a route for privacy
-    
-    Args:
-        location_points: List of dictionaries with 'lat' and 'lng' keys
-    
-    Returns:
-        List of clipped location points
-    """
-    if not location_points or len(location_points) < 3:
-        return location_points
-    
-    # Privacy clipping distance (200m)
-    PRIVACY_DISTANCE_METERS = 200.0
-    
-    # Convert to consistent format
-    normalized_points = []
-    for point in location_points:
-        if isinstance(point, dict):
-            if 'lat' in point and 'lng' in point:
-                normalized_points.append({
-                    'lat': float(point['lat']),
-                    'lng': float(point['lng'])
-                })
-            elif 'latitude' in point and 'longitude' in point:
-                normalized_points.append({
-                    'lat': float(point['latitude']),
-                    'lng': float(point['longitude'])
-                })
-    
-    if len(normalized_points) < 3:
-        return location_points
-    
-    # Find start clipping index (skip first ~100m)
-    start_idx = 0
-    cumulative_distance = 0
-    for i in range(1, len(normalized_points)):
-        prev_point = normalized_points[i-1]
-        curr_point = normalized_points[i]
-        
-        distance = haversine_distance(
-            prev_point['lat'], prev_point['lng'],
-            curr_point['lat'], curr_point['lng']
-        )
-        cumulative_distance += distance
-        
-        if cumulative_distance >= PRIVACY_DISTANCE_METERS:
-            start_idx = i
-            break
-    
-    # Find end clipping index (skip last ~100m)
-    end_idx = len(normalized_points)
-    cumulative_distance = 0
-    for i in range(len(normalized_points) - 2, -1, -1):
-        curr_point = normalized_points[i]
-        next_point = normalized_points[i+1]
-        
-        distance = haversine_distance(
-            curr_point['lat'], curr_point['lng'],
-            next_point['lat'], next_point['lng']
-        )
-        cumulative_distance += distance
-        
-        if cumulative_distance >= PRIVACY_DISTANCE_METERS:
-            end_idx = i + 1
-            break
-    
-    # Safety check: ensure we have valid indices and some points
-    if start_idx >= end_idx or start_idx >= len(normalized_points) or end_idx <= 0:
-        # Fallback: return middle 50% if distance clipping fails
-        total = len(normalized_points)
-        start_idx = total // 4
-        end_idx = 3 * total // 4
-        if end_idx <= start_idx:
-            # Last resort: return all points
-            return normalized_points
-    
-    # Extract the visible portion
-    clipped_points = normalized_points[start_idx:end_idx]
-    
-    # Final safety: never return empty list
-    if not clipped_points:
-        return normalized_points
-        
-    return clipped_points
-
-class RuckSessionListResource(Resource):
-    def get(self):
-        """Get all ruck sessions for the current user"""
+    except (TypeError, ValueError):
         try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-                
-            limit = request.args.get('limit', 20, type=int)  # Default to 20 sessions
-            
-            # Build cache key based on user and limit
-            cache_key = f"ruck_session:{g.user.id}:list:{limit}"
-            
-            # Try to get cached response first
-            cached_response = cache_get(cache_key)
-            if cached_response:
-                logger.info(f"[CACHE HIT] Returning cached session list for user {g.user.id}")
-                return cached_response, 200
-            
-            logger.info(f"[CACHE MISS] Fetching session list from database for user {g.user.id}")
-            
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            response_query = supabase.table('ruck_session') \
-                .select('*') \
-                .eq('user_id', g.user.id) \
-                .eq('status', 'completed') \
-                .order('completed_at', desc=True) \
-                .limit(min(limit, 50))  # Cap at 50 sessions max
-            
-            response = response_query.execute()
-            sessions = response.data
-            if sessions is None:
-                sessions = []
-            
-            # Get all session IDs for batch queries
-            session_ids = [session['id'] for session in sessions]
-            
-            if not session_ids:
-                cache_set(cache_key, sessions, 300)  # Cache for 5 minutes
-                return sessions, 200
-            
-            # Fetch route data with intelligent sampling (preserve full route shape)
-            locations_by_session = {}
-            for session_id in session_ids:
-                cache_key = f"session_points:{session_id}"
-                cached_points = cache_get(cache_key)
-                if cached_points:
-                    locations_by_session[session_id] = cached_points
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Cache hit with {len(cached_points)} points")
-                else:
-                    try:
-                        points_resp = supabase.rpc('get_simplified_route', {'p_session_id': int(session_id), 'p_tolerance': 0.0001}).execute()
-                        if points_resp.data:
-                            processed_points = [{'lat': float(p['lat']), 'lng': float(p['lng'])} for p in points_resp.data]
-                            locations_by_session[session_id] = processed_points
-                            cache_set(cache_key, processed_points, 3600)
-                            logger.info(f"[ROUTE_DEBUG] Session {session_id}: Fetched and cached {len(processed_points)} simplified points")
-                        else:
-                            locations_by_session[session_id] = []
-                    except Exception as e:
-                        logger.error(f"[ROUTE_DEBUG] RPC failed for {session_id}: {e}")
-                        locations_by_session[session_id] = []
-
-            # Batch fetch splits for all sessions (splits are small, safe to fetch)
-            splits_by_session = {}
-            try:
-                all_splits_resp = supabase.table('session_splits') \
-                    .select('session_id,split_number,split_distance_km,split_duration_seconds') \
-                    .in_('session_id', session_ids) \
-                    .order('session_id,split_number') \
-                    .execute()
-                
-                if all_splits_resp.data:
-                    for split in all_splits_resp.data:
-                        session_id = split['session_id']
-                        if session_id not in splits_by_session:
-                            splits_by_session[session_id] = []
-                        splits_by_session[session_id].append({
-                            'split_number': split['split_number'],
-                            'split_distance_km': split['split_distance_km'],
-                            'split_duration_seconds': split['split_duration_seconds'],
-                            'calories_burned': split.get('calories_burned', 0.0),
-                            'elevation_gain_m': split.get('elevation_gain_m', 0.0),
-                            'timestamp': split.get('split_timestamp')
-                        })
-            except Exception as e:
-                logger.error(f"ERROR: Failed to fetch splits: {e}")
-                splits_by_session = {}
-            
-            # Batch fetch photos for all sessions
-            photos_by_session = {}
-            try:
-                all_photos_resp = supabase.table('ruck_photos') \
-                    .select('ruck_id,id,filename,size,url,thumbnail_url,created_at') \
-                    .in_('ruck_id', session_ids) \
-                    .order('ruck_id,created_at') \
-                    .execute()
-                
-                if all_photos_resp.data:
-                    for photo in all_photos_resp.data:
-                        session_id = photo['ruck_id']
-                        if session_id not in photos_by_session:
-                            photos_by_session[session_id] = []
-                        photos_by_session[session_id].append({
-                            'id': photo['id'],
-                            'file_name': photo['filename'],
-                            'file_size': photo['size'],
-                            'url': photo['url'],
-                            'thumbnail_url': photo['thumbnail_url'],
-                            'uploaded_at': photo['created_at']
-                        })
-            except Exception as e:
-                logger.error(f"ERROR: Failed to fetch photos: {e}")
-                photos_by_session = {}
-            
-            # Enrich sessions with location and splits data
-            for session in sessions:
-                session_id = session['id']
-                logger.info(f"[ROUTE_DEBUG] Enriching session {session_id}")
-                
-                # Add location points WITHOUT privacy clipping for now
-                if session_id in locations_by_session:
-                    route_data = locations_by_session[session_id]
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Found {len(route_data)} route points")
-                    session['route'] = route_data
-                    session['location_points'] = route_data  # For compatibility
-                else:
-                    logger.warning(f"[ROUTE_DEBUG] Session {session_id}: No location data found")
-                    session['route'] = []
-                    session['location_points'] = []
-                
-                # Add splits if available
-                if session_id in splits_by_session:
-                    session['splits'] = splits_by_session[session_id]
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Added {len(session['splits'])} splits")
-                else:
-                    session['splits'] = []
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: No splits data found")
-                
-                # Add photos if available
-                if session_id in photos_by_session:
-                    session['photos'] = photos_by_session[session_id]
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: Added {len(session['photos'])} photos")
-                else:
-                    session['photos'] = []
-                    logger.info(f"[ROUTE_DEBUG] Session {session_id}: No photos found")
-            
-            # Cache the enriched result for 5 minutes
-            cache_set(cache_key, sessions, 300)
-            
-            # Log final summary
-            sessions_with_routes = sum(1 for s in sessions if s.get('location_points') and len(s['location_points']) > 0)
-            total_route_points = sum(len(s.get('location_points', [])) for s in sessions)
-            logger.info(f"[ROUTE_DEBUG] FINAL SUMMARY: Returning {len(sessions)} sessions, {sessions_with_routes} with routes, {total_route_points} total route points")
-            
-            logger.info(f"Returning {len(sessions)} sessions for user {g.user.id}")
-            return sessions, 200
-            
-        except Exception as e:
-            logger.error(f"Error fetching ruck sessions: {e}")
-            return {'message': f"Error fetching sessions: {str(e)}"}, 500
-
-    def post(self):
-        """Create a new ruck session for the current user"""
-        try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            data = request.get_json()
-            if not data:
-                return {'message': 'Missing required data for session creation'}, 400
-            
-            # Log incoming request data for debugging
-            logger.info(f"Session creation request data: {data}")
-            logger.info(f"Request contains event_id: {'event_id' in data}")
-            if 'event_id' in data:
-                logger.info(f"Event ID value: {data.get('event_id')} (type: {type(data.get('event_id'))})")
-                
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-
-            # Check for any active (in_progress) session for the current user
-            active_sessions = supabase.table('ruck_session') \
-                .select('id,status,started_at,ruck_weight_kg') \
-                .eq('user_id', g.user.id) \
-                .eq('status', 'in_progress') \
-                .execute()
-            
-            if active_sessions.data and len(active_sessions.data) > 0:
-                active_session = active_sessions.data[0]
-                
-                # Check if client explicitly wants to force start a new session
-                force_new = data.get('force_new_session', False)
-                
-                if force_new:
-                    logger.info(f"Force starting new session, deleting abandoned session {active_session['id']}")
-                    
-                    # Delete the abandoned session and all associated data
-                    try:
-                        # Delete associated location points first (if not using CASCADE)
-                        supabase.table('location_point') \
-                            .delete() \
-                            .eq('session_id', active_session['id']) \
-                            .execute()
-                        
-                        # Delete associated heart rate samples (if not using CASCADE)  
-                        supabase.table('heart_rate_sample') \
-                            .delete() \
-                            .eq('session_id', active_session['id']) \
-                            .execute()
-                        
-                        # Delete the session itself
-                        supabase.table('ruck_session') \
-                            .delete() \
-                            .eq('id', active_session['id']) \
-                            .eq('user_id', g.user.id) \
-                            .execute()
-                        
-                        logger.info(f"Successfully deleted abandoned session {active_session['id']} and all associated data")
-                    except Exception as e:
-                        logger.error(f"Failed to delete abandoned session: {e}")
-                        # Continue with new session creation anyway
-                else:
-                    # Return existing session info with additional context
-                    active_session['has_active_session'] = True
-                    logger.info(f"Returning existing active session {active_session['id']}")
-                    return active_session, 200
-
-            session_data = {
-                'user_id': g.user.id,
-                'status': 'in_progress',
-                'started_at': datetime.now(tz.tzutc()).isoformat()
-            }
-            
-            # Handle ruck weight (multiple possible keys)
-            if 'ruck_weight_kg' in data and data.get('ruck_weight_kg') is not None:
-                session_data['ruck_weight_kg'] = data.get('ruck_weight_kg')
-            
-            # Handle user weight (multiple possible keys)
-            if 'user_weight_kg' in data and data.get('user_weight_kg') is not None:
-                session_data['weight_kg'] = data.get('user_weight_kg')  # Map user_weight_kg to weight_kg
-            elif 'weight_kg' in data and data.get('weight_kg') is not None:
-                session_data['weight_kg'] = data.get('weight_kg')
-            
-            # Handle custom session ID if provided
-            if 'id' in data and data.get('id') is not None:
-                session_id_raw = data.get('id')
-                
-                # Handle manual sessions - these should get database auto-generated ID
-                if isinstance(session_id_raw, str) and session_id_raw.startswith('manual_'):
-                    logger.info(f"Manual session detected, letting database auto-generate ID instead of: {session_id_raw}")
-                    # Don't set id for manual sessions - let database auto-generate
-                else:
-                    # For regular sessions, use the provided ID
-                    try:
-                        session_id = int(session_id_raw)
-                        session_data['id'] = session_id
-                        logger.info(f"Using provided session ID: {session_id}")
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid session ID format: {session_id_raw}, letting database auto-generate")
-            
-            # Handle notes if provided
-            if 'notes' in data and data.get('notes') is not None:
-                session_data['notes'] = data.get('notes')
-            
-            # Handle custom start time if provided (for crash recovery)
-            if 'start_time' in data and data.get('start_time') is not None:
-                try:
-                    # Parse and use the provided start time (frontend sends start_time, backend uses started_at)
-                    start_time = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
-                    session_data['started_at'] = start_time.isoformat()
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid start_time format, using current time: {e}")
-                    # Fall back to current time if parsing fails
-            
-            # Add event_id if provided (for event-associated ruck sessions)
-            if 'event_id' in data and data.get('event_id') is not None:
-                event_id_raw = data.get('event_id')
-                
-                # Handle manual ruck sessions - these shouldn't have an event_id
-                if isinstance(event_id_raw, str) and event_id_raw.startswith('manual_'):
-                    logger.info(f"Manual ruck session detected, ignoring event_id: {event_id_raw}")
-                    # Don't set event_id for manual sessions
-                else:
-                    # For actual events, ensure event_id is an integer
-                    try:
-                        event_id = int(event_id_raw)
-                        session_data['event_id'] = event_id
-                        logger.info(f"Creating session for event {event_id}")
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid event_id format: {event_id_raw}, ignoring")
-            else:
-                logger.info("No event_id provided - creating regular session")
-            
-            # Add route_id if provided (for route-associated ruck sessions)
-            if 'route_id' in data and data.get('route_id') is not None:
-                route_id_raw = data.get('route_id')
-                
-                # Handle manual ruck sessions - these shouldn't have a route_id
-                if isinstance(route_id_raw, str) and route_id_raw.startswith('manual_'):
-                    logger.info(f"Manual ruck session detected, ignoring route_id: {route_id_raw}")
-                    # Don't set route_id for manual sessions
-                else:
-                    # For actual routes, store the route_id
-                    try:
-                        route_id = str(route_id_raw)  # Keep as string since route IDs are UUIDs
-                        session_data['route_id'] = route_id
-                        logger.info(f"Creating session for route {route_id}")
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid route_id format: {route_id_raw}, ignoring")
-            else:
-                logger.info("No route_id provided - creating regular session")
-            
-            # Add planned_ruck_id if provided (linking to planned ruck)
-            if 'planned_ruck_id' in data and data.get('planned_ruck_id') is not None:
-                planned_ruck_id_raw = data.get('planned_ruck_id')
-                try:
-                    planned_ruck_id = str(planned_ruck_id_raw)  # Keep as string since planned_ruck IDs are UUIDs
-                    session_data['planned_ruck_id'] = planned_ruck_id
-                    logger.info(f"Creating session for planned ruck {planned_ruck_id}")
-                except (ValueError, TypeError):
-                    logger.warning(f"Invalid planned_ruck_id format: {planned_ruck_id_raw}, ignoring")
-            
-            # Insert the session into the database
-            logger.info(f"Inserting session data: {session_data}")
-            insert_resp = supabase.table('ruck_session').insert(session_data).execute()
-            
-            if not insert_resp.data:
-                logger.error(f"Failed to create session: {insert_resp.error}")
-                return {'message': 'Failed to create session'}, 500
-                
-            # Send notifications to followers if session is created with status='in_progress'
-            if session_data.get('status') == 'in_progress':
-                try:
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Session created with in_progress status, sending notifications")
-                    
-                    # Get user's username (display_name column doesn't exist)
-                    user_response = supabase.table('user').select('username').eq('id', g.user.id).execute()
-                    user_name = 'Someone'
-                    if user_response.data:
-                        user_data = user_response.data[0]
-                        user_name = user_data.get('username') or 'Someone'
-                    
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User name: {user_name}")
-                    
-                    # Get followers of the user who started the ruck
-                    followers_response = supabase.table('user_follows').select('follower_id').eq('followed_id', g.user.id).execute()
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Followers query result: {followers_response.data}")
-                    
-                    if followers_response.data:
-                        follower_ids = [f['follower_id'] for f in followers_response.data]
-                        logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Sending ruck start notifications to {len(follower_ids)} followers of {user_name}")
-                        logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Follower IDs: {follower_ids}")
-                        
-                        # Get device tokens for followers
-                        device_tokens = get_user_device_tokens(follower_ids)
-                        logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Found {len(device_tokens) if device_tokens else 0} device tokens")
-                        
-                        if device_tokens:
-                            # Send push notification
-                            push_service = PushNotificationService()
-                            result = push_service.send_ruck_started_notification(
-                                device_tokens=device_tokens,
-                                rucker_name=user_name,
-                                ruck_id=str(insert_resp.data[0]['id'])
-                            )
-                            logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Notification send result: {result}")
-                            logger.info(f"Sent ruck start notification to {len(device_tokens)} devices")
-                            
-                        else:
-                            logger.warning(f"🔔 RUCK START NOTIFICATION DEBUG: No device tokens found for {len(follower_ids)} followers")
-                    else:
-                        logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User {user_name} has no followers to notify")
-                        
-                except Exception as notification_error:
-                    # Don't fail the ruck creation if notifications fail
-                    logger.error(f"🔔 RUCK START NOTIFICATION DEBUG: Failed to send ruck start notifications: {notification_error}", exc_info=True)
-            
-            # Invalidate user's session cache and ruck buddies cache (new session may appear in feed)
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            cache_delete_pattern("ruck_buddies:*")
-            return insert_resp.data[0], 201
-        except Exception as e:
-            logger.error(f"Error creating ruck session: {e}")
-            return {'message': f"Error creating ruck session: {str(e)}"}, 500
-
-class RuckSessionResource(Resource):
-    def get(self, ruck_id):
-        try:
-            ruck_id = validate_ruck_id(ruck_id)
-            if ruck_id is None:
-                return {'message': 'Invalid ruck session ID format'}, 400
-            
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            
-            # First try to get the session for the current user (full access)
-            response = supabase.table('ruck_session') \
-                .select('*') \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            
-            is_own_session = bool(response.data and len(response.data) > 0)
-            
-            if not is_own_session:
-                # If not the user's own session, check if it's a public session
-                response = supabase.table('ruck_session') \
-                    .select('*') \
-                    .eq('id', ruck_id) \
-                    .eq('is_public', True) \
-                    .execute()
-                
-                if not response.data or len(response.data) == 0:
-                    return {'message': 'Session not found'}, 404
-                    
-                session = response.data[0]
-            else:
-                session = response.data[0]
-            
-            # Fetch location points with intelligent sampling
-            cache_key = f"session_points:{ruck_id}"
-            cached_points = cache_get(cache_key)
-            if cached_points:
-                location_points = cached_points
-                logger.info(f"[SESSION_DETAIL] Cache hit for {ruck_id}: {len(location_points)} points")
-            else:
-                try:
-                    if is_own_session:
-                        points_resp = supabase.rpc('get_simplified_route', {'p_session_id': int(ruck_id), 'p_tolerance': 0.0001}).execute()
-                    else:
-                        points_resp = supabase.rpc('get_clipped_simplified_route', {'p_session_id': int(ruck_id), 'p_privacy_distance': 200.0, 'p_max_points': 500}).execute()
-                    if points_resp.data:
-                        location_points = [{'lat': float(p['lat']), 'lng': float(p['lng']), 'timestamp': p.get('timestamp')} for p in points_resp.data]
-                        if is_own_session:  # Cache unclipped for own sessions
-                            cache_set(cache_key, location_points, 3600)
-                        logger.info(f"[SESSION_DETAIL] Fetched {len(location_points)} points via RPC for {ruck_id}")
-                    else:
-                        location_points = []
-                except Exception as e:
-                    logger.error(f"[SESSION_DETAIL] RPC failed for {ruck_id}: {e}")
-                    location_points = []  # Fallback: use old query logic here if needed
-
-            if location_points and not is_own_session:
-                original_count = len(location_points)
-                location_points = clip_route_for_privacy(location_points)
-                logger.debug(f"[PRIVACY_DEBUG] Clipped from {original_count} to {len(location_points)}")
-
-            session['route'] = location_points
-            session['location_points'] = location_points
-
-            # Fetch splits data (for all sessions - public sessions should also show splits)
-            try:
-                splits_resp = supabase.table('session_splits') \
-                    .select('*') \
-                    .eq('session_id', ruck_id) \
-                    .order('split_number') \
-                    .execute()
-                
-                if splits_resp.data:
-                    session['splits'] = splits_resp.data
-                    logger.info(f"[SPLITS_DEBUG] Included {len(splits_resp.data)} splits in detail response for session {ruck_id}")
-                else:
-                    session['splits'] = []
-                    logger.info(f"[SPLITS_DEBUG] No splits found for session {ruck_id}")
-            except Exception as splits_fetch_error:
-                logger.error(f"Error fetching splits for session {ruck_id}: {splits_fetch_error}")
-                session['splits'] = []  # Ensure splits field exists even if fetch fails
-            
-            # Fetch photos data (only for the session owner for now)
-            if is_own_session:
-                logger.info(f"[PHOTO_DEBUG] Fetching photos for session {ruck_id} owned by user {g.user.id}")
-                photos_resp = supabase.table('ruck_photos') \
-                    .select('id,filename,size,url,thumbnail_url,created_at') \
-                    .eq('ruck_id', ruck_id) \
-                    .order('created_at') \
-                    .execute()
-                
-                if photos_resp.data:
-                    logger.info(f"[PHOTO_DEBUG] Found {len(photos_resp.data)} photos for session {ruck_id}")
-                    # Transform photo data to match frontend expectations
-                    session['photos'] = [{
-                        'id': photo['id'],
-                        'file_name': photo['filename'],
-                        'file_size': photo['size'],
-                        'url': photo['url'],
-                        'thumbnail_url': photo['thumbnail_url'],
-                        'uploaded_at': photo['created_at']
-                    } for photo in photos_resp.data]
-                    logger.info(f"[PHOTO_DEBUG] Transformed photos for session {ruck_id}: {[p['file_name'] for p in session['photos']]}")
-                else:
-                    logger.info(f"[PHOTO_DEBUG] No photos found for session {ruck_id}")
-                    session['photos'] = []
-            else:
-                session['photos'] = []
-            
-            # Fetch heart rate samples (always include for session details)
-            try:
-                hr_resp = supabase.table('heart_rate_sample') \
-                    .select('bpm,timestamp') \
-                    .eq('session_id', ruck_id) \
-                    .order('timestamp') \
-                    .limit(10000) \
-                    .execute()
-                
-                if hr_resp.data:
-                    session['heart_rate_samples'] = hr_resp.data
-                    logger.info(f"[HR_DEBUG] Included {len(hr_resp.data)} heart rate samples in detail response for session {ruck_id}")
-                else:
-                    session['heart_rate_samples'] = []
-                    logger.info(f"[HR_DEBUG] No heart rate samples found for session {ruck_id}")
-            except Exception as hr_fetch_error:
-                logger.error(f"Error fetching heart rate samples for session {ruck_id}: {hr_fetch_error}")
-                session['heart_rate_samples'] = []  # Ensure field exists even if fetch fails
-            
-            # Clean up user data before returning
-            if 'user' in session:
-                del session['user']
-            
-            return session, 200
-        except Exception as e:
-            logger.error(f"Error fetching ruck session {ruck_id}: {e}")
-            return {'message': f"Error fetching ruck session: {str(e)}"}, 500
-
-    def patch(self, ruck_id):
-        """Allow updating notes, rating, perceived_exertion, and tags on any session."""
-        try:
-            ruck_id = validate_ruck_id(ruck_id)
-            if ruck_id is None:
-                return {'message': 'Invalid ruck session ID format'}, 400
-            
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            data = request.get_json()
-            if not data:
-                return {'message': 'No data provided'}, 400
-
-            allowed_fields = ['notes', 'rating', 'perceived_exertion', 'tags', 'elevation_gain_m', 'elevation_loss_m', 'distance_km', 'distance_meters', 'calories_burned', 'is_public', 'splits', 'calorie_method', 'hr_zone_snapshot', 'time_in_zones', 'steps']
-            update_data = {k: v for k, v in data.items() if k in allowed_fields}
-
-            if not update_data:
-                # We may still allow heart rate samples updates even if no other fields
-                if 'heart_rate_samples' not in data:
-                    return {'message': 'No valid fields to update'}, 400
-
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            
-            # Handle splits separately since they need to be inserted into session_splits table
-            splits_data = update_data.pop('splits', None)
-            # Handle heart rate samples separately
-            hr_samples = data.get('heart_rate_samples')
-            
-            # Update the main session data
-            update_resp = supabase.table('ruck_session') \
-                .update(update_data) \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-
-            if not update_resp.data or len(update_resp.data) == 0:
-                return {'message': 'Failed to update session'}, 500
-
-            # Handle splits data if provided
-            if splits_data is not None:
-                # First, delete existing splits for this session
-                delete_resp = supabase.table('session_splits') \
-                    .delete() \
-                    .eq('session_id', ruck_id) \
-                    .execute()
-                
-                # Insert new splits
-                if splits_data and len(splits_data) > 0:
-                    splits_to_insert = []
-                    for split in splits_data:
-                        split_record = {
-                            'session_id': int(ruck_id),
-                            'split_number': split.get('split_number') or split.get('splitNumber'),  # Handle both formats
-                            'split_distance_km': split.get('split_distance', 1.0) or (split.get('distance', 0) / 1000.0 if split.get('distance') else 1.0),
-                            'split_duration_seconds': split.get('split_duration_seconds') or (split.get('duration', {}).get('inSeconds') if isinstance(split.get('duration'), dict) else split.get('duration')),
-                            'total_distance_km': split.get('total_distance', 0),
-                            'total_duration_seconds': split.get('total_duration_seconds', 0),
-                            'calories_burned': split.get('calories_burned', 0.0),
-                            'elevation_gain_m': split.get('elevation_gain_m', 0.0),
-                            'split_timestamp': split.get('timestamp') or datetime.now(tz.tzutc()).isoformat()
-                        }
-                        splits_to_insert.append(split_record)
-                    
-                    if splits_to_insert:
-                        insert_resp = supabase.table('session_splits') \
-                            .insert(splits_to_insert) \
-                            .execute()
-                        
-                        if not insert_resp.data:
-                            logger.warning(f"Failed to insert splits for session {ruck_id}")
-
-            # Handle heart rate samples if provided
-            if isinstance(hr_samples, list):
-                try:
-                    logger.info(f"[HR_DEBUG] Updating {len(hr_samples)} heart rate samples for session {ruck_id} via PATCH")
-                    # Delete existing samples for this session
-                    supabase.table('heart_rate_sample') \
-                        .delete() \
-                        .eq('session_id', ruck_id) \
-                        .execute()
-
-                    rows = []
-                    for s in hr_samples:
-                        # Support keys: bpm or heart_rate
-                        bpm = s.get('bpm')
-                        if bpm is None:
-                            bpm = s.get('heart_rate')
-                        ts = s.get('timestamp')
-                        if bpm is None or ts is None:
-                            continue
-                        rows.append({
-                            'session_id': ruck_id,
-                            'timestamp': ts,
-                            'bpm': bpm
-                        })
-                    if rows:
-                        insert_resp = supabase.table('heart_rate_sample').insert(rows).execute()
-                        if not insert_resp.data:
-                            logger.warning(f"[HR_DEBUG] Failed to insert heart rate samples for session {ruck_id}")
-
-                        # Compute HR stats and update session
-                        stats_resp = supabase.table('heart_rate_sample') \
-                            .select('bpm') \
-                            .eq('session_id', ruck_id) \
-                            .limit(50000) \
-                            .execute()
-                        if stats_resp.data:
-                            bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
-                            if bpm_values:
-                                avg_hr = sum(bpm_values) / len(bpm_values)
-                                min_hr = min(bpm_values)
-                                max_hr = max(bpm_values)
-                                supabase.table('ruck_session').update({
-                                    'avg_heart_rate': round(avg_hr, 1),
-                                    'min_heart_rate': int(min_hr),
-                                    'max_heart_rate': int(max_hr)
-                                }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
-                                logger.info(f"[HR_DEBUG] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr}")
-                except Exception as hr_err:
-                    logger.error(f"[HR_DEBUG] Error updating heart rate samples for session {ruck_id}: {hr_err}")
-
-            return update_resp.data[0], 200
-        except Exception as e:
-            logger.error(f"Error updating ruck session {ruck_id}: {e}")
-            return {'message': f"Error updating ruck session: {str(e)}"}, 500
-
-    def delete(self, ruck_id):
-        """Hard delete a ruck session and all associated location_point records for the authenticated user."""
-        try:
-            ruck_id = validate_ruck_id(ruck_id)
-            if ruck_id is None:
-                return {'message': 'Invalid ruck session ID format'}, 400
-            
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            # First, delete all associated location_point records
-            loc_del_resp = supabase.table('location_point') \
-                .delete() \
-                .eq('session_id', ruck_id) \
-                .execute()
-            # Then, delete the ruck_session itself
-            session_del_resp = supabase.table('ruck_session') \
-                .delete() \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not session_del_resp.data or len(session_del_resp.data) == 0:
-                return {'message': 'Session not found or failed to delete'}, 404
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            return {'message': 'Session deleted successfully'}, 200
-        except Exception as e:
-            logger.error(f"Error deleting ruck session {ruck_id}: {e}")
-            return {'message': f"Error deleting ruck session: {str(e)}"}, 500
-
-class RuckSessionStartResource(Resource):
-    def post(self, ruck_id):
-        try:
-            ruck_id = validate_ruck_id(ruck_id)
-            if ruck_id is None:
-                return {'message': 'Invalid ruck session ID format'}, 400
-            
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            # Check if session already exists
-            check = supabase.table('ruck_session') \
-                .select('id,status') \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not check.data or len(check.data) == 0:
-                return {'message': 'Session not found'}, 404
-            if check.data[0]['status'] != 'created':
-                # Instead of error, return the existing session with 200
-                return check.data[0], 200
-            # Update status to in_progress
-            update_resp = supabase.table('ruck_session') \
-                .update({'status': 'in_progress', 'started_at': datetime.now(tz.tzutc()).isoformat()}) \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not update_resp.data or len(update_resp.data) == 0:
-                logger.error(f"Failed to start session {ruck_id}: {update_resp.error}")
-                return {'message': 'Failed to start session'}, 500
-        
-            # Send notifications to followers when ruck starts
-            try:
-                logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Starting notification process for user {g.user.id}")
-                
-                # Get user's username for notification (display_name column doesn't exist)
-                user_profile = supabase.table('user').select('username').eq('id', g.user.id).single().execute()
-                user_name = user_profile.data.get('username') or 'Someone' if user_profile.data else 'Someone'
-                logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User starting ruck: {user_name}")
-                
-                # Get followers (users who follow this user)
-                followers_response = supabase.table('user_follows').select('follower_id').eq('followed_id', g.user.id).execute()
-                logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Followers query result: {followers_response.data}")
-                
-                if followers_response.data:
-                    follower_ids = [f['follower_id'] for f in followers_response.data]
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Sending ruck start notifications to {len(follower_ids)} followers of {user_name}")
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Follower IDs: {follower_ids}")
-                    
-                    # Get device tokens for followers
-                    device_tokens = get_user_device_tokens(follower_ids)
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Found {len(device_tokens) if device_tokens else 0} device tokens")
-                    
-                    if device_tokens:
-                        # Send push notification
-                        push_service = PushNotificationService()
-                        result = push_service.send_ruck_started_notification(
-                            device_tokens=device_tokens,
-                            rucker_name=user_name,
-                            ruck_id=str(ruck_id)
-                        )
-                        logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: Notification send result: {result}")
-                        logger.info(f"Sent ruck start notification to {len(device_tokens)} devices")
-                        
-                    else:
-                        logger.warning(f"🔔 RUCK START NOTIFICATION DEBUG: No device tokens found for {len(follower_ids)} followers")
-                else:
-                    logger.info(f"🔔 RUCK START NOTIFICATION DEBUG: User {user_name} has no followers to notify")
-                    
-            except Exception as notification_error:
-                # Don't fail the ruck start if notifications fail
-                logger.error(f"🔔 RUCK START NOTIFICATION DEBUG: Failed to send ruck start notifications: {notification_error}", exc_info=True)
-            
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            return update_resp.data[0], 200
-        except Exception as e:
-            logger.error(f"Error starting ruck session {ruck_id}: {e}")
-            return {'message': f"Error starting ruck session: {str(e)}"}, 500
-
-class RuckSessionPauseResource(Resource):
-    def post(self, ruck_id):
-        try:
-            ruck_id = validate_ruck_id(ruck_id)
-            if ruck_id is None:
-                return {'message': 'Invalid ruck session ID format'}, 400
-            
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            # Check if session exists and is in_progress
-            check = supabase.table('ruck_session') \
-                .select('id,status') \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not check.data or len(check.data) == 0:
-                return {'message': 'Session not found'}, 404
-            if check.data[0]['status'] != 'in_progress':
-                return {'message': 'Session not in progress'}, 400
-            # Update status to paused
-            update_resp = supabase.table('ruck_session') \
-                .update({'status': 'paused'}) \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not update_resp.data or len(update_resp.data) == 0:
-                logger.error(f"Failed to pause session {ruck_id}: {update_resp.error}")
-                return {'message': 'Failed to pause session'}, 500
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            return update_resp.data[0], 200
-        except Exception as e:
-            logger.error(f"Error pausing ruck session {ruck_id}: {e}")
-            return {'message': f"Error pausing ruck session: {str(e)}"}, 500
-
-class RuckSessionResumeResource(Resource):
-    def post(self, ruck_id):
-        try:
-            ruck_id = validate_ruck_id(ruck_id)
-            if ruck_id is None:
-                return {'message': 'Invalid ruck session ID format'}, 400
-            
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            # Check if session exists and is paused
-            check = supabase.table('ruck_session') \
-                .select('id,status') \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not check.data or len(check.data) == 0:
-                return {'message': 'Session not found'}, 404
-            if check.data[0]['status'] != 'paused':
-                return {'message': 'Session not paused'}, 400
-            # Update status to in_progress
-            update_resp = supabase.table('ruck_session') \
-                .update({'status': 'in_progress'}) \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-            if not update_resp.data or len(update_resp.data) == 0:
-                logger.error(f"Failed to resume session {ruck_id}: {update_resp.error}")
-                return {'message': 'Failed to resume session'}, 500
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            return update_resp.data[0], 200
-        except Exception as e:
-            logger.error(f"Error resuming ruck session {ruck_id}: {e}")
-            return {'message': f"Error resuming ruck session: {str(e)}"}, 500
+            return int(str(ruck_id).strip())
+        except Exception:
+            return None
 
 class RuckSessionCompleteResource(Resource):
     def post(self, ruck_id):
@@ -1595,6 +666,142 @@ class RuckSessionCompleteResource(Resource):
                 logger.error(f"Error updating duel progress for session {ruck_id}: {duel_error}")
                 # Don't fail the session completion if duel progress update fails
         
+            # Evaluate active custom goals for this user (event-driven hook)
+            try:
+                logger.info(f"[GOALS] Triggering evaluation of active goals for user {g.user.id} after session {ruck_id}")
+                # Fetch active goals for the user
+                goals_resp = supabase.table('user_custom_goals').select(
+                    'id, user_id, title, metric, target_value, unit, window, constraints_json, '
+                    'start_at, end_at, deadline_at, created_at, status'
+                ).eq('user_id', g.user.id).eq('status', 'active').limit(200).execute()
+
+                active_goals = goals_resp.data or []
+                if not active_goals:
+                    logger.info(f"[GOALS] No active goals found for user {g.user.id}")
+                else:
+                    # For each goal, compute window, aggregate sessions, and upsert progress
+                    for goal in active_goals:
+                        try:
+                            metric = goal.get('metric')
+                            target_value = float(goal.get('target_value') or 0)
+                            unit = goal.get('unit')
+
+                            supported = {
+                                'distance_km_total',
+                                'duration_minutes_total',
+                                'steps_total',
+                                'elevation_gain_m_total',
+                                'power_points_total',
+                            }
+                            if metric not in supported:
+                                continue
+
+                            start_iso, end_iso = _compute_window_bounds(goal)
+
+                            # Fetch completed sessions in window
+                            select_cols = 'id,distance_km,duration_seconds,steps,elevation_gain_m,power_points,completed_at'
+                            s_resp = supabase.table('ruck_session').select(select_cols) \
+                                .eq('user_id', g.user.id) \
+                                .eq('status', 'completed') \
+                                .gte('completed_at', start_iso) \
+                                .lte('completed_at', end_iso) \
+                                .limit(10000) \
+                                .execute()
+
+                            sessions = s_resp.data or []
+
+                            total_distance_km = 0.0
+                            total_duration_seconds = 0.0
+                            total_steps = 0
+                            total_elevation_m = 0.0
+                            total_power_points = 0.0
+
+                            for s in sessions:
+                                try:
+                                    if s.get('distance_km') is not None:
+                                        total_distance_km += float(s.get('distance_km') or 0)
+                                    if s.get('duration_seconds') is not None:
+                                        total_duration_seconds += float(s.get('duration_seconds') or 0)
+                                    if s.get('steps') is not None:
+                                        total_steps += int(s.get('steps') or 0)
+                                    if s.get('elevation_gain_m') is not None:
+                                        total_elevation_m += float(s.get('elevation_gain_m') or 0)
+                                    if s.get('power_points') is not None:
+                                        total_power_points += float(s.get('power_points') or 0)
+                                except Exception:
+                                    continue
+
+                            current_value = 0.0
+                            breakdown_totals = {}
+
+                            if metric == 'distance_km_total':
+                                distance_in_goal_unit = _km_to_mi(total_distance_km) if unit == 'mi' else total_distance_km
+                                current_value = distance_in_goal_unit
+                                breakdown_totals = {
+                                    'distance_km': round(total_distance_km, 3),
+                                    'distance_mi': round(_km_to_mi(total_distance_km), 3),
+                                }
+                            elif metric == 'duration_minutes_total':
+                                minutes = total_duration_seconds / 60.0
+                                current_value = minutes
+                                breakdown_totals = {
+                                    'duration_seconds': int(total_duration_seconds),
+                                    'duration_minutes': round(minutes, 2),
+                                }
+                            elif metric == 'steps_total':
+                                current_value = float(total_steps)
+                                breakdown_totals = {
+                                    'steps': int(total_steps),
+                                }
+                            elif metric == 'elevation_gain_m_total':
+                                current_value = float(total_elevation_m)
+                                breakdown_totals = {
+                                    'elevation_gain_m': round(total_elevation_m, 1),
+                                }
+                            elif metric == 'power_points_total':
+                                current_value = float(total_power_points)
+                                breakdown_totals = {
+                                    'power_points': round(total_power_points, 1),
+                                }
+
+                            progress_percent = 0.0
+                            if target_value > 0:
+                                progress_percent = max(0.0, min(100.0, (current_value / float(target_value)) * 100.0))
+
+                            breakdown = {
+                                'metric': metric,
+                                'unit': unit,
+                                'window': {'start': start_iso, 'end': end_iso, 'source': goal.get('window') or 'custom'},
+                                'totals': breakdown_totals,
+                                'session_count': len(sessions),
+                                'session_ids': [s.get('id') for s in sessions],
+                            }
+
+                            # Upsert progress
+                            progress_lookup = supabase.table('user_goal_progress').select('id') \
+                                .eq('goal_id', goal['id']).eq('user_id', g.user.id).limit(1).execute()
+
+                            now_iso = datetime.now(tz.tzutc()).isoformat()
+                            payload = {
+                                'goal_id': goal['id'],
+                                'user_id': g.user.id,
+                                'current_value': float(round(current_value, 3)),
+                                'progress_percent': float(round(progress_percent, 2)),
+                                'last_evaluated_at': now_iso,
+                                'breakdown_json': breakdown,
+                            }
+
+                            if progress_lookup.data:
+                                progress_id = progress_lookup.data[0]['id']
+                                supabase.table('user_goal_progress').update(payload).eq('id', progress_id).execute()
+                            else:
+                                supabase.table('user_goal_progress').insert(payload).execute()
+
+                        except Exception as goal_err:
+                            logger.error(f"[GOALS] Failed to evaluate goal {goal.get('id')} for user {g.user.id}: {goal_err}")
+            except Exception as goals_err:
+                logger.error(f"[GOALS] Error evaluating active goals for user {g.user.id} after session {ruck_id}: {goals_err}")
+
             logger.info(f"Session {ruck_id} completion - achievement checking moved to frontend post-navigation")
             completed_session['new_achievements'] = []  # Empty for now, populated by separate API call
         

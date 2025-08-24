@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS user_goal_progress (
     breakdown_json JSONB,
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for performance and lookups

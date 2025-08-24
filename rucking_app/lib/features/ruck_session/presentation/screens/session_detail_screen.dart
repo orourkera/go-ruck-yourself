@@ -54,7 +54,6 @@ class SessionDetailScreen extends StatefulWidget {
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
 }
-
 class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   late ScrollController _scrollController;
@@ -63,6 +62,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   bool _photosLoadAttemptedForThisSession = false; // Flag to prevent multiple fetches
   RuckSession? _fullSession; // Store the complete session data
   Timer? _photoRefreshTimer;
+  Map<String, Color>? _zoneColorMap; // Cache of zone name -> color from HeartRateZoneService
   
   /// Get the session to use for display - prefers full session if available
   RuckSession get currentSession => _fullSession ?? widget.session;
@@ -70,10 +70,42 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   int _refreshAttempts = 0;
   final int _maxRefreshAttempts = 5;
 
+  void _initZoneColors() {
+    try {
+      // Use user fields when available to compute canonical zones/colors
+      String? gender;
+      String? dateOfBirth;
+      int? restingHr;
+      int? maxHr;
+
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        gender = authState.user.gender;
+        // dateOfBirth/restingHr/maxHr may not exist on the user model; pass nulls safely
+      }
+
+      final zones = HeartRateZoneService.zonesFromUserFields(
+        restingHr: restingHr,
+        maxHr: maxHr,
+        dateOfBirth: dateOfBirth,
+        gender: gender,
+      );
+
+      if (zones != null) {
+        setState(() {
+          _zoneColorMap = {for (final z in zones) z.name.toUpperCase(): z.color};
+        });
+      }
+    } catch (e) {
+      AppLogger.warning('[HEARTRATE ZONES] Failed to init zone colors: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
+    _initZoneColors();
     
     // Reset photo loading flag for fresh screen instance
     _photosLoadAttemptedForThisSession = false;
@@ -99,17 +131,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     // Load session data and photos
     if (widget.session.id != null) {
       AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Loading session ${widget.session.id}');
-      
-      // 1. Load the full session data (if heart rate data OR location points are missing)
-      bool needsHeartRate = widget.session.heartRateSamples == null || widget.session.heartRateSamples!.isEmpty;
-      bool needsLocationPoints = widget.session.locationPoints == null || widget.session.locationPoints!.isEmpty;
-      
-      if (needsHeartRate || needsLocationPoints) {
-        AppLogger.debug('[SESSION DETAIL] Loading full session data - heart rate missing: $needsHeartRate, location points missing: $needsLocationPoints');
-        _loadFullSessionData();
-      } else {
-        AppLogger.debug('[SESSION DETAIL] Using provided session data - heart rate and location points already available');
-      }
+      // Always fetch full session to normalize data (repository cache keeps this cheap)
+      AppLogger.debug('[SESSION DETAIL] Normalizing session payload: fetching full session (cached if fresh)');
+      _loadFullSessionData();
       
       // 2. Load photos - use standard loading instead of force loading to leverage cache
       AppLogger.debug('[PHOTO_DEBUG] Loading photos in initState for session: ${widget.session.id}');
@@ -258,6 +282,28 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     return null;
   }
 
+  Color _getZoneColor(String zoneName) {
+    final key = zoneName.toUpperCase();
+    // Prefer cached service-provided colors
+    final cached = _zoneColorMap?[key];
+    if (cached != null) return cached;
+
+    // Fallback: compute on the fly using defaults/inference
+    try {
+      final zones = HeartRateZoneService.zonesFromUserFields();
+      if (zones != null) {
+        final match = zones.firstWhere(
+          (z) => z.name.toUpperCase() == key,
+          orElse: () => (min: 0, max: 0, color: Colors.grey, name: key),
+        );
+        return match.color;
+      }
+    } catch (_) {}
+
+    // Final fallback
+    return Colors.grey;
+  }
+
   Widget _buildHeartRateStatCard(String label, String value, String unit) {
     return Expanded(
       child: Container(
@@ -276,23 +322,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         ),
       ),
     );
-  }
-
-  Color _getZoneColor(String zoneName) {
-    switch (zoneName.toUpperCase()) {
-      case 'Z1':
-        return const Color(0xFF81C784); // Light green
-      case 'Z2':
-        return const Color(0xFF4FC3F7); // Light blue
-      case 'Z3':
-        return const Color(0xFFFFB74D); // Orange
-      case 'Z4':
-        return const Color(0xFFFF8A65); // Deep orange
-      case 'Z5':
-        return const Color(0xFFE57373); // Red
-      default:
-        return Colors.grey;
-    }
   }
 
   @override
@@ -1021,14 +1050,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         width: double.infinity,
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                                          child: AnimatedHeartRateChart(
-                                            heartRateSamples: safeHeartRateSamples,
-                                            avgHeartRate: avgHeartRate,
-                                            maxHeartRate: maxHeartRate,
-                                            minHeartRate: minHeartRate,
-                                            totalDuration: widget.session.duration,
-                                            getLadyModeColor: (context) => Theme.of(context).primaryColor,
-                                            zones: zones,
+                                          child: Builder(
+                                            builder: (context) {
+                                              try {
+                                                final int count = safeHeartRateSamples.length;
+                                                final DateTime? first = count > 0 ? safeHeartRateSamples.first.timestamp : null;
+                                                final DateTime? last = count > 0 ? safeHeartRateSamples.last.timestamp : null;
+                                                final double durMin = (widget.session.duration?.inSeconds ?? 0) / 60.0;
+                                                print('[HR_UI] samples=$count dur=${durMin.toStringAsFixed(2)}m first=${first?.toIso8601String()} last=${last?.toIso8601String()}');
+                                              } catch (_) {}
+                                              return AnimatedHeartRateChart(
+                                                heartRateSamples: safeHeartRateSamples,
+                                                avgHeartRate: avgHeartRate,
+                                                maxHeartRate: maxHeartRate,
+                                                minHeartRate: minHeartRate,
+                                                totalDuration: widget.session.duration,
+                                                sessionStartTime: widget.session.startTime,
+                                                getLadyModeColor: (context) => Theme.of(context).primaryColor,
+                                                zones: zones,
+                                              );
+                                            },
                                           ),
                                         ),
                                       )
@@ -1067,12 +1108,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               List<({int min, int max, Color color, String name})>? localZones;
                               try {
                                 if (widget.session.hrZoneSnapshot != null && widget.session.hrZoneSnapshot!.isNotEmpty) {
-                                  localZones = widget.session.hrZoneSnapshot!.map((z) => (
-                                    min: (z['min_bpm'] as num).toInt(),
-                                    max: (z['max_bpm'] as num).toInt(),
-                                    color: Color((z['color'] as num).toInt()),
-                                    name: (z['name'] as String?) ?? 'Z',
-                                  )).toList();
+                                  localZones = widget.session.hrZoneSnapshot!.map((z) {
+                                    final name = (z['name'] as String?) ?? 'Z';
+                                    return (
+                                      min: (z['min_bpm'] as num).toInt(),
+                                      max: (z['max_bpm'] as num).toInt(),
+                                      color: _getZoneColor(name),
+                                      name: name,
+                                    );
+                                  }).toList();
                                 } else {
                                   final authState = context.read<AuthBloc>().state;
                                   if (authState is Authenticated) {
@@ -1479,8 +1523,17 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       // Get the session repository from SessionBloc
       final sessionRepository = context.read<SessionBloc>().sessionRepository;
       
+      // Determine if we should bypass cache (when passed session is a summary without samples/points)
+      final bool needsForceRefresh =
+          (widget.session.heartRateSamples == null || widget.session.heartRateSamples!.isEmpty) ||
+          (widget.session.locationPoints == null || widget.session.locationPoints!.isEmpty);
+      AppLogger.debug('[SESSION DETAIL] Force refresh needed: $needsForceRefresh');
+
       // Fetch the complete session data
-      final fullSession = await sessionRepository.fetchSessionById(widget.session.id!);
+      final fullSession = await sessionRepository.fetchSessionById(
+        widget.session.id!,
+        forceRefresh: needsForceRefresh,
+      );
       
       if (fullSession != null) {
         // Store the complete session data in state

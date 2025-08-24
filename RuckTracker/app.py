@@ -358,7 +358,19 @@ from .api.gpx_export import (
 )
 from .api.weather import WeatherResource
 from .api.ai_cheerleader import AICheerleaderLogResource
-from .api.goals import GoalsListResource, GoalResource, GoalParseResource, GoalEvaluateResource
+from .api.goals import (
+    GoalsListResource,
+    GoalsWithProgressResource,
+    GoalResource,
+    GoalParseResource,
+    GoalEvaluateResource,
+    GoalDetailsResource,
+    GoalProgressResource,
+    GoalScheduleResource,
+    GoalMessagesResource,
+    GoalEvaluateAllResource,
+    GoalNotificationSendResource,
+)
 
 # Apply rate limiting to RefreshTokenResource to prevent refresh token abuse
 app.logger.info("RefreshTokenResource: Using default rate limits (20000/hour)")
@@ -627,11 +639,26 @@ GoalsListResource.post = conditional_rate_limit("100 per hour", key_func=get_use
 GoalResource.patch = conditional_rate_limit("300 per hour", key_func=get_user_id)(GoalResource.patch)
 GoalParseResource.post = conditional_rate_limit("60 per hour", key_func=get_user_id)(GoalParseResource.post)
 GoalEvaluateResource.post = conditional_rate_limit("300 per hour", key_func=get_user_id)(GoalEvaluateResource.post)
+GoalDetailsResource.get = conditional_rate_limit("1000 per hour", key_func=get_user_id)(GoalDetailsResource.get)
+GoalsWithProgressResource.get = conditional_rate_limit("1000 per hour", key_func=get_user_id)(GoalsWithProgressResource.get)
+GoalProgressResource.get = conditional_rate_limit("1000 per hour", key_func=get_user_id)(GoalProgressResource.get)
+GoalScheduleResource.get = conditional_rate_limit("300 per hour", key_func=get_user_id)(GoalScheduleResource.get)
+GoalScheduleResource.put = conditional_rate_limit("60 per hour", key_func=get_user_id)(GoalScheduleResource.put)
+GoalMessagesResource.get = conditional_rate_limit("1000 per hour", key_func=get_user_id)(GoalMessagesResource.get)
+GoalEvaluateAllResource.post = conditional_rate_limit("120 per hour", key_func=get_user_id)(GoalEvaluateAllResource.post)
+GoalNotificationSendResource.post = conditional_rate_limit("120 per hour", key_func=get_user_id)(GoalNotificationSendResource.post)
 
 api.add_resource(GoalsListResource, '/api/goals')
+api.add_resource(GoalsWithProgressResource, '/api/goals-with-progress')
 api.add_resource(GoalResource, '/api/goals/<string:goal_id>')
 api.add_resource(GoalParseResource, '/api/goals/parse')
 api.add_resource(GoalEvaluateResource, '/api/goals/<string:goal_id>/evaluate')
+api.add_resource(GoalDetailsResource, '/api/goals/<string:goal_id>/details')
+api.add_resource(GoalProgressResource, '/api/goals/<string:goal_id>/progress')
+api.add_resource(GoalScheduleResource, '/api/goals/<string:goal_id>/schedule')
+api.add_resource(GoalMessagesResource, '/api/goals/<string:goal_id>/messages')
+api.add_resource(GoalEvaluateAllResource, '/api/goals/evaluate-all')
+api.add_resource(GoalNotificationSendResource, '/api/goals/<string:goal_id>/notify')
 
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource

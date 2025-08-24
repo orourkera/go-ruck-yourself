@@ -10,10 +10,10 @@ class HeartRateZoneService {
   }) {
     final int hrr = (maxHr - restingHr).clamp(20, 200);
     int at(double pct) => (restingHr + pct * hrr).round();
-    final z1Min = at(0.50), z1Max = at(0.60);
-    final z2Min = at(0.60), z2Max = at(0.70);
-    final z3Min = at(0.70), z3Max = at(0.80);
-    final z4Min = at(0.80), z4Max = at(0.90);
+    final z1Min = at(0.50), z1Max = at(0.60) - 1; // Subtract 1 to avoid overlap
+    final z2Min = at(0.60), z2Max = at(0.70) - 1;
+    final z3Min = at(0.70), z3Max = at(0.80) - 1;
+    final z4Min = at(0.80), z4Max = at(0.90) - 1;
     final z5Min = at(0.90), z5Max = maxHr;
     return [
       (min: z1Min, max: z1Max, color: Colors.blue.shade400, name: 'Z1'),

@@ -393,37 +393,34 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 }
                 
             case "stopSession", "workoutStopped", "endSession", "sessionEnded", "sessionComplete":
-                // Stop the session if active
-                if isSessionActive {
-                    // Stopping session from phone command
-                    DispatchQueue.main.async {
-                        self.isSessionActive = false
-                        self.isPaused = false
-                        
-                        // Clear the timer status to prevent lock screen persistence
-                        self.status = "--"
-                        
-                        // Reset all session data
-                        self.heartRate = 0
-                        self.calories = 0
-                        self.distanceValue = 0.0
-                        self.paceValue = 0.0
-                        self.elevationGain = 0.0
-                        self.elevationLoss = 0.0
-                        
-                        // Stop the workout manager
-                        self.workoutManager.stopWorkout()
-                        
-                        // Force UI refresh to clear any background state
-                        WKInterfaceDevice.current().play(.stop)
-                        
-                        // Terminate the app to remove from lock screen
-                        // Delay slightly to ensure cleanup completes
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            // Exit the app completely
-                            // This will remove it from the lock screen and prevent battery drain
-                            exit(0)
-                        }
+                // Always perform cleanup on stop commands, regardless of current flags
+                DispatchQueue.main.async {
+                    self.isSessionActive = false
+                    self.isPaused = false
+                    
+                    // Clear the timer status to prevent lock screen persistence
+                    self.status = "--"
+                    
+                    // Reset all session data
+                    self.heartRate = 0
+                    self.calories = 0
+                    self.distanceValue = 0.0
+                    self.paceValue = 0.0
+                    self.elevationGain = 0.0
+                    self.elevationLoss = 0.0
+                    
+                    // Stop the workout manager
+                    self.workoutManager.stopWorkout()
+                    
+                    // Force UI refresh to clear any background state
+                    WKInterfaceDevice.current().play(.stop)
+                    
+                    // Terminate the app to remove from lock screen
+                    // Delay slightly to ensure cleanup completes
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        // Exit the app completely
+                        // This will remove it from the lock screen and prevent battery drain
+                        exit(0)
                     }
                 }
                 
@@ -464,6 +461,28 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 }
                 if let unitPref = message["isMetric"] as? Bool {
                     DispatchQueue.main.async { self.isMetric = unitPref }
+                }
+                // If isSessionActive is provided, honor it to ensure proper cleanup
+                if let activeVal = message["isSessionActive"] as? Bool {
+                    DispatchQueue.main.async {
+                        self.isSessionActive = activeVal
+                        if !activeVal {
+                            // Mirror the full cleanup path used by stop commands
+                            self.isPaused = false
+                            self.status = "--"
+                            self.heartRate = 0
+                            self.calories = 0
+                            self.distanceValue = 0.0
+                            self.paceValue = 0.0
+                            self.elevationGain = 0.0
+                            self.elevationLoss = 0.0
+                            self.workoutManager.stopWorkout()
+                            WKInterfaceDevice.current().play(.stop)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                exit(0)
+                            }
+                        }
+                    }
                 }
                 
             case "updateMetrics":

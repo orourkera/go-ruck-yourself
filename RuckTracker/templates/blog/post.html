@@ -32,7 +32,22 @@
     .content-container { padding-inline: 16px; max-width: var(--content-max); margin: 0 auto 80px; background: transparent !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
     .footer-pinned { background: transparent; color: #555; }
     .footer-pinned .footer-links a { color: #336; }
-    .prose img { width: 33%; height: auto; border-radius: 0 !important; display: block; margin: 1rem 0; }
+    .prose img {
+      width: 33%;
+      height: auto;
+      border-radius: 0 !important;
+      float: right;
+      margin: 0 0 1rem 1rem;
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .prose img {
+        float: none;
+        margin: 1rem auto;
+        width: 100%;
+      }
+    }
     
     /* Override any global h1 styling */
     article h1 { 

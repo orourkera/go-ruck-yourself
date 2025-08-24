@@ -65,6 +65,8 @@ import 'package:rucking_app/features/profile/presentation/screens/public_profile
 import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/screens/followers_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/advanced_calorie_settings_screen.dart';
+import 'package:rucking_app/features/goals/presentation/screens/goals_list_screen.dart';
+import 'package:rucking_app/features/goals/presentation/screens/goal_detail_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -500,6 +502,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                     switch (settings.name) {
                       case '/home':
                         return MaterialPageRoute(builder: (_) => const HomeScreen());
+                      case '/goals':
+                        return MaterialPageRoute(builder: (_) => const GoalsListScreen());
                       case '/login':
                         return MaterialPageRoute(builder: (_) => LoginScreen());
                       case '/auth_callback':
@@ -652,6 +656,19 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                       case '/duel_stats':
                         return MaterialPageRoute(
                           builder: (_) => const DuelStatsScreen(),
+                        );
+                      case '/goal_detail':
+                        final goalId = settings.arguments as String?;
+                        if (goalId != null && goalId.isNotEmpty) {
+                          return MaterialPageRoute(
+                            builder: (_) => GoalDetailScreen(goalId: goalId),
+                          );
+                        }
+                        return MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(title: const Text('Error')),
+                            body: const Center(child: Text('Missing goal ID')),
+                          ),
                         );
                       case '/auth/callback':
                         // Parse the full URI from the route settings

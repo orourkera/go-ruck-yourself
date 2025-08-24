@@ -38,11 +38,7 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    Text("Start a ruck on your phone to begin.")
-                        .font(.body)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                    // Removed instructional text per design update
 
                     // Start button to initiate a ruck directly from the watch
                     Button(action: {
@@ -237,51 +233,39 @@ struct ContentView: View {
                 }
                 .padding(.top, 2)
                 
-                // Control buttons section (Heart rate display removed from here)
-                VStack(spacing: 2) {
-                    // Play/Pause button (only shown if session is active)
-                    if sessionManager.isSessionActive {
+                // Control buttons section: side-by-side icon-only buttons
+                if sessionManager.isSessionActive {
+                    HStack(spacing: 8) {
+                        // Pause/Resume icon button
                         Button(action: {
                             sessionManager.togglePauseResume()
                         }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(sessionManager.isPaused ? .green : .orange)
-                                
-                                Text(sessionManager.isPaused ? "Resume" : "Pause")
-                                    .font(.headline)
-                                    .foregroundColor(sessionManager.isPaused ? .green : .orange)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.black.opacity(0.2))
-                            .cornerRadius(8)
+                            Image(systemName: sessionManager.isPaused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(sessionManager.isPaused ? .green : .orange)
+                                .frame(maxWidth: .infinity, minHeight: 42)
+                                .background(Color.black.opacity(0.2))
+                                .cornerRadius(8)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel(sessionManager.isPaused ? "Resume" : "Pause")
                         
-                        // Stop/End button
+                        // Stop icon button
                         Button(action: {
                             sessionManager.endSession()
                         }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "stop.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.red)
-                                
-                                Text("End")
-                                    .font(.headline)
-                                    .foregroundColor(.red)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.black.opacity(0.2))
-                            .cornerRadius(8)
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity, minHeight: 42)
+                                .background(Color.black.opacity(0.2))
+                                .cornerRadius(8)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel("End")
                     }
+                    .padding(.top, 2)
                 }
-                .padding(.top, 2)
             }
             .padding(6)
         }

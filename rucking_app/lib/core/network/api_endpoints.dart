@@ -35,6 +35,18 @@ class ApiEndpoints {
   static const String achievementStats = '$baseApi/achievements/stats/{user_id}'; // Replace {user_id} with actual user ID
   static const String recentAchievements = '$baseApi/achievements/recent';
 
+  // AI Goals
+  static const String goals = '$baseApi/goals';
+  static const String goalsWithProgress = '$baseApi/goals-with-progress';
+  static const String goalById = '$baseApi/goals/{goal_id}';
+  static const String goalDetails = '$baseApi/goals/{goal_id}/details';
+  static const String goalProgress = '$baseApi/goals/{goal_id}/progress';
+  static const String goalSchedule = '$baseApi/goals/{goal_id}/schedule';
+  static const String goalMessages = '$baseApi/goals/{goal_id}/messages';
+  static const String goalEvaluate = '$baseApi/goals/{goal_id}/evaluate';
+  static const String goalNotify = '$baseApi/goals/{goal_id}/notify';
+  static const String goalsEvaluateAll = '$baseApi/goals/evaluate-all';
+
   // Helper methods for path parameters
   static String getRuckEndpoint(String ruckId) => '$ruckById/$ruckId';
   static String getLikesEndpoint(String ruckId) => likes.replaceAll('{id}', ruckId);
@@ -54,4 +66,14 @@ class ApiEndpoints {
       achievementStats.replaceAll('{user_id}', userId);
   static String getAchievementCategoriesEndpoint() => achievementCategories;
   static String getRecentAchievementsEndpoint() => recentAchievements;
+
+  // Goals helper methods
+  static String getGoalEndpoint(String goalId) => goalById.replaceAll('{goal_id}', goalId);
+  static String getGoalDetailsEndpoint(String goalId) => goalDetails.replaceAll('{goal_id}', goalId);
+  static String getGoalProgressEndpoint(String goalId) => goalProgress.replaceAll('{goal_id}', goalId);
+  static String getGoalScheduleEndpoint(String goalId) => goalSchedule.replaceAll('{goal_id}', goalId);
+  static String getGoalMessagesEndpoint(String goalId) => goalMessages.replaceAll('{goal_id}', goalId);
+  static String getGoalEvaluateEndpoint(String goalId) => goalEvaluate.replaceAll('{goal_id}', goalId);
+  static String getGoalNotifyEndpoint(String goalId) => goalNotify.replaceAll('{goal_id}', goalId);
+  static String getGoalsEvaluateAllEndpoint() => goalsEvaluateAll;
 }

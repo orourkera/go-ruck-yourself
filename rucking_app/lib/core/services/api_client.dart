@@ -390,7 +390,7 @@ class ApiClient {
   Future<dynamic> post(String endpoint, dynamic body) async {
     try {
       // Require token for rucks/*, users/*, achievements/*, and duels/* endpoints, EXCEPT for users/register
-      bool requiresAuth = ((endpoint.startsWith('/rucks') || endpoint.startsWith('/users/') || endpoint.startsWith('/achievements/') || endpoint.startsWith('/duels/')) && 
+      bool requiresAuth = ((endpoint.startsWith('/rucks') || endpoint.startsWith('/users/') || endpoint.startsWith('/achievements/') || endpoint.startsWith('/duels/') || endpoint.startsWith('/goals')) && 
                         endpoint != '/users/register') ||
                         endpoint.startsWith('/duel-') ||
                         endpoint == '/device-token'; // Ensure device token registration is authenticated

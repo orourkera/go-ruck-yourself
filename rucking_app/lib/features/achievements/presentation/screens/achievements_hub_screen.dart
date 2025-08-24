@@ -234,6 +234,23 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Create Custom Goal'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                textStyle: AppTextStyles.titleSmall,
+              ),
+              onPressed: () {
+                Navigator.of(context).pushNamed('/goals');
+              },
+            ),
+          ),
           
           const SizedBox(height: 24),
           
