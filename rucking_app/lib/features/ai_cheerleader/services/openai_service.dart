@@ -249,10 +249,13 @@ Generate your analytical, personalized motivational message:''';
     switch (triggerType) {
       case 'milestone':
         final milestone = triggerData['milestone'];
-        final unit = session['distance']['unit'] ?? 'km';
-        final userPreferMetric = user['preferMetric'] ?? true;
-        final milestoneValue = userPreferMetric ? milestone : (milestone * 0.621371).toStringAsFixed(1);
-        contextText += " Just hit ${milestoneValue}${unit} milestone!";
+        final distanceObj = session['distance'];
+        final unit = distanceObj is Map && distanceObj['unit'] != null ? distanceObj['unit'] : 'km';
+        final userPreferMetric = (user['preferMetric'] as bool?) ?? true;
+        if (milestone is num) {
+          final milestoneValue = userPreferMetric ? milestone : (milestone * 0.621371).toStringAsFixed(1);
+          contextText += " Just hit ${milestoneValue}${unit} milestone!";
+        }
         break;
       case 'paceDrop':
         final slowdown = triggerData['slowdownPercent'];
@@ -272,9 +275,10 @@ Generate your analytical, personalized motivational message:''';
         break;
     }
     
-    // Add performance context
-    if (session['performance']['heartRate'] != null) {
-      contextText += " HR: ${session['performance']['heartRate']}bpm.";
+    // Add performance context (null-safe)
+    final performance = session['performance'];
+    if (performance is Map && performance['heartRate'] != null) {
+      contextText += " HR: ${performance['heartRate']}bpm.";
     }
     
     // Add environmental context

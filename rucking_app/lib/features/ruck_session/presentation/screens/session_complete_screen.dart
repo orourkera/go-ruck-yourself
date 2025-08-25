@@ -351,7 +351,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       
       // Create a simplified prompt for session completion
       final completionPrompt = '''
-You are an expert fitness analyst providing insightful post-session analysis.
+You are an expert fitness analyst providing a concise, creative congratulation.
 
 Session Data:
 - Duration: ${_formatDuration(widget.duration)}
@@ -364,7 +364,7 @@ Session Data:
 Historical Context:
 ${history != null ? 'User has completed ${(history['recent_rucks'] as List?)?.length ?? 0} recent rucks with ${(history['achievements'] as List?)?.length ?? 0} achievements earned.' : 'Limited historical data available.'}
 
-Generate 2-3 sentences of encouraging analysis focusing on specific accomplishments, performance insights, or interesting patterns. Be positive and data-driven.
+Generate exactly ONE sentence that quotes one specific fact from the session data and congratulates the user in a creative, encouraging way.
 ''';
 
       final insight = await openAIService.generateMessage(

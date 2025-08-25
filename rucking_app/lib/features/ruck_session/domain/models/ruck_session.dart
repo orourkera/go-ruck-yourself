@@ -204,16 +204,23 @@ class RuckSession {
 
 factory RuckSession.fromJson(Map<String, dynamic> json) {
   try {
-    // Strictly use 'started_at' for start time
     final parsedStartTime = RuckSession.parseDateTime(json['started_at']);
+    final statusString = json['status']?.toString().toLowerCase();
+    final DateTime? startTime;
     if (parsedStartTime == null) {
-      AppLogger.error(
-        "RuckSession.fromJson: Missing or invalid 'started_at'. Session ID: ${json['id']}. JSON: $json"
-      );
-      throw FormatException(
-          "RuckSession.fromJson: 'started_at' is null or invalid for session ID: ${json['id']}. Received data must include a valid 'started_at'.");
+      if (statusString == 'created') {
+        startTime = null;  // Allow null for created sessions
+        AppLogger.info("RuckSession.fromJson: 'started_at' is null for created session ID: ${json['id']}. Setting startTime to null.");
+      } else {
+        AppLogger.error(
+          "RuckSession.fromJson: Missing or invalid 'started_at' for non-created session. Session ID: ${json['id']}. JSON: $json"
+        );
+        throw FormatException(
+            "RuckSession.fromJson: 'started_at' is null or invalid for session ID: ${json['id']}. Non-created sessions must have a valid 'started_at'.");
+      }
+    } else {
+      startTime = parsedStartTime;
     }
-    final DateTime startTime = parsedStartTime;
 
     // Strictly use 'completed_at' for end time, with fallback to duration_seconds calculation
     DateTime? potentialEndTime = RuckSession.parseDateTime(json['completed_at']);
@@ -224,7 +231,6 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         potentialEndTime = startTime.add(Duration(seconds: durationSeconds));
         AppLogger.info("RuckSession.fromJson: 'completed_at' is null, calculated endTime from startTime and duration_seconds. Session ID: ${json['id']}");
       } else {
-        final statusString = json['status']?.toString().toLowerCase();
         if (statusString == 'in_progress' || statusString == 'inprogress') {
             AppLogger.info("RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for an in-progress session. Setting endTime to startTime. Session ID: ${json['id']}");
             potentialEndTime = startTime; // For in-progress, use startTime if no end data
@@ -371,7 +377,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     
     return {
       'id': id,
-      'start_time': dateFormat.format(startTime),
+      'start_time': startTime, // Use the startTime variable directly
       'average_pace': averagePace,
       'end_time': dateFormat.format(endTime),
       'duration_seconds': duration.inSeconds,

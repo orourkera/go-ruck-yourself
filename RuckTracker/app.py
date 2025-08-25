@@ -451,6 +451,10 @@ api.add_resource(StravaCallbackResource, '/auth/strava/callback')  # No /api pre
 api.add_resource(StravaDisconnectResource, '/api/auth/strava/disconnect')
 api.add_resource(StravaStatusResource, '/api/auth/strava/status')
 
+# Strava export endpoint
+from api.strava_export import StravaExportResource
+api.add_resource(StravaExportResource, '/api/rucks/<string:session_id>/export/strava')
+
 # Helper used by Flask-Limiter to uniquely identify the caller (user ID or IP)
 
 def get_user_id():

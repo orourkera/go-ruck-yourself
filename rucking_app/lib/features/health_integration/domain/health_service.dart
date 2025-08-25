@@ -451,7 +451,10 @@ class HealthService {
       AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
       
       // Always check authorization status fresh (don't rely on cached _isAuthorized)
-      final authStatuses = await _health.hasPermissions([HealthDataType.STEPS]);
+      final authStatuses = await _health.hasPermissions(
+        [HealthDataType.STEPS],
+        permissions: [HealthDataAccess.READ],
+      );
       final hasStepPermission = authStatuses ?? false;
       AppLogger.info('[STEPS DEBUG] Fresh permission check for STEPS: $hasStepPermission');
       
@@ -528,6 +531,44 @@ class HealthService {
           
         } catch (e) {
           AppLogger.error('[STEPS DEBUG] getHealthDataFromTypes failed: $e');
+        }
+      } else if (Platform.isAndroid) {
+        // Android path: Use Health Connect via health plugin to sum steps
+        try {
+          AppLogger.info('[STEPS DEBUG][Android] Calling health.getHealthDataFromTypes for STEPS...');
+          final List<HealthDataPoint> points = await _health.getHealthDataFromTypes(
+            startTime: start,
+            endTime: end,
+            types: [HealthDataType.STEPS],
+          );
+
+          AppLogger.info('[STEPS DEBUG][Android] Retrieved ${points.length} points');
+          if (points.isEmpty) {
+            AppLogger.warning('[STEPS DEBUG][Android] No step data points in range');
+            return 0;
+          }
+
+          int total = 0;
+          for (int i = 0; i < points.length; i++) {
+            final p = points[i];
+            final dynamic raw = p.value;
+            AppLogger.debug('[STEPS DEBUG][Android] Point $i: ${p.dateFrom}→${p.dateTo} value=$raw (${raw.runtimeType})');
+
+            if (raw is NumericHealthValue) {
+              final value = (raw.numericValue ?? 0).toInt();
+              total += value;
+            } else if (raw is num) {
+              total += raw.toInt();
+            } else {
+              final parsed = int.tryParse(raw.toString());
+              if (parsed != null) total += parsed;
+            }
+          }
+
+          AppLogger.info('[STEPS DEBUG][Android] Total steps summed: $total');
+          return total;
+        } catch (e) {
+          AppLogger.error('[STEPS DEBUG][Android] Error retrieving steps: $e');
         }
       }
       
