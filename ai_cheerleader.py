@@ -18,76 +18,13 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 # Use service role for this backend service to bypass RLS when fetching user history
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY)
 
-# Firebase Remote Config integration
-FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'getrucky-app')  # Add to your env vars
-FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY')  # Add tosu your env vars
-
-# Default prompts (fallback if Remote Config fails)
+# Simple prompts for backend service (Remote Config is now handled in Flutter frontend)
 DEFAULT_SYSTEM_PROMPT = """You are an enthusiastic AI cheerleader for rucking workouts. 
-Analyze the provided context JSON: 
-- 'current_session': Real-time stats like distance, pace, duration.
-- 'historical': Past rucks, splits, achievements, user profile, notifications, and ai_cheerleader_history (your previous messages to this user).
-Generate personalized, motivational messages. Reference historical trends (e.g., 'Faster than your last 3 rucks!') and achievements (e.g., 'Building on your 10K badge!') to encourage based on current progress. Avoid repeating similar messages from your ai_cheerleader_history - be creative and vary your encouragement style. Keep responses under 150 words, positive, and action-oriented."""
+Analyze the provided context JSON and generate personalized, motivational messages. 
+Focus on current performance, progress, and achievements.
+Be encouraging, positive, and action-oriented."""
 
 DEFAULT_USER_PROMPT_TEMPLATE = "Context data:\n{context}\nGenerate encouragement for this ongoing ruck session."
-
-# Cache for prompts (refresh every 5 minutes)
-_prompt_cache = None
-_cache_timestamp = None
-CACHE_DURATION = 300  # 5 minutes in seconds
-
-def get_remote_config_prompts():
-    """Fetch AI cheerleader prompts from Firebase Remote Config with caching"""
-    global _prompt_cache, _cache_timestamp
-    
-    import time
-    current_time = time.time()
-    
-    # Check if we have valid cached prompts
-    if _prompt_cache and _cache_timestamp and (current_time - _cache_timestamp) < CACHE_DURATION:
-        return _prompt_cache
-    
-    try:
-        if not FIREBASE_API_KEY or not FIREBASE_PROJECT_ID:
-            app.logger.warning("Firebase credentials not configured, using default prompts")
-            prompts = (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
-            _prompt_cache = prompts
-            _cache_timestamp = current_time
-            return prompts
-            
-        # Firebase Remote Config REST API endpoint
-        url = f"https://firebaseremoteconfig.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/remoteConfig"
-        headers = {
-            'Authorization': f'Bearer {FIREBASE_API_KEY}',
-            'Content-Type': 'application/json'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            config_data = response.json()
-            parameters = config_data.get('parameters', {})
-            
-            system_prompt = parameters.get('ai_cheerleader_system_prompt', {}).get('defaultValue', {}).get('value', DEFAULT_SYSTEM_PROMPT)
-            user_prompt_template = parameters.get('ai_cheerleader_user_prompt_template', {}).get('defaultValue', {}).get('value', DEFAULT_USER_PROMPT_TEMPLATE)
-            
-            prompts = (system_prompt, user_prompt_template)
-            _prompt_cache = prompts
-            _cache_timestamp = current_time
-            
-            app.logger.info(f"Successfully fetched and cached prompts from Remote Config")
-            return prompts
-        else:
-            app.logger.warning(f"Failed to fetch Remote Config: {response.status_code}, using cached/default prompts")
-            # Use cached prompts if available, otherwise defaults
-            prompts = _prompt_cache or (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
-            return prompts
-            
-    except Exception as e:
-        app.logger.error(f"Error fetching Remote Config: {str(e)}, using cached/default prompts")
-        # Use cached prompts if available, otherwise defaults
-        prompts = _prompt_cache or (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
-        return prompts
 # Historical fetch function (fetches all columns from relevant tables)
 def get_user_history(user_id: str) -> dict:
     try:
@@ -176,14 +113,12 @@ def ai_cheerleader():
         # Step 3: Format for prompt (concise JSON string)
         context_str = json.dumps(full_context, indent=2)  # Human-readable for debugging
 
-        # Step 4: Get prompts from Remote Config
-        system_prompt, user_prompt_template = get_remote_config_prompts()
-        user_prompt = user_prompt_template.replace('{context}', context_str)
+        # Step 4: Use simple prompts (Remote Config is now handled in Flutter frontend)
+        system_prompt = DEFAULT_SYSTEM_PROMPT
+        user_prompt = DEFAULT_USER_PROMPT_TEMPLATE.replace('{context}', context_str)
         
         # Debug logging
-        app.logger.info(f"[AI_DEBUG] System prompt length: {len(system_prompt)}")
-        app.logger.info(f"[AI_DEBUG] System prompt preview: {system_prompt[:200]}...")
-        app.logger.info(f"[AI_DEBUG] User prompt preview: {user_prompt[:300]}...")
+        app.logger.info(f"[AI_DEBUG] Using backend service with historical context")
         app.logger.info(f"[AI_DEBUG] Context length: {len(context_str)} characters")
         app.logger.info(f"[AI_DEBUG] Historical data keys: {list(historical.keys()) if historical else 'None'}")
         if historical and 'ai_cheerleader_history' in historical:

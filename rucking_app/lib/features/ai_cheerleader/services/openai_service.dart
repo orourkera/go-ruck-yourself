@@ -6,6 +6,7 @@ import 'package:dart_openai/dart_openai.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 
 /// Service for generating motivational text using OpenAI GPT-4o
@@ -127,28 +128,33 @@ class OpenAIService {
       ? 'Use colorful, explicit language and profanity when it fits the character. Adult language and edgy humor is encouraged'
       : 'Keep language family-friendly and appropriate for all ages';
 
+    // Get Remote Config prompts (with fallback to current behavior)
+    final remoteConfig = getIt<RemoteConfigService>();
+    final systemPrompt = remoteConfig.getAICheerleaderSystemPrompt();
+    final userName = _extractFirstName(user['username']) ?? 'athlete';
+    
     return '''
-$personalityPrompt
+$systemPrompt
+
+Personality: Act as a $personality character.
+User: $userName
+Content Guidelines: $contentGuidelines
 
 Context:
 $baseContext
 
-Guidelines:
+Additional Instructions:
 - Respond as the $personality character with FRESH, UNIQUE phrasing each time
 - Keep message under 25 words
 - Be specific about their current situation
 - ${_getCreativityBooster()}
-- Make fun observations or jokes about their location when mentioned
-- Reference local terrain, landmarks, or city personality if relevant
-- Comment on weather conditions when relevant (temperature, conditions, etc.)
 - ${_getVariedInstructions()}
-- $contentGuidelines
 - Sound natural and conversational
 - Focus on encouragement and motivation
 - NEVER repeat phrases you've used before - be inventive and original
 - NEVER use hashtags like #RuckLife #BeastMode - absolutely no # symbols allowed
 - NEVER use social media language or internet slang
-- Get creative with the user's name: ${_extractFirstName(user['username']) ?? 'athlete'} - make up fun nicknames, rhymes, or playful variations that match your $personality character (e.g., Drill Sergeant: "Soldier Billy", Southern Redneck: "Wild Willie", British Butler: "Master William", Yoga Instructor: "Mindful Will", etc.)
+- Get creative with the user's name: $userName - make up fun nicknames, rhymes, or playful variations that match your $personality character
 
 Generate a motivational message:''';
   }
