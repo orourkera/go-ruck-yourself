@@ -286,15 +286,24 @@ class RefreshTokenResource(Resource):
     def post(self):
         """Refresh an authentication token"""
         try:
-            data = request.get_json()
-            refresh_token = data.get('refresh_token')
+            # Accept JSON or form-encoded body; support both snake_case and camelCase
+            data = {}
+            try:
+                data = request.get_json(force=False, silent=True) or {}
+            except Exception:
+                data = {}
+            # Fallback to form data if JSON missing
+            if not data and request.form:
+                data = request.form.to_dict()
+            refresh_token = (data.get('refresh_token') or data.get('refreshToken') or '').strip()
             
             if not refresh_token:
+                logger.warning("[AUTH_REFRESH] Missing refresh token in request body (accepted keys: refresh_token, refreshToken)")
                 return {'message': 'Refresh token is required'}, 400
             
             # Get client IP for logging
             client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
-            logger.info(f"Token refresh attempt from IP: {client_ip}")
+            logger.info(f"[AUTH_REFRESH] Token refresh attempt from IP: {client_ip}; Content-Type={request.headers.get('Content-Type')} BodyKeys={list(data.keys())}")
                 
             # Refresh token with Supabase
             supabase = get_supabase_client()
@@ -313,24 +322,24 @@ class RefreshTokenResource(Resource):
                         'user': user_data
                     }, 200
                 else:
-                    logger.error("Invalid auth response or no session in refresh token response")
+                    logger.error("[AUTH_REFRESH] Invalid auth response or no session in refresh token response")
                     return {'message': 'Invalid refresh token'}, 401
                     
             except Exception as auth_error:
                 # Check if this is a rate limit error
                 error_message = str(auth_error)
                 if '429' in error_message or 'Too Many Requests' in error_message or 'rate limit' in error_message.lower():
-                    logger.warning(f"Rate limit hit for refresh token from {client_ip}: {error_message}")
+                    logger.warning(f"[AUTH_REFRESH] Rate limit hit for refresh token from {client_ip}: {error_message}")
                     return {'message': 'Too many requests. Please wait before retrying.'}, 429
                 elif 'already used' in error_message.lower() or 'invalid refresh token' in error_message.lower():
-                    logger.warning(f"Invalid/expired refresh token from {client_ip}: {error_message}")
+                    logger.warning(f"[AUTH_REFRESH] Invalid/expired refresh token from {client_ip}: {error_message}")
                     return {'message': 'Refresh token expired. Please sign in again.'}, 401
                 else:
-                    logger.error(f"Supabase auth error during refresh from {client_ip}: {error_message}")
+                    logger.error(f"[AUTH_REFRESH] Supabase auth error during refresh from {client_ip}: {error_message}")
                     return {'message': 'Authentication service temporarily unavailable'}, 503
                 
         except Exception as e:
-            logger.error(f"Unexpected error in refresh token: {str(e)}")
+            logger.error(f"[AUTH_REFRESH] Unexpected error in refresh token: {str(e)}")
             return {'message': f'Error refreshing token: {str(e)}'}, 500
 
 class ForgotPasswordResource(Resource):

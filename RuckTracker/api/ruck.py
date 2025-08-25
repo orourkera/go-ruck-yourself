@@ -240,9 +240,10 @@ class RuckSessionDetailResource(Resource):
         return c * r
 
     def _clip_route_for_privacy(self, location_points):
-        if not location_points or len(location_points) < 3:
-            return location_points
-        PRIVACY_DISTANCE_METERS = 200.0
+        if not location_points or len(location_points) < 5:
+            logger.warning(f"[PRIVACY_DEBUG] Route too short ({len(location_points) if location_points else 0} points) - hiding for privacy")
+            return []
+        PRIVACY_DISTANCE_METERS = 400.0  # Increased to 400m for better privacy
         sorted_points = sorted(location_points, key=lambda p: p.get('timestamp', ''))
         if len(sorted_points) < 3:
             return sorted_points
@@ -277,15 +278,16 @@ class RuckSessionDetailResource(Resource):
                     end_idx = i + 1
                     break
         if start_idx >= end_idx or start_idx >= len(sorted_points) or end_idx <= 0:
-            total = len(sorted_points)
-            start_idx = total // 4
-            end_idx = 3 * total // 4
-            if end_idx <= start_idx:
-                return sorted_points
+            logger.warning(f"[PRIVACY_DEBUG] Clipping failed - start_idx={start_idx}, end_idx={end_idx}, total={len(sorted_points)} - hiding route for privacy")
+            return []  # Return empty for privacy instead of fallback
         clipped_points = sorted_points[start_idx:end_idx]
-        return clipped_points or sorted_points
+        if len(clipped_points) < 3:
+            logger.warning(f"[PRIVACY_DEBUG] Clipped route too short ({len(clipped_points)} points) - hiding for privacy")
+            return []
+        logger.info(f"[PRIVACY_DEBUG] Successfully clipped route: {len(clipped_points)} points (removed {start_idx} from start, {len(sorted_points) - end_idx} from end)")
+        return clipped_points
 
-    def _sample_route_points(self, location_points, target_distance_between_points_m=75):
+    def _sample_route_points(self, location_points, target_distance_between_points_m=35):
         if not location_points or len(location_points) <= 2:
             return location_points
         sampled = [location_points[0]]
@@ -315,8 +317,126 @@ class RuckSessionDetailResource(Resource):
                 if index < len(sampled):
                     final_sampled.append(sampled[index])
             final_sampled.append(sampled[-1])
+            # Enforce maximum segment length by interpolating if needed (defense-in-depth)
+            try:
+                final_sampled = self._cap_max_segment_length(final_sampled, max_segment_length_m=60.0)
+            except Exception as e:
+                logger.debug(f"[ROUTE_SAMPLING_DEBUG] Failed to cap max segment length (final_sampled): {e}")
+            # Post-sampling diagnostics: log long segments
+            try:
+                self._log_long_segments(final_sampled)
+            except Exception as e:
+                logger.debug(f"[ROUTE_SAMPLING_DEBUG] Failed to log long segments: {e}")
             return final_sampled
+        # Enforce maximum segment length by interpolating if needed (defense-in-depth)
+        try:
+            sampled = self._cap_max_segment_length(sampled, max_segment_length_m=60.0)
+        except Exception as e:
+            logger.debug(f"[ROUTE_SAMPLING_DEBUG] Failed to cap max segment length: {e}")
+        # Post-sampling diagnostics: log long segments
+        try:
+            self._log_long_segments(sampled)
+        except Exception as e:
+            logger.debug(f"[ROUTE_SAMPLING_DEBUG] Failed to log long segments: {e}")
         return sampled
+
+    def _log_long_segments(self, points, threshold_m=60.0):
+        """Diagnostic helper: logs segments longer than threshold after sampling.
+        No behavior change. Helps identify potential visual artifacts where the
+        polyline might cut across private property due to long straight segments.
+        """
+        if not points or len(points) < 2:
+            return
+        long_segments = []
+        for i in range(1, len(points)):
+            p1 = points[i-1]
+            p2 = points[i]
+            if p1.get('latitude') is None or p1.get('longitude') is None:
+                continue
+            if p2.get('latitude') is None or p2.get('longitude') is None:
+                continue
+            d = self._haversine_distance(
+                float(p1['latitude']), float(p1['longitude']),
+                float(p2['latitude']), float(p2['longitude'])
+            )
+            if d >= threshold_m:
+                long_segments.append({
+                    'idx1': i-1,
+                    'idx2': i,
+                    'distance_m': round(d, 2),
+                    'p1': {'lat': p1.get('latitude'), 'lng': p1.get('longitude')},
+                    'p2': {'lat': p2.get('latitude'), 'lng': p2.get('longitude')},
+                })
+        if long_segments:
+            try:
+                logger.info(f"[ROUTE_SAMPLING_DEBUG] {len(long_segments)} long segments >= {threshold_m}m after sampling")
+                # Log first few details to avoid log spam
+                for seg in long_segments[:10]:
+                    logger.info(
+                        f"[ROUTE_SAMPLING_DEBUG] seg {seg['idx1']}->{seg['idx2']} distance={seg['distance_m']}m "
+                        f"p1=({seg['p1']['lat']},{seg['p1']['lng']}) p2=({seg['p2']['lat']},{seg['p2']['lng']})"
+                    )
+                if len(long_segments) > 10:
+                    logger.info(f"[ROUTE_SAMPLING_DEBUG] ... {len(long_segments) - 10} more long segments not shown")
+            except Exception:
+                # Ensure diagnostics never crash request handling
+                pass
+
+    def _cap_max_segment_length(self, points, max_segment_length_m=60.0):
+        """Ensure no consecutive points are farther apart than max_segment_length_m.
+        Inserts linearly interpolated points as needed. Returns a new list.
+        """
+        if not points or len(points) < 2:
+            return points
+        capped = [points[0]]
+        inserted_count = 0
+        for i in range(1, len(points)):
+            p1 = capped[-1]
+            p2 = points[i]
+            if p1.get('latitude') is None or p1.get('longitude') is None or \
+               p2.get('latitude') is None or p2.get('longitude') is None:
+                capped.append(p2)
+                continue
+            d = self._haversine_distance(
+                float(p1['latitude']), float(p1['longitude']),
+                float(p2['latitude']), float(p2['longitude'])
+            )
+            if d <= max_segment_length_m:
+                capped.append(p2)
+                continue
+            # Determine number of intermediate points needed
+            # We aim for segments <= max_segment_length_m
+            n_segments = int(math.ceil(d / max_segment_length_m))
+            # Insert n_segments-1 intermediate points
+            lat1 = float(p1['latitude']); lon1 = float(p1['longitude'])
+            lat2 = float(p2['latitude']); lon2 = float(p2['longitude'])
+            for k in range(1, n_segments):
+                t = k / n_segments
+                new_lat = lat1 + (lat2 - lat1) * t
+                new_lon = lon1 + (lon2 - lon1) * t
+                new_point = dict(p2)  # copy structure to preserve keys
+                new_point['latitude'] = new_lat
+                new_point['longitude'] = new_lon
+                # Timestamp interpolation if both timestamps present and ISO-8601
+                try:
+                    ts1 = p1.get('timestamp'); ts2 = p2.get('timestamp')
+                    if ts1 and ts2 and isinstance(ts1, str) and isinstance(ts2, str) and 'T' in ts1 and 'T' in ts2:
+                        dt1 = datetime.fromisoformat(ts1.replace('Z', '+00:00'))
+                        dt2 = datetime.fromisoformat(ts2.replace('Z', '+00:00'))
+                        delta = dt2 - dt1
+                        new_ts = dt1 + delta * t
+                        new_point['timestamp'] = new_ts.isoformat()
+                except Exception:
+                    pass
+                capped.append(new_point)
+                inserted_count += 1
+            capped.append(p2)
+        if inserted_count > 0:
+            try:
+                logger.info(f"[ROUTE_SAMPLING_DEBUG] Inserted {inserted_count} interpolated points to cap segments at <= {max_segment_length_m}m")
+            except Exception:
+                pass
+        return capped
 
     def get(self, ruck_id):
         if not hasattr(g, 'user') or g.user is None:

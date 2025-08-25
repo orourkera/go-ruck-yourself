@@ -4,12 +4,33 @@ import logging
 from typing import Any, Dict
 import re
 from datetime import datetime, timezone, timedelta
+import os
+import json
 
 from ..supabase_client import get_supabase_client
-from .schemas import GoalCreateSchema
+from .schemas import GoalCreateSchema, SUPPORTED_METRICS, SUPPORTED_UNITS, SUPPORTED_WINDOWS
 from ..utils.ai_guardrails import prefilter_user_input, validate_goal_draft_payload
 
 logger = logging.getLogger(__name__)
+
+# ---- Optional OpenAI client (safe import / init) ----
+try:
+    from openai import OpenAI  # type: ignore
+except Exception:
+    OpenAI = None  # type: ignore
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+openai_client = None
+if OpenAI is None:
+    logger.warning("[GOALS_PARSE] OpenAI library not available; LLM parsing disabled")
+else:
+    try:
+        openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+        if not openai_client:
+            logger.warning("[GOALS_PARSE] OPENAI_API_KEY not configured; LLM parsing disabled")
+    except Exception as _:
+        openai_client = None
+        logger.warning("[GOALS_PARSE] Failed to initialize OpenAI client; LLM parsing disabled")
 
 
 def _require_auth() -> tuple[bool, Dict[str, Any] | None]:
@@ -137,6 +158,124 @@ def _parse_goal_text(text: str) -> Dict[str, Any] | None:
 
     return None
 
+
+def _llm_parse_goal(cleaned_text: str) -> Dict[str, Any] | None:
+    """Attempt to parse goal via OpenAI with strict JSON-only output.
+
+    Returns a dict matching GoalDraftSchema on success, or None on any failure.
+    """
+    if not openai_client:
+        return None
+
+    # System and user prompts designed for deterministic, bounded JSON
+    sys_prompt = (
+        "You parse short fitness goal requests into STRICT JSON that matches a schema. "
+        "Only output the JSON object with these keys: "
+        "['title','description','metric','target_value','unit','window','constraints_json','start_at','end_at','deadline_at']. "
+        "Never include explanations. If request is off-topic or unsafe, output exactly {}."
+    )
+
+    # Insert allow-lists to minimize hallucination
+    enum_info = {
+        "metrics": SUPPORTED_METRICS,
+        "units": SUPPORTED_UNITS,
+        "windows": SUPPORTED_WINDOWS,
+    }
+
+    user_prompt = (
+        "Input: " + json.dumps({"text": cleaned_text}, ensure_ascii=False) + "\n" +
+        "Rules:\n" +
+        "- metric must be one of: " + ", ".join(SUPPORTED_METRICS) + "\n" +
+        "- unit must be one of: " + ", ".join(SUPPORTED_UNITS) + "\n" +
+        "- window is optional; if present, one of: " + ", ".join(SUPPORTED_WINDOWS) + "\n" +
+        "- target_value is a non-negative number.\n" +
+        "- Use null for any unknown optional fields.\n" +
+        "- For distance goals, metric must be 'distance_km_total' and unit either 'km' or 'mi'.\n" +
+        "- For duration goals, metric 'duration_minutes_total' and unit 'minutes'.\n" +
+        "- For steps goals, metric 'steps_total' and unit 'steps'.\n" +
+        "- For elevation goals, metric 'elevation_gain_m_total' and unit 'm'.\n" +
+        "- For power points, metric 'power_points_total' and unit 'points'.\n" +
+        "Return ONLY a compact JSON object without markdown fencing."
+    )
+
+    try:
+        completion = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=200,
+            temperature=0.2,
+        )
+        content = (completion.choices[0].message.content or "").strip()
+        # Must be raw JSON; attempt to find JSON object boundaries if any extra text leaked
+        start = content.find('{')
+        end = content.rfind('}')
+        if start == -1 or end == -1 or end < start:
+            logger.warning(f"[GOALS_PARSE] LLM returned non-JSON content: {content[:120]}")
+            return None
+        json_str = content[start:end + 1]
+        data = json.loads(json_str)
+        if not isinstance(data, dict) or not data:
+            return None
+        # Validate against schema and guardrails
+        validated = validate_goal_draft_payload(data)
+        return validated
+    except Exception as e:
+        logger.warning(f"[GOALS_PARSE] LLM parse failed: {e}")
+        return None
+
+
+def _llm_compose_message(original_text: str, draft: Dict[str, Any] | None) -> str | None:
+    """Compose a short natural-language assistant response.
+
+    - If draft is provided, acknowledge the interpreted goal briefly and invite confirmation/refinement.
+    - If draft is None, ask a concise clarifying question.
+    Returns a single short line (<= 140 chars preferred). If LLM is unavailable, returns a templated message.
+    """
+    try:
+        if not openai_client:
+            # Fallback templates
+            if draft:
+                title = draft.get('title') or 'your goal'
+                return f"Proposed: {title}. Want to confirm or refine anything?"
+            return "I couldn’t quite parse that. Can you add units or timeframe (e.g., 20 mi this month)?"
+
+        sys = (
+            "You are a concise assistant. Reply with a SINGLE short sentence (<=140 chars). "
+            "If a goal draft is provided, confirm it briefly and invite confirmation/refinement. "
+            "If not, ask one clarifying question to help parse the goal."
+        )
+        user_payload = {
+            'original_text': original_text,
+            'parsed_draft': draft or {},
+        }
+        user = (
+            "Context:" + json.dumps(user_payload, ensure_ascii=False) + "\n"
+            "Rules:\n"
+            "- One sentence only, friendly and direct.\n"
+            "- No markdown, no lists, no emojis.\n"
+        )
+        resp = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": sys},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=60,
+            temperature=0.3,
+        )
+        msg = (resp.choices[0].message.content or '').strip()
+        if msg:
+            return msg
+    except Exception as e:
+        logger.warning(f"[GOALS_PARSE] compose message failed: {e}")
+    # Final fallback
+    if draft:
+        title = draft.get('title') or 'your goal'
+        return f"Proposed: {title}. Want to confirm or refine anything?"
+    return "I couldn’t quite parse that. Can you add units or timeframe (e.g., 20 mi this month)?"
 
 def _km_to_mi(km: float) -> float:
     try:
@@ -560,16 +699,35 @@ class GoalParseResource(Resource):
             body = request.get_json() or {}
             text = body.get('text', '')
             cleaned = prefilter_user_input(text)
-            draft = _parse_goal_text(cleaned)
-            if not draft:
-                return {"error": "Unable to parse request into a goal"}, 422
 
-            # Validate and normalize via guardrails/schema
+            # First try LLM-based parser if available
+            draft = _llm_parse_goal(cleaned)
+            parser_used = 'llm_v1' if draft else None
+
+            # Fallback to rule-based if LLM is unavailable or failed
+            if not draft:
+                draft = _parse_goal_text(cleaned)
+                parser_used = parser_used or 'rule_based_v1'
+
+            assistant_message = _llm_compose_message(text, draft)
+
+            if not draft:
+                # Conversational mode: return helper message even when we have no draft
+                return {
+                    "assistant_message": assistant_message,
+                    "input_preview": cleaned[:100],
+                    "parser": parser_used,
+                    "needs_clarification": True,
+                }, 200
+
+            # Validate and normalize via guardrails/schema (LLM result already validated, but re-validate safely)
             validated = validate_goal_draft_payload(draft)
             return {
+                "assistant_message": assistant_message,
                 "draft": validated,
                 "input_preview": cleaned[:100],
-                "parser": "rule_based_v1"
+                "parser": parser_used,
+                "needs_clarification": False,
             }, 200
         except ValueError as ve:
             return {"error": str(ve)}, 400

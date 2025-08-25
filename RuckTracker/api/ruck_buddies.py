@@ -94,21 +94,43 @@ def clip_route_for_privacy(location_points):
                 end_idx = i + 1
                 break
 
+    # Debug logging for privacy clipping
+    logger.info(f"[PRIVACY_DEBUG] Route clipping: {len(sorted_points)} total points")
+    logger.info(f"[PRIVACY_DEBUG] Start clipping: found start_idx={start_idx} after {cumulative_distance:.1f}m")
+    
+    # Calculate end clipping distance for logging
+    end_cumulative_distance = 0
+    for i in range(len(sorted_points) - 2, -1, -1):
+        curr_point = sorted_points[i]
+        next_point = sorted_points[i+1]
+        if curr_point.get('latitude') and curr_point.get('longitude') and \
+           next_point.get('latitude') and next_point.get('longitude'):
+            distance = haversine_distance(
+                float(curr_point['latitude']), float(curr_point['longitude']),
+                float(next_point['latitude']), float(next_point['longitude'])
+            )
+            end_cumulative_distance += distance
+            if end_cumulative_distance >= PRIVACY_DISTANCE_METERS:
+                end_idx = i + 1
+                break
+    
+    logger.info(f"[PRIVACY_DEBUG] End clipping: found end_idx={end_idx} after {end_cumulative_distance:.1f}m")
+    logger.info(f"[PRIVACY_DEBUG] Clipping indices: start={start_idx}, end={end_idx}")
+
     # Safety check: ensure we have valid indices and some points
     if start_idx >= end_idx or start_idx >= len(sorted_points) or end_idx <= 0:
-        # Fallback: return middle 50% if distance clipping fails
-        total = len(sorted_points)
-        start_idx = total // 4
-        end_idx = 3 * total // 4
-        if end_idx <= start_idx:
-            # Last resort: return all points
-            return sorted_points
+        logger.warning(f"[PRIVACY_DEBUG] Invalid clipping indices - start_idx={start_idx}, end_idx={end_idx}, total={len(sorted_points)}")
+        # For privacy, return empty list instead of fallback
+        return []
 
     clipped_points = sorted_points[start_idx:end_idx]
+    logger.info(f"[PRIVACY_DEBUG] Final clipped route: {len(clipped_points)} points (removed {start_idx} from start, {len(sorted_points) - end_idx} from end)")
     
-    # Final safety: never return empty list
-    if not clipped_points:
-        return sorted_points
+    # Final safety: if clipping removed too many points, return empty for privacy
+    if len(clipped_points) < 3:
+        logger.warning(f"[PRIVACY_DEBUG] Clipped route too short ({len(clipped_points)} points) - hiding for privacy")
+        return []
+    
     return clipped_points
 
 
