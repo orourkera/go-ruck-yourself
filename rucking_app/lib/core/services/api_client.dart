@@ -56,7 +56,7 @@ class ApiClient {
           if (error.response?.statusCode == 401) {
             // Skip token refresh for requests that are already token refresh attempts
             if (error.requestOptions.path.contains('/auth/refresh')) {
-              debugPrint('[API] Skipping refresh for refresh token request');
+              debugPrint('[API] Skipping refresh for refresh token request - auth token is invalid');
               return handler.next(error);
             }
             
@@ -66,12 +66,24 @@ class ApiClient {
             if (_tokenRefreshCallback != null) {
               try {
                 await _coordinatedRefresh();
-                // If refresh succeeded, retry the original request
+                // If refresh succeeded, retry the original request with updated token
                 debugPrint('[API] Coordinated refresh completed. Retrying original request...');
-                final response = await _dio.fetch(error.requestOptions);
-                return handler.resolve(response);
+                
+                // Get the updated token and set it in the request headers
+                final newToken = await _storageService.getSecureString(AppConfig.tokenKey);
+                if (newToken != null && newToken.isNotEmpty) {
+                  error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+                  final response = await _dio.fetch(error.requestOptions);
+                  return handler.resolve(response);
+                } else {
+                  debugPrint('[API] No valid token after refresh, failing request');
+                  return handler.next(error);
+                }
               } catch (refreshError) {
                 debugPrint('[API] Coordinated refresh failed: $refreshError');
+                // If refresh fails, clear invalid tokens to prevent infinite loops
+                await _storageService.removeSecure(AppConfig.tokenKey);
+                await _storageService.removeSecure(AppConfig.refreshTokenKey);
                 return handler.next(error);
               }
             } else {
@@ -213,6 +225,15 @@ class ApiClient {
       } catch (e) {
         debugPrint('[API] Error refreshing token (attempt $attempt/3): $e');
         
+        // For 401 errors (invalid/expired refresh token), clear tokens and stop retrying
+        if (e is DioException && e.response?.statusCode == 401) {
+          debugPrint('[API] Refresh token invalid/expired (401) - clearing stored tokens');
+          await _storageService.removeSecure(AppConfig.tokenKey);
+          await _storageService.removeSecure(AppConfig.refreshTokenKey);
+          clearAuthToken();
+          break; // Don't retry with invalid refresh token
+        }
+        
         // For rate limit (429) or network errors, wait before retrying (exponential backoff)
         if (attempt < 3 && (e is DioException && 
             (e.type == DioExceptionType.connectionError || 
@@ -223,12 +244,6 @@ class ApiClient {
           debugPrint('[API] Error ${e.response?.statusCode}, waiting ${waitTime.inSeconds}s before retry...');
           await Future.delayed(waitTime);
           continue; // Retry
-        }
-        
-        // For 401 errors (invalid token), don't retry - token is dead
-        if (e is DioException && e.response?.statusCode == 401) {
-          debugPrint('[API] Refresh token invalid/expired, stopping retries');
-          break;
         }
       }
       

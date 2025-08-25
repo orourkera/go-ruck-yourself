@@ -594,11 +594,13 @@ class AuthServiceImpl implements AuthService {
       AppLogger.info('[AUTH] Attempting token refresh...');
       
       final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
-      if (refreshToken == null) {
+      if (refreshToken == null || refreshToken.isEmpty) {
         AppLogger.warning('[AUTH] No refresh token available');
         await _handleRefreshFailure();
         return null;
       }
+
+      AppLogger.debug('[AUTH] Making refresh request with token: ${refreshToken.substring(0, 10)}...');
 
       final response = await _apiClient.post('/auth/refresh', {
         'refresh_token': refreshToken,
@@ -610,6 +612,7 @@ class AuthServiceImpl implements AuthService {
       
       if (newToken == null || newRefreshToken == null || newToken.isEmpty || newRefreshToken.isEmpty) {
         AppLogger.error('[AUTH] Invalid refresh response - missing or empty tokens');
+        AppLogger.error('[AUTH] Response data: $response');
         await _handleRefreshFailure();
         return null;
       }
@@ -635,6 +638,15 @@ class AuthServiceImpl implements AuthService {
 
     } catch (e) {
       AppLogger.error('Error in refreshToken', exception: e);
+      
+      // Handle specific error cases
+      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+        AppLogger.error('[AUTH] Refresh token is invalid or expired - clearing stored tokens');
+        // Clear invalid tokens to prevent infinite retry loops
+        await _storageService.removeSecure(AppConfig.tokenKey);
+        await _storageService.removeSecure(AppConfig.refreshTokenKey);
+      }
+      
       await _handleRefreshFailure();
       return null;
     }

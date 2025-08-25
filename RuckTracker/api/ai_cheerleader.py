@@ -122,6 +122,10 @@ class AICheerleaderLogResource(Resource):
             
             user_id = data.get('user_id')
             current_session = data.get('current_session', {})
+            # Optional personality and environment/location passthrough from client
+            personality = data.get('personality') or 'AI Cheerleader'
+            environment = data.get('environment') or current_session.get('environment') or {}
+            location_ctx = data.get('location') or current_session.get('location') or {}
             
             if not user_id:
                 return {"error": "Missing user_id"}, 400
@@ -216,17 +220,40 @@ class AICheerleaderLogResource(Resource):
                 recent_rucks = []
                 achievements = []
             
-            # Build context
+            # Build compact context to reduce repetition and improve signal
+            def _pick(d, keys):
+                return {k: d.get(k) for k in keys if k in d}
+
+            cs_keys = [
+                'status', 'distance_km', 'duration_seconds', 'average_pace', 'steps', 'is_paused',
+                'elevation_gain_m', 'elevation_loss_m', 'ruck_weight_kg', 'avg_heart_rate'
+            ]
+            compact_current = _pick(current_session, cs_keys)
+            if environment:
+                compact_current['environment'] = _pick(environment, ['weather', 'temperature_c', 'temperature_f', 'conditions']) or environment
+            if location_ctx:
+                compact_current['location'] = _pick(location_ctx, ['city', 'region', 'country', 'lat', 'lng']) or location_ctx
+
+            # Extract last few AI lines to avoid repeating phrasing
+            avoid_lines = []
+            for it in ai_logs:
+                t = (it or {}).get('openai_response')
+                if isinstance(t, str) and t.strip():
+                    t = ' '.join(t.split())
+                    avoid_lines.append(t[:120])
+                    if len(avoid_lines) >= 4:
+                        break
+
             context = {
-                'current_session': current_session,
-                'recent_rucks': recent_rucks,
-                'achievements': achievements,
-                'ai_cheerleader_history': ai_logs,
-                'aggregates': {
-                    'total_ai_messages': len(ai_logs),
-                    'total_recent_rucks': len(recent_rucks),
-                    'total_achievements': len(achievements)
-                }
+                'current_session': compact_current,
+                'recent_rucks_summary': [
+                    _pick(r, ['id', 'distance_km', 'duration_seconds', 'elevation_gain_m', 'calories_burned', 'completed_at'])
+                    for r in recent_rucks[:5]
+                ],
+                'achievements_recent': [
+                    _pick(a, ['achievement_id', 'earned_at']) for a in achievements[:5]
+                ],
+                'avoid_repeating_lines': avoid_lines,
             }
             
             # Get prompts from Remote Config
@@ -234,22 +261,41 @@ class AICheerleaderLogResource(Resource):
             
             # Format the context as JSON string
             context_str = json.dumps(context, indent=2, default=str)
-            user_prompt = user_prompt_template.replace('{context}', context_str)
+            extra_instructions = (
+                "\nInstructions:"\
+                "\n- Act as a {personality} character."\
+                "\n- Keep it SHORT: 20 words MAX. Hard cap."\
+                "\n- Vary wording every time. Do NOT repeat prior lines shown in avoid_repeating_lines."\
+                "\n- Mention location or weather ONCE if present (natural, brief)."\
+                "\n- Do NOT mention BPM/heart rate or achievements unless explicitly present AND clearly noteworthy right now."\
+                "\n- No hashtags. No internet slang. Sound natural and encouraging."\
+            ).format(personality=personality)
+
+            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions)
             
             logger.info(f"[AI_CHEERLEADER] Calling OpenAI with {len(context_str)} chars of context")
             
-            # Call OpenAI
+            # Call OpenAI with stricter length/creativity
             completion = openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                max_tokens=150,
-                temperature=0.8,
+                max_tokens=60,
+                temperature=0.7,
             )
             
-            ai_message = completion.choices[0].message.content.strip()
+            ai_message = (completion.choices[0].message.content or "").strip()
+
+            # Hard 20-word cap and cleanup (no deps)
+            words = ai_message.split()
+            if len(words) > 20:
+                ai_message = ' '.join(words[:20])
+            # Remove hashtags entirely
+            ai_message = ' '.join(w for w in ai_message.split() if not w.startswith('#'))
+            # Final trim
+            ai_message = ai_message.strip()
             logger.info(f"[AI_CHEERLEADER] Generated AI response: {ai_message[:100]}...")
             
             return {"message": ai_message}, 200

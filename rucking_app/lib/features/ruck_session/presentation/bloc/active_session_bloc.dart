@@ -503,6 +503,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             };
             context['environment'] = environment;
             AppLogger.info('[AI_LOCATION_DEBUG] Added location to context: ${environment['location']}');
+            
+            // Also populate a dedicated weather map for OpenAIService prompt consumption
+            // OpenAIService._buildBaseContext expects environment['weather'] with keys like tempF/tempC and condition/summary
+            final weatherMap = <String, dynamic>{};
+            if (locationContext.temperature != null) {
+              weatherMap['tempF'] = locationContext.temperature; // Fahrenheit already
+            }
+            final condition = locationContext.weatherCondition;
+            if (condition != null && condition.isNotEmpty) {
+              weatherMap['condition'] = condition;
+            }
+            if (weatherMap.isNotEmpty) {
+              environment['weather'] = weatherMap;
+              context['environment'] = environment; // reassign to ensure updated ref
+              AppLogger.info('[AI_LOCATION_DEBUG] Added weather to context: ${environment['weather']}');
+            }
           } else {
             AppLogger.warning('[AI_LOCATION_DEBUG] Location context service returned null');
           }

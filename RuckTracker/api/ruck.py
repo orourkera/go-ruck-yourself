@@ -152,6 +152,74 @@ class RuckSessionResource(Resource):
             logger.error(f"Error fetching session {ruck_id}: {e}")
             return {'message': f'Error fetching session: {str(e)}'}, 500
 
+    def delete(self, ruck_id):
+        """Delete a ruck session owned by the authenticated user (DELETE /api/rucks/<id>)
+
+        This will cascade-delete dependent records where applicable and then
+        remove the ruck_session row. Only the session owner may delete.
+        """
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        try:
+            # Verify session exists and ownership
+            session_resp = (
+                supabase.table('ruck_session')
+                .select('id,user_id')
+                .eq('id', ruck_id)
+                .single()
+                .execute()
+            )
+            if not session_resp.data:
+                return {'message': 'Session not found'}, 404
+
+            if session_resp.data.get('user_id') != g.user.id:
+                return {'message': 'Forbidden'}, 403
+
+            # Best-effort cascading deletes for related data
+            def _safe_delete(table_name, col, val):
+                try:
+                    supabase.table(table_name).delete().eq(col, val).execute()
+                except Exception as del_err:
+                    logger.warning(f"[RUCK_DELETE] Skipping optional table {table_name} delete: {del_err}")
+
+            # Known related tables/columns
+            _safe_delete('heart_rate_sample', 'session_id', ruck_id)
+            _safe_delete('location_point', 'session_id', ruck_id)
+            _safe_delete('session_splits', 'session_id', ruck_id)
+            _safe_delete('ruck_likes', 'ruck_id', ruck_id)
+            _safe_delete('ruck_comments', 'ruck_id', ruck_id)
+            _safe_delete('ruck_photos', 'ruck_id', ruck_id)
+
+            # Finally delete the session itself (owner constraint)
+            delete_resp = (
+                supabase.table('ruck_session')
+                .delete()
+                .eq('id', ruck_id)
+                .eq('user_id', g.user.id)
+                .execute()
+            )
+            if delete_resp.data is None:
+                # Some clients of supabase-py return None on delete; treat as success
+                pass
+
+            # Invalidate any cached user session lists
+            try:
+                cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            except Exception:
+                pass
+
+            return {'message': 'Session deleted', 'id': ruck_id}, 200
+        except Exception as e:
+            logger.error(f"Error deleting session {ruck_id}: {e}")
+            return {'message': f'Error deleting session: {str(e)}'}, 500
+
 class RuckSessionDetailResource(Resource):
     """Return enriched ruck session details (GET /api/rucks/<id>/details)
 
@@ -257,31 +325,20 @@ class RuckSessionDetailResource(Resource):
         ruck_id = validate_ruck_id(ruck_id)
         if ruck_id is None:
             return {'message': 'Invalid ruck session ID format'}, 400
-
-        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-
         try:
-            # Fetch session with related data
-            resp = (
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+            # Fetch base session (no embedded photos to avoid FK join issues)
+            session_resp = (
                 supabase.table('ruck_session')
-                .select(
-                    'id, user_id, ruck_weight_kg, duration_seconds, distance_km, calories_burned,'
-                    ' elevation_gain_m, elevation_loss_m, started_at, completed_at, created_at,'
-                    ' avg_heart_rate, title, notes, is_public,'
-                    ' user:user_id(id,username,allow_ruck_sharing,gender,avatar_url),'
-                    ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp),'
-                    ' likes:ruck_likes!ruck_likes_ruck_id_fkey(id,user_id),'
-                    ' comments:ruck_comments!ruck_comments_ruck_id_fkey(id,user_id,content,created_at),'
-                    ' photos:ruck_photos!ruck_photos_ruck_id_fkey(id,ruck_id,user_id,filename,original_filename,content_type,size,url,thumbnail_url,created_at)'
-                )
+                .select('*')
                 .eq('id', ruck_id)
                 .single()
                 .execute()
             )
-
-            session = resp.data if resp and resp.data else None
-            if not session:
+            if not session_resp.data:
                 return {'message': 'Session not found'}, 404
+            session = session_resp.data
 
             # Authorization: allow owner or public
             if session.get('user_id') != g.user.id and not session.get('is_public'):
@@ -289,15 +346,21 @@ class RuckSessionDetailResource(Resource):
 
             current_user_id = g.user.id
 
-            # Social aggregates
-            likes = session.get('likes', []) or []
-            comments = session.get('comments', []) or []
-            like_count = len(likes)
-            comment_count = len(comments)
-            is_liked_by_current_user = any(like.get('user_id') == current_user_id for like in likes)
+            # Route points: fetch from table and attach
+            try:
+                lp_resp = (
+                    supabase.table('location_point')
+                    .select('latitude,longitude,altitude,timestamp')
+                    .eq('session_id', ruck_id)
+                    .order('timestamp', desc=False)
+                    .execute()
+                )
+                location_points = lp_resp.data or []
+            except Exception as lp_err:
+                logger.warning(f"[RUCK_DETAILS] Failed to fetch location points for session {ruck_id}: {lp_err}")
+                location_points = []
 
             # Process route points
-            location_points = session.get('location_points', []) or []
             clipped_points = self._clip_route_for_privacy(location_points)
             sampled_points = self._sample_route_points(clipped_points)
 
@@ -312,10 +375,53 @@ class RuckSessionDetailResource(Resource):
                 for p in sampled_points if p.get('latitude') is not None and p.get('longitude') is not None
             ]
 
-            # Photos
-            photos = session.get('photos', []) or []
+            # Likes/comments aggregates via separate lightweight queries
+            like_count = 0
+            comment_count = 0
+            is_liked_by_current_user = False
+            try:
+                likes_count_resp = (
+                    supabase.table('ruck_likes')
+                    .select('id', count='exact')
+                    .eq('ruck_id', ruck_id)
+                    .execute()
+                )
+                like_count = likes_count_resp.count or 0
+                liked_by_me_resp = (
+                    supabase.table('ruck_likes')
+                    .select('id', count='exact')
+                    .eq('ruck_id', ruck_id)
+                    .eq('user_id', current_user_id)
+                    .execute()
+                )
+                is_liked_by_current_user = (liked_by_me_resp.count or 0) > 0
+            except Exception as likes_err:
+                logger.warning(f"[RUCK_DETAILS] Failed to compute likes aggregates for {ruck_id}: {likes_err}")
+            try:
+                comments_count_resp = (
+                    supabase.table('ruck_comments')
+                    .select('id', count='exact')
+                    .eq('ruck_id', ruck_id)
+                    .execute()
+                )
+                comment_count = comments_count_resp.count or 0
+            except Exception as comments_err:
+                logger.warning(f"[RUCK_DETAILS] Failed to compute comments count for {ruck_id}: {comments_err}")
 
-            # Clean up fields and attach aggregates
+            # Photos (separate query to avoid dependency on missing FK embedding)
+            try:
+                photos_resp = (
+                    supabase.table('ruck_photos')
+                    .select('id,ruck_id,user_id,filename,original_filename,content_type,size,url,thumbnail_url,created_at')
+                    .eq('ruck_id', ruck_id)
+                    .execute()
+                )
+                photos = photos_resp.data or []
+            except Exception as photo_err:
+                logger.warning(f"[RUCK_DETAILS] Failed to fetch photos for ruck_id {ruck_id}: {photo_err}")
+                photos = []
+
+            # Attach aggregates and derived fields
             session['like_count'] = like_count
             session['comment_count'] = comment_count
             session['is_liked_by_current_user'] = is_liked_by_current_user
@@ -329,7 +435,7 @@ class RuckSessionDetailResource(Resource):
             if 'elevation_loss_m' in session and session.get('elevation_loss_m') is not None:
                 session.setdefault('elevation_loss_meters', session.get('elevation_loss_m'))
 
-            # Remove raw likes/comments arrays
+            # Ensure raw likes/comments arrays are not present
             session.pop('likes', None)
             session.pop('comments', None)
 
@@ -412,74 +518,6 @@ class RuckSessionDetailResource(Resource):
         except Exception as e:
             logger.error(f"Error patching session {ruck_id}: {e}")
             return {'message': f'Error patching session: {str(e)}'}, 500
-
-    def delete(self, ruck_id):
-        """Delete a ruck session owned by the authenticated user (DELETE /api/rucks/<id>)
-
-        This will cascade-delete dependent records where applicable and then
-        remove the ruck_session row. Only the session owner may delete.
-        """
-        if not hasattr(g, 'user') or g.user is None:
-            return {'message': 'User not authenticated'}, 401
-
-        ruck_id = validate_ruck_id(ruck_id)
-        if ruck_id is None:
-            return {'message': 'Invalid ruck session ID format'}, 400
-
-        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-
-        try:
-            # Verify session exists and ownership
-            session_resp = (
-                supabase.table('ruck_session')
-                .select('id,user_id')
-                .eq('id', ruck_id)
-                .single()
-                .execute()
-            )
-            if not session_resp.data:
-                return {'message': 'Session not found'}, 404
-
-            if session_resp.data.get('user_id') != g.user.id:
-                return {'message': 'Forbidden'}, 403
-
-            # Best-effort cascading deletes for related data
-            def _safe_delete(table_name, col, val):
-                try:
-                    supabase.table(table_name).delete().eq(col, val).execute()
-                except Exception as del_err:
-                    logger.warning(f"[RUCK_DELETE] Skipping optional table {table_name} delete: {del_err}")
-
-            # Known related tables/columns
-            _safe_delete('heart_rate_sample', 'session_id', ruck_id)
-            _safe_delete('location_point', 'session_id', ruck_id)
-            _safe_delete('session_splits', 'session_id', ruck_id)
-            _safe_delete('ruck_likes', 'ruck_id', ruck_id)
-            _safe_delete('ruck_comments', 'ruck_id', ruck_id)
-            _safe_delete('ruck_photos', 'ruck_id', ruck_id)
-
-            # Finally delete the session itself (owner constraint)
-            delete_resp = (
-                supabase.table('ruck_session')
-                .delete()
-                .eq('id', ruck_id)
-                .eq('user_id', g.user.id)
-                .execute()
-            )
-            if delete_resp.data is None:
-                # Some clients of supabase-py return None on delete; treat as success
-                pass
-
-            # Invalidate any cached user session lists
-            try:
-                cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            except Exception:
-                pass
-
-            return {'message': 'Session deleted', 'id': ruck_id}, 200
-        except Exception as e:
-            logger.error(f"Error deleting session {ruck_id}: {e}")
-            return {'message': f'Error deleting session: {str(e)}'}, 500
 
 class RuckSessionStartResource(Resource):
     def post(self, ruck_id):

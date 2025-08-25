@@ -94,8 +94,8 @@ class UploadManager implements SessionManager {
   }
 
   Future<void> _onSessionStopped(SessionStopRequested event) async {
-    // Process any remaining uploads
-    await _processUploadQueue();
+    // Skip final uploads to prevent 400 errors - session completion handles final data
+    AppLogger.info('[UPLOAD_MANAGER] Session stopped - clearing upload queue without processing to avoid 400 errors');
     
     // Stop upload timer
     _uploadTimer?.cancel();
@@ -139,7 +139,7 @@ class UploadManager implements SessionManager {
     
     // Convert heart rate samples to uploadable format
     final heartRateData = event.samples.map((sample) => {
-      'bpm': sample.bpm,
+      'bpm': sample.bpm, // Already an int from HeartRateSample model
       'timestamp': sample.timestamp.toIso8601String(),
       'session_id': _activeSessionId,
     }).toList();

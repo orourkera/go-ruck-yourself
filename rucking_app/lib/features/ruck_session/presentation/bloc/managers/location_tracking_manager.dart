@@ -845,13 +845,12 @@ class LocationTrackingManager implements SessionManager {
     
     _locationService.stopLocationTracking();
     
-    // Upload any remaining pending points BEFORE clearing session ID
+    // Skip final upload if session is already completed to avoid 400 errors
+    // The session completion process handles the final data upload
     if (_pendingLocationPoints.isNotEmpty && _activeSessionId != null) {
-      try {
-        await _processBatchUpload();
-      } catch (e) {
-        AppLogger.warning('[LOCATION_MANAGER] Failed to upload final batch during stop: $e');
-      }
+      AppLogger.info('[LOCATION_MANAGER] Skipping final location upload - session completion handles final data');
+      // Just clear the pending points without uploading
+      _pendingLocationPoints.clear();
     }
     
     // CRITICAL: Clear session ID to prevent further uploads

@@ -510,7 +510,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         // Heart rate zones: snapshot thresholds and time in zones
         ..._computeHrZonesPayload(),
         // Heart rate aggregates expected by backend
-        'avg_heart_rate': _heartRateManager.currentState.averageHeartRate.round(),
+        'avg_heart_rate': _heartRateManager.currentState.averageHeartRate?.round(),
         'min_heart_rate': _heartRateManager.currentState.minHeartRate,
         'max_heart_rate': _heartRateManager.currentState.maxHeartRate,
       };

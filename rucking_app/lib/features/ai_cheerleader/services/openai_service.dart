@@ -12,9 +12,12 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
   static const String _model = 'gpt-4o';
-  static const int _maxTokens = 150;
-  static const double _temperature = 0.8; // Increased from 0.8 for more creativity
+  static const int _maxTokens = 60; // lower to help enforce brevity
+  static const double _temperature = 0.7; // slightly lower to reduce repetitiveness
   static const Duration _timeout = Duration(seconds: 10);
+
+  // Local in-memory cache of recent AI lines to avoid repetition even if history isn't provided
+  static final List<String> _localRecentLines = <String>[]; // stores last few AI outputs (trimmed)
 
   final SimpleAILogger? _logger;
 
@@ -40,6 +43,7 @@ class OpenAIService {
         context['session'] ?? {},
         context['user'] ?? {},
         context['environment'] ?? {},
+        context['history'] ?? context['userHistory'] ?? {},
       );
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
       
@@ -77,11 +81,32 @@ class OpenAIService {
 
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 4: OpenAI API call completed successfully');
       
-      final message = completion.choices.first.message.content?.first.text?.trim();
+      var message = completion.choices.first.message.content?.first.text?.trim();
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 5: Extracted message from response');
       AppLogger.info('[OPENAI_DEBUG] Extracted message: $message');
       
       if (message != null && message.isNotEmpty) {
+        // Enforce hard 20-word cap and strip hashtags client-side
+        final tokens = message.split(RegExp(r"\s+")).where((w) => w.isNotEmpty).toList();
+        if (tokens.length > 20) {
+          message = tokens.take(20).join(' ');
+        }
+        // Remove any hashtags entirely
+        message = message
+            .split(RegExp(r"\s+"))
+            .where((w) => !w.startsWith('#'))
+            .join(' ')
+            .trim();
+        // Collapse multiple spaces
+        message = message.replaceAll(RegExp(r"\s+"), ' ').trim();
+
+        // Update local recent lines cache (dedupe, keep latest 6)
+        final line = message.length > 120 ? message.substring(0, 120) : message;
+        _localRecentLines.removeWhere((e) => e == line);
+        _localRecentLines.insert(0, line);
+        if (_localRecentLines.length > 6) {
+          _localRecentLines.removeRange(6, _localRecentLines.length);
+        }
         AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 6: Message is valid, about to log to database');
         AppLogger.info('[OPENAI_DEBUG] Generated message: "${message.substring(0, 50)}..."');
         AppLogger.info('[OPENAI_DEBUG] About to call _logSimpleResponse...');
@@ -121,9 +146,10 @@ class OpenAIService {
     Map<String, dynamic> session,
     Map<String, dynamic> user,
     Map<String, dynamic> environment,
+    Map<String, dynamic> history,
   ) {
     final personalityPrompt = _getPersonalityPrompt(personality, explicitContent);
-    final baseContext = _buildBaseContext(trigger, session, user, environment);
+    final baseContext = _buildBaseContext(trigger, session, user, environment, history);
     final contentGuidelines = explicitContent 
       ? 'Use colorful, explicit language and profanity when it fits the character. Adult language and edgy humor is encouraged'
       : 'Keep language family-friendly and appropriate for all ages';
@@ -132,6 +158,12 @@ class OpenAIService {
     final remoteConfig = getIt<RemoteConfigService>();
     final systemPrompt = remoteConfig.getAICheerleaderSystemPrompt();
     final userName = _extractFirstName(user['username']) ?? 'athlete';
+    
+    // Pull last 3–4 prior AI responses to help prevent repetition
+    final avoidLines = _recentAICheerleaderLines(history, max: 4);
+    final avoidBlock = avoidLines.isEmpty
+        ? ''
+        : '\nRecent lines to avoid repeating:\n- ' + avoidLines.join('\n- ') + '\n';
     
     return '''
 $systemPrompt
@@ -142,13 +174,15 @@ Content Guidelines: $contentGuidelines
 
 Context:
 $baseContext
+$avoidBlock
 
 Additional Instructions:
 - Respond as the $personality character with FRESH, UNIQUE phrasing each time
-- Keep message under 25 words
+- Keep message to 20 words or fewer. HARD CAP: 20 words.
 - Be specific about their current situation
 - ${_getCreativityBooster()}
 - ${_getVariedInstructions()}
+- If weather or location context is provided, reference it naturally (one short mention only)
 - Sound natural and conversational
 - Focus on encouragement and motivation
 - NEVER repeat phrases you've used before - be inventive and original
@@ -164,9 +198,12 @@ Generate a motivational message:''';
     Map<String, dynamic> session,
     Map<String, dynamic> user,
     Map<String, dynamic> environment,
+    Map<String, dynamic> history,
   ) {
     final triggerType = trigger['type'];
-    final triggerData = trigger['data'] as Map<String, dynamic>;
+    final triggerData = (trigger['data'] is Map<String, dynamic>)
+        ? (trigger['data'] as Map<String, dynamic>)
+        : <String, dynamic>{};
     
     String contextText = "Rucking session: ${session['elapsedTime']['formatted']} elapsed, ${session['distance']['formatted']} covered.";
     
@@ -209,38 +246,68 @@ Generate a motivational message:''';
     AppLogger.info('[OPENAI_DEBUG] Location object type: ${location.runtimeType}');
     AppLogger.info('[OPENAI_DEBUG] Location contents: $location');
     
-    if (location != null && location is Map<String, dynamic>) {
-      final city = location['city'] as String?;
-      final terrain = location['terrain'] as String?; 
-      final landmark = location['landmark'] as String?;
-      final weatherCondition = location['weatherCondition'] as String?;
-      final temperature = location['temperature'] as int?;
-      
-      AppLogger.info('[OPENAI_DEBUG] Parsed - city: $city, terrain: $terrain, landmark: $landmark, weather: $weatherCondition, temp: $temperature');
-      
-      if (city != null && city != 'Unknown Location') {
-        contextText += " Location: $city";
-        if (terrain != null && terrain.isNotEmpty) contextText += " ($terrain terrain)";
-        if (landmark != null && landmark.isNotEmpty) contextText += " near $landmark";
-        
-        // Add weather context
-        if (temperature != null || weatherCondition != null) {
-          contextText += " - Weather: ";
-          if (temperature != null) contextText += "${temperature}°F";
-          if (weatherCondition != null) {
-            if (temperature != null) contextText += ", ";
-            contextText += weatherCondition;
+    // Pull user unit preference earlier for temp unit
+    final preferMetric = (user['preferMetric'] as bool?) ?? true;
+
+    if (location != null) {
+      if (location is Map<String, dynamic>) {
+        final city = (location['city'] ?? location['name'] ?? location['locality']) as String?;
+        final terrain = location['terrain'] as String?;
+        final landmark = location['landmark'] as String?;
+
+        // Weather may live inside location or environment['weather']
+        String? weatherCondition = location['weatherCondition'] as String?;
+        num? tempF = location['temperature'] is num ? location['temperature'] as num : null;
+        // Alternative nested weather structures
+        final weather = environment['weather'];
+        if (weather is Map<String, dynamic>) {
+          weatherCondition = weatherCondition ?? (weather['condition'] ?? weather['summary']) as String?;
+          tempF = tempF ?? (weather['tempF'] is num ? weather['tempF'] as num : null);
+          final tempCAlt = weather['tempC'] is num ? weather['tempC'] as num : null;
+          if (preferMetric && tempF == null && tempCAlt != null) {
+            // keep as C, convert later during render
+            tempF = (tempCAlt * 9 / 5) + 32; // store F for unified handling
           }
         }
-        
-        contextText += ".";
+
+        AppLogger.info('[OPENAI_DEBUG] Parsed - city: $city, terrain: $terrain, landmark: $landmark, weather: $weatherCondition, tempF: $tempF');
+
+        if (city != null && city.isNotEmpty && city != 'Unknown Location') {
+          contextText += " Location: $city";
+          if (terrain != null && terrain.isNotEmpty) contextText += " ($terrain terrain)";
+          if (landmark != null && landmark.isNotEmpty) contextText += " near $landmark";
+
+          // Add weather context (respect unit preference)
+          if (tempF != null || weatherCondition != null) {
+            contextText += " - Weather: ";
+            if (tempF != null) {
+              if (preferMetric) {
+                final tempC = ((tempF - 32) * 5 / 9).round();
+                contextText += "${tempC}°C";
+              } else {
+                contextText += "${tempF.round()}°F";
+              }
+            }
+            if (weatherCondition != null && weatherCondition.isNotEmpty) {
+              if (tempF != null) contextText += ", ";
+              contextText += weatherCondition;
+            }
+          }
+        }
+      } else if (location is String && location.isNotEmpty && location != 'Unknown Location') {
+        contextText += " Location: $location";
       }
     }
-    
+
+    // Add exactly one concise history insight if available
+    final insight = _deriveOneHistoryInsight(session: session, history: history, preferMetric: preferMetric);
+    if (insight != null && insight.isNotEmpty) {
+      contextText += " $insight";
+    }
+
     return contextText;
   }
 
-  /// Log simple response if logger is available
   void _logSimpleResponse({
     required Map<String, dynamic> context,
     required String personality,
@@ -333,6 +400,86 @@ Generate a motivational message:''';
     return username.isEmpty ? null : username;
   }
 
+  // Safely read a numeric value from a nested map path
+  num? _readNum(Map<String, dynamic>? obj, List<String> path) {
+    if (obj == null) return null;
+    dynamic cur = obj;
+    for (final key in path) {
+      if (cur is Map<String, dynamic> && cur.containsKey(key)) {
+        cur = cur[key];
+      } else {
+        return null;
+      }
+    }
+    if (cur == null) return null;
+    if (cur is num) return cur;
+    if (cur is String) return num.tryParse(cur);
+    return null;
+  }
+
+  // Derive exactly one concise history insight comparing current session vs most recent past ruck
+  String? _deriveOneHistoryInsight({
+    required Map<String, dynamic> session,
+    required Map<String, dynamic> history,
+    required bool preferMetric,
+  }) {
+    final recentRucks = (history['recent_rucks'] as List?) ?? const [];
+    if (recentRucks.isEmpty) return null;
+    final last = recentRucks.first;
+    if (last is! Map<String, dynamic>) return null;
+
+    // 1) Ruck weight delta (highest priority)
+    final currentWeightKg = _readNum(session, ['gear', 'ruckWeightKg']) ?? _readNum(session, ['weightKg']);
+    final lastWeightKg = _readNum(last, ['ruck_weight_kg']) ?? _readNum(last, ['weight_kg']);
+    if (currentWeightKg != null && lastWeightKg != null) {
+      final deltaKg = currentWeightKg - lastWeightKg;
+      if (deltaKg.abs() >= 0.5) {
+        if (preferMetric) {
+          return "Noticed your ruck weight is ${deltaKg > 0 ? 'up' : 'down'} ${deltaKg.abs().toStringAsFixed(1)} kg from last time.";
+        } else {
+          final deltaLb = deltaKg * 2.20462;
+          return "Noticed your ruck weight is ${deltaKg > 0 ? 'up' : 'down'} ${deltaLb.abs().toStringAsFixed(0)} lb from last time.";
+        }
+      }
+    }
+
+    // 2) Distance pacing (current pace vs last pace at similar distance)
+    final currentPace = _readNum(session, ['performance', 'pace']); // seconds per unit
+    final lastPace = _readNum(last, ['avg_pace_seconds_per_km']) ?? _readNum(last, ['avg_pace_seconds_per_mile']);
+    if (currentPace != null && lastPace != null) {
+      final diffSec = currentPace - lastPace;
+      if (diffSec.abs() >= 5) { // meaningful difference >= 5s
+        final unit = preferMetric ? 'km' : 'mi';
+        return diffSec < 0
+          ? "You're pacing faster than your last ${unit} splits."
+          : "You're pacing a bit slower than your last ${unit} splits—keep steady.";
+      }
+    }
+
+    // 3) Split comparison (current latest split vs last latest split)
+    final sessionSplits = (session['splits'] as List?) ?? const [];
+    final lastSplits = (last['splits'] as List?) ?? const [];
+    if (sessionSplits.isNotEmpty && lastSplits.isNotEmpty) {
+      final curLast = sessionSplits.last;
+      final prevLast = lastSplits.last;
+      if (curLast is Map && prevLast is Map) {
+        final curDur = _readNum(curLast.cast<String, dynamic>(), ['splitDurationSeconds']);
+        final prevDur = _readNum(prevLast.cast<String, dynamic>(), ['splitDurationSeconds']);
+        if (curDur != null && prevDur != null) {
+          final delta = curDur - prevDur;
+          if (delta.abs() >= 5) {
+            final unit = preferMetric ? 'km' : 'mi';
+            return delta < 0
+              ? "Latest $unit split quicker than your last session."
+              : "Latest $unit split a touch slower than your last session—stay smooth.";
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
   String _getPersonalityPrompt(String personality, bool explicitContent) {
     switch (personality) {
       case 'Supportive Friend':
@@ -370,5 +517,31 @@ Generate a motivational message:''';
       default:
         return '''You are a supportive fitness companion providing encouragement during their ruck.''';
     }
+  }
+
+  // Extract recent AI cheerleader responses to avoid repeating phrasing
+  List<String> _recentAICheerleaderLines(Map<String, dynamic> history, {int max = 2}) {
+    final items = (history['ai_cheerleader_history'] as List?) ?? const [];
+    final lines = <String>[];
+    for (final it in items) {
+      if (it is Map && it['openai_response'] is String) {
+        var t = (it['openai_response'] as String).trim();
+        if (t.isEmpty) continue;
+        // Collapse whitespace and limit length
+        t = t.replaceAll(RegExp(r'\s+'), ' ');
+        if (t.length > 120) t = t.substring(0, 120);
+        lines.add(t);
+        if (lines.length >= max) break;
+      }
+    }
+    // If not enough history, supplement with local cache of recent lines
+    if (lines.length < max && _localRecentLines.isNotEmpty) {
+      for (final t in _localRecentLines) {
+        if (lines.contains(t)) continue;
+        lines.add(t);
+        if (lines.length >= max) break;
+      }
+    }
+    return lines;
   }
 }

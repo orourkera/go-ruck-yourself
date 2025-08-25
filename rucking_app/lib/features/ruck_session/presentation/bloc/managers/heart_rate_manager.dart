@@ -362,7 +362,7 @@ class HeartRateManager implements SessionManager {
             ? _heartRateSampleObjects[index].timestamp 
             : DateTime.now().subtract(Duration(seconds: _heartRateSamples.length - index));
         return {
-          'bpm': entry.value,
+          'bpm': (entry.value is num) ? entry.value.round() : entry.value,
           'timestamp': timestamp.toIso8601String(),
           'session_id': _activeSessionId,
           'uploaded_at': DateTime.now().toIso8601String(),
