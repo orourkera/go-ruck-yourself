@@ -50,10 +50,16 @@ def get_user_history(user_id: str) -> dict:
         notifications = notifications_resp.data
         
         # Query AI cheerleader logs (previous AI messages for context)
-        # Try both tables - simple logs and detailed interactions
-        ai_logs_resp = supabase.table('ai_cheerleader_logs').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
-        ai_logs = ai_logs_resp.data or []
-        app.logger.info(f"[AI_HISTORY_DEBUG] ai_cheerleader_logs query returned {len(ai_logs)} records for user {user_id}")
+        # Direct query by user_id since we added that column
+        try:
+            ai_logs_resp = supabase.table('ai_cheerleader_logs').select('session_id, personality, openai_response, created_at').eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
+            ai_logs = ai_logs_resp.data or []
+            app.logger.info(f"[AI_HISTORY_DEBUG] ai_cheerleader_logs query returned {len(ai_logs)} records for user {user_id}")
+            if ai_logs:
+                app.logger.info(f"[AI_HISTORY_DEBUG] Latest AI response: {ai_logs[0]['openai_response'][:100]}...")
+        except Exception as e:
+            app.logger.error(f"[AI_HISTORY_DEBUG] Error querying ai_cheerleader_logs: {e}")
+            ai_logs = []
         
         # Also check the interactions table for more comprehensive logging
         try:
