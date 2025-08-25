@@ -152,6 +152,74 @@ class RuckSessionResource(Resource):
             logger.error(f"Error fetching session {ruck_id}: {e}")
             return {'message': f'Error fetching session: {str(e)}'}, 500
 
+    def delete(self, ruck_id):
+        """Delete a ruck session owned by the authenticated user (DELETE /api/rucks/<id>)
+
+        This will cascade-delete dependent records where applicable and then
+        remove the ruck_session row. Only the session owner may delete.
+        """
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        try:
+            # Verify session exists and ownership
+            session_resp = (
+                supabase.table('ruck_session')
+                .select('id,user_id')
+                .eq('id', ruck_id)
+                .single()
+                .execute()
+            )
+            if not session_resp.data:
+                return {'message': 'Session not found'}, 404
+
+            if session_resp.data.get('user_id') != g.user.id:
+                return {'message': 'Forbidden'}, 403
+
+            # Best-effort cascading deletes for related data
+            def _safe_delete(table_name, col, val):
+                try:
+                    supabase.table(table_name).delete().eq(col, val).execute()
+                except Exception as del_err:
+                    logger.warning(f"[RUCK_DELETE] Skipping optional table {table_name} delete: {del_err}")
+
+            # Known related tables/columns
+            _safe_delete('heart_rate_sample', 'session_id', ruck_id)
+            _safe_delete('location_point', 'session_id', ruck_id)
+            _safe_delete('session_splits', 'session_id', ruck_id)
+            _safe_delete('ruck_likes', 'ruck_id', ruck_id)
+            _safe_delete('ruck_comments', 'ruck_id', ruck_id)
+            _safe_delete('ruck_photos', 'ruck_id', ruck_id)
+
+            # Finally delete the session itself (owner constraint)
+            delete_resp = (
+                supabase.table('ruck_session')
+                .delete()
+                .eq('id', ruck_id)
+                .eq('user_id', g.user.id)
+                .execute()
+            )
+            if delete_resp.data is None:
+                # Some clients of supabase-py return None on delete; treat as success
+                pass
+
+            # Invalidate any cached user session lists
+            try:
+                cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            except Exception:
+                pass
+
+            return {'message': 'Session deleted', 'id': ruck_id}, 200
+        except Exception as e:
+            logger.error(f"Error deleting session {ruck_id}: {e}")
+            return {'message': f'Error deleting session: {str(e)}'}, 500
+
 class RuckSessionStartResource(Resource):
     def post(self, ruck_id):
         """Mark a ruck session as started (POST /api/rucks/<ruck_id>/start)"""
@@ -576,7 +644,14 @@ class RuckSessionCompleteResource(Resource):
                     .execute()
                 logger.info(f"[HR_AGGREGATE] Found {len(stats_resp.data) if stats_resp.data else 0} heart rate samples for session {ruck_id}")
                 if stats_resp.data:
-                    bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
+                    bpm_values = []
+                    for x in stats_resp.data:
+                        if x.get('bpm') is None:
+                            continue
+                        try:
+                            bpm_values.append(int(round(float(x['bpm']))))
+                        except Exception:
+                            continue
                     logger.info(f"[HR_AGGREGATE] Filtered to {len(bpm_values)} valid BPM values")
                     if bpm_values:
                         avg_hr = sum(bpm_values) / len(bpm_values)
@@ -682,7 +757,15 @@ class RuckSessionCompleteResource(Resource):
                         .limit(50000) \
                         .execute()
                     if stats_resp.data:
-                        bpm_values = [int(x['bpm']) for x in stats_resp.data if x.get('bpm') is not None]
+                        # Coerce BPM values robustly to handle cases like "80.0" returned as strings
+                        bpm_values = []
+                        for x in stats_resp.data:
+                            if x.get('bpm') is None:
+                                continue
+                            try:
+                                bpm_values.append(int(round(float(x['bpm']))))
+                            except Exception:
+                                continue
                         if bpm_values:
                             avg_hr = sum(bpm_values) / len(bpm_values)
                             min_hr = min(bpm_values)
@@ -742,8 +825,19 @@ class RuckSessionCompleteResource(Resource):
                             splits_to_insert.append(split_record)
                         
                         if splits_to_insert:
+                            # Deduplicate by (session_id, split_number) to avoid unique constraint violations
+                            unique_map = {}
+                            for rec in splits_to_insert:
+                                sn = rec.get('split_number')
+                                if sn is None:
+                                    # Skip invalid split numbers
+                                    continue
+                                unique_map[(rec['session_id'], sn)] = rec
+
+                            deduped_splits = list(sorted(unique_map.values(), key=lambda r: r['split_number']))
+
                             insert_resp = supabase.table('session_splits') \
-                                .insert(splits_to_insert) \
+                                .insert(deduped_splits) \
                                 .execute()
                             
                             if insert_resp.data:

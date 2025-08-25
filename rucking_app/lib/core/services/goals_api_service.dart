@@ -1,5 +1,6 @@
 import 'package:rucking_app/core/network/api_endpoints.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/core/models/goal.dart';
 import 'package:rucking_app/core/models/goal_progress.dart';
 import 'package:rucking_app/core/models/goal_schedule.dart';
@@ -23,8 +24,28 @@ class GoalsApiService {
     if (status != null) query['status'] = status;
 
     final data = await _api.get(ApiEndpoints.goalsWithProgress, queryParams: query);
-    final list = (data as List?) ?? const [];
+    // The API may return either a raw List or a wrapped Map like { items: [...], meta: {...} }
+    List<dynamic> list;
+    if (data is List) {
+      list = data;
+    } else if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      final dynamic items = map['items'] ?? map['data'] ?? map['goals'] ?? map['results'] ?? map['records'];
+      if (items is List) {
+        list = items;
+      } else {
+        // Fallback to empty if structure is unexpected
+        // Debug aid: print keys to understand payload shape during development
+        // ignore: avoid_print
+        print('[GoalsApiService] Unexpected goals-with-progress response shape. Keys: ${map.keys.toList()}');
+        list = const [];
+      }
+    } else {
+      list = const [];
+    }
+
     return list
+        .whereType<dynamic>()
         .map((e) => GoalWithProgress.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
@@ -113,10 +134,20 @@ class GoalsApiService {
 
   // Parse a natural language goal into a structured object
   Future<Map<String, dynamic>> parseGoal(String inputText) async {
+    final promptVersion = RemoteConfigService.instance.getAIGoalPromptVersion();
     final data = await _api.post(ApiEndpoints.goals + '/parse', {
       'text': inputText,
+      // Forward prompt version for backend prompt selection (server may ignore if unused)
+      'prompt_version': promptVersion,
     });
     return Map<String, dynamic>.from(data as Map);
+  }
+
+  // Create a goal from a confirmed draft structure
+  Future<GoalWithProgress> createGoal(Map<String, dynamic> draft) async {
+    final data = await _api.post(ApiEndpoints.goals, draft);
+    // Backend may return either a flat combined object or { goal, progress }
+    return GoalWithProgress.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
   // Optional: fetch a single goal (basic)

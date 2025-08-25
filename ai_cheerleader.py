@@ -182,10 +182,14 @@ def ai_cheerleader():
         
         # Debug logging
         app.logger.info(f"[AI_DEBUG] System prompt length: {len(system_prompt)}")
+        app.logger.info(f"[AI_DEBUG] System prompt preview: {system_prompt[:200]}...")
+        app.logger.info(f"[AI_DEBUG] User prompt preview: {user_prompt[:300]}...")
         app.logger.info(f"[AI_DEBUG] Context length: {len(context_str)} characters")
         app.logger.info(f"[AI_DEBUG] Historical data keys: {list(historical.keys()) if historical else 'None'}")
         if historical and 'ai_cheerleader_history' in historical:
             app.logger.info(f"[AI_DEBUG] AI history count: {len(historical['ai_cheerleader_history'])}")
+        else:
+            app.logger.info(f"[AI_DEBUG] No AI history found in context")
         
         # Step 5: OpenAI call
         completion = openai_client.chat.completions.create(
