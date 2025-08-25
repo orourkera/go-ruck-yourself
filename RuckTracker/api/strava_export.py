@@ -3,7 +3,8 @@ import requests as http_requests
 from datetime import datetime
 from flask import g
 from flask_restful import Resource, request
-from .utils import get_supabase_client, auth_required
+from ..supabase_client import get_supabase_client
+from .auth import auth_required
 
 logger = logging.getLogger(__name__)
 
