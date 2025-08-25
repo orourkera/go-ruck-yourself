@@ -593,6 +593,19 @@ class AuthServiceImpl implements AuthService {
     try {
       AppLogger.info('[AUTH] Attempting token refresh...');
       
+      // One-time cleanup for v3.0.0 - clear potentially invalid tokens
+      final prefs = await SharedPreferences.getInstance();
+      final hasRunTokenCleanup = prefs.getBool('token_cleanup_v3_0_0') ?? false;
+      if (!hasRunTokenCleanup) {
+        AppLogger.info('[AUTH] Running one-time token cleanup for v3.0.0');
+        await _storageService.removeSecure(AppConfig.tokenKey);
+        await _storageService.removeSecure(AppConfig.refreshTokenKey);
+        await prefs.setBool('token_cleanup_v3_0_0', true);
+        AppLogger.info('[AUTH] Token cleanup completed - user will need to re-authenticate');
+        await _handleRefreshFailure();
+        return null;
+      }
+      
       final refreshToken = await _storageService.getSecureString(AppConfig.refreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
         AppLogger.warning('[AUTH] No refresh token available');
