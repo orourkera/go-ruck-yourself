@@ -140,17 +140,75 @@ class AICheerleaderLogResource(Resource):
                 ai_logs = ai_logs_resp.data or []
                 logger.info(f"[AI_CHEERLEADER] Found {len(ai_logs)} previous AI responses for user {user_id}")
                 
-                # Get recent rucks
-                rucks_resp = supabase_admin.table('ruck_session').select('*').eq(
-                    'user_id', user_id
-                ).order('created_at', desc=True).limit(10).execute()
-                recent_rucks = rucks_resp.data or []
+                # Get recent rucks with priority: completed -> in_progress -> created
+                recent_rucks = []
+                try:
+                    rucks_resp = supabase_admin.table('ruck_session').select('*') \
+                        .eq('user_id', user_id) \
+                        .eq('status', 'completed') \
+                        .order('completed_at', desc=True) \
+                        .limit(10) \
+                        .execute()
+                    recent_rucks = rucks_resp.data or []
+                except Exception as e:
+                    logger.warning(f"[AI_CHEERLEADER] Completed rucks fetch failed: {e}")
+                    recent_rucks = []
+
+                if not recent_rucks:
+                    try:
+                        rucks_resp = supabase_admin.table('ruck_session').select('*') \
+                            .eq('user_id', user_id) \
+                            .eq('status', 'in_progress') \
+                            .order('started_at', desc=True) \
+                            .limit(10) \
+                            .execute()
+                        recent_rucks = rucks_resp.data or []
+                    except Exception as e:
+                        logger.warning(f"[AI_CHEERLEADER] In-progress rucks fetch failed: {e}")
+                        recent_rucks = []
+
+                if not recent_rucks:
+                    try:
+                        rucks_resp = supabase_admin.table('ruck_session').select('*') \
+                            .eq('user_id', user_id) \
+                            .eq('status', 'created') \
+                            .order('created_at', desc=True) \
+                            .limit(10) \
+                            .execute()
+                        recent_rucks = rucks_resp.data or []
+                    except Exception as e:
+                        logger.warning(f"[AI_CHEERLEADER] Created rucks fetch failed: {e}")
+                        recent_rucks = []
                 
-                # Get recent achievements
-                achievements_resp = supabase_admin.table('user_achievement').select(
-                    '*, achievements(*)'
-                ).eq('user_id', user_id).order('earned_at', desc=True).limit(10).execute()
-                achievements = achievements_resp.data or []
+                # Get recent achievements without relying on FK embedding.
+                # Try plural then singular table name to be compatible with prod schema.
+                achievements_rows = []
+                try:
+                    achievements_rows_resp = supabase_admin.table('user_achievements').select(
+                        'id, achievement_id, session_id, earned_at, progress_value, metadata'
+                    ).eq('user_id', user_id).order('earned_at', desc=True).limit(10).execute()
+                    achievements_rows = achievements_rows_resp.data or []
+                except Exception:
+                    # Fallback to singular table name if plural is not available
+                    achievements_rows_resp = supabase_admin.table('user_achievement').select(
+                        'id, achievement_id, session_id, earned_at, progress_value, metadata'
+                    ).eq('user_id', user_id).order('earned_at', desc=True).limit(10).execute()
+                    achievements_rows = achievements_rows_resp.data or []
+
+                achievements = achievements_rows
+                # Enrich with achievement details via separate fetch
+                ach_ids = [row.get('achievement_id') for row in achievements_rows if row.get('achievement_id') is not None]
+                if ach_ids:
+                    try:
+                        ach_details_resp = supabase_admin.table('achievements').select(
+                            'id, name, description, tier, category, icon_name, achievement_key'
+                        ).in_('id', ach_ids).execute()
+                        by_id = {a['id']: a for a in (ach_details_resp.data or [])}
+                        for row in achievements:
+                            row['achievements'] = by_id.get(row.get('achievement_id'))
+                    except Exception as _:
+                        # If details fetch fails, continue with base rows
+                        pass
                 
             except Exception as e:
                 logger.error(f"[AI_CHEERLEADER] Error fetching user history: {e}")
@@ -308,7 +366,13 @@ class AICheerleaderUserHistoryResource(Resource):
                 except Exception:
                     return default
 
-            rucks_limit = _get_int('rucks_limit', 20, 1, 200)
+            # Accept both rucks_limit and ruck_limit for compatibility
+            rucks_limit = _get_int('rucks_limit', None, 1, 200)
+            if rucks_limit is None:
+                rucks_limit = _get_int('ruck_limit', 20, 1, 200)
+            else:
+                # Clamp again just in case
+                rucks_limit = max(1, min(rucks_limit, 200))
             achievements_limit = _get_int('achievements_limit', 50, 1, 500)
 
             user_id = g.user.id
@@ -317,13 +381,48 @@ class AICheerleaderUserHistoryResource(Resource):
             user_resp = supabase.table('user').select('*').eq('id', user_id).single().execute()
             user_profile = user_resp.data if hasattr(user_resp, 'data') else None
 
-            # Fetch recent rucks (all columns). Use started_at desc when available.
-            rucks_resp = supabase.table('ruck_session').select('*') \
-                .eq('user_id', user_id) \
-                .order('started_at', desc=True) \
-                .limit(rucks_limit) \
-                .execute()
-            recent_rucks = rucks_resp.data or []
+            # Fetch recent rucks prioritizing meaningful data to avoid null-heavy "created" rows
+            recent_rucks = []
+            try:
+                # 1) Prefer completed sessions (richest history)
+                rucks_resp = supabase.table('ruck_session').select('*') \
+                    .eq('user_id', user_id) \
+                    .eq('status', 'completed') \
+                    .order('completed_at', desc=True) \
+                    .limit(rucks_limit) \
+                    .execute()
+                recent_rucks = rucks_resp.data or []
+            except Exception as e:
+                logger.warning(f"User history: completed rucks fetch failed: {e}")
+                recent_rucks = []
+
+            # 2) Fallback to in-progress (ordered by started_at)
+            if not recent_rucks:
+                try:
+                    rucks_resp = supabase.table('ruck_session').select('*') \
+                        .eq('user_id', user_id) \
+                        .eq('status', 'in_progress') \
+                        .order('started_at', desc=True) \
+                        .limit(rucks_limit) \
+                        .execute()
+                    recent_rucks = rucks_resp.data or []
+                except Exception as e:
+                    logger.warning(f"User history: in-progress rucks fetch failed: {e}")
+                    recent_rucks = []
+
+            # 3) Finally, if still empty, allow created (ordered by created_at)
+            if not recent_rucks:
+                try:
+                    rucks_resp = supabase.table('ruck_session').select('*') \
+                        .eq('user_id', user_id) \
+                        .eq('status', 'created') \
+                        .order('created_at', desc=True) \
+                        .limit(rucks_limit) \
+                        .execute()
+                    recent_rucks = rucks_resp.data or []
+                except Exception as e:
+                    logger.warning(f"User history: created rucks fetch failed: {e}")
+                    recent_rucks = []
 
             # Fetch splits for those rucks
             splits = []
@@ -335,16 +434,49 @@ class AICheerleaderUserHistoryResource(Resource):
                 except Exception as e:
                     logger.warning(f"User history: splits fetch failed: {e}")
 
-            # Fetch recent achievements with achievement details
+            # Fetch recent achievements with achievement details (no FK embedding; support plural/singular table name)
             achievements = []
             try:
-                ach_resp = supabase.table('user_achievements').select(
-                    'id, achievement_id, session_id, earned_at, progress_value, metadata, '
-                    'achievements(name, description, tier, category, icon_name, achievement_key)'
+                # Try plural first
+                ach_rows_resp = supabase.table('user_achievements').select(
+                    'id, achievement_id, session_id, earned_at, progress_value, metadata'
                 ).eq('user_id', user_id).order('earned_at', desc=True).limit(achievements_limit).execute()
-                achievements = ach_resp.data or []
+                ach_rows = ach_rows_resp.data or []
+            except Exception:
+                try:
+                    # Fallback to singular
+                    ach_rows_resp = supabase.table('user_achievement').select(
+                        'id, achievement_id, session_id, earned_at, progress_value, metadata'
+                    ).eq('user_id', user_id).order('earned_at', desc=True).limit(achievements_limit).execute()
+                    ach_rows = ach_rows_resp.data or []
+                except Exception as e:
+                    logger.warning(f"User history: achievements fetch failed: {e}")
+                    ach_rows = []
+
+            # Enrich with achievement details
+            if ach_rows:
+                ach_ids = [r.get('achievement_id') for r in ach_rows if r.get('achievement_id') is not None]
+                if ach_ids:
+                    try:
+                        ach_details_resp = supabase.table('achievements').select(
+                            'id, name, description, tier, category, icon_name, achievement_key'
+                        ).in_('id', ach_ids).execute()
+                        by_id = {a['id']: a for a in (ach_details_resp.data or [])}
+                        for r in ach_rows:
+                            r['achievements'] = by_id.get(r.get('achievement_id'))
+                    except Exception as e:
+                        logger.warning(f"User history: achievement details fetch failed: {e}")
+            achievements = ach_rows
+
+            # Fetch previous AI responses (ai_cheerleader_history) for this user
+            ai_history = []
+            try:
+                ai_logs_resp = supabase.table('ai_cheerleader_logs').select(
+                    'session_id, personality, openai_response, is_explicit, created_at'
+                ).eq('user_id', user_id).order('created_at', desc=True).limit(50).execute()
+                ai_history = ai_logs_resp.data or []
             except Exception as e:
-                logger.warning(f"User history: achievements fetch failed: {e}")
+                logger.warning(f"User history: ai_cheerleader_logs fetch failed: {e}")
 
             # Aggregates over returned rucks only (lightweight; full totals available via profile stats if needed)
             def _sum(field):
@@ -368,6 +500,7 @@ class AICheerleaderUserHistoryResource(Resource):
                 'recent_rucks': recent_rucks,
                 'splits': splits,
                 'achievements': achievements,
+                'ai_cheerleader_history': ai_history,
                 'aggregates': aggregates,
             }
 

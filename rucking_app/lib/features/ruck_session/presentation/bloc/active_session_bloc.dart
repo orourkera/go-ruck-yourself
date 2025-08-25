@@ -426,6 +426,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         history: history,
       );
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Context keys: ${context.keys.toList()}');
 
       // Inspect assembled context typing and normalize environment before any location work
       AppLogger.info('[AI_CONTEXT_DEBUG] Context runtimeType: ${context.runtimeType}');
@@ -511,7 +512,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (e) {
         AppLogger.error('[AI_LOCATION_DEBUG] Error in location processing: $e');
         AppLogger.error('[AI_LOCATION_DEBUG] Error type: ${e.runtimeType}');
-        rethrow;
+        AppLogger.warning('[AI_LOCATION_DEBUG] Continuing without location context due to error');
+        // Don't rethrow - continue without location context
       }
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 2 complete: Location context processed');
 
@@ -523,7 +525,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final messageStartTime = DateTime.now();
       String? message;
       try {
-        // Call backend AI service instead of local OpenAI
+        // Call backend AI service for message generation
         final response = await _apiClient.post(ApiEndpoints.aiCheerleader, {
           'user_id': _currentUser!.userId,
           'current_session': context['session'],
@@ -574,14 +576,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             AppLogger.warning('[AI_CHEERLEADER] Audio playback failed');
           }
         } else {
-          AppLogger.warning('[AI_CHEERLEADER] Audio synthesis failed, falling back to TTS');
-          
-          // Play fallback TTS directly
-          await _audioService.playCheerleaderAudio(
-            audioBytes: Uint8List(0), // Empty bytes to trigger TTS fallback
-            fallbackText: message,
-            personality: _aiCheerleaderPersonality!,
-          );
+          AppLogger.warning('[AI_CHEERLEADER] Audio synthesis failed, skipping playback (TTS disabled)');
         }
 
         // 5. Log interaction to analytics
@@ -620,8 +615,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
       }
 
-    } catch (e) {
+    } catch (e, stackTrace) {
       AppLogger.error('[AI_CHEERLEADER] Pipeline processing failed: $e');
+      AppLogger.error('[AI_CHEERLEADER] Stack trace: $stackTrace');
     }
   }
 

@@ -1764,15 +1764,39 @@ class HeartRateSampleUploadResource(Resource):
                 logger.warning(f"Session {ruck_id} status is '{current_status}', not 'in_progress'")
                 return {'message': f"Session not in progress (status: {current_status})"}, 400
             
-            # Insert heart rate samples
+            # Insert heart rate samples (normalize timestamp and coerce bpm)
+            def _normalize_ts(ts_val):
+                try:
+                    if isinstance(ts_val, (int, float)):
+                        # Assume ms if large
+                        sec = ts_val / 1000.0 if ts_val > 1e12 else ts_val
+                        return datetime.fromtimestamp(sec, tz=tz.tzutc()).isoformat()
+                    if isinstance(ts_val, str):
+                        try:
+                            return datetime.fromisoformat(ts_val.replace('Z', '+00:00')).isoformat()
+                        except Exception:
+                            return ts_val
+                except Exception:
+                    return None
+
+            def _coerce_bpm(v):
+                try:
+                    return int(round(float(v)))
+                except Exception:
+                    return None
+
             heart_rate_rows = []
             for sample in data['samples']:
                 if 'timestamp' not in sample or 'bpm' not in sample:
                     continue
+                ts_norm = _normalize_ts(sample['timestamp'])
+                bpm_i = _coerce_bpm(sample['bpm'])
+                if ts_norm is None or bpm_i is None:
+                    continue
                 heart_rate_rows.append({
-                    'session_id': ruck_id,
-                    'timestamp': sample['timestamp'],
-                    'bpm': sample['bpm']
+                    'session_id': int(ruck_id),
+                    'timestamp': ts_norm,
+                    'bpm': bpm_i
                 })
             if not heart_rate_rows:
                 return {'message': 'No valid heart rate samples'}, 400
