@@ -180,6 +180,13 @@ class MetCalculator {
     double? humidity,
     bool isRaining = false,
   }) {
+    // If no movement and no significant elevation change, return minimal calories (resting metabolic rate)
+    if (distanceKm <= 0.01 && (elevationGain + elevationLoss) <= 10.0) {
+      // Resting metabolic rate: ~1.2 MET * weight * time (not including ruck weight when stationary)
+      final restingCalories = 1.2 * userWeightKg * (elapsedSeconds / 3600.0);
+      return restingCalories;
+    }
+    
     // Calculate average speed (km/h)
     double durationHours = elapsedSeconds / 3600.0;
     double avgSpeedKmh = (durationHours > 0) ? (distanceKm / durationHours) : 0.0;
