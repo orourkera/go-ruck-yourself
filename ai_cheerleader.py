@@ -20,7 +20,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY or SUPA
 
 # Firebase Remote Config integration
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'getrucky-app')  # Add to your env vars
-FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY')  # Add to your env vars
+FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY')  # Add tosu your env vars
 
 # Default prompts (fallback if Remote Config fails)
 DEFAULT_SYSTEM_PROMPT = """You are an enthusiastic AI cheerleader for rucking workouts. 
@@ -179,7 +179,14 @@ def ai_cheerleader():
         # Step 4: Get prompts from Remote Config
         system_prompt, user_prompt_template = get_remote_config_prompts()
         user_prompt = user_prompt_template.replace('{context}', context_str)
-
+        
+        # Debug logging
+        app.logger.info(f"[AI_DEBUG] System prompt length: {len(system_prompt)}")
+        app.logger.info(f"[AI_DEBUG] Context length: {len(context_str)} characters")
+        app.logger.info(f"[AI_DEBUG] Historical data keys: {list(historical.keys()) if historical else 'None'}")
+        if historical and 'ai_cheerleader_history' in historical:
+            app.logger.info(f"[AI_DEBUG] AI history count: {len(historical['ai_cheerleader_history'])}")
+        
         # Step 5: OpenAI call
         completion = openai_client.chat.completions.create(
             model="gpt-4o",  # Or gpt-3.5-turbo for cheaper/faster
