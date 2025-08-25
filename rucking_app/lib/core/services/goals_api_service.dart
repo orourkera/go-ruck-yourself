@@ -133,13 +133,17 @@ class GoalsApiService {
   }
 
   // Parse a natural language goal into a structured object
-  Future<Map<String, dynamic>> parseGoal(String inputText) async {
+  Future<Map<String, dynamic>> parseGoal(String inputText, {Map<String, dynamic>? userHistory}) async {
     final promptVersion = RemoteConfigService.instance.getAIGoalPromptVersion();
-    final data = await _api.post(ApiEndpoints.goals + '/parse', {
+    final body = <String, dynamic>{
       'text': inputText,
       // Forward prompt version for backend prompt selection (server may ignore if unused)
       'prompt_version': promptVersion,
-    });
+    };
+    if (userHistory != null && userHistory.isNotEmpty) {
+      body['user_history'] = userHistory;
+    }
+    final data = await _api.post(ApiEndpoints.goals + '/parse', body);
     return Map<String, dynamic>.from(data as Map);
   }
 

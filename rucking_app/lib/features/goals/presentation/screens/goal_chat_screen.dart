@@ -59,7 +59,7 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
     });
 
     try {
-      final parsed = await _api.parseGoal(text);
+      final parsed = await _api.parseGoal(text, userHistory: _userHistory);
       // Conversational response may include assistant_message and optional draft
       final assistantMessage = parsed['assistant_message'] as String?;
       final needsClarification = parsed['needs_clarification'] == true;

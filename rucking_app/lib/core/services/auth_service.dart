@@ -13,6 +13,7 @@ import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, OAuthProvider, AuthResponse, AuthState, AuthChangeEvent;
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase show User;
 import 'package:url_launcher/url_launcher.dart';
@@ -593,14 +594,14 @@ class AuthServiceImpl implements AuthService {
     try {
       AppLogger.info('[AUTH] Attempting token refresh...');
       
-      // One-time cleanup for v3.0.0 - clear potentially invalid tokens
+      // One-time cleanup for v3.3.6 - clear potentially invalid tokens
       final prefs = await SharedPreferences.getInstance();
-      final hasRunTokenCleanup = prefs.getBool('token_cleanup_v3_0_0') ?? false;
+      final hasRunTokenCleanup = prefs.getBool('token_cleanup_v3_3_6') ?? false;
       if (!hasRunTokenCleanup) {
-        AppLogger.info('[AUTH] Running one-time token cleanup for v3.0.0');
+        AppLogger.info('[AUTH] Running one-time token cleanup for v3.3.6');
         await _storageService.removeSecure(AppConfig.tokenKey);
         await _storageService.removeSecure(AppConfig.refreshTokenKey);
-        await prefs.setBool('token_cleanup_v3_0_0', true);
+        await prefs.setBool('token_cleanup_v3_3_6', true);
         AppLogger.info('[AUTH] Token cleanup completed - user will need to re-authenticate');
         await _handleRefreshFailure();
         return null;

@@ -232,7 +232,19 @@ Generate your analytical, personalized motivational message:''';
         ? (trigger['data'] as Map<String, dynamic>)
         : <String, dynamic>{};
     
-    String contextText = "Rucking session: ${session['elapsedTime']['formatted']} elapsed, ${session['distance']['formatted']} covered.";
+    // Safe access to session data with fallbacks
+    final elapsedTime = session != null 
+        ? (session['elapsedTime'] is Map 
+            ? session['elapsedTime']['formatted'] ?? '0' 
+            : session['duration_seconds']?.toString() ?? '0') 
+        : '0';
+    final distance = session != null 
+        ? (session['distance'] is Map 
+            ? session['distance']['formatted'] ?? '0' 
+            : session['distance_km']?.toString() ?? '0') 
+        : '0';
+    
+    String contextText = "Rucking session: ${elapsedTime} elapsed, ${distance} covered.";
     
     switch (triggerType) {
       case 'milestone':

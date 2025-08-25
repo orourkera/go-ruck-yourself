@@ -300,7 +300,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         AppLogger.warning('[AI_COMPLETION] Failed to fetch user history: $e');
       }
       
-      // Build session context for AI
+      // Build session context for AI with safe access
       final sessionContext = {
         'session': {
           'duration_seconds': widget.duration.inSeconds,
@@ -318,25 +318,96 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           if (_maxHeartRate != null) 'max_heart_rate': _maxHeartRate,
           if (_minHeartRate != null) 'min_heart_rate': _minHeartRate,
           if (widget.splits != null) 'split_count': widget.splits!.length,
+          // Add formatted time for safe access
+          'elapsedTime': {
+            'formatted': _formatDuration(widget.duration),
+            'seconds': widget.duration.inSeconds,
+          },
+          'distance': {
+            'formatted': widget.distance > 0 
+                ? '${widget.distance.toStringAsFixed(2)} km'
+                : '0.00 km',
+            'km': widget.distance,
+          },
         },
         'user': {
-          'username': authState.user.username,
+          'username': authState.user.username ?? 'athlete',
           'prefer_metric': authState.user.preferMetric,
-          'gender': authState.user.gender,
+          'gender': authState.user.gender ?? 'unknown',
         },
         'trigger': {
           'type': 'session_completion',
           'context': 'post_session_summary',
         },
         'history': history ?? {},
+        'environment': {
+          'timeOfDay': _getTimeOfDay(),
+          'sessionPhase': 'completed',
+        },
       };
       
-      // Generate completion insight using OpenAI
+      // Generate completion insight using OpenAI with simplified prompt
       final openAIService = OpenAIService();
+      
+      // Create a simplified prompt for session completion
+      final completionPrompt = '''
+You are an expert fitness analyst providing insightful post-session analysis.
+
+Session Data:
+- Duration: ${_formatDuration(widget.duration)}
+- Distance: ${widget.distance.toStringAsFixed(2)} km
+- Calories: ${widget.caloriesBurned}
+- Elevation Gain: ${widget.elevationGain.toStringAsFixed(1)}m
+- Ruck Weight: ${widget.ruckWeight.toStringAsFixed(1)} kg
+- User: ${authState.user.username}
+
+Historical Context:
+${history != null ? 'User has completed ${(history['recent_rucks'] as List?)?.length ?? 0} recent rucks with ${(history['achievements'] as List?)?.length ?? 0} achievements earned.' : 'Limited historical data available.'}
+
+Generate 2-3 sentences of encouraging analysis focusing on specific accomplishments, performance insights, or interesting patterns. Be positive and data-driven.
+''';
+
       final insight = await openAIService.generateMessage(
-        context: sessionContext,
-        personality: 'Session Analyst', // Use analytical personality for insights
-        explicitContent: false, // Keep it clean for completion screen
+        context: {
+          'session': {
+            'duration_seconds': widget.duration.inSeconds,
+            'distance_km': widget.distance,
+            'calories_burned': widget.caloriesBurned,
+            'elevation_gain_m': widget.elevationGain,
+            'ruck_weight_kg': widget.ruckWeight,
+            'avg_heart_rate': _avgHeartRate ?? 0,
+            // Provide formatted fields expected by OpenAIService safe access
+            'elapsedTime': {
+              'formatted': _formatDuration(widget.duration),
+              'seconds': widget.duration.inSeconds,
+            },
+            'distance': {
+              'formatted': widget.distance > 0
+                  ? '${widget.distance.toStringAsFixed(2)} km'
+                  : '0.00 km',
+              'km': widget.distance,
+              'unit': 'km',
+            },
+          },
+          'user': {
+            'username': authState.user.username ?? 'Rucker',
+            // Use camelCase key as expected by OpenAIService
+            'preferMetric': authState.user.preferMetric,
+            'gender': authState.user.gender ?? 'unknown',
+          },
+          'trigger': {
+            'type': 'session_completion',
+            'context': completionPrompt,
+          },
+          'history': history ?? {},
+          'environment': {
+            'timeOfDay': _getTimeOfDay(),
+            // Explicitly mark session phase for richer context
+            'sessionPhase': 'completed',
+          },
+        },
+        personality: 'Session Analyst',
+        explicitContent: false,
       );
       
       if (insight != null && insight.isNotEmpty && mounted) {
@@ -355,6 +426,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         });
       }
     }
+  }
+
+  String _getTimeOfDay() {
+    final hour = DateTime.now().hour;
+    if (hour < 6) return 'early_morning';
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    if (hour < 20) return 'evening';
+    return 'night';
   }
 
   // Heart rate handling
