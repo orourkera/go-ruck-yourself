@@ -152,6 +152,81 @@ class RuckSessionResource(Resource):
             logger.error(f"Error fetching session {ruck_id}: {e}")
             return {'message': f'Error fetching session: {str(e)}'}, 500
 
+    def patch(self, ruck_id):
+        """Partially update a ruck session owned by the authenticated user (PATCH /api/rucks/<id>)
+
+        Currently used by the app to set flags like has_photos after background uploads.
+        Only whitelisted fields are accepted.
+        """
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        try:
+            data = request.get_json() or {}
+        except Exception:
+            data = {}
+
+        if not isinstance(data, dict) or not data:
+            return {'message': 'No data provided'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        try:
+            # Verify ownership
+            session_resp = (
+                supabase.table('ruck_session')
+                .select('id,user_id')
+                .eq('id', ruck_id)
+                .single()
+                .execute()
+            )
+            if not session_resp.data:
+                return {'message': 'Session not found'}, 404
+            if session_resp.data.get('user_id') != g.user.id:
+                return {'message': 'Forbidden'}, 403
+
+            # Whitelist allowed fields for partial update
+            allowed_fields = {
+                'has_photos',
+                'notes',
+                'rating',
+                'perceived_exertion',
+                'tags',
+                'is_public',
+                'title',
+                'route_id',
+                'planned_duration_minutes',
+            }
+
+            update_data = {k: v for k, v in data.items() if k in allowed_fields}
+            if not update_data:
+                return {'message': 'No allowed fields to update'}, 400
+
+            update_resp = (
+                supabase.table('ruck_session')
+                .update(update_data)
+                .eq('id', ruck_id)
+                .eq('user_id', g.user.id)
+                .execute()
+            )
+            if not update_resp.data:
+                return {'message': 'Failed to update session'}, 500
+
+            # Invalidate caches for this user's session lists/details
+            try:
+                cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            except Exception:
+                pass
+
+            return update_resp.data[0], 200
+        except Exception as e:
+            logger.error(f"Error patching session {ruck_id}: {e}")
+            return {'message': f'Error patching session: {str(e)}'}, 500
+
     def delete(self, ruck_id):
         """Delete a ruck session owned by the authenticated user (DELETE /api/rucks/<id>)
 
