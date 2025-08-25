@@ -5,14 +5,25 @@ import json
 import os
 import requests
 import time
-from openai import OpenAI
+
+# Safe import for OpenAI to avoid boot failure if dependency is missing
+try:
+    from openai import OpenAI  # type: ignore
+except Exception:  # ModuleNotFoundError or any import-time error
+    OpenAI = None  # type: ignore
+
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
 
-# OpenAI client
+# OpenAI client (only initialize if library and API key are available)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+if OpenAI is None:
+    logger = logging.getLogger(__name__)
+    logger.warning("OpenAI library not available; AI Cheerleader generation disabled")
+    openai_client = None
+else:
+    openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Firebase Remote Config integration for backend
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'getrucky-app')
