@@ -525,7 +525,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       try {
         // Call backend AI service instead of local OpenAI
         final response = await _apiClient.post(ApiEndpoints.aiCheerleader, {
-          'user_id': _currentUser!.id,
+          'user_id': _currentUser!.userId,
           'current_session': context['session'],
         });
         message = response['message'] as String?;

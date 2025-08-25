@@ -490,7 +490,8 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 # Ruck session endpoints (prefixed with /api)
 # Register RuckSessionListResource without modifying it (rate limiting was breaking POST method)
 api.add_resource(RuckSessionListResource, '/api/rucks')
-api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>')
+# Register detail route with and without trailing slash to prevent 405 from strict slashes mismatches
+api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>', '/api/rucks/<string:ruck_id>/')
 api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
 api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
 api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
