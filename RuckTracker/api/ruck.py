@@ -152,6 +152,192 @@ class RuckSessionResource(Resource):
             logger.error(f"Error fetching session {ruck_id}: {e}")
             return {'message': f'Error fetching session: {str(e)}'}, 500
 
+class RuckSessionDetailResource(Resource):
+    """Return enriched ruck session details (GET /api/rucks/<id>/details)
+
+    Includes:
+    - user profile subset
+    - privacy-clipped and sampled route points
+    - photos
+    - like/comment counts and liked-by-current-user flag
+    """
+
+    def _haversine_distance(self, lat1, lon1, lat2, lon2):
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        r = 6371000  # meters
+        return c * r
+
+    def _clip_route_for_privacy(self, location_points):
+        if not location_points or len(location_points) < 3:
+            return location_points
+        PRIVACY_DISTANCE_METERS = 200.0
+        sorted_points = sorted(location_points, key=lambda p: p.get('timestamp', ''))
+        if len(sorted_points) < 3:
+            return sorted_points
+        start_idx = 0
+        cumulative_distance = 0
+        for i in range(1, len(sorted_points)):
+            prev_point = sorted_points[i-1]
+            curr_point = sorted_points[i]
+            if prev_point.get('latitude') and prev_point.get('longitude') and \
+               curr_point.get('latitude') and curr_point.get('longitude'):
+                distance = self._haversine_distance(
+                    float(prev_point['latitude']), float(prev_point['longitude']),
+                    float(curr_point['latitude']), float(curr_point['longitude'])
+                )
+                cumulative_distance += distance
+                if cumulative_distance >= PRIVACY_DISTANCE_METERS:
+                    start_idx = i
+                    break
+        end_idx = len(sorted_points)
+        cumulative_distance = 0
+        for i in range(len(sorted_points) - 2, -1, -1):
+            curr_point = sorted_points[i]
+            next_point = sorted_points[i+1]
+            if curr_point.get('latitude') and curr_point.get('longitude') and \
+               next_point.get('latitude') and next_point.get('longitude'):
+                distance = self._haversine_distance(
+                    float(curr_point['latitude']), float(curr_point['longitude']),
+                    float(next_point['latitude']), float(next_point['longitude'])
+                )
+                cumulative_distance += distance
+                if cumulative_distance >= PRIVACY_DISTANCE_METERS:
+                    end_idx = i + 1
+                    break
+        if start_idx >= end_idx or start_idx >= len(sorted_points) or end_idx <= 0:
+            total = len(sorted_points)
+            start_idx = total // 4
+            end_idx = 3 * total // 4
+            if end_idx <= start_idx:
+                return sorted_points
+        clipped_points = sorted_points[start_idx:end_idx]
+        return clipped_points or sorted_points
+
+    def _sample_route_points(self, location_points, target_distance_between_points_m=75):
+        if not location_points or len(location_points) <= 2:
+            return location_points
+        sampled = [location_points[0]]
+        cumulative_distance = 0
+        last_included_idx = 0
+        for i in range(1, len(location_points)):
+            prev_point = location_points[i-1]
+            curr_point = location_points[i]
+            if prev_point.get('latitude') and prev_point.get('longitude') and \
+               curr_point.get('latitude') and curr_point.get('longitude'):
+                distance = self._haversine_distance(
+                    float(prev_point['latitude']), float(prev_point['longitude']),
+                    float(curr_point['latitude']), float(curr_point['longitude'])
+                )
+                cumulative_distance += distance
+                if cumulative_distance >= target_distance_between_points_m:
+                    sampled.append(curr_point)
+                    cumulative_distance = 0
+                    last_included_idx = i
+        if last_included_idx < len(location_points) - 1:
+            sampled.append(location_points[-1])
+        if len(sampled) > 500:
+            interval = len(sampled) / 500
+            final_sampled = [sampled[0]]
+            for i in range(1, 499):
+                index = int(i * interval)
+                if index < len(sampled):
+                    final_sampled.append(sampled[index])
+            final_sampled.append(sampled[-1])
+            return final_sampled
+        return sampled
+
+    def get(self, ruck_id):
+        if not hasattr(g, 'user') or g.user is None:
+            return {'message': 'User not authenticated'}, 401
+
+        ruck_id = validate_ruck_id(ruck_id)
+        if ruck_id is None:
+            return {'message': 'Invalid ruck session ID format'}, 400
+
+        supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+        try:
+            # Fetch session with related data
+            resp = (
+                supabase.table('ruck_session')
+                .select(
+                    'id, user_id, ruck_weight_kg, duration_seconds, distance_km, calories_burned,'
+                    ' elevation_gain_m, elevation_loss_m, started_at, completed_at, created_at,'
+                    ' avg_heart_rate, title, notes, is_public,'
+                    ' user:user_id(id,username,allow_ruck_sharing,gender,avatar_url),'
+                    ' location_points:location_point!location_point_session_id_fkey(id,latitude,longitude,altitude,timestamp),'
+                    ' likes:ruck_likes!ruck_likes_ruck_id_fkey(id,user_id),'
+                    ' comments:ruck_comments!ruck_comments_ruck_id_fkey(id,user_id,content,created_at),'
+                    ' photos:ruck_photos!ruck_photos_ruck_id_fkey(id,ruck_id,user_id,filename,original_filename,content_type,size,url,thumbnail_url,created_at)'
+                )
+                .eq('id', ruck_id)
+                .single()
+                .execute()
+            )
+
+            session = resp.data if resp and resp.data else None
+            if not session:
+                return {'message': 'Session not found'}, 404
+
+            # Authorization: allow owner or public
+            if session.get('user_id') != g.user.id and not session.get('is_public'):
+                return {'message': 'Forbidden'}, 403
+
+            current_user_id = g.user.id
+
+            # Social aggregates
+            likes = session.get('likes', []) or []
+            comments = session.get('comments', []) or []
+            like_count = len(likes)
+            comment_count = len(comments)
+            is_liked_by_current_user = any(like.get('user_id') == current_user_id for like in likes)
+
+            # Process route points
+            location_points = session.get('location_points', []) or []
+            clipped_points = self._clip_route_for_privacy(location_points)
+            sampled_points = self._sample_route_points(clipped_points)
+
+            # Build a frontend-friendly 'route' array with lat/lng keys as well
+            route_for_map = [
+                {
+                    'lat': p.get('latitude'),
+                    'lng': p.get('longitude'),
+                    'alt': p.get('altitude'),
+                    'timestamp': p.get('timestamp'),
+                }
+                for p in sampled_points if p.get('latitude') is not None and p.get('longitude') is not None
+            ]
+
+            # Photos
+            photos = session.get('photos', []) or []
+
+            # Clean up fields and attach aggregates
+            session['like_count'] = like_count
+            session['comment_count'] = comment_count
+            session['is_liked_by_current_user'] = is_liked_by_current_user
+            session['location_points'] = sampled_points
+            session['route'] = route_for_map
+            session['photos'] = photos
+
+            # Add compatibility aliases for elevation keys used by some clients
+            if 'elevation_gain_m' in session and session.get('elevation_gain_m') is not None:
+                session.setdefault('elevation_gain_meters', session.get('elevation_gain_m'))
+            if 'elevation_loss_m' in session and session.get('elevation_loss_m') is not None:
+                session.setdefault('elevation_loss_meters', session.get('elevation_loss_m'))
+
+            # Remove raw likes/comments arrays
+            session.pop('likes', None)
+            session.pop('comments', None)
+
+            return session, 200
+        except Exception as e:
+            logger.error(f"Error fetching enriched session details for {ruck_id}: {e}")
+            return {'message': f'Error fetching session details: {str(e)}'}, 500
+
     def patch(self, ruck_id):
         """Partially update a ruck session owned by the authenticated user (PATCH /api/rucks/<id>)
 

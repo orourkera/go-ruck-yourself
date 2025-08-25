@@ -168,8 +168,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
       // Get API client for direct API access
       final apiClient = GetIt.I<ApiClient>();
 
-      // Fetch session data directly - this gives us all raw fields
-      final data = await apiClient.get('/rucks/$ruckId');
+      // Fetch enriched session details (includes user, route, photos, social)
+      final data = await apiClient.get('/rucks/$ruckId/details');
       log('RuckBuddyDetailScreen _loadRuckDetails: API response data for ruckId $ruckId: $data');
 
       print('RuckBuddyDetailScreen _loadRuckDetails: Raw API data = $data'); // Log raw data
@@ -209,8 +209,9 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
         final durationSeconds = _parseInt(data['duration_seconds']) ?? 0;
         final caloriesBurned = _parseInt(data['calories_burned']) ?? 0;
         final ruckWeightKg = _parseDouble(data['ruck_weight_kg']) ?? 0.0;
-        final elevationGainM = _parseDouble(data['elevation_gain_meters']) ?? 0.0;
-        final elevationLossM = _parseDouble(data['elevation_loss_meters']) ?? 0.0;
+        // Elevation fallback: prefer *_meters, then *_m
+        final elevationGainM = _parseDouble(data['elevation_gain_meters']) ?? _parseDouble(data['elevation_gain_m']) ?? 0.0;
+        final elevationLossM = _parseDouble(data['elevation_loss_meters']) ?? _parseDouble(data['elevation_loss_m']) ?? 0.0;
         print('RuckBuddyDetailScreen _loadRuckDetails: Parsed Metrics: dist=$distanceKm, dur=$durationSeconds, cal=$caloriesBurned, weight=$ruckWeightKg, elevGain=$elevationGainM, elevLoss=$elevationLossM');
 
         // Process location points

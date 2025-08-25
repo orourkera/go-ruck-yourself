@@ -288,6 +288,7 @@ except Exception as e:
 from .api.ruck import (
     RuckSessionListResource, 
     RuckSessionResource, 
+    RuckSessionDetailResource,
     RuckSessionStartResource,
     RuckSessionPauseResource,
     RuckSessionResumeResource,
@@ -492,6 +493,8 @@ api.add_resource(UserResource, '/api/users/<string:user_id>') # Add registration
 api.add_resource(RuckSessionListResource, '/api/rucks')
 # Register detail route with and without trailing slash to prevent 405 from strict slashes mismatches
 api.add_resource(RuckSessionResource, '/api/rucks/<string:ruck_id>', '/api/rucks/<string:ruck_id>/')
+# Enriched ruck details endpoint (with and without trailing slash)
+api.add_resource(RuckSessionDetailResource, '/api/rucks/<string:ruck_id>/details', '/api/rucks/<string:ruck_id>/details/')
 api.add_resource(RuckSessionStartResource, '/api/rucks/<string:ruck_id>/start')
 api.add_resource(RuckSessionPauseResource, '/api/rucks/<string:ruck_id>/pause')
 api.add_resource(RuckSessionResumeResource, '/api/rucks/<string:ruck_id>/resume')
