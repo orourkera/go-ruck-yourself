@@ -1,12 +1,89 @@
 from flask import request, g
 from flask_restful import Resource
 import logging
-from ..supabase_client import get_supabase_client
+import json
+import os
+import requests
+import time
+from openai import OpenAI
+from ..supabase_client import get_supabase_client, get_supabase_admin_client
 
 logger = logging.getLogger(__name__)
 
+# OpenAI client
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+# Firebase Remote Config integration for backend
+FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'getrucky-app')
+FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY')
+
+# Default prompts (fallback if Remote Config fails)
+DEFAULT_SYSTEM_PROMPT = """You are an enthusiastic AI cheerleader for rucking workouts.
+Analyze the provided context JSON and generate personalized, motivational messages.
+Focus on current performance, progress, and achievements.
+Be encouraging, positive, and action-oriented.
+Reference historical trends and achievements when relevant.
+Avoid repeating similar messages from your ai_cheerleader_history - be creative and vary your encouragement style."""
+
+DEFAULT_USER_PROMPT_TEMPLATE = "Context data:\n{context}\nGenerate encouragement for this ongoing ruck session."
+
+# Cache for prompts (refresh every 5 minutes)
+_prompt_cache = None
+_cache_timestamp = None
+CACHE_DURATION = 300  # 5 minutes in seconds
+
+def get_remote_config_prompts():
+    """Fetch AI cheerleader prompts from Firebase Remote Config with caching"""
+    global _prompt_cache, _cache_timestamp
+
+    current_time = time.time()
+
+    # Check if we have valid cached prompts
+    if _prompt_cache and _cache_timestamp and (current_time - _cache_timestamp) < CACHE_DURATION:
+        return _prompt_cache
+
+    try:
+        if not FIREBASE_API_KEY or not FIREBASE_PROJECT_ID:
+            logger.warning("Firebase credentials not configured, using default prompts")
+            prompts = (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
+            _prompt_cache = prompts
+            _cache_timestamp = current_time
+            return prompts
+
+        url = f"https://firebaseremoteconfig.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/remoteConfig"
+        headers = {
+            'Authorization': f'Bearer {FIREBASE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.get(url, headers=headers, timeout=5)
+
+        if response.status_code == 200:
+            config_data = response.json()
+            parameters = config_data.get('parameters', {})
+
+            system_prompt = parameters.get('ai_cheerleader_system_prompt', {}).get('defaultValue', {}).get('value', DEFAULT_SYSTEM_PROMPT)
+            user_prompt_template = parameters.get('ai_cheerleader_user_prompt_template', {}).get('defaultValue', {}).get('value', DEFAULT_USER_PROMPT_TEMPLATE)
+
+            prompts = (system_prompt, user_prompt_template)
+            _prompt_cache = prompts
+            _cache_timestamp = current_time
+
+            logger.info(f"Successfully fetched and cached prompts from Remote Config")
+            return prompts
+        else:
+            logger.warning(f"Failed to fetch Remote Config: {response.status_code}, using cached/default prompts")
+            prompts = _prompt_cache or (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
+            return prompts
+
+    except Exception as e:
+        logger.error(f"Error fetching Remote Config: {str(e)}, using cached/default prompts")
+        prompts = _prompt_cache or (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
+        return prompts
+
 class AICheerleaderLogResource(Resource):
-    """Simple logging endpoint for AI cheerleader responses"""
+    """AI cheerleader endpoint that handles both generation and logging"""
     
     def post(self):
         try:
@@ -15,6 +92,106 @@ class AICheerleaderLogResource(Resource):
             if not data:
                 return {"error": "No data provided"}, 400
             
+            # Check if this is an AI generation request (from Flutter)
+            if 'user_id' in data and 'current_session' in data:
+                return self._handle_ai_generation(data)
+            
+            # Otherwise, handle as logging request
+            return self._handle_logging(data)
+                
+        except Exception as e:
+            logger.error(f"Error in AI cheerleader endpoint: {str(e)}")
+            return {"error": "Internal server error"}, 500
+    
+    def _handle_ai_generation(self, data):
+        """Handle AI generation request from Flutter app"""
+        try:
+            if not openai_client:
+                return {"error": "OpenAI not configured"}, 500
+            
+            user_id = data.get('user_id')
+            current_session = data.get('current_session', {})
+            
+            if not user_id:
+                return {"error": "Missing user_id"}, 400
+            
+            logger.info(f"[AI_CHEERLEADER] Generating AI response for user {user_id}")
+            
+            # Get user history using admin client to bypass RLS
+            supabase_admin = get_supabase_admin_client()
+            
+            # Fetch user history (recent rucks, achievements, AI history)
+            try:
+                # Get recent AI responses
+                ai_logs_resp = supabase_admin.table('ai_cheerleader_logs').select(
+                    'session_id, personality, openai_response, created_at'
+                ).eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
+                ai_logs = ai_logs_resp.data or []
+                logger.info(f"[AI_CHEERLEADER] Found {len(ai_logs)} previous AI responses for user {user_id}")
+                
+                # Get recent rucks
+                rucks_resp = supabase_admin.table('ruck_session').select('*').eq(
+                    'user_id', user_id
+                ).order('created_at', desc=True).limit(10).execute()
+                recent_rucks = rucks_resp.data or []
+                
+                # Get recent achievements
+                achievements_resp = supabase_admin.table('user_achievement').select(
+                    '*, achievements(*)'
+                ).eq('user_id', user_id).order('earned_at', desc=True).limit(10).execute()
+                achievements = achievements_resp.data or []
+                
+            except Exception as e:
+                logger.error(f"[AI_CHEERLEADER] Error fetching user history: {e}")
+                ai_logs = []
+                recent_rucks = []
+                achievements = []
+            
+            # Build context
+            context = {
+                'current_session': current_session,
+                'recent_rucks': recent_rucks,
+                'achievements': achievements,
+                'ai_cheerleader_history': ai_logs,
+                'aggregates': {
+                    'total_ai_messages': len(ai_logs),
+                    'total_recent_rucks': len(recent_rucks),
+                    'total_achievements': len(achievements)
+                }
+            }
+            
+            # Get prompts from Remote Config
+            system_prompt, user_prompt_template = get_remote_config_prompts()
+            
+            # Format the context as JSON string
+            context_str = json.dumps(context, indent=2, default=str)
+            user_prompt = user_prompt_template.replace('{context}', context_str)
+            
+            logger.info(f"[AI_CHEERLEADER] Calling OpenAI with {len(context_str)} chars of context")
+            
+            # Call OpenAI
+            completion = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=150,
+                temperature=0.8,
+            )
+            
+            ai_message = completion.choices[0].message.content.strip()
+            logger.info(f"[AI_CHEERLEADER] Generated AI response: {ai_message[:100]}...")
+            
+            return {"message": ai_message}, 200
+            
+        except Exception as e:
+            logger.error(f"[AI_CHEERLEADER] Error generating AI response: {str(e)}")
+            return {"error": f"AI generation failed: {str(e)}"}, 500
+    
+    def _handle_logging(self, data):
+        """Handle logging request (original functionality)"""
+        try:
             session_id = data.get('session_id')
             personality = data.get('personality')
             openai_response = data.get('openai_response')
