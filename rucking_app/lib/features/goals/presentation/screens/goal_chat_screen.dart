@@ -65,7 +65,7 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
         isScrollControlled: true,
         useSafeArea: true,
         builder: (ctx) => GoalConfirmationSheet(
-          draft: draftMap,
+          draft: draftMap!,
           onConfirm: (confirmedDraft) async {
             final res = await _api.createGoal(confirmedDraft);
             return res;
