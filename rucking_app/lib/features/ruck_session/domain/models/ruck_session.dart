@@ -228,7 +228,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     if (potentialEndTime == null) {
       final durationSeconds = (json['duration_seconds'] as num?)?.toInt();
       if (durationSeconds != null) {
-        potentialEndTime = startTime.add(Duration(seconds: durationSeconds));
+        // At this point, for non-created sessions, startTime must be non-null
+        potentialEndTime = startTime!.add(Duration(seconds: durationSeconds));
         AppLogger.info("RuckSession.fromJson: 'completed_at' is null, calculated endTime from startTime and duration_seconds. Session ID: ${json['id']}");
       } else {
         if (statusString == 'in_progress' || statusString == 'inprogress') {
@@ -243,12 +244,12 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         }
       }
     }
-    final DateTime endTime = potentialEndTime;
+    final DateTime endTime = potentialEndTime!;
     
     // Calculate duration from start/end time or use duration_seconds field
     final duration = json['duration_seconds'] != null
         ? Duration(seconds: (json['duration_seconds'] as num).toInt())
-        : endTime.difference(startTime);
+        : endTime.difference(startTime!);
       
       // Handle various ways distance might be stored
       double parseDistance(dynamic value) {

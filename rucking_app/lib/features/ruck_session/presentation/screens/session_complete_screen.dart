@@ -693,11 +693,16 @@ Generate exactly ONE sentence that quotes one specific fact from the session dat
         }
       }
 
+      // Get user unit preference
+      final authState = context.read<AuthBloc>().state;
+      final preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
+
       // Format session name using StravaService helper
       final sessionName = _stravaService.formatSessionName(
         ruckWeightKg: widget.ruckWeight,
         distanceKm: widget.distance,
         duration: widget.duration,
+        preferMetric: preferMetric,
       );
 
       // Format session description
@@ -705,6 +710,7 @@ Generate exactly ONE sentence that quotes one specific fact from the session dat
         ruckWeightKg: widget.ruckWeight,
         distanceKm: widget.distance,
         duration: widget.duration,
+        preferMetric: preferMetric,
         calories: widget.caloriesBurned,
       );
 

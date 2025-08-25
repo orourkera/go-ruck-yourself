@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:get_it/get_it.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_logger.dart';
+import '../utils/measurement_utils.dart';
 import 'api_client.dart';
 
 class StravaConnectionStatus {
@@ -140,15 +141,13 @@ class StravaService {
     required double ruckWeightKg,
     required double distanceKm,
     required Duration duration,
+    required bool preferMetric,
   }) {
-    final weightStr = ruckWeightKg > 0 
-        ? '${ruckWeightKg.toStringAsFixed(1)}kg'
-        : 'Hike';
-    
-    final distanceStr = distanceKm.toStringAsFixed(1);
+    final weightStr = MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric);
+    final distanceStr = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
     final durationStr = _formatDuration(duration);
     
-    return 'Ruck - $weightStr • ${distanceStr}km • $durationStr';
+    return 'Ruck - $weightStr • $distanceStr • $durationStr';
   }
 
   /// Format ruck session description for Strava
@@ -156,15 +155,15 @@ class StravaService {
     required double ruckWeightKg,
     required double distanceKm,
     required Duration duration,
+    required bool preferMetric,
     int? calories,
   }) {
     final buffer = StringBuffer();
     buffer.writeln('🎒 Ruck Session');
-    buffer.writeln('📏 Distance: ${distanceKm.toStringAsFixed(2)} km');
+    buffer.writeln('📏 Distance: ${MeasurementUtils.formatDistance(distanceKm, metric: preferMetric)}');
     
     if (ruckWeightKg > 0) {
-      final weightLbs = (ruckWeightKg * 2.20462).round();
-      buffer.writeln('⚖️ Ruck Weight: ${weightLbs} lbs (${ruckWeightKg.toStringAsFixed(1)} kg)');
+      buffer.writeln('⚖️ Ruck Weight: ${MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric)}');
     }
     
     buffer.writeln('⏱️ Duration: ${_formatDuration(duration)}');
@@ -174,7 +173,7 @@ class StravaService {
     }
     
     buffer.writeln();
-    buffer.writeln('Tracked with RuckingApp');
+    buffer.writeln('Tracked with Ruck!');
     
     return buffer.toString();
   }
