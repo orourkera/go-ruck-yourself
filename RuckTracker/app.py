@@ -632,7 +632,8 @@ api.add_resource(GPXExportBatchResource, '/api/gpx/export-batch')
 api.add_resource(WeatherResource, '/api/weather')
 
 # AI Cheerleader Endpoints
-api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader/log')
+# Register both the legacy '/api/ai-cheerleader/log' and the client-used '/api/ai-cheerleader'
+api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader', '/api/ai-cheerleader/log')
 api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs')
 api.add_resource(AICheerleaderUserHistoryResource, '/api/ai-cheerleader/user-history')
 
