@@ -36,6 +36,7 @@ class ApiEndpoints {
   static const String recentAchievements = '$baseApi/achievements/recent';
 
   // AI Cheerleader
+  static const String aiCheerleader = '$baseApi/ai-cheerleader';
   static const String aiCheerleaderLogs = '$baseApi/ai-cheerleader/logs';
   static const String aiCheerleaderUserHistory = '$baseApi/ai-cheerleader/user-history';
 

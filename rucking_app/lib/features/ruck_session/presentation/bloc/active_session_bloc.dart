@@ -517,15 +517,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       // 3. Generate motivational text with OpenAI
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3: Calling OpenAI...');
-      AppLogger.info('[AI_CHEERLEADER_DEBUG] About to call OpenAI generateMessage with context: $context');
+      AppLogger.info('[AI_CHEERLEADER_DEBUG] About to call backend AI service with context: $context');
       AppLogger.info('[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
       
       final messageStartTime = DateTime.now();
-      final message = await _openAIService.generateMessage(
-        context: context,
-        personality: _aiCheerleaderPersonality!,
-        explicitContent: _aiCheerleaderExplicitContent,
-      );
+      String? message;
+      try {
+        // Call backend AI service instead of local OpenAI
+        final response = await _apiClient.post(ApiEndpoints.aiCheerleader, {
+          'user_id': _currentUser!.id,
+          'current_session': context['session'],
+        });
+        message = response['message'] as String?;
+        AppLogger.info('[AI_CHEERLEADER_DEBUG] Backend AI service returned: $message');
+      } catch (e) {
+        AppLogger.error('[AI_CHEERLEADER_DEBUG] Backend AI service failed, falling back to local: $e');
+        // Fallback to local OpenAI service if backend fails
+        message = await _openAIService.generateMessage(
+          context: context,
+          personality: _aiCheerleaderPersonality!,
+          explicitContent: _aiCheerleaderExplicitContent,
+        );
+      }
       final messageEndTime = DateTime.now();
       final generationTimeMs = messageEndTime.difference(messageStartTime).inMilliseconds;
       
