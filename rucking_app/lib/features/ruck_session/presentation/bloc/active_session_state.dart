@@ -107,6 +107,9 @@ class ActiveSessionRunning extends ActiveSessionState {
   final bool isRecovered;
   // Live steps (optional)
   final int? steps;
+  
+  // AI Cheerleader
+  final String? aiCheerMessage; // Latest AI cheerleader message for UI display
 
   static const _unset = Object();
 
@@ -159,6 +162,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.hasGpsAccess = false, // Default to false
     this.isRecovered = false,
     this.steps,
+    this.aiCheerMessage,
   });
   
   @override
@@ -210,6 +214,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     plannedRouteDuration, // Add route duration to props
     isRecovered,
     steps,
+    aiCheerMessage,
   ];
   
   ActiveSessionRunning copyWith({
@@ -264,6 +269,7 @@ class ActiveSessionRunning extends ActiveSessionState {
     int? plannedRouteDuration, // Add route duration to copyWith parameters
     bool? isRecovered,
     int? steps,
+    String? aiCheerMessage,
   }) {
     return ActiveSessionRunning(
       sessionId: sessionId ?? this.sessionId,
@@ -312,6 +318,7 @@ class ActiveSessionRunning extends ActiveSessionState {
       plannedRouteDuration: plannedRouteDuration ?? this.plannedRouteDuration, // Use route duration in copyWith
       isRecovered: isRecovered ?? this.isRecovered,
       steps: steps ?? this.steps,
+      aiCheerMessage: aiCheerMessage ?? this.aiCheerMessage,
     );
   }
 }

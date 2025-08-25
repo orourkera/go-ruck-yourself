@@ -80,6 +80,13 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     
     override func willActivate() {
         super.willActivate()
+        
+        // Request HealthKit permissions when watch app becomes active
+        print("[INTERFACE] Watch app activated - requesting HealthKit permissions")
+        SessionManager.shared.requestPermissionsOnAppOpen()
+        
+        // Also set up HealthKit through the local workout manager as backup
+        setupHealthKit()
     }
     
     override func didDeactivate() {

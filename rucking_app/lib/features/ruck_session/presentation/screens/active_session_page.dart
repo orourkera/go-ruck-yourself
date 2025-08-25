@@ -728,6 +728,45 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   },
                                 ),
                               ),
+                              // AI Cheerleader message display
+                              if (state is ActiveSessionRunning &&
+                                  state.aiCheerMessage != null &&
+                                  state.aiCheerMessage!.trim().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                  child: Container
+                                    (
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppColors.surfaceDark 
+                                          : AppColors.surfaceLight,
+                                      borderRadius: BorderRadius.circular(12.0),
+                                      border: Border.all(color: _getLadyModeColor(context).withOpacity(0.3)),
+                                    ),
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.campaign,
+                                          color: _getLadyModeColor(context),
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8.0),
+                                        Expanded(
+                                          child: Text(
+                                            state.aiCheerMessage!,
+                                            style: AppTextStyles.bodyMedium.copyWith(
+                                              color: AppColors.getTextColor(context),
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               Builder(
                                 builder: (context) {
                                   final isRunning = state is ActiveSessionRunning;

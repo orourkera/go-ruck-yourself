@@ -40,12 +40,13 @@ class SimpleAILogger {
         '/ai-cheerleader/log',
         logData,
       );
-      AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] API call completed with status: ${response.statusCode}');
+      AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] API call completed with response: $response');
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      // API client returns response data directly, not a Response object
+      if (response is Map<String, dynamic> && response['status'] == 'success') {
         AppLogger.info('[AI_LOG] Response logged successfully');
       } else {
-        AppLogger.warning('[AI_LOG] Failed to log response: ${response.statusCode}');
+        AppLogger.warning('[AI_LOG] Failed to log response: $response');
       }
     } catch (e) {
       AppLogger.error('[AI_LOG] Error logging response: $e');

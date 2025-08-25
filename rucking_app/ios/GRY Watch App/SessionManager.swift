@@ -148,9 +148,12 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     }
     
     private func requestHealthKitPermissions() {
+        print("[WATCH] Requesting HealthKit permissions...")
+        
         // Set up heart rate handler first
         workoutManager.setHeartRateHandler { [weak self] (heartRate: Double) in
             guard let self = self else { return }
+            print("[WATCH] Heart rate received: \(heartRate) BPM")
             // Update UI with heart rate
             DispatchQueue.main.async {
                 self.heartRate = Int(heartRate)
@@ -159,14 +162,32 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             self.sendHeartRate(heartRate)
         }
         
-        // Request HealthKit permissions
+        // Request HealthKit permissions with detailed logging
         workoutManager.requestAuthorization { success, error in
             if success {
-                // HealthKit authorization successful - ready for heart rate monitoring
+                print("[WATCH] ✅ HealthKit authorization successful - heart rate monitoring ready")
+                // Send success confirmation to phone
+                self.sendMessage([
+                    "command": "healthKitPermissionGranted",
+                    "success": true,
+                    "timestamp": Date().timeIntervalSince1970
+                ])
             } else if let error = error {
-                print("[WATCH] HealthKit authorization failed: \(error.localizedDescription)")
+                print("[WATCH] ❌ HealthKit authorization failed: \(error.localizedDescription)")
+                // Send failure notification to phone
+                self.sendMessage([
+                    "command": "healthKitPermissionDenied", 
+                    "error": error.localizedDescription,
+                    "timestamp": Date().timeIntervalSince1970
+                ])
             }
         }
+    }
+    
+    /// Request permissions when watch app becomes active
+    func requestPermissionsOnAppOpen() {
+        print("[WATCH] Watch app opened - checking/requesting permissions")
+        requestHealthKitPermissions()
     }
     
     func sendMessage(_ message: [String: Any]) {
@@ -369,6 +390,11 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             case "sessionStartAlert":
                 processSessionStartAlert(message)
                 
+            case "requestHealthKitPermissions":
+                // Explicitly request HealthKit permissions
+                print("[WATCH] Received permission request from phone")
+                requestHealthKitPermissions()
+                
             case "startSession", "workoutStarted":
                 // Start the session if not already active
                 if !isSessionActive {
@@ -378,6 +404,12 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     } else {
                         // Default to metric if not specified
                         self.isMetric = true
+                    }
+                    
+                    // Check if we need to force permission validation
+                    if message["forcePermissionCheck"] as? Bool == true {
+                        print("[WATCH] Force permission check requested - re-requesting permissions")
+                        requestHealthKitPermissions()
                     }
                     
                     // Starting session from phone command - need to start HealthKit workout

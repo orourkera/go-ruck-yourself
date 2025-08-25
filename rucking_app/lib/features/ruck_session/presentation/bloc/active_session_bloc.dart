@@ -387,12 +387,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     );
     
     AppLogger.warning('[AI_CHEERLEADER_DEBUG] Manual trigger created, calling _processAICheerleaderTrigger...');
-    await _processAICheerleaderTrigger(manualTrigger, runningState);
+    final generatedMessage = await _processAICheerleaderTrigger(manualTrigger, runningState);
     AppLogger.warning('[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER PROCESSING COMPLETE =======');
+
+    // Emit UI-visible message if available
+    if (generatedMessage != null && generatedMessage.isNotEmpty) {
+      AppLogger.info('[AI_CHEERLEADER_UI] Emitting AI cheer message to UI');
+      emit(runningState.copyWith(aiCheerMessage: generatedMessage));
+    } else {
+      AppLogger.warning('[AI_CHEERLEADER_UI] No message generated to emit');
+    }
   }
 
   /// Process AI Cheerleader trigger through the full pipeline
-  Future<void> _processAICheerleaderTrigger(
+  Future<String?> _processAICheerleaderTrigger(
     CheerleaderTrigger trigger, 
     ActiveSessionRunning state
   ) async {
@@ -533,29 +541,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       }
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 2 complete: Location context processed');
 
-      // 3. Generate motivational text with OpenAI
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3: Calling OpenAI...');
-      AppLogger.info('[AI_CHEERLEADER_DEBUG] About to call backend AI service with context: $context');
+      // 3. Generate motivational text with OpenAI (LOCAL GENERATION ONLY)
+      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3: Calling LOCAL OpenAI service...');
+      AppLogger.info('[AI_CHEERLEADER_DEBUG] Using local OpenAI generation with full context');
       AppLogger.info('[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
       
       final messageStartTime = DateTime.now();
       String? message;
       try {
-        // Call backend AI service for message generation
-        final response = await _apiClient.post(ApiEndpoints.aiCheerleader, {
-          'user_id': _currentUser!.userId,
-          'current_session': context['session'],
-        });
-        message = response['message'] as String?;
-        AppLogger.info('[AI_CHEERLEADER_DEBUG] Backend AI service returned: $message');
-      } catch (e) {
-        AppLogger.error('[AI_CHEERLEADER_DEBUG] Backend AI service failed, falling back to local: $e');
-        // Fallback to local OpenAI service if backend fails
+        // Use LOCAL OpenAI service with full context (session, weather, location, history)
         message = await _openAIService.generateMessage(
           context: context,
           personality: _aiCheerleaderPersonality!,
           explicitContent: _aiCheerleaderExplicitContent,
         );
+        AppLogger.info('[AI_CHEERLEADER_DEBUG] Local OpenAI service returned: $message');
+      } catch (e) {
+        AppLogger.error('[AI_CHEERLEADER_DEBUG] Local OpenAI service failed: $e');
+        message = null;
       }
       final messageEndTime = DateTime.now();
       final generationTimeMs = messageEndTime.difference(messageStartTime).inMilliseconds;
@@ -627,13 +630,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         } catch (e) {
           AppLogger.error('[AI_ANALYTICS] Failed to log automatic trigger interaction: $e');
         }
+        // Return the generated message for optional UI display
+        return message;
+
       } else {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
       }
 
+      return null;
+
     } catch (e, stackTrace) {
       AppLogger.error('[AI_CHEERLEADER] Pipeline processing failed: $e');
       AppLogger.error('[AI_CHEERLEADER] Stack trace: $stackTrace');
+      return null;
     }
   }
 

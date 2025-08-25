@@ -1251,6 +1251,8 @@ class _RouteMapState extends State<_RouteMap> {
   FlutterMap? _cachedMapWidget;
   List<LatLng>? _cachedRoutePoints;
   final GlobalKey _mapKey = GlobalKey();
+  // Debug overlay toggle (disabled by default). When true, renders point markers and logs segment distances.
+  static const bool _enableRouteDebugOverlay = false;
 
   // Compare route points for equality to determine if we need to rebuild
   bool _areRoutePointsEqual(List<LatLng> list1, List<LatLng> list2) {
@@ -1308,6 +1310,23 @@ class _RouteMapState extends State<_RouteMap> {
       }
     }
     
+    // Optional: log per-segment distances to diagnose long straight jumps
+    if (_enableRouteDebugOverlay && pts.length > 1) {
+      try {
+        final dist = const Distance();
+        for (int i = 1; i < pts.length; i++) {
+          final d = dist.as(LengthUnit.Meter, pts[i - 1], pts[i]);
+          if (d >= 60.0) {
+            // Only log segments >=60m to reduce noise
+            print('[ROUTE_DEBUG] seg ${i - 1}->${i} distance=${d.toStringAsFixed(1)}m p1=${pts[i - 1]} p2=${pts[i]}');
+          }
+        }
+      } catch (e) {
+        // Ensure diagnostics never crash UI
+        debugPrint('[ROUTE_DEBUG] error computing segment distances: $e');
+      }
+    }
+
     // If we couldn't extract any valid points, return a default
     return pts.isEmpty
         ? [const LatLng(37.7749, -122.4194)] // San Francisco as default
@@ -1437,6 +1456,23 @@ class _RouteMapState extends State<_RouteMap> {
               )
             ],
           ),
+          if (_enableRouteDebugOverlay)
+            MarkerLayer(
+              markers: [
+                for (final p in routePoints)
+                  Marker(
+                    width: 6,
+                    height: 6,
+                    point: p,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
         ],
       );
     }

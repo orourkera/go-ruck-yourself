@@ -239,16 +239,13 @@ class LocationTrackingManager implements SessionManager {
     
     AppLogger.info('[LOCATION_MANAGER] MEMORY_RESET: Session started, all lists cleared and validation reset');
     
-    // Check location permission with request fallback (like version 2.5)
+    // Check location permission - DON'T request if already granted
     bool hasLocationAccess = await _locationService.hasLocationPermission();
+    AppLogger.info('[LOCATION_MANAGER] Location permission check: $hasLocationAccess');
+    
     if (!hasLocationAccess) {
-      AppLogger.info('[LOCATION_MANAGER] Requesting location permission...');
-      hasLocationAccess = await _locationService.requestLocationPermission();
-    }
-  
-    if (!hasLocationAccess) {
-      AppLogger.warning('[LOCATION_MANAGER] Location permission denied - starting session in offline mode (no GPS tracking)');
-      // Don't fail the session - allow offline mode for indoor rucks, airplanes, etc.
+      AppLogger.warning('[LOCATION_MANAGER] Location permission not granted - session will run in offline mode');
+      // Don't request permissions during session start - user should grant them in onboarding/settings
     }
   
     _updateState(_currentState.copyWith(

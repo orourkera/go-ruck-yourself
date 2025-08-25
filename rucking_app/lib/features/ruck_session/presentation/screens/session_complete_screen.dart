@@ -32,6 +32,8 @@ import 'package:rucking_app/features/achievements/domain/repositories/achievemen
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
 import 'package:rucking_app/features/ruck_session/data/models/location_point.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
@@ -129,6 +131,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   bool _pendingUpsellNavigation = false;
   RuckSession? _pendingSessionData;
 
+  // AI completion insights
+  String? _aiCompletionInsight;
+  bool _isGeneratingInsight = false;
+
   @override
   void initState() {
     super.initState();
@@ -154,6 +160,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     
     // Auto-save the main session data immediately
     _autoSaveBasicSession();
+    
+    // Generate AI completion insights
+    _generateCompletionInsights();
   }
 
   @override
@@ -256,6 +265,95 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     } catch (e) {
       AppLogger.error('[SESSION_SAVE] Failed to auto-save basic session: $e');
       // Don't show error to user for auto-save failure - they can still manually save
+    }
+  }
+
+  /// Generate AI completion insights for the session
+  Future<void> _generateCompletionInsights() async {
+    if (_isGeneratingInsight) return;
+    
+    setState(() {
+      _isGeneratingInsight = true;
+    });
+    
+    try {
+      AppLogger.info('[AI_COMPLETION] Generating session completion insights');
+      
+      // Get user data
+      final authState = context.read<AuthBloc>().state;
+      if (authState is! Authenticated) {
+        AppLogger.warning('[AI_COMPLETION] User not authenticated - skipping AI insights');
+        return;
+      }
+      
+      // Fetch user history for context
+      Map<String, dynamic>? history;
+      try {
+        final historyResp = await _apiClient.get('/ai-cheerleader/user-history', queryParams: {
+          'ruck_limit': 20,
+          'achievements_limit': 20,
+        });
+        if (historyResp is Map<String, dynamic>) {
+          history = historyResp;
+        }
+      } catch (e) {
+        AppLogger.warning('[AI_COMPLETION] Failed to fetch user history: $e');
+      }
+      
+      // Build session context for AI
+      final sessionContext = {
+        'session': {
+          'duration_seconds': widget.duration.inSeconds,
+          'distance_km': widget.distance,
+          'calories_burned': widget.caloriesBurned,
+          'elevation_gain_m': widget.elevationGain,
+          'elevation_loss_m': widget.elevationLoss,
+          'ruck_weight_kg': widget.ruckWeight,
+          'average_pace': widget.duration.inSeconds > 0 && widget.distance > 0 
+              ? (widget.duration.inSeconds / 60) / widget.distance 
+              : 0.0,
+          'is_manual': widget.isManual,
+          'completed_at': DateTime.now().toIso8601String(),
+          if (_avgHeartRate != null) 'avg_heart_rate': _avgHeartRate,
+          if (_maxHeartRate != null) 'max_heart_rate': _maxHeartRate,
+          if (_minHeartRate != null) 'min_heart_rate': _minHeartRate,
+          if (widget.splits != null) 'split_count': widget.splits!.length,
+        },
+        'user': {
+          'username': authState.user.username,
+          'prefer_metric': authState.user.preferMetric,
+          'gender': authState.user.gender,
+        },
+        'trigger': {
+          'type': 'session_completion',
+          'context': 'post_session_summary',
+        },
+        'history': history ?? {},
+      };
+      
+      // Generate completion insight using OpenAI
+      final openAIService = OpenAIService();
+      final insight = await openAIService.generateMessage(
+        context: sessionContext,
+        personality: 'Session Analyst', // Use analytical personality for insights
+        explicitContent: false, // Keep it clean for completion screen
+      );
+      
+      if (insight != null && insight.isNotEmpty && mounted) {
+        setState(() {
+          _aiCompletionInsight = insight;
+        });
+        AppLogger.info('[AI_COMPLETION] Generated completion insight: ${insight.substring(0, math.min(50, insight.length))}...');
+      }
+      
+    } catch (e) {
+      AppLogger.error('[AI_COMPLETION] Failed to generate completion insights: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingInsight = false;
+        });
+      }
     }
   }
 
@@ -1096,9 +1194,36 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         children: [
           const Icon(Icons.check_circle, color: Colors.green, size: 72),
           const SizedBox(height: 16),
-          Text('Great job rucker!', style: AppTextStyles.headlineLarge.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('You completed your ruck', style: AppTextStyles.titleLarge),
+          
+          // AI-generated completion insight or fallback
+          if (_isGeneratingInsight)
+            Column(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 8),
+                Text('Analyzing your session...', style: AppTextStyles.titleMedium),
+              ],
+            )
+          else if (_aiCompletionInsight != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                _aiCompletionInsight!,
+                style: AppTextStyles.headlineMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Column(
+              children: [
+                Text('Great job rucker!', style: AppTextStyles.headlineLarge.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('You completed your ruck', style: AppTextStyles.titleLarge),
+              ],
+            ),
         ],
       ),
     );

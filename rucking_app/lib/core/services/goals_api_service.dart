@@ -155,4 +155,13 @@ class GoalsApiService {
     final data = await _api.get(ApiEndpoints.getGoalEndpoint(goalId));
     return Goal.fromJson(Map<String, dynamic>.from(data as Map));
   }
+
+  // Fetch AI Cheerleader user history for richer context (recent rucks, achievements, ai history)
+  Future<Map<String, dynamic>> getAICheerleaderUserHistory({int? rucksLimit, int? achievementsLimit}) async {
+    final query = <String, dynamic>{};
+    if (rucksLimit != null) query['rucks_limit'] = rucksLimit;
+    if (achievementsLimit != null) query['achievements_limit'] = achievementsLimit;
+    final data = await _api.get(ApiEndpoints.aiCheerleaderUserHistory, queryParams: query);
+    return Map<String, dynamic>.from((data ?? const <String, dynamic>{}) as Map);
+  }
 }

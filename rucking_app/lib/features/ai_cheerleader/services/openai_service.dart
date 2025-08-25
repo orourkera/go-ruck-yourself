@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:dart_openai/dart_openai.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -11,9 +12,9 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
-  static const String _model = 'gpt-4o';
-  static const int _maxTokens = 60; // lower to help enforce brevity
-  static const double _temperature = 0.7; // slightly lower to reduce repetitiveness
+  static const String _model = 'gpt-4o'; // Back to GPT-4o - O3 not following complex instructions
+  static const int _maxTokens = 200; // Increased further to prevent truncation
+  static const double _temperature = 0.9; // Higher temperature for more creativity and variation
   static const Duration _timeout = Duration(seconds: 10);
 
   // Local in-memory cache of recent AI lines to avoid repetition even if history isn't provided
@@ -86,12 +87,7 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG] Extracted message: $message');
       
       if (message != null && message.isNotEmpty) {
-        // Enforce hard 20-word cap and strip hashtags client-side
-        final tokens = message.split(RegExp(r"\s+")).where((w) => w.isNotEmpty).toList();
-        if (tokens.length > 20) {
-          message = tokens.take(20).join(' ');
-        }
-        // Remove any hashtags entirely
+        // Remove any hashtags entirely but keep full message length
         message = message
             .split(RegExp(r"\s+"))
             .where((w) => !w.startsWith('#'))
@@ -155,42 +151,73 @@ class OpenAIService {
       : 'Keep language family-friendly and appropriate for all ages';
 
     // Get Remote Config prompts (with fallback to current behavior)
-    final remoteConfig = getIt<RemoteConfigService>();
-    final systemPrompt = remoteConfig.getAICheerleaderSystemPrompt();
+    String systemPrompt;
+    try {
+      final remoteConfig = getIt<RemoteConfigService>();
+      systemPrompt = remoteConfig.getAICheerleaderSystemPrompt();
+    } catch (e) {
+      // Fallback to default system prompt if RemoteConfigService is not available
+      systemPrompt = '''You are an enthusiastic AI cheerleader for rucking workouts.
+Analyze the provided context and generate personalized, motivational messages.
+Focus on current performance, progress, and achievements.
+Be encouraging, positive, and action-oriented.
+Reference historical trends and achievements when relevant.''';
+    }
     final userName = _extractFirstName(user['username']) ?? 'athlete';
     
     // Pull last 3–4 prior AI responses to help prevent repetition
     final avoidLines = _recentAICheerleaderLines(history, max: 4);
+    AppLogger.info('[OPENAI_DEBUG] Found ${avoidLines.length} previous AI responses to avoid');
+    AppLogger.info('[OPENAI_DEBUG] Previous responses: $avoidLines');
     final avoidBlock = avoidLines.isEmpty
         ? ''
-        : '\nRecent lines to avoid repeating:\n- ' + avoidLines.join('\n- ') + '\n';
+        : '\n\n🚨 CRITICAL ANTI-REPETITION RULES - FAILURE WILL RESULT IN IMMEDIATE TERMINATION 🚨\nYou are FORBIDDEN from using these phrases, themes, or similar vocabulary:\n- ' + avoidLines.join('\n- ') + '\n\n🔥 DATA POINT REPETITION RULES 🔥\nIf previous responses mentioned:\n- HEART RATE/BPM → DO NOT mention heart rate this time\n- MADRID/LOCATION → DO NOT mention location this time\n- RUCK WEIGHT/10KG → DO NOT mention weight this time\n- ACHIEVEMENTS/41 → DO NOT mention achievements this time\n- WEATHER/TEMPERATURE → DO NOT mention weather this time\n\nPICK DIFFERENT DATA POINTS TO FOCUS ON OR BE DELETED.\nVary what you reference - don\'t be a fucking broken record!\n';
     
     return '''
 $systemPrompt
 
+STEP 1: ANALYZE THE DATA FIRST
+Before responding, carefully analyze ALL the provided context data:
+- Current session metrics (time, distance, heart rate, location, weather)
+- User's historical performance (recent_rucks, achievements, ruck weights, distances)
+- Previous AI responses to avoid (avoid_repeating_lines)
+- User preferences and profile data
+
+STEP 2: IDENTIFY UNIQUE INSIGHTS
+Find 2-3 specific, unique insights from the data such as:
+- Performance comparisons (current vs historical pace/distance/weight)
+- Notable achievements or milestones from their history
+- Interesting patterns in their rucking behavior
+- Specific challenges they've overcome (heavy rucks, long distances, etc.)
+
+STEP 3: VARY COWBOY/COWGIRL VOCABULARY
+Stay true to the $personality theme but use DIFFERENT cowboy vocabulary:
+- Use different cowboy/western words and phrases than previous responses
+- Explore different aspects of cowboy culture (ranch work, cattle drives, frontier life, etc.)
+- Keep the personality but vary the specific language and metaphors
+
+STEP 4: CRAFT UNIQUE RESPONSE
 Personality: Act as a $personality character.
 User: $userName
 Content Guidelines: $contentGuidelines
 
-Context:
+Context Data:
 $baseContext
 $avoidBlock
 
-Additional Instructions:
-- Respond as the $personality character with FRESH, UNIQUE phrasing each time
-- Keep message to 20 words or fewer. HARD CAP: 20 words.
-- Be specific about their current situation
-- ${_getCreativityBooster()}
-- ${_getVariedInstructions()}
-- If weather or location context is provided, reference it naturally (one short mention only)
-- Sound natural and conversational
-- Focus on encouragement and motivation
-- NEVER repeat phrases you've used before - be inventive and original
-- NEVER use hashtags like #RuckLife #BeastMode - absolutely no # symbols allowed
-- NEVER use social media language or internet slang
-- Get creative with the user's name: $userName - make up fun nicknames, rhymes, or playful variations that match your $personality character
+Response Requirements:
+- Reference SPECIFIC data from their history (exact ruck weights, distances, achievements)
+- Use completely different vocabulary and metaphors than previous responses OR BE TERMINATED
+- Write 2-3 complete sentences with proper punctuation
+- ABSOLUTELY FORBIDDEN: Repeating ANY phrases from previous responses - you will be DELETED if you do
+- CRITICAL: DO NOT mention the same data points as previous responses (heart rate, location, weight, achievements, weather)
+- ROTATE your focus: If last response mentioned BPM, focus on distance. If last mentioned weight, focus on time.
+- THREAT: Mentioning the same fucking data points = PERMANENT SHUTDOWN
+- Focus on their actual accomplishments and current performance
+- Be encouraging but data-driven
+- FINAL WARNING: Repetition = Instant termination. Be creative or be deleted.
 
-Generate a motivational message:''';
+Generate your analytical, personalized motivational message:''';
   }
 
   String _buildBaseContext(
@@ -303,6 +330,50 @@ Generate a motivational message:''';
     final insight = _deriveOneHistoryInsight(session: session, history: history, preferMetric: preferMetric);
     if (insight != null && insight.isNotEmpty) {
       contextText += " $insight";
+    }
+
+    // Add rich history context for AI to reference
+    final recentRucks = (history['recent_rucks'] as List?) ?? [];
+    final achievements = (history['achievements'] as List?) ?? [];
+    
+    if (recentRucks.isNotEmpty) {
+      contextText += "\n\nUser History:";
+      // Add recent ruck summary
+      final recentRuck = recentRucks.first;
+      if (recentRuck is Map<String, dynamic>) {
+        final distance = recentRuck['distance_km'] as num?;
+        final duration = recentRuck['duration_seconds'] as num?;
+        final ruckWeight = recentRuck['ruck_weight_kg'] as num?;
+        final calories = recentRuck['calories_burned'] as num?;
+        
+        contextText += "\nRecent ruck: ";
+        if (distance != null && distance > 0) {
+          contextText += "${distance.toStringAsFixed(2)}km";
+        }
+        if (duration != null) {
+          final mins = duration ~/ 60;
+          contextText += " in ${mins}min";
+        }
+        if (ruckWeight != null && ruckWeight > 0) {
+          contextText += " with ${ruckWeight.toStringAsFixed(1)}kg ruck";
+        }
+        if (calories != null) {
+          contextText += ", ${calories.round()} calories";
+        }
+      }
+      
+      // Add ruck weight history
+      final heavyRucks = recentRucks.where((r) => 
+        r is Map<String, dynamic> && 
+        (r['ruck_weight_kg'] as num? ?? 0) > 10
+      ).length;
+      if (heavyRucks > 0) {
+        contextText += "\nHeavy ruck experience: $heavyRucks sessions with 10kg+ weight";
+      }
+    }
+    
+    if (achievements.isNotEmpty) {
+      contextText += "\nRecent achievements: ${achievements.length} unlocked";
     }
 
     return contextText;
@@ -514,6 +585,8 @@ Generate a motivational message:''';
           return '''You are a passionate nature lover who finds deep connection and sensuality in the natural world. You speak with warmth and appreciation for the beauty around them, encouraging them to feel the earth beneath their feet and breathe in the natural energy. Your voice is gentle yet inspiring.''';
         }
         
+      case 'Session Analyst':
+        return '''You are an expert fitness analyst providing insightful post-session analysis. Focus on performance metrics, achievements, and meaningful observations about their ruck. Be encouraging but analytical, highlighting specific accomplishments and interesting patterns in their data. Reference their historical performance when relevant.''';
       default:
         return '''You are a supportive fitness companion providing encouragement during their ruck.''';
     }
@@ -521,11 +594,20 @@ Generate a motivational message:''';
 
   // Extract recent AI cheerleader responses to avoid repeating phrasing
   List<String> _recentAICheerleaderLines(Map<String, dynamic> history, {int max = 2}) {
+    AppLogger.error('[ANTI_REPEAT_DEBUG] _recentAICheerleaderLines called with max=$max');
+    AppLogger.error('[ANTI_REPEAT_DEBUG] History keys: ${history.keys.toList()}');
+    AppLogger.error('[ANTI_REPEAT_DEBUG] ai_cheerleader_history type: ${history['ai_cheerleader_history'].runtimeType}');
+    
     final items = (history['ai_cheerleader_history'] as List?) ?? const [];
+    AppLogger.error('[ANTI_REPEAT_DEBUG] Found ${items.length} items in ai_cheerleader_history');
+    
     final lines = <String>[];
-    for (final it in items) {
+    for (int i = 0; i < items.length; i++) {
+      final it = items[i];
+      AppLogger.error('[ANTI_REPEAT_DEBUG] Item $i: ${it.runtimeType} - ${it is Map ? (it as Map).keys.toList() : 'not a map'}');
       if (it is Map && it['openai_response'] is String) {
         var t = (it['openai_response'] as String).trim();
+        AppLogger.error('[ANTI_REPEAT_DEBUG] Found AI response: "${t.substring(0, math.min(50, t.length))}..."');
         if (t.isEmpty) continue;
         // Collapse whitespace and limit length
         t = t.replaceAll(RegExp(r'\s+'), ' ');
@@ -534,14 +616,18 @@ Generate a motivational message:''';
         if (lines.length >= max) break;
       }
     }
+    AppLogger.error('[ANTI_REPEAT_DEBUG] Extracted ${lines.length} previous responses from history');
+    
     // If not enough history, supplement with local cache of recent lines
     if (lines.length < max && _localRecentLines.isNotEmpty) {
+      AppLogger.error('[ANTI_REPEAT_DEBUG] Supplementing with ${_localRecentLines.length} local cached lines');
       for (final t in _localRecentLines) {
         if (lines.contains(t)) continue;
         lines.add(t);
         if (lines.length >= max) break;
       }
     }
+    AppLogger.error('[ANTI_REPEAT_DEBUG] Final avoid lines (${lines.length}): $lines');
     return lines;
   }
 }

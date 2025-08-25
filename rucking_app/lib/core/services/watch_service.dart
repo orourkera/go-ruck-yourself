@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/api/rucking_api.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
@@ -29,6 +30,7 @@ class WatchService {
   // Session state
   bool _isSessionActive = false;
   bool _isPaused = false;
+  String? _currentSessionId; // Track current session ID for sync
   double _currentDistance = 0.0;
   Duration _currentDuration = Duration.zero;
   double _currentPace = 0.0;
@@ -104,18 +106,9 @@ class WatchService {
     // This ensures world-class reliability when the iPhone app wasn't foregrounded.
     Future.delayed(const Duration(milliseconds: 500), _drainQueuedMessages);
 
-    // Load persisted settings and sync to watch
-    Future.delayed(const Duration(milliseconds: 600), () async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        _lastRuckWeightKg = prefs.getDouble(_lastRuckWeightKey) ?? _lastRuckWeightKg;
-        _lastUserWeightKg = prefs.getDouble(_lastUserWeightKey) ?? _lastUserWeightKg;
-        await _sendMessageToWatch({
-          'command': 'updateSettings',
-          if (_lastRuckWeightKg != null) 'ruckWeightKg': _lastRuckWeightKg,
-          if (_lastUserWeightKg != null) 'userWeightKg': _lastUserWeightKg,
-        });
-      } catch (_) {}
+    // Load persisted settings and sync to watch immediately
+    Future.delayed(const Duration(milliseconds: 100), () async {
+      await _loadAndSyncUserPreferences();
     });
   }
 
@@ -171,27 +164,42 @@ class WatchService {
 
   /// Handle a session started from the watch
   Future<void> _handleSessionStartedFromWatch(Map<String, dynamic> data) async {
+    AppLogger.info('[WATCH] Processing session start from watch');
+    
+    // Check if there's already an active session to prevent conflicts
+    if (_isSessionActive) {
+      AppLogger.warning('[WATCH] Session already active - ignoring watch start request');
+      await _sendMessageToWatch({
+        'command': 'sessionAlreadyActive',
+        'message': 'Session already running on phone'
+      });
+      return;
+    }
+    
     final double ruckWeight = (data['ruckWeight'] as num?)?.toDouble() ?? 10.0;
     final DateTime? startedAt = _parseEpochOrIso(data['startedAt']);
     final double? userWeightKg = (data['userWeightKg'] as num?)?.toDouble();
     final double? ruckWeightKg = (data['ruckWeightKg'] as num?)?.toDouble() ?? ruckWeight;
-    // Handle session start from watch
 
     try {
       // Get current user
       final authState = await _authService.getCurrentUser();
       if (authState == null) {
         AppLogger.error('[WATCH] No authenticated user found - cannot create session from Watch');
+        await _sendMessageToWatch({
+          'command': 'sessionStartFailed',
+          'error': 'User not authenticated'
+        });
         return;
       }
-      // User authenticated
 
-      // Create ruck session
+      // Create ruck session with watch-specific metadata
       final response = await GetIt.instance<ApiClient>().post('/rucks', {
         'ruckWeight': ruckWeightKg,
         'ruck_weight_kg': ruckWeightKg,
         if (userWeightKg != null) 'weight_kg': userWeightKg,
         'is_manual': false,
+        'started_from': 'apple_watch', // Track source for analytics
         if (startedAt != null) 'started_at': startedAt.toUtc().toIso8601String(),
       });
 
@@ -199,26 +207,38 @@ class WatchService {
 
       if (response == null || !response.containsKey('id')) {
         AppLogger.error('[WATCH] Failed to create session - invalid API response');
+        await _sendMessageToWatch({
+          'command': 'sessionStartFailed',
+          'error': 'Failed to create session'
+        });
         return;
       }
-      // Session created successfully
 
       final String sessionId = response['id'].toString();
-      // Session ID extracted
+      _currentSessionId = sessionId; // Track session ID for sync
+      AppLogger.info('[WATCH] Session created successfully: $sessionId');
 
-      // Send session ID to watch
-      await sendSessionIdToWatch(sessionId);
+      // Start session on backend first
+      try {
+        await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {
+          if (startedAt != null) 'started_at': startedAt.toUtc().toIso8601String(),
+        });
+        AppLogger.info('[WATCH] Session started on backend: $sessionId');
+      } catch (e) {
+        AppLogger.error('[WATCH] Failed to start session on backend: $e');
+        await _sendMessageToWatch({
+          'command': 'sessionStartFailed',
+          'error': 'Failed to start session on backend'
+        });
+        return;
+      }
 
-      // Start session on backend
-      await GetIt.instance<ApiClient>().post('/rucks/$sessionId/start', {
-        if (startedAt != null) 'started_at': startedAt.toUtc().toIso8601String(),
-      });
-
-      // Notify watch of workout start
+      // Send session ID and confirmation to watch
       await _sendMessageToWatch({
-        'command': 'workoutStarted',
+        'command': 'sessionStarted',
         'sessionId': sessionId,
         'ruckWeight': ruckWeight,
+        'status': 'success'
       });
 
       // Dispatch SessionStarted to ActiveSessionBloc so the phone app reflects the watch-initiated start
@@ -426,35 +446,60 @@ class WatchService {
     AppLogger.debug('[WATCH_SERVICE] Reset heart rate sampling variables');
   }
 
-  /// Start a new rucking session on the watch
+  /// Start a new rucking session on the watch (called from phone)
   Future<void> startSessionOnWatch(double ruckWeight, {bool isMetric = true}) async {
-    AppLogger.info('[WATCH_SERVICE] startSessionOnWatch - sending isMetric: $isMetric to watch');
+    AppLogger.info('[WATCH_SERVICE] Starting session on watch from phone - weight: $ruckWeight, metric: $isMetric');
+    
+    // Update local state first
     _isSessionActive = true;
     _isPaused = false;
     _ruckWeight = ruckWeight;
     _resetHeartRateSamplingVariables();
-    _currentSessionHeartRateSamples = []; // Clear samples for the new session
+    _currentSessionHeartRateSamples = [];
 
     try {
-      // Store ruckWeight locally for calorie calculations, but don't send to watch
-      // to prevent it from being displayed on the watch face
+      // Send comprehensive session start data to watch with workout start command
       final message = {
-        'command': 'workoutStarted',
-        'isMetric': isMetric, // Send user's unit preference to watch
-        // ruckWeight intentionally omitted to prevent display on watch
+        'command': 'workoutStarted', // Tell watch to start HealthKit workout session
+        'isMetric': isMetric,
+        'ruckWeight': ruckWeight,
+        'sessionId': _currentSessionId,
+        'timestamp': DateTime.now().toIso8601String(),
+        'source': 'phone',
+        'startHeartRateMonitoring': true, // Explicitly request heart rate monitoring
+        'forcePermissionCheck': true, // Force permission validation
       };
-      AppLogger.info('[WATCH_SERVICE] Sending message to watch: $message');
+      
+      AppLogger.info('[WATCH_SERVICE] Sending workout start command to watch: $message');
       await _sendMessageToWatch(message);
       
-      // Send session start notification to alert user about watch app availability
-      // Small delay to ensure the workout start command is processed first
+      // Send follow-up sync and permission requests asynchronously (non-blocking)
+      Future.delayed(const Duration(milliseconds: 100), () async {
+        try {
+          await _sendMessageToWatch({
+            'command': 'requestHealthKitPermissions',
+            'requestHeartRate': true,
+            'requestWorkout': true,
+          });
+          await syncSessionStateWithWatch();
+        } catch (e) {
+          AppLogger.debug('[WATCH] Background sync failed: $e');
+        }
+      });
+      
+      // Send session start notification with delay
       await Future.delayed(const Duration(milliseconds: 500));
       await sendSessionStartNotification(
         ruckWeight: ruckWeight,
         isMetric: isMetric,
       );
+      
+      AppLogger.info('[WATCH_SERVICE] Session successfully started on watch from phone');
     } catch (e) {
-      AppLogger.error('[ERROR] Failed to start session on Watch: $e');
+      AppLogger.error('[WATCH_SERVICE] Failed to start session on watch: $e');
+      // Reset state on failure
+      _isSessionActive = false;
+      _isPaused = false;
     }
   }
 
@@ -496,6 +541,85 @@ class WatchService {
     } catch (e) {
       AppLogger.error('[WATCH] Error pinging watch: $e');
     }
+  }
+
+  /// Load user preferences and sync to watch
+  Future<void> _loadAndSyncUserPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Load last ruck weight with sensible fallback
+      _lastRuckWeightKg = prefs.getDouble(_lastRuckWeightKey) ?? AppConfig.defaultRuckWeight;
+      _lastUserWeightKg = prefs.getDouble(_lastUserWeightKey) ?? 70.0; // Default user weight
+      
+      // Try to get user's actual weight from auth service
+      try {
+        final user = await _authService.getCurrentUser();
+        if (user?.weightKg != null) {
+          _lastUserWeightKg = user!.weightKg!;
+        }
+      } catch (e) {
+        AppLogger.debug('[WATCH] Could not get user weight from auth service: $e');
+      }
+      
+      AppLogger.info('[WATCH] Syncing preferences to watch - ruck: ${_lastRuckWeightKg}kg, user: ${_lastUserWeightKg}kg');
+      
+      // Sync to watch with guaranteed values
+      await _sendMessageToWatch({
+        'command': 'updateSettings',
+        'ruckWeightKg': _lastRuckWeightKg,
+        'userWeightKg': _lastUserWeightKg,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      
+      AppLogger.info('[WATCH] User preferences synced to watch successfully');
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to load/sync user preferences: $e');
+    }
+  }
+
+  /// Set the current session ID for tracking (called when session starts from phone)
+  void setCurrentSessionId(String sessionId) {
+    _currentSessionId = sessionId;
+    AppLogger.info('[WATCH] Session ID set for watch sync: $sessionId');
+  }
+
+  /// Synchronize session state between phone and watch
+  Future<void> syncSessionStateWithWatch() async {
+    try {
+      AppLogger.info('[WATCH] Syncing session state with watch');
+      await _sendMessageToWatch({
+        'command': 'syncSessionState',
+        'isSessionActive': _isSessionActive,
+        'isPaused': _isPaused,
+        'sessionId': _currentSessionId,
+        'ruckWeight': _ruckWeight,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      AppLogger.error('[WATCH] Failed to sync session state: $e');
+    }
+  }
+
+  /// Handle session state conflicts between phone and watch
+  Future<void> _resolveSessionConflict(String source, Map<String, dynamic> data) async {
+    AppLogger.warning('[WATCH] Session conflict detected from $source');
+    
+    // Phone takes precedence for session management
+    if (_isSessionActive) {
+      AppLogger.info('[WATCH] Phone session active - notifying watch to sync');
+      await syncSessionStateWithWatch();
+    } else {
+      AppLogger.info('[WATCH] No phone session - allowing watch to proceed');
+      if (source == 'watch') {
+        await _handleSessionStartedFromWatch(data);
+      }
+    }
+  }
+
+  /// Sync user preferences to watch (can be called anytime)
+  Future<void> syncUserPreferencesToWatch() async {
+    await _loadAndSyncUserPreferences();
   }
 
   /// Send a split notification to the watch

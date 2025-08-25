@@ -18,6 +18,7 @@ import GRY_Watch_App
 struct ContentView: View {
     // Use the singleton instance so UI and connectivity logic share the same state
     @StateObject private var sessionManager = SessionManager.shared
+    @State private var showingEndConfirmation: Bool = false
     
     var body: some View {
         ZStack {
@@ -119,6 +120,19 @@ struct ContentView: View {
                 .transition(.opacity)
                 .animation(.easeInOut(duration: 0.3), value: sessionManager.showingSplitNotification)
             }
+        }
+        // Global confirmation dialog for ending the session
+        .confirmationDialog(
+            "End Ruck?",
+            isPresented: $showingEndConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("End Session", role: .destructive) {
+                sessionManager.endSession()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to end your current ruck?")
         }
         .edgesIgnoringSafeArea(.bottom)
     }
@@ -252,7 +266,7 @@ struct ContentView: View {
                         
                         // Stop icon button
                         Button(action: {
-                            sessionManager.endSession()
+                            showingEndConfirmation = true
                         }) {
                             Image(systemName: "stop.fill")
                                 .font(.system(size: 20, weight: .bold))

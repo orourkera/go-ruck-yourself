@@ -167,6 +167,9 @@ class SessionLifecycleManager implements SessionManager {
       // Update the in-memory active sessionId so all other managers use the correct backend ID
       _activeSessionId = finalSessionId;
       
+      // Set session ID in watch service for proper sync
+      _watchService.setCurrentSessionId(finalSessionId);
+      
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);
       
       _startTimer();
@@ -354,24 +357,24 @@ class SessionLifecycleManager implements SessionManager {
   Future<void> _onSessionPaused(manager_events.SessionPaused event) async {
     if (!_currentState.isActive) return;
     
-    AppLogger.info('Pausing session');
+    AppLogger.info('[LIFECYCLE] Pausing session - keeping session active but paused');
     
     // Pause timers
     _ticker?.cancel();
     
-    // Update watch
+    // Update watch (the watch service will handle avoiding duplicate calls)
     await _watchService.pauseSessionOnWatch();
     
     _updateState(_currentState.copyWith(
-      isActive: false, // Using isActive to track pause state
-      pausedAt: DateTime.now(),
+      isActive: true, // Keep session active - just mark as paused
+      pausedAt: DateTime.now(), // Use pausedAt to indicate paused state
     ));
   }
 
   Future<void> _onSessionResumed(manager_events.SessionResumed event) async {
-    if (_currentState.isActive) return;
+    if (!_currentState.isActive || _currentState.pausedAt == null) return;
     
-    AppLogger.info('Resuming session');
+    AppLogger.info('[LIFECYCLE] Resuming session from paused state');
     
     // Calculate pause duration
     final pausedDuration = _currentState.pausedAt != null

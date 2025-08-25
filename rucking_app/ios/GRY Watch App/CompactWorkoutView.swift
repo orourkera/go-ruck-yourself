@@ -11,6 +11,7 @@ import SwiftUI
 
 struct CompactWorkoutView: View {
     @ObservedObject private var sessionManager = SessionManager.shared
+    @State private var showingEndConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -37,17 +38,21 @@ struct CompactWorkoutView: View {
                 
                 // Active calories
                 metricRow(value: sessionManager.caloriesText, labelLines: ["ACTIVE", "CAL"])
+                    .padding(.top, -4)
 
                 // Heart-rate row with heart glyph
                 metricRow(value: sessionManager.heartRateText,
                           symbol: AnyView(Image(systemName: "heart.fill").foregroundColor(.red)),
                           labelLines: [" ", " "]) // No label text – glyph suffices
+                    .padding(.top, -4)
 
                 // Pace with label, but value without unit
                 metricRow(value: sessionManager.pace, labelLines: ["AVERAGE", "PACE"])
+                    .padding(.top, -4)
 
                 // Elevation gain (already formatted with unit)
                 metricRow(value: sessionManager.elevationText, labelLines: [" ", " "]) // Unit embedded in value
+                    .padding(.top, -4)
 
                 Spacer()
 
@@ -69,7 +74,7 @@ struct CompactWorkoutView: View {
 
                     // Stop icon button
                     Button(action: {
-                        sessionManager.endSession()
+                        showingEndConfirmation = true
                     }) {
                         Image(systemName: "stop.fill")
                             .font(.system(size: 20, weight: .bold))
@@ -84,6 +89,17 @@ struct CompactWorkoutView: View {
                 .padding(.top, 8)
             }
             .padding(.horizontal, 4)
+        }
+        .alert("Finish Session?", isPresented: $showingEndConfirmation) {
+            Button("Cancel", role: .cancel) {
+                showingEndConfirmation = false
+            }
+            Button("Finish", role: .destructive) {
+                sessionManager.endSession()
+                showingEndConfirmation = false
+            }
+        } message: {
+            Text("Are you sure you want to finish your ruck session?")
         }
     }
 

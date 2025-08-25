@@ -20,6 +20,26 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
   bool _loading = false;
   String? _error;
   final List<_ChatTurn> _turns = <_ChatTurn>[];
+  Map<String, dynamic>? _userHistory; // optional: AI cheerleader history/context
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserHistory();
+  }
+
+  Future<void> _loadUserHistory() async {
+    try {
+      final hist = await _api.getAICheerleaderUserHistory(rucksLimit: 15, achievementsLimit: 25);
+      if (mounted) {
+        setState(() {
+          _userHistory = hist;
+        });
+      }
+    } catch (_) {
+      // Non-fatal; continue without history
+    }
+  }
 
   @override
   void dispose() {
@@ -40,8 +60,10 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
 
     try {
       final parsed = await _api.parseGoal(text);
-      // Support backend shape: { draft: {...}, input_preview, parser }
-      // Also keep compatibility for { draft_goal: {...} } or flat draft objects.
+      // Conversational response may include assistant_message and optional draft
+      final assistantMessage = parsed['assistant_message'] as String?;
+      final needsClarification = parsed['needs_clarification'] == true;
+
       Map<String, dynamic>? draftMap;
       if (parsed['draft'] is Map) {
         draftMap = Map<String, dynamic>.from(parsed['draft'] as Map);
@@ -52,29 +74,37 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
         draftMap = Map<String, dynamic>.from(parsed);
       }
 
-      if (draftMap == null) {
-        throw Exception('Invalid parse response');
+      if (assistantMessage != null && assistantMessage.isNotEmpty) {
+        _turns.add(_ChatTurn.assistantText(assistantMessage));
       }
 
-      _turns.add(_ChatTurn.assistantDraft(draftMap));
-      setState(() {});
+      if (draftMap != null) {
+        _turns.add(_ChatTurn.assistantDraft(draftMap));
+        setState(() {});
 
-      if (!mounted) return;
-      final created = await showModalBottomSheet<GoalWithProgress>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (ctx) => GoalConfirmationSheet(
-          draft: draftMap!,
-          onConfirm: (confirmedDraft) async {
-            final res = await _api.createGoal(confirmedDraft);
-            return res;
-          },
-        ),
-      );
+        if (!mounted) return;
+        final created = await showModalBottomSheet<GoalWithProgress>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          builder: (ctx) => GoalConfirmationSheet(
+            draft: draftMap!,
+            onConfirm: (confirmedDraft) async {
+              final res = await _api.createGoal(confirmedDraft);
+              return res;
+            },
+          ),
+        );
 
-      if (created != null && mounted) {
-        Navigator.of(context).pop(created);
+        if (created != null && mounted) {
+          Navigator.of(context).pop(created);
+        }
+      } else {
+        // No draft returned (clarification). Keep chat open for user to refine
+        if (assistantMessage == null && needsClarification) {
+          _turns.add(_ChatTurn.assistantText('Can you add more detail, like units or timeframe?'));
+        }
+        setState(() {});
       }
     } catch (e) {
       setState(() {
@@ -99,93 +129,109 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Set a Personal Goal')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(12),
-              itemCount: _turns.length + (_error != null ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (_error != null && index == _turns.length) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
-                  );
-                }
-                final turn = _turns[index];
-                if (turn.role == _Role.user) {
-                  return Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(turn.text ?? ''),
-                    ),
-                  );
-                } else {
-                  // Assistant draft preview chip
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Draft goal ready. Review & confirm.',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          _DraftSummary(draft: turn.draft ?? const {}),
-                          const SizedBox(height: 4),
-                          const Text('Tap Send again to refine your intent, or confirm in the sheet.'),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Row(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Describe your goal (e.g., 50 km this month with 9kg pack)'
-                      ),
-                      onSubmitted: (_) => _onSend(),
+                  Text(
+                    'What do you want to achieve, rucker?',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: _loading ? null : _onSend,
-                    icon: _loading
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.send),
-                    label: const Text('Send'),
+                  const SizedBox(height: 16),
+                  _PromptBar(
+                    controller: _controller,
+                    onSubmit: _loading ? null : _onSend,
+                    loading: _loading,
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                itemCount: _turns.length + (_error != null ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (_error != null && index == _turns.length) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    );
+                  }
+                  if (_turns.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  final turn = _turns[index];
+                  if (turn.role == _Role.user) {
+                    return Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(turn.text ?? ''),
+                      ),
+                    );
+                  } else {
+                    // Assistant turn: either a natural message or a draft preview
+                    if (turn.draft == null) {
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(turn.text ?? ''),
+                        ),
+                      );
+                    }
+                    // Assistant draft preview chip
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Draft goal ready. Review & confirm.',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 8),
+                            _DraftSummary(draft: turn.draft ?? const {}),
+                            const SizedBox(height: 4),
+                            const Text('Submit again to refine your intent, or confirm in the sheet.'),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -200,6 +246,10 @@ class _ChatTurn {
 
   _ChatTurn.user(this.text)
       : role = _Role.user,
+        draft = null;
+
+  _ChatTurn.assistantText(this.text)
+      : role = _Role.assistant,
         draft = null;
 
   _ChatTurn.assistantDraft(this.draft)
@@ -222,6 +272,59 @@ class _DraftSummary extends StatelessWidget {
         Text('Target: ${v('target_value')} ${v('unit')}'),
         Text('Window: ${v('window')}'),
       ],
+    );
+  }
+}
+
+class _PromptBar extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback? onSubmit;
+  final bool loading;
+
+  const _PromptBar({
+    required this.controller,
+    required this.onSubmit,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: TextField(
+        controller: controller,
+        minLines: 1,
+        maxLines: 4,
+        textInputAction: TextInputAction.send,
+        decoration: InputDecoration(
+          hintText: 'Ask anything',
+          border: InputBorder.none,
+          suffixIcon: loading
+              ? const Padding(
+                  padding: EdgeInsets.only(right: 8.0),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : null,
+        ),
+        onSubmitted: (_) => onSubmit?.call(),
+      ),
     );
   }
 }
