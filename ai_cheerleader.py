@@ -11,9 +11,12 @@ app = Flask(__name__)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+# Use service role key for backend operations that need to bypass RLS
+SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Use service role for this backend service to bypass RLS when fetching user history
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY)
 
 # Firebase Remote Config integration
 FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'getrucky-app')  # Add to your env vars
@@ -110,8 +113,24 @@ def get_user_history(user_id: str) -> dict:
         notifications = notifications_resp.data
         
         # Query AI cheerleader logs (previous AI messages for context)
+        # Try both tables - simple logs and detailed interactions
         ai_logs_resp = supabase.table('ai_cheerleader_logs').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
-        ai_logs = ai_logs_resp.data
+        ai_logs = ai_logs_resp.data or []
+        app.logger.info(f"[AI_HISTORY_DEBUG] ai_cheerleader_logs query returned {len(ai_logs)} records for user {user_id}")
+        
+        # Also check the interactions table for more comprehensive logging
+        try:
+            interactions_resp = supabase.table('ai_cheerleader_interactions').select('session_id, personality, openai_response, created_at').eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
+            interactions = interactions_resp.data or []
+            # Combine both sources, preferring interactions if available
+            if interactions:
+                ai_logs.extend(interactions)
+                # Sort by created_at and limit to 20 most recent
+                ai_logs.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+                ai_logs = ai_logs[:20]
+        except Exception as e:
+            logger.warning(f"Could not fetch AI interactions: {e}")
+            # Continue with just simple logs
         
         # Build JSON with aggregates
         history = {
