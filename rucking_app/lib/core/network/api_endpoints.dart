@@ -35,6 +35,10 @@ class ApiEndpoints {
   static const String achievementStats = '$baseApi/achievements/stats/{user_id}'; // Replace {user_id} with actual user ID
   static const String recentAchievements = '$baseApi/achievements/recent';
 
+  // AI Cheerleader
+  static const String aiCheerleaderLogs = '$baseApi/ai-cheerleader/logs';
+  static const String aiCheerleaderUserHistory = '$baseApi/ai-cheerleader/user-history';
+
   // AI Goals
   static const String goals = '$baseApi/goals';
   static const String goalsWithProgress = '$baseApi/goals-with-progress';

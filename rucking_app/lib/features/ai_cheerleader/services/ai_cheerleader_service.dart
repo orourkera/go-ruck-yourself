@@ -206,6 +206,7 @@ class AICheerleaderService {
     User user,
     String personality,
     bool explicitContent,
+    {Map<String, dynamic>? history}
   ) {
     AppLogger.info('[AI_CONTEXT_DEBUG] Starting context assembly for trigger type: ${trigger.type}');
     AppLogger.info('[AI_CONTEXT_DEBUG] User data: ${user.toJson()}');
@@ -257,6 +258,8 @@ class AICheerleaderService {
         'personality': personality,
         'explicitContent': explicitContent,
       },
+      // Historical user data for richer context
+      'history': history,
       'environment': <String, dynamic>{
         'timeOfDay': _getTimeOfDay(),
         'sessionPhase': _getSessionPhase(state),

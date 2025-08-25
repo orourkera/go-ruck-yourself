@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/api/api_exceptions.dart';
 import 'package:rucking_app/core/models/api_exception.dart';
+import 'package:rucking_app/core/network/api_endpoints.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/models/user.dart';
@@ -397,13 +398,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     try {
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1: Assembling context...');
-      // 1. Assemble context for AI generation
+      // 1. Fetch historical user data for richer AI context
+      Map<String, dynamic>? history;
+      try {
+        AppLogger.info('[AI_CHEERLEADER_DEBUG] Fetching user history from ${ApiEndpoints.aiCheerleaderUserHistory}');
+        final historyResp = await _apiClient.get(ApiEndpoints.aiCheerleaderUserHistory, queryParams: {
+          'ruck_limit': 50,
+          'achievements_limit': 50,
+        });
+        if (historyResp is Map<String, dynamic>) {
+          history = historyResp;
+          AppLogger.info('[AI_CHEERLEADER_DEBUG] User history fetched successfully');
+        } else {
+          AppLogger.warning('[AI_CHEERLEADER_DEBUG] Unexpected user history response type: ${historyResp.runtimeType}');
+        }
+      } catch (e) {
+        AppLogger.warning('[AI_CHEERLEADER_DEBUG] Failed to fetch user history (continuing without it): $e');
+      }
+
+      // 2. Assemble context for AI generation (including history if available)
       final context = _aiCheerleaderService.assembleContext(
         state,
         trigger,
         _currentUser!,
         _aiCheerleaderPersonality!,
         _aiCheerleaderExplicitContent,
+        history: history,
       );
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
 

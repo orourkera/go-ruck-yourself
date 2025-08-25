@@ -85,7 +85,6 @@ def get_remote_config_prompts():
         # Use cached prompts if available, otherwise defaults
         prompts = _prompt_cache or (DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE)
         return prompts
-
 # Historical fetch function (fetches all columns from relevant tables)
 def get_user_history(user_id: str) -> dict:
     try:

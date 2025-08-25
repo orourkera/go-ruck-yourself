@@ -48,7 +48,7 @@ class RuckSessionListResource(Resource):
                 supabase.table('ruck_session')
                 .select('*')
                 .eq('user_id', g.user.id)
-                .order('completed_at', desc=True, nulls_first=False)
+                .order('completed_at', desc=True, nullsfirst=False)
                 .order('started_at', desc=True)
                 .range(offset, offset + max(limit - 1, 0))
                 .execute()
