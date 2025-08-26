@@ -448,25 +448,41 @@ class HealthService {
     }
     
     try {
-      AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
-      
-      // Always check authorization status fresh (don't rely on cached _isAuthorized)
-      final authStatuses = await _health.hasPermissions(
-        [HealthDataType.STEPS],
-        permissions: [HealthDataAccess.READ],
-      );
-      final hasStepPermission = authStatuses ?? false;
-      AppLogger.info('[STEPS DEBUG] Fresh permission check for STEPS: $hasStepPermission');
-      
-      if (!hasStepPermission) {
-        AppLogger.info('[STEPS DEBUG] No step permission, requesting authorization...');
-        final ok = await requestAuthorization();
-        AppLogger.info('[STEPS DEBUG] Authorization request result: $ok');
-        if (!ok) {
-          AppLogger.error('[STEPS DEBUG] Authorization failed, returning 0');
-          return 0;
-        }
+    AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
+    
+    // Always check authorization status fresh (don't rely on cached _isAuthorized)
+    final authStatuses = await _health.hasPermissions(
+      [HealthDataType.STEPS],
+      permissions: [HealthDataAccess.READ],
+    );
+    // On iOS, some plugin versions return null here even when authorized. Treat null as authorized if
+    // we've already marked the session as authorized to avoid unnecessary re-prompts.
+    bool hasStepPermission;
+    if (authStatuses == null) {
+      hasStepPermission = Platform.isIOS ? _isAuthorized : false;
+      AppLogger.warning('[STEPS DEBUG] hasPermissions returned null; inferring hasStepPermission=$hasStepPermission (iOS=$_isAuthorized)');
+    } else {
+      hasStepPermission = authStatuses;
+    }
+    AppLogger.info('[STEPS DEBUG] Fresh permission check for STEPS: $hasStepPermission');
+    // Extra diagnostics: dump broader permission status snapshot on iOS
+    if (Platform.isIOS) {
+      try {
+        final snapshot = await getPermissionStatus();
+        AppLogger.info('[STEPS DEBUG] iOS permission snapshot: $snapshot');
+      } catch (_) {}
+    }
+    
+    if (hasStepPermission == false) {
+      AppLogger.info('[STEPS DEBUG] No step permission, requesting authorization...');
+      final ok = await requestAuthorization();
+      AppLogger.info('[STEPS DEBUG] Authorization request result: $ok');
+      if (!ok) {
+        AppLogger.error('[STEPS DEBUG] Authorization failed, returning 0');
+        return 0;
       }
+    }
+      
       
       // Use a more robust approach - try multiple methods
       if (Platform.isIOS) {

@@ -12,10 +12,10 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
-  static const String _model = 'gpt-4o'; // Back to GPT-4o - O3 not following complex instructions
-  static const int _maxTokens = 200; // Increased further to prevent truncation
-  static const double _temperature = 0.9; // Higher temperature for more creativity and variation
-  static const Duration _timeout = Duration(seconds: 10);
+  static const String _model = 'gpt-4o-mini'; // Faster, lower-latency model
+  static const int _maxTokens = 60; // Keep concise for one-sentence output
+  static const double _temperature = 0.7; // Slightly lower for tighter responses
+  static const Duration _timeout = Duration(seconds: 6);
 
   // Local in-memory cache of recent AI lines to avoid repetition even if history isn't provided
   static final List<String> _localRecentLines = <String>[]; // stores last few AI outputs (trimmed)
@@ -87,14 +87,30 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG] Extracted message: $message');
       
       if (message != null && message.isNotEmpty) {
-        // Remove any hashtags entirely but keep full message length
+        // 1) Strip hashtags
         message = message
             .split(RegExp(r"\s+"))
             .where((w) => !w.startsWith('#'))
             .join(' ')
             .trim();
-        // Collapse multiple spaces
-        message = message.replaceAll(RegExp(r"\s+"), ' ').trim();
+        // 2) Remove emojis and pictographs (common ranges)
+        final emojiRegex = RegExp(r"[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]", unicode: true);
+        message = message.replaceAll(emojiRegex, '');
+        // 3) Replace newlines with spaces and collapse whitespace
+        message = message.replaceAll('\n', ' ').replaceAll(RegExp(r"\s+"), ' ').trim();
+        // 4) Enforce exactly one sentence
+        final split = message.split(RegExp(r"(?<=[.!?])\s+"));
+        if (split.isNotEmpty) {
+          message = split.first.trim();
+        }
+        // If no terminal punctuation, cap length to ~25 words and add a period
+        final words = message.split(' ');
+        if (words.length > 25) {
+          message = words.take(25).join(' ');
+        }
+        if (!RegExp(r"[.!?]$").hasMatch(message)) {
+          message = message + '.';
+        }
 
         // Update local recent lines cache (dedupe, keep latest 6)
         final line = message.length > 120 ? message.substring(0, 120) : message;
@@ -176,48 +192,20 @@ Reference historical trends and achievements when relevant.''';
     return '''
 $systemPrompt
 
-STEP 1: ANALYZE THE DATA FIRST
-Before responding, carefully analyze ALL the provided context data:
-- Current session metrics (time, distance, heart rate, location, weather)
-- User's historical performance (recent_rucks, achievements, ruck weights, distances)
-- Previous AI responses to avoid (avoid_repeating_lines)
-- User preferences and profile data
-
-STEP 2: IDENTIFY UNIQUE INSIGHTS
-Find 2-3 specific, unique insights from the data such as:
-- Performance comparisons (current vs historical pace/distance/weight)
-- Notable achievements or milestones from their history
-- Interesting patterns in their rucking behavior
-- Specific challenges they've overcome (heavy rucks, long distances, etc.)
-
-STEP 3: VARY COWBOY/COWGIRL VOCABULARY
-Stay true to the $personality theme but use DIFFERENT cowboy vocabulary:
-- Use different cowboy/western words and phrases than previous responses
-- Explore different aspects of cowboy culture (ranch work, cattle drives, frontier life, etc.)
-- Keep the personality but vary the specific language and metaphors
-
-STEP 4: CRAFT UNIQUE RESPONSE
-Personality: Act as a $personality character.
+Personality: $personality
 User: $userName
-Content Guidelines: $contentGuidelines
+Guidelines: $contentGuidelines
 
-Context Data:
+Context:
 $baseContext
 $avoidBlock
 
-Response Requirements:
-- Reference SPECIFIC data from their history (exact ruck weights, distances, achievements)
-- Use completely different vocabulary and metaphors than previous responses OR BE TERMINATED
-- Write 2-3 complete sentences with proper punctuation
-- ABSOLUTELY FORBIDDEN: Repeating ANY phrases from previous responses - you will be DELETED if you do
-- CRITICAL: DO NOT mention the same data points as previous responses (heart rate, location, weight, achievements, weather)
-- ROTATE your focus: If last response mentioned BPM, focus on distance. If last mentioned weight, focus on time.
-- THREAT: Mentioning the same fucking data points = PERMANENT SHUTDOWN
-- Focus on their actual accomplishments and current performance
-- Be encouraging but data-driven
-- FINAL WARNING: Repetition = Instant termination. Be creative or be deleted.
+Response Requirements (STRICT):
+- Output EXACTLY ONE sentence, maximum 25 words, no emojis, no hashtags, no line breaks.
+- Reference at least one specific, relevant data point from the context/history.
+- Vary vocabulary from prior responses and avoid repeating previously used themes.
 
-Generate your analytical, personalized motivational message:''';
+Now respond with the single sentence only:''';
   }
 
   String _buildBaseContext(

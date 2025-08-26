@@ -35,10 +35,21 @@ class StravaExportResource(Resource):
             if not session.get('completed_at'):
                 return {'message': 'Session must be completed before exporting'}, 400
             
-            # Get user's Strava tokens
-            user_resp = supabase.table('users').select(
-                'strava_access_token, strava_refresh_token, strava_expires_at'
-            ).eq('id', g.user.id).execute()
+            # Get user's Strava tokens (correct table is 'user', not 'users')
+            try:
+                user_resp = supabase.table('user').select(
+                    'strava_access_token, strava_refresh_token, strava_expires_at'
+                ).eq('id', g.user.id).execute()
+            except Exception as e:
+                # Handle missing column/schema issues gracefully (e.g., 42703 undefined column)
+                err = str(e)
+                if '42703' in err or 'column' in err and 'strava_' in err:
+                    logger.error(f"[STRAVA] Token columns missing: {err}")
+                    return {
+                        'success': False,
+                        'message': 'Strava is not connected. Please re-authorize Strava from your profile settings.'
+                    }, 400
+                raise
             
             if not user_resp.data:
                 return {'message': 'User profile not found'}, 404
@@ -49,7 +60,10 @@ class StravaExportResource(Resource):
             expires_at = user_data.get('strava_expires_at')
             
             if not access_token or not refresh_token:
-                return {'message': 'Strava not connected. Please connect your Strava account first.'}, 400
+                return {
+                    'success': False,
+                    'message': 'Strava not connected. Please re-authorize Strava in your profile.'
+                }, 400
             
             # Check if token needs refresh
             if expires_at:
@@ -130,11 +144,19 @@ class StravaExportResource(Resource):
             # Update tokens in database
             expires_datetime = datetime.fromtimestamp(expires_at).isoformat() if expires_at else None
             
-            supabase.table('users').update({
-                'strava_access_token': new_access_token,
-                'strava_refresh_token': new_refresh_token,
-                'strava_expires_at': expires_datetime
-            }).eq('id', g.user.id).execute()
+            try:
+                # Correct table is 'user' not 'users'
+                supabase.table('user').update({
+                    'strava_access_token': new_access_token,
+                    'strava_refresh_token': new_refresh_token,
+                    'strava_expires_at': expires_datetime
+                }).eq('id', g.user.id).execute()
+            except Exception as db_err:
+                err = str(db_err)
+                if '42703' in err or ('column' in err and 'strava_' in err):
+                    logger.error(f"[STRAVA] Token columns missing during refresh: {err}")
+                    return None
+                raise
             
             logger.info(f"[STRAVA] Successfully refreshed token for user {g.user.id}")
             return new_access_token

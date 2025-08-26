@@ -30,6 +30,7 @@ class AchievementSummary extends StatefulWidget {
 }
 
 class _AchievementSummaryState extends State<AchievementSummary> {
+  String? _lastSuggestedId;
   @override
   void initState() {
     super.initState();
@@ -262,6 +263,18 @@ class _AchievementSummaryState extends State<AchievementSummary> {
     String progressText = '';
     String achievementId = '';
     
+    // Determine user's elevation affinity (very low if essentially no elevation progress)
+    final elevationProgress = state.userProgress
+        .where((p) => (p.achievement?.category.toLowerCase() ?? '') == 'elevation')
+        .toList();
+    final hasAnyElevationProgress = elevationProgress.any((p) => p.currentValue > 0);
+    final avgElevationPercent = elevationProgress.isNotEmpty
+        ? (elevationProgress
+                .map((p) => p.targetValue > 0 ? (p.currentValue / p.targetValue) : 0.0)
+                .fold<double>(0.0, (a, b) => a + b) /
+            elevationProgress.length)
+        : 0.0;
+    
     // First try to find an achievement with progress using smart selection
     if (achievementsWithProgress.isNotEmpty) {
       // Calculate smart scores for each achievement
@@ -288,10 +301,12 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         // Factor 2: Category diversity - 30% weight
         // Avoid elevation-heavy achievements if user likely doesn't do elevation
         final category = achievement.category.toLowerCase();
-        if (category != 'elevation') {
-          score += 0.3;
+        final stronglyAvoidElevation = !hasAnyElevationProgress || avgElevationPercent < 0.05;
+        if (category == 'elevation') {
+          // Heavily deprioritize elevation when user's history suggests low elevation
+          score += stronglyAvoidElevation ? -0.3 : 0.05;
         } else {
-          score += 0.05; // Still possible, just less likely
+          score += 0.3;
         }
         
         // Factor 3: Tier appropriateness - 20% weight
@@ -318,8 +333,21 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       scoredAchievements.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
       
       if (scoredAchievements.isNotEmpty) {
-        nextChallenge = scoredAchievements.first['achievement'] as Achievement;
-        achievementId = nextChallenge.id;
+        // Prefer top candidate, but avoid repeating the last suggestion within this session
+        Achievement top = scoredAchievements.first['achievement'] as Achievement;
+        if (_lastSuggestedId != null && top.id == _lastSuggestedId && scoredAchievements.length > 1) {
+          // Pick the next best different candidate, prefer non-elevation
+          final alt = scoredAchievements
+              .skip(1)
+              .map((m) => m['achievement'] as Achievement)
+              .firstWhere(
+                (a) => a.id != _lastSuggestedId && a.category.toLowerCase() != 'elevation',
+                orElse: () => scoredAchievements[1]['achievement'] as Achievement,
+              );
+          top = alt;
+        }
+        nextChallenge = top;
+        achievementId = top.id;
         final percent = scoredAchievements.first['percent'] as double;
         final progress = state.getProgressForAchievement(nextChallenge.id);
         
@@ -365,6 +393,9 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       }
     }
     
+    // Remember what we suggested this build to avoid repeating next time
+    _lastSuggestedId = achievementId;
+
     return GestureDetector(
       onTap: () {
         // Navigate to achievement detail page

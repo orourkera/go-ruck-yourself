@@ -41,6 +41,10 @@ import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zon
 import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
 import 'package:rucking_app/core/services/share_service.dart';
 import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:rucking_app/core/services/image_cache_manager.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -63,6 +67,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   RuckSession? _fullSession; // Store the complete session data
   Timer? _photoRefreshTimer;
   Map<String, Color>? _zoneColorMap; // Cache of zone name -> color from HeartRateZoneService
+  UserInfo? _authorProfile; // Session author's profile
+  bool _isLoadingAuthor = false;
   
   /// Get the session to use for display - prefers full session if available
   RuckSession get currentSession => _fullSession ?? widget.session;
@@ -141,6 +147,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       
       // 3. Load social data
       _loadSocialData(widget.session.id!);
+
+      // 4. Load session author profile (real data from backend)
+      _loadAuthorProfile();
     } else {
       AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: Session ID is null, cannot load session data');
     }
@@ -248,6 +257,36 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
   // Builds the photo section - either showing photos or empty state
   // _buildPhotoSection method removed - functionality moved to photo section in main build method
+
+  // Load the session author's profile using the session.userId
+  Future<void> _loadAuthorProfile() async {
+    try {
+      final userId = widget.session.userId ?? _fullSession?.userId;
+      if (userId == null || userId.isEmpty) {
+        AppLogger.warning('[SESSION DETAIL] No userId on session; cannot load author profile');
+        return;
+      }
+      if (_isLoadingAuthor) return;
+      setState(() {
+        _isLoadingAuthor = true;
+      });
+      final api = getIt<ApiClient>();
+      final profile = await api.getUserProfile(userId);
+      if (!mounted) return;
+      setState(() {
+        _authorProfile = profile;
+        _isLoadingAuthor = false;
+      });
+      AppLogger.debug('[SESSION DETAIL] Loaded author profile: ${profile.username} (${profile.id})');
+    } catch (e) {
+      AppLogger.error('[SESSION DETAIL] Failed to load author profile: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingAuthor = false;
+        });
+      }
+    }
+  }
 
   // Helper method to get the appropriate color based on user gender
   Color _getLadyModeColor(BuildContext context) {
@@ -578,6 +617,66 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       ],
                     ),
                     const SizedBox(height: 16),
+                    // Author row (avatar + username) from real profile data
+                    if (_authorProfile != null) ...[
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey[300]!, width: 1.5),
+                            ),
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: Colors.grey[200],
+                              child: (_authorProfile!.photoUrl != null && _authorProfile!.photoUrl!.isNotEmpty)
+                                  ? ClipOval(
+                                      child: CachedNetworkImage(
+                                        imageUrl: _authorProfile!.photoUrl!,
+                                        cacheManager: ImageCacheManager.instance,
+                                        fit: BoxFit.cover,
+                                        width: 38,
+                                        height: 38,
+                                        placeholder: (context, url) => const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                        errorWidget: (context, url, error) => ClipOval(
+                                          child: Image.asset(
+                                            'assets/images/profile.png',
+                                            fit: BoxFit.cover,
+                                            width: 38,
+                                            height: 38,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : ClipOval(
+                                      child: Image.asset(
+                                        'assets/images/profile.png',
+                                        fit: BoxFit.cover,
+                                        width: 38,
+                                        height: 38,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _authorProfile!.username.isNotEmpty ? _authorProfile!.username : 'Rucker',
+                              style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     // Stats row with Distance, Pace, Duration
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,

@@ -342,9 +342,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
     final String formattedDuration = MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds.round()));
     final String formattedElevation = MeasurementUtils.formatElevation(widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM, metric: preferMetric);
     final String formattedCalories = '${widget.ruckBuddy.caloriesBurned.round()} kcal';
-    // Debug: Log weight value to understand the issue
-    print('🎒 [UI_WEIGHT_DEBUG] RuckBuddyCard: ruckWeightKg = ${widget.ruckBuddy.ruckWeightKg}');
-    final String formattedWeight = widget.ruckBuddy.ruckWeightKg <= 0.0 ? 'Hike' : '${widget.ruckBuddy.ruckWeightKg.toInt()}kg';
+    // Debug: Log weight value and formatted output
+    print('🎒 [UI_WEIGHT_DEBUG] RuckBuddyCard: ruckWeightKg = ${widget.ruckBuddy.ruckWeightKg}, preferMetric=$preferMetric');
+    final String formattedWeight = widget.ruckBuddy.ruckWeightKg <= 0.0
+        ? 'HIKE'
+        : MeasurementUtils.formatWeightForChip(
+            widget.ruckBuddy.ruckWeightKg.toDouble(),
+            metric: preferMetric,
+          );
 
     return BlocListener<ActiveSessionBloc, ActiveSessionState>(
       listener: (context, state) {
@@ -1155,8 +1160,16 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
     print('🗺️ [MAP_WEIGHT_DEBUG] Map overlay: ruckWeightKg = ${widget.ruckWeightKg}');
+    // Read user preference from AuthBloc for proper unit conversion
+    final authState = context.watch<AuthBloc>().state;
+    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
     final String weightText = widget.ruckWeightKg != null 
-        ? (widget.ruckWeightKg! <= 0.0 ? 'Hike' : '${widget.ruckWeightKg!.toInt()}kg')
+        ? (widget.ruckWeightKg! <= 0.0
+            ? 'HIKE'
+            : MeasurementUtils.formatWeightForChip(
+                widget.ruckWeightKg!,
+                metric: preferMetric,
+              ))
         : '';
 
     if (routePoints.isEmpty) {
