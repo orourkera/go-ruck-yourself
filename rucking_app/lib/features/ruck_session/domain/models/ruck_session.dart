@@ -18,7 +18,6 @@ class RuckSession {
   // Returns a copy of this RuckSession with updated fields
   RuckSession copyWith({
     String? id,
-    String? userId,
     DateTime? startTime,
     DateTime? endTime,
     Duration? duration,
@@ -55,7 +54,6 @@ class RuckSession {
   }) {
     return RuckSession(
       id: id ?? this.id,
-      userId: userId ?? this.userId,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       duration: duration ?? this.duration,
@@ -99,7 +97,6 @@ class RuckSession {
   final int? plannedDurationMinutes;
   final int? pausedDurationSeconds;
   final String? id;
-  final String? userId; // Session author's user ID
   final DateTime startTime;
   final DateTime endTime;
   final Duration duration;
@@ -133,7 +130,6 @@ class RuckSession {
 
   RuckSession({
     this.id,
-    this.userId,
     required this.startTime,
     required this.endTime,
     required this.duration,
@@ -210,13 +206,11 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
   try {
     final parsedStartTime = RuckSession.parseDateTime(json['started_at']);
     final statusString = json['status']?.toString().toLowerCase();
-    // Ensure startTime is always non-null for the model contract
-    final DateTime startTime;
+    final DateTime? startTime;
     if (parsedStartTime == null) {
       if (statusString == 'created') {
-        // Use a safe fallback for draft/created sessions
-        startTime = DateTime.now();
-        AppLogger.info("RuckSession.fromJson: 'started_at' is null for created session ID: ${json['id']}. Using DateTime.now() as fallback startTime.");
+        startTime = null;  // Allow null for created sessions
+        AppLogger.info("RuckSession.fromJson: 'started_at' is null for created session ID: ${json['id']}. Setting startTime to null.");
       } else {
         AppLogger.error(
           "RuckSession.fromJson: Missing or invalid 'started_at' for non-created session. Session ID: ${json['id']}. JSON: $json"
@@ -233,17 +227,19 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
 
     if (potentialEndTime == null) {
       final durationSeconds = (json['duration_seconds'] as num?)?.toInt();
-      if (durationSeconds != null) {
-        // At this point, for non-created sessions, startTime must be non-null
-        potentialEndTime = startTime!.add(Duration(seconds: durationSeconds));
+      if (durationSeconds != null && startTime != null) {
+        potentialEndTime = startTime.add(Duration(seconds: durationSeconds));
         AppLogger.info("RuckSession.fromJson: 'completed_at' is null, calculated endTime from startTime and duration_seconds. Session ID: ${json['id']}");
       } else {
         if (statusString == 'in_progress' || statusString == 'inprogress') {
             AppLogger.info("RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for an in-progress session. Setting endTime to startTime. Session ID: ${json['id']}");
             potentialEndTime = startTime; // For in-progress, use startTime if no end data
+        } else if (statusString == 'created') {
+            AppLogger.info("RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for a created session. Using current time as placeholder. Session ID: ${json['id']}");
+            potentialEndTime = DateTime.now(); // For created sessions, use current time as placeholder
         } else {
             AppLogger.error(
-              "RuckSession.fromJson: Missing or invalid 'completed_at' AND 'duration_seconds' for a session not marked 'in_progress'. Session ID: ${json['id']}. Session status: '$statusString'. JSON: $json"
+              "RuckSession.fromJson: Missing or invalid 'completed_at' AND 'duration_seconds' for a session not marked 'in_progress' or 'created'. Session ID: ${json['id']}. Session status: '$statusString'. JSON: $json"
             );
             throw FormatException(
                 "RuckSession.fromJson: 'completed_at' and 'duration_seconds' are both null or invalid for session ID: ${json['id']}. Session status: '$statusString'.");
@@ -255,7 +251,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     // Calculate duration from start/end time or use duration_seconds field
     final duration = json['duration_seconds'] != null
         ? Duration(seconds: (json['duration_seconds'] as num).toInt())
-        : endTime.difference(startTime);
+        : (startTime != null ? endTime.difference(startTime) : Duration.zero);
       
       // Handle various ways distance might be stored
       double parseDistance(dynamic value) {
@@ -307,16 +303,19 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       // Extract other fields with sensible defaults
       return RuckSession(
         id: json['id']?.toString(),
-        userId: json['user_id']?.toString(),
-        startTime: startTime,
+        startTime: startTime ?? DateTime.now(), // Use current time if null
         endTime: endTime,
         duration: duration,
         distance: distance,
         elevationGain: parseDistance(json['elevation_gain_meters'] ?? json['elevation_gain_m'] ?? json['elevationGain'] ?? 0.0),
         elevationLoss: parseDistance(json['elevation_loss_meters'] ?? json['elevation_loss_m'] ?? json['elevationLoss'] ?? 0.0),
-        caloriesBurned: (json['calories_burned'] ?? json['caloriesBurned'] ?? 0) is int
-            ? (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
-            : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0).toInt(),
+        caloriesBurned: () {
+          final calorieValue = (json['calories_burned'] ?? json['caloriesBurned'] ?? 0) is int
+              ? (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
+              : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0).toInt();
+          AppLogger.info('[RUCK_SESSION] CALORIES_DEBUG: Parsing session ${json['id']}: calories_burned=${json['calories_burned']}, caloriesBurned=${json['caloriesBurned']}, final value=$calorieValue');
+          return calorieValue;
+        }(),
         averagePace: parsePace(json['average_pace'] ?? json['averagePace'], distance, duration),
         ruckWeightKg: parseDistance(json['ruck_weight_kg'] ?? json['ruckWeightKg'] ?? 0.0),
         status: status,
@@ -385,7 +384,6 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     
     return {
       'id': id,
-      'user_id': userId,
       'start_time': startTime, // Use the startTime variable directly
       'average_pace': averagePace,
       'end_time': dateFormat.format(endTime),

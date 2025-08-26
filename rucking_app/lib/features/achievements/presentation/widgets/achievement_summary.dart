@@ -31,6 +31,8 @@ class AchievementSummary extends StatefulWidget {
 
 class _AchievementSummaryState extends State<AchievementSummary> {
   String? _lastSuggestedId;
+  static String? _globalLastSuggestedId; // Persist across widget rebuilds
+  static DateTime? _lastSuggestionTime;
   @override
   void initState() {
     super.initState();
@@ -333,22 +335,52 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       scoredAchievements.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
       
       if (scoredAchievements.isNotEmpty) {
-        // Prefer top candidate, but avoid repeating the last suggestion within this session
-        Achievement top = scoredAchievements.first['achievement'] as Achievement;
-        if (_lastSuggestedId != null && top.id == _lastSuggestedId && scoredAchievements.length > 1) {
-          // Pick the next best different candidate, prefer non-elevation
-          final alt = scoredAchievements
-              .skip(1)
-              .map((m) => m['achievement'] as Achievement)
-              .firstWhere(
-                (a) => a.id != _lastSuggestedId && a.category.toLowerCase() != 'elevation',
-                orElse: () => scoredAchievements[1]['achievement'] as Achievement,
-              );
-          top = alt;
+        // Enhanced variety logic - avoid repeating recent suggestions
+        Achievement? selectedAchievement;
+        
+        // Check if we should rotate to avoid repetition
+        final now = DateTime.now();
+        final shouldRotate = _globalLastSuggestedId != null && 
+            _lastSuggestionTime != null &&
+            now.difference(_lastSuggestionTime!).inMinutes < 30; // Rotate within 30 minutes
+        
+        if (shouldRotate) {
+          // Find alternatives that aren't the last suggested achievement
+          final alternatives = scoredAchievements
+              .where((item) => (item['achievement'] as Achievement).id != _globalLastSuggestedId)
+              .toList();
+          
+          if (alternatives.isNotEmpty) {
+            // Prefer non-elevation alternatives for better variety
+            final nonElevationAlts = alternatives
+                .where((item) => (item['achievement'] as Achievement).category.toLowerCase() != 'elevation')
+                .toList();
+            
+            if (nonElevationAlts.isNotEmpty) {
+              // Use time-based rotation for consistent variety
+              final rotationIndex = (now.hour + now.day) % nonElevationAlts.length;
+              selectedAchievement = nonElevationAlts[rotationIndex]['achievement'] as Achievement;
+            } else {
+              // Fallback to any alternative
+              final rotationIndex = (now.hour + now.day) % alternatives.length;
+              selectedAchievement = alternatives[rotationIndex]['achievement'] as Achievement;
+            }
+          }
         }
-        nextChallenge = top;
-        achievementId = top.id;
-        final percent = scoredAchievements.first['percent'] as double;
+        
+        // If no rotation needed or no alternatives found, use top candidate
+        selectedAchievement ??= scoredAchievements.first['achievement'] as Achievement;
+        
+        nextChallenge = selectedAchievement;
+        achievementId = selectedAchievement.id;
+        
+        // Update global tracking
+        _globalLastSuggestedId = achievementId;
+        _lastSuggestionTime = now;
+        
+        final selectedScore = scoredAchievements
+            .firstWhere((item) => (item['achievement'] as Achievement).id == achievementId);
+        final percent = selectedScore['percent'] as double;
         final progress = state.getProgressForAchievement(nextChallenge.id);
         
         if (progress != null) {
@@ -370,14 +402,32 @@ class _AchievementSummaryState extends State<AchievementSummary> {
             .toList();
         
         if (nonElevationBeginners.isNotEmpty) {
-          // Rotate through different achievements based on day of year for variety
-          final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
-          nextChallenge = nonElevationBeginners[dayOfYear % nonElevationBeginners.length];
+          // Enhanced rotation logic - avoid recent suggestions even for beginners
+          final now = DateTime.now();
+          final availableBeginners = nonElevationBeginners
+              .where((a) => a.id != _globalLastSuggestedId)
+              .toList();
+          
+          if (availableBeginners.isNotEmpty) {
+            // Use time-based rotation for variety
+            final rotationIndex = (now.hour + now.day + now.month) % availableBeginners.length;
+            nextChallenge = availableBeginners[rotationIndex];
+          } else {
+            // All filtered out, use time-based rotation on full list
+            final rotationIndex = (now.hour + now.day + now.month) % nonElevationBeginners.length;
+            nextChallenge = nonElevationBeginners[rotationIndex];
+          }
         } else {
-          // Fallback to any beginner achievement
-          nextChallenge = beginnerAchievements[DateTime.now().millisecondsSinceEpoch % beginnerAchievements.length];
+          // Fallback to any beginner achievement with rotation
+          final now = DateTime.now();
+          final rotationIndex = (now.hour + now.day + now.month) % beginnerAchievements.length;
+          nextChallenge = beginnerAchievements[rotationIndex];
         }
         achievementId = nextChallenge.id;
+        
+        // Update global tracking for beginners too
+        _globalLastSuggestedId = achievementId;
+        _lastSuggestionTime = DateTime.now();
       } else {
         // Just get any locked achievement (prefer non-elevation)
         final nonElevationAchievements = lockedAchievements
@@ -385,11 +435,21 @@ class _AchievementSummaryState extends State<AchievementSummary> {
             .toList();
         
         if (nonElevationAchievements.isNotEmpty) {
-          nextChallenge = nonElevationAchievements[0];
+          // Apply rotation even to fallback selections
+          final now = DateTime.now();
+          final rotationIndex = (now.hour + now.day + now.month) % nonElevationAchievements.length;
+          nextChallenge = nonElevationAchievements[rotationIndex];
         } else {
-          nextChallenge = lockedAchievements[0];
+          // Last resort - rotate through all locked achievements
+          final now = DateTime.now();
+          final rotationIndex = (now.hour + now.day + now.month) % lockedAchievements.length;
+          nextChallenge = lockedAchievements[rotationIndex];
         }
         achievementId = nextChallenge.id;
+        
+        // Update global tracking for fallback selections too
+        _globalLastSuggestedId = achievementId;
+        _lastSuggestionTime = DateTime.now();
       }
     }
     

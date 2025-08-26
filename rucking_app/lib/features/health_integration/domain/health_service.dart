@@ -6,6 +6,8 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'dart:async';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
+import 'package:rucking_app/core/services/watch_service.dart';
+import 'package:get_it/get_it.dart';
 
 /// Implementation of health service using the health package
 class HealthService {
@@ -489,12 +491,14 @@ class HealthService {
         // Method 1: Try getTotalStepsInInterval (iOS specific)
         try {
           AppLogger.info('[STEPS DEBUG] Method 1: Calling health.getTotalStepsInInterval...');
+          AppLogger.info('[STEPS DEBUG] Time window: $start to $end (duration: ${end.difference(start).inMinutes} minutes)');
           final totalSteps = await _health.getTotalStepsInInterval(start, end);
+          AppLogger.info('[STEPS DEBUG] getTotalStepsInInterval returned: $totalSteps (type: ${totalSteps.runtimeType})');
           if (totalSteps != null && totalSteps > 0) {
             AppLogger.info('[STEPS DEBUG] getTotalStepsInInterval success: $totalSteps');
             return totalSteps;
           } else {
-            AppLogger.warning('[STEPS DEBUG] getTotalStepsInInterval returned: $totalSteps');
+            AppLogger.warning('[STEPS DEBUG] getTotalStepsInInterval returned null or 0: $totalSteps');
           }
         } catch (e) {
           AppLogger.error('[STEPS DEBUG] getTotalStepsInInterval failed: $e');
@@ -512,8 +516,26 @@ class HealthService {
           AppLogger.info('[STEPS DEBUG] Retrieved ${points.length} health data points');
           
           if (points.isEmpty) {
-            AppLogger.warning('[STEPS DEBUG] No health data points returned - checking if Health app has data');
-            // This could mean: 1) No data in time range, 2) Permission denied, 3) Health app has no data
+            AppLogger.warning('[STEPS DEBUG] No health data points returned for time window');
+            AppLogger.info('[STEPS DEBUG] Checking broader time window to see if ANY step data exists...');
+            
+            // Check if there's ANY step data in the last 24 hours to diagnose the issue
+            final yesterday = DateTime.now().subtract(const Duration(hours: 24));
+            final now = DateTime.now();
+            try {
+              final testPoints = await _health.getHealthDataFromTypes(
+                startTime: yesterday,
+                endTime: now,
+                types: [HealthDataType.STEPS],
+              );
+              AppLogger.info('[STEPS DEBUG] Last 24h test query returned ${testPoints.length} points');
+              if (testPoints.isNotEmpty) {
+                AppLogger.info('[STEPS DEBUG] Sample point: ${testPoints.first.dateFrom} to ${testPoints.first.dateTo}, value: ${testPoints.first.value}');
+              }
+            } catch (e) {
+              AppLogger.error('[STEPS DEBUG] 24h test query failed: $e');
+            }
+            
             return 0;
           }
           
@@ -625,17 +647,45 @@ class HealthService {
   
   Stream<int> startLiveSteps(DateTime start) {
     AppLogger.info('[STEPS LIVE] startLiveSteps called with start=$start');
+    
+    // Check if we can get real-time steps from Apple Watch
+    try {
+      final watchService = GetIt.instance<WatchService>();
+      AppLogger.info('[STEPS LIVE] Using Apple Watch for real-time step tracking');
+      
+      // Return the watch service steps stream directly
+      return watchService.stepsStream;
+    } catch (e) {
+      AppLogger.warning('[STEPS LIVE] WatchService not available, falling back to HealthKit polling: $e');
+    }
+    
+    // Fallback to HealthKit polling if watch service not available
     try {
       _stepsController?.close();
     } catch (_) {}
     _stepsController = StreamController<int>.broadcast();
     _stepsTimer?.cancel();
 
-    // Emit immediately so UI has a value without waiting 10 seconds
+    // Store session start time for calculating session-only steps
+    final sessionStart = start;
+
+    // Emit 0 immediately since HealthKit needs time to record step intervals
     (() async {
       final now = DateTime.now();
-      AppLogger.debug('[STEPS LIVE] Immediate poll for window: $start → $now');
-      final total = await getStepsBetween(start, now);
+      final sessionDuration = now.difference(sessionStart);
+      AppLogger.debug('[STEPS LIVE] Immediate poll - session duration: ${sessionDuration.inSeconds}s');
+      
+      if (sessionDuration.inMinutes < 1) {
+        // Too early - HealthKit likely hasn't recorded any intervals yet
+        AppLogger.info('[STEPS LIVE] Session too new (${sessionDuration.inSeconds}s), emitting 0 steps');
+        if (_stepsController != null && !_stepsController!.isClosed) {
+          _stepsController!.add(0);
+        }
+        return;
+      }
+      
+      // Query for steps only during the session
+      final total = await getStepsBetween(sessionStart, now);
       AppLogger.info('[STEPS LIVE] Immediate emit total steps: $total');
       if (_stepsController != null && !_stepsController!.isClosed) {
         _stepsController!.add(total);
@@ -644,8 +694,20 @@ class HealthService {
 
     _stepsTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       final now = DateTime.now();
-      AppLogger.debug('[STEPS LIVE] Polling steps for window: $start → $now');
-      final total = await getStepsBetween(start, now);
+      final sessionDuration = now.difference(sessionStart);
+      AppLogger.debug('[STEPS LIVE] Polling steps - session duration: ${sessionDuration.inMinutes}min');
+      
+      // Only query HealthKit after session has been running for at least 1 minute
+      // This gives HealthKit time to record step intervals
+      if (sessionDuration.inMinutes < 1) {
+        AppLogger.info('[STEPS LIVE] Session too new (${sessionDuration.inSeconds}s), emitting 0 steps');
+        if (_stepsController != null && !_stepsController!.isClosed) {
+          _stepsController!.add(0);
+        }
+        return;
+      }
+      
+      final total = await getStepsBetween(sessionStart, now);
       AppLogger.info('[STEPS LIVE] Emitting total steps: $total');
       if (_stepsController != null && !_stepsController!.isClosed) {
         _stepsController!.add(total);

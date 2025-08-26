@@ -100,7 +100,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       onRefresh: _loadSessions,
       child: BlocBuilder<SessionHistoryBloc, SessionHistoryState>(
         builder: (context, state) {
+          AppLogger.info('[SESSION_HISTORY_SCREEN] Building UI with state: ${state.runtimeType}');
+          
           if (state is SessionHistoryLoading) {
+            AppLogger.info('[SESSION_HISTORY_SCREEN] Showing loading skeleton');
             return SingleChildScrollView(
               child: Column(
                 children: List.generate(5, (index) => const SessionCardSkeleton()),
@@ -108,9 +111,16 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
             );
           } else if (state is SessionHistoryLoaded) {
             final sessions = state.sessions;
+            AppLogger.info('[SESSION_HISTORY_SCREEN] Loaded state with ${sessions.length} sessions');
             
             if (sessions.isEmpty) {
+              AppLogger.info('[SESSION_HISTORY_SCREEN] No sessions found, showing empty state');
               return _buildEmptyState();
+            }
+            
+            AppLogger.info('[SESSION_HISTORY_SCREEN] Building ListView with ${sessions.length} sessions');
+            for (int i = 0; i < sessions.length; i++) {
+              AppLogger.debug('[SESSION_HISTORY_SCREEN] Session $i: id=${sessions[i].id}, status=${sessions[i].status}');
             }
             
             return ListView.builder(
@@ -118,6 +128,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
               itemCount: sessions.length,
               itemBuilder: (context, index) {
                 final session = sessions[index];
+                AppLogger.debug('[SESSION_HISTORY_SCREEN] Building SessionCard for session ${session.id}');
                 return SessionCard(
                   session: session,
                   preferMetric: preferMetric,
@@ -126,8 +137,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
               },
             );
           } else if (state is SessionHistoryError) {
+            AppLogger.error('[SESSION_HISTORY_SCREEN] Error state: ${state.message}');
             return _buildErrorState(state.message);
           } else {
+            AppLogger.warning('[SESSION_HISTORY_SCREEN] Unknown state: ${state.runtimeType}');
             return const Center(
               child: Text('No session data available. Pull down to refresh.'),
             );

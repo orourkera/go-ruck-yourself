@@ -24,6 +24,8 @@ class SessionBloc extends Bloc<SessionEvent, SessionState> {
       final success = await sessionRepository.deleteSession(event.sessionId);
 
       if (success) {
+        // Clear cached lists/details so UI updates immediately
+        SessionRepository.clearSessionHistoryCache();
         emit(SessionDeleteSuccess(sessionId: event.sessionId));
       } else {
         emit(const SessionOperationFailure(
@@ -38,6 +40,8 @@ class SessionBloc extends Bloc<SessionEvent, SessionState> {
           e.toString().contains('Session not found') ||
           e.toString().contains('NotFoundException')) {
         AppLogger.warning('Session ${event.sessionId} not found in backend - treating as successful deletion');
+        // Clear cache in case of local stale entries
+        SessionRepository.clearSessionHistoryCache();
         emit(SessionDeleteSuccess(sessionId: event.sessionId));
       } else {
         emit(SessionOperationFailure(

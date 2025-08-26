@@ -284,6 +284,7 @@ class SessionLifecycleManager implements SessionManager {
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
           AppLogger.info('[LIFECYCLE] Sending completion data (attempt $attempt): ${completionData.keys.join(", ")}');
+          AppLogger.info('[LIFECYCLE] CALORIES_DEBUG: Sending calories_burned=${completionData['calories_burned']} to backend');
           await _apiClient.post('/rucks/$_activeSessionId/complete', completionData);
           completionSuccessful = true;
           AppLogger.info('[LIFECYCLE] Session completion successful with comprehensive data');
@@ -761,7 +762,9 @@ Future<void> clearCrashRecoveryData() async {
   }
 
   bool get isSessionActive => _currentState.isActive;
-  bool get isPaused => !_currentState.isActive && _activeSessionId != null;
+  // A session is considered paused when it's active but has a non-null pausedAt timestamp
+  // We deliberately keep the session active during pause, so rely on pausedAt to signal pause state
+  bool get isPaused => _currentState.pausedAt != null;
   Duration get totalPausedDuration => _currentState.totalPausedDuration;
 
   /// Public method to reset the session lifecycle manager

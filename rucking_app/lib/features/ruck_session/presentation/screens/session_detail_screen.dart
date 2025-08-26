@@ -46,6 +46,7 @@ import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/core/services/strava_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -111,6 +112,150 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       AppLogger.warning('[HEARTRATE ZONES] Failed to init zone colors: $e');
     }
   }
+
+  // Helper method to get the appropriate color based on user gender
+  Color _getLadyModeColor(BuildContext context) {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.gender == 'female') {
+        // In lady mode, emphasize with secondary color if available
+        return Theme.of(context).colorScheme.secondary;
+      }
+    } catch (e) {
+      // If we can't access the AuthBloc, fall back to default color
+    }
+    return Theme.of(context).primaryColor;
+  }
+
+  // Refresh Strava connection status for CTA labeling and actions
+  Future<void> _refreshStravaStatus() async {
+    try {
+      if (mounted) {
+        setState(() {
+          _loadingStravaStatus = true;
+        });
+      }
+
+      final status = await _stravaService.getConnectionStatus();
+
+      if (!mounted) return;
+      setState(() {
+        _stravaConnected = status.connected;
+        _loadingStravaStatus = false;
+      });
+    } catch (e, stackTrace) {
+      AppLogger.error('[STRAVA] Failed to refresh connection status: $e', exception: e, stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() {
+        _stravaConnected = false;
+        _loadingStravaStatus = false;
+      });
+    }
+  }
+
+  // Handle Strava CTA: connect if not connected, otherwise export current session
+  Future<void> _handleStravaCta() async {
+    if (_isExportingToStrava) return;
+    try {
+      // If we don't yet know, refresh quickly
+      if (_loadingStravaStatus) {
+        await _refreshStravaStatus();
+      }
+
+      if (!_stravaConnected) {
+        // Initiate OAuth flow
+        final opened = await _stravaService.connectToStrava();
+        if (opened && mounted) {
+          StyledSnackBar.show(
+            context: context,
+            message: 'Opening Strava authorization...'
+          );
+        }
+        // Give the app a moment, then refresh status once
+        await Future.delayed(const Duration(seconds: 2));
+        await _refreshStravaStatus();
+        return;
+      }
+
+      // Export flow
+      if (mounted) {
+        setState(() => _isExportingToStrava = true);
+      }
+
+      final session = currentSession;
+      final sessionId = session.id;
+      if (sessionId == null || sessionId.isEmpty) {
+        if (mounted) {
+          StyledSnackBar.showError(context: context, message: 'Missing session ID for Strava export');
+        }
+        return;
+      }
+
+      // User unit preference
+      final authState = context.read<AuthBloc>().state;
+      final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+
+      // Build name/description (try AI-generated title, fallback to formatter)
+      String sessionName = _stravaService.formatSessionName(
+        ruckWeightKg: session.ruckWeightKg ?? 0.0,
+        distanceKm: session.distance,
+        duration: session.duration,
+        preferMetric: preferMetric,
+      );
+
+      try {
+        final ai = GetIt.I<OpenAIService>();
+        final aiTitle = await ai.generateStravaTitle(
+          distanceKm: session.distance,
+          duration: session.duration,
+          ruckWeightKg: session.ruckWeightKg ?? 0.0,
+          preferMetric: preferMetric,
+          startTime: session.startTime,
+          // city: could be derived from route in future; omitted for now
+        );
+        if (aiTitle != null && aiTitle.isNotEmpty) {
+          sessionName = aiTitle;
+        }
+      } catch (e, st) {
+        AppLogger.warning('[STRAVA][AI] Title generation failed, using fallback: $e');
+      }
+
+      final description = _stravaService.formatSessionDescription(
+        ruckWeightKg: session.ruckWeightKg ?? 0.0,
+        distanceKm: session.distance,
+        duration: session.duration,
+        preferMetric: preferMetric,
+        calories: session.caloriesBurned,
+      );
+
+      final success = await _stravaService.exportRuckSession(
+        sessionId: sessionId,
+        sessionName: sessionName,
+        ruckWeightKg: session.ruckWeightKg ?? 0.0,
+        duration: session.duration,
+        distanceMeters: session.distance * 1000.0,
+        description: description,
+      );
+
+      if (mounted) {
+        if (success) {
+          StyledSnackBar.showSuccess(context: context, message: 'Successfully exported to Strava!');
+        } else {
+          StyledSnackBar.showError(context: context, message: 'Failed to export to Strava.');
+        }
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('[STRAVA] CTA failed: $e', exception: e, stackTrace: stackTrace);
+      if (mounted) {
+        StyledSnackBar.showError(context: context, message: 'Strava action failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingToStrava = false);
+      }
+    }
+  }
+
 
   @override
   void initState() {
@@ -269,7 +414,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   // Load the session author's profile using the session.userId
   Future<void> _loadAuthorProfile() async {
     try {
-      final userId = widget.session.userId ?? _fullSession?.userId;
+      // Since userId was removed from RuckSession, we'll need to get it from the auth service
+      final authState = context.read<AuthBloc>().state;
+      final userId = authState is Authenticated ? authState.user.userId : null;
       if (userId == null || userId.isEmpty) {
         AppLogger.warning('[SESSION DETAIL] No userId on session; cannot load author profile');
         return;
@@ -294,19 +441,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         });
       }
     }
-  }
-
-  // Helper method to get the appropriate color based on user gender
-  Color _getLadyModeColor(BuildContext context) {
-    try {
-      final authState = context.read<AuthBloc>().state;
-      if (authState is Authenticated && authState.user.gender == 'female') {
-        return Theme.of(context).primaryColor;
-      }
-    } catch (e) {
-      // If we can't access the AuthBloc, fall back to default color
-    }
-    return Theme.of(context).primaryColor;
   }
 
   // Heart rate calculation helper methods (from feature/heart-rate-viz)
@@ -712,26 +846,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    // Strava CTA button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _isExportingToStrava ? null : _handleStravaCta,
-                        icon: const Icon(Icons.directions_run),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: _stravaConnected ? const Color(0xFFFC4C02) : Theme.of(context).primaryColor,
-                          foregroundColor: Colors.white,
-                        ),
-                        label: Text(
-                          _loadingStravaStatus
-                              ? 'Checking Strava...'
-                              : (_stravaConnected ? 'Export to Strava' : 'Connect to Strava'),
-                          style: AppTextStyles.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -1050,7 +1164,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             const SizedBox(height: 12),
                             
                             // Average HR stat item
-                            if (widget.session.avgHeartRate != null && widget.session.avgHeartRate! > 0 || 
+                            if ((widget.session.avgHeartRate != null && widget.session.avgHeartRate! > 0) ||
                                 (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
                               _buildStatItem(
                                 context,
@@ -1061,7 +1175,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               ),
                               
                             // Max HR stat item
-                            if (widget.session.maxHeartRate != null && widget.session.maxHeartRate! > 0 || 
+                            if ((widget.session.maxHeartRate != null && widget.session.maxHeartRate! > 0) ||
                                 (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
                               _buildStatItem(
                                 context,
@@ -1269,7 +1383,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('TIME IN ZONES', style: AppTextStyles.displaySmall.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.red : const Color(0xFF3E2723))),
+                                  Text(
+                                    'TIME IN ZONES',
+                                    style: AppTextStyles.displaySmall.copyWith(
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.red : const Color(0xFF3E2723),
+                                    ),
+                                  ),
                                   const SizedBox(height: 10),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1297,6 +1416,48 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       );
                     }),
                   ],
+                ),
+              ),
+              // Strava CTA button - moved below heart rate section
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isExportingToStrava ? null : _handleStravaCta,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: _isExportingToStrava
+                          ? Container(
+                              width: 250,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFC4C02),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Image.asset(
+                              'assets/images/btn_strava_connect_with_orange.png',
+                              width: 250,
+                              fit: BoxFit.contain,
+                            ),
+                    ),
+                  ),
                 ),
               ),
               // Comments Section

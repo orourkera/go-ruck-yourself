@@ -12,6 +12,7 @@ import FirebaseCore
     private let watchHealthChannelName = "com.getrucky.gfy/watch_health"
     private let userPrefsChannelName = "com.getrucky.gfy/user_preferences"
     private let eventChannelName = "com.getrucky.gfy/heartRateStream"
+    private let stepEventChannelName = "com.getrucky.gfy/stepStream"
     private let queuedMessagesKey = "WCQueuedMessages"
     
     override func application(
@@ -151,6 +152,10 @@ import FirebaseCore
         // Setup Flutter Event Channel for streaming heart rate data to Dart
         let eventChannel = FlutterEventChannel(name: eventChannelName, binaryMessenger: controller.binaryMessenger)
         eventChannel.setStreamHandler(HeartRateStreamHandler())
+        
+        // Setup Flutter Event Channel for streaming step count data to Dart
+        let stepEventChannel = FlutterEventChannel(name: stepEventChannelName, binaryMessenger: controller.binaryMessenger)
+        stepEventChannel.setStreamHandler(StepCountStreamHandler())
         
         // Register for push notifications and get APNS token
         if #available(iOS 10.0, *) {
@@ -409,6 +414,15 @@ import FirebaseCore
                     // Acknowledge the heart rate reception if reply handler is available
                     replyHandler?(["status": "success", "heartRateReceived": heartRate])
                 }
+            case "watchStepUpdate":
+                if let steps = message["steps"] as? Int {
+                    print("[WATCH] Step update received: \(steps) steps")
+                    // Forward step update to Flutter via EventChannel
+                    StepCountStreamHandler.sendStepCount(steps)
+                    
+                    // Acknowledge the step reception if reply handler is available
+                    replyHandler?(["status": "success", "stepsReceived": steps])
+                }
             default:
                 print("[WATCH] Unknown command: \(command)")
                 replyHandler?(["status": "error", "message": "Unknown command \(command)"])
@@ -476,7 +490,106 @@ import FirebaseCore
     
     override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for remote notifications: \(error)")
-        super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
+        return super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
+    }
+}
+
+// Stream handler for step count data to Flutter
+class StepCountStreamHandler: NSObject, FlutterStreamHandler {
+    private static var eventSink: FlutterEventSink?
+    private static var lastErrorLogTime: Date?
+    private static var lastStepCountSent: Int?
+    private static var lastStepCountSentTime: Date?
+    private static var pendingStepCounts: [Int] = []
+    private static var isListening: Bool = false
+    
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        print("🟢 [WATCH] StepCountStreamHandler.onListen called - setting up event sink")
+        StepCountStreamHandler.eventSink = events
+        StepCountStreamHandler.isListening = true
+        
+        // Send any pending step counts that were buffered while sink was unavailable
+        if !StepCountStreamHandler.pendingStepCounts.isEmpty {
+            let countsToSend = StepCountStreamHandler.pendingStepCounts
+            StepCountStreamHandler.pendingStepCounts.removeAll()
+            
+            for (index, count) in countsToSend.enumerated() {
+                let delay = Double(index) * 0.1
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    if StepCountStreamHandler.isListening, let sink = StepCountStreamHandler.eventSink {
+                        sink(count)
+                    }
+                }
+            }
+        }
+        
+        // If we have a recent step count, send it immediately
+        if let lastCount = StepCountStreamHandler.lastStepCountSent,
+           let lastTime = StepCountStreamHandler.lastStepCountSentTime,
+           Date().timeIntervalSince(lastTime) < 60 {
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if StepCountStreamHandler.isListening {
+                    events(lastCount)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        print("🔴 [WATCH] StepCountStreamHandler.onCancel called - removing event sink")
+        StepCountStreamHandler.isListening = false
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            if !StepCountStreamHandler.isListening {
+                print("🔴 [WATCH] Clearing step count event sink after delay")
+                StepCountStreamHandler.eventSink = nil
+            }
+        }
+        return nil
+    }
+    
+    static func sendStepCount(_ stepCount: Int) {
+        lastStepCountSent = stepCount
+        lastStepCountSentTime = Date()
+        
+        print("[WATCH] Processing step count: \(stepCount)")
+        
+        if Thread.isMainThread {
+            sendStepCountOnMainThread(stepCount)
+        } else {
+            DispatchQueue.main.async {
+                sendStepCountOnMainThread(stepCount)
+            }
+        }
+    }
+    
+    private static func sendStepCountOnMainThread(_ stepCount: Int) {
+        if isListening, let sink = eventSink {
+            print("[WATCH] Sending step count to Flutter: \(stepCount)")
+            let message = [
+                "command": "watchStepUpdate",
+                "steps": stepCount
+            ] as [String: Any]
+            sink(message)
+            
+            pendingStepCounts.removeAll { $0 == stepCount }
+        } else {
+            if !pendingStepCounts.contains(stepCount) {
+                pendingStepCounts.append(stepCount)
+                if pendingStepCounts.count > 50 {
+                    pendingStepCounts.removeFirst()
+                }
+            }
+            
+            let now = Date()
+            if lastErrorLogTime == nil || now.timeIntervalSince(lastErrorLogTime!) > 10 {
+                print("❌ [WATCH] ERROR: Cannot send step count to Flutter - eventSink is nil")
+                lastErrorLogTime = now
+            }
+        }
     }
 }
 
@@ -578,9 +691,12 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
     
     private static func sendHeartRateOnMainThread(_ heartRate: Double) {
         if isListening, let sink = eventSink {
-            // Sending heart rate to Flutter
-            // IMPORTANT: Send as Int - the UI may expect integer values
-            sink(heartRate)
+            // Sending heart rate to Flutter as a properly formatted message
+            let message = [
+                "command": "watchHeartRateUpdate",
+                "heartRate": heartRate
+            ] as [String: Any]
+            sink(message)
             // Heart rate sent to Flutter
             
             // Clear successful send from pending buffer if it was there

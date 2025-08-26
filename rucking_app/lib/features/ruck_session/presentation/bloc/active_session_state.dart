@@ -381,6 +381,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
   final bool isOffline;
   final double ruckWeightKg;
   final int? steps;
+  final String? aiCompletionInsight;
   
   const ActiveSessionCompleted({
     required this.sessionId,
@@ -401,6 +402,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
     this.isOffline = false,
     required this.ruckWeightKg,
     this.steps,
+    this.aiCompletionInsight,
   });
   
   @override
@@ -423,6 +425,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
     isOffline,
     ruckWeightKg,
     steps,
+    aiCompletionInsight,
   ];
 }
 

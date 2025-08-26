@@ -184,6 +184,16 @@ class MetCalculator {
     if (distanceKm <= 0.01 && (elevationGain + elevationLoss) <= 10.0) {
       // Resting metabolic rate: ~1.2 MET * weight * time (not including ruck weight when stationary)
       final restingCalories = 1.2 * userWeightKg * (elapsedSeconds / 3600.0);
+      
+      // If activeOnly is enabled, subtract resting energy to get only active calories
+      if (activeOnly && elapsedSeconds > 0) {
+        final durationHours = elapsedSeconds / 3600.0;
+        final bmrPerHour = _estimateBmrKcalPerDay(weightKg: userWeightKg, age: age, gender: gender ?? 'male') / 24.0;
+        final restingKcal = bmrPerHour * durationHours;
+        final activeCalories = (restingCalories - restingKcal).clamp(0.0, double.infinity);
+        return activeCalories;
+      }
+      
       return restingCalories;
     }
     

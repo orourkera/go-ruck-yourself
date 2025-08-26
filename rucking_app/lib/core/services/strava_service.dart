@@ -173,7 +173,7 @@ class StravaService {
     }
     
     buffer.writeln();
-    buffer.writeln('Tracked with Ruck!');
+    buffer.writeln("Tracked with Ruck! The world's #1 rucking app for iOS and Android.");
     
     return buffer.toString();
   }

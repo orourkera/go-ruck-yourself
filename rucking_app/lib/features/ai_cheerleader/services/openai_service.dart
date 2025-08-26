@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.dart';
@@ -146,6 +147,67 @@ class OpenAIService {
       return null;
     } catch (e) {
       AppLogger.error('[OPENAI] Failed to generate message: $e');
+      return null;
+    }
+  }
+
+  /// Generate a concise Strava activity title (8-12 words, emojis allowed)
+  /// Returns null on failure/timeout so callers can fallback.
+  Future<String?> generateStravaTitle({
+    required double distanceKm,
+    required Duration duration,
+    required double ruckWeightKg,
+    required bool preferMetric,
+    String? city,
+    DateTime? startTime,
+  }) async {
+    try {
+      final distance = preferMetric
+          ? '${distanceKm.toStringAsFixed(distanceKm >= 10 ? 0 : 2)} km'
+          : '${(distanceKm * 0.621371).toStringAsFixed(distanceKm >= 10 ? 0 : 2)} mi';
+      final weight = preferMetric
+          ? '${ruckWeightKg.round()} kg'
+          : '${(ruckWeightKg * 2.20462).round()} lb';
+      final mins = duration.inMinutes;
+      final timeOfDay = startTime != null ? DateFormat('EEEE').format(startTime) : '';
+
+      final prompt = [
+        'You are naming a Strava activity for a weighted ruck workout.',
+        'Write ONE catchy title, 8-12 words. Emojis allowed. No hashtags.',
+        'Avoid generic words like "Workout" or "Activity". Prefer unique phrasing.',
+        'Context:',
+        'distance=$distance, duration=${mins}m, ruck_weight=$weight, city=${city ?? 'Unknown'}, day=$timeOfDay.',
+        'Output just the title text.'
+      ].join('\n');
+
+      final completion = await OpenAI.instance.chat.create(
+        model: _model,
+        messages: [
+          OpenAIChatCompletionChoiceMessageModel(
+            content: [OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)],
+            role: OpenAIChatMessageRole.user,
+          ),
+        ],
+        maxTokens: 32,
+        temperature: 0.8,
+      ).timeout(const Duration(seconds: 4));
+
+      var title = completion.choices.first.message.content?.first.text?.trim();
+      if (title == null || title.isEmpty) return null;
+      // Sanitize: single line, clamp length (keep emojis)
+      title = title.replaceAll('\n', ' ').trim();
+      // Remove enclosing quotes if any
+      if (title.startsWith('"') && title.endsWith('"') && title.length > 2) {
+        title = title.substring(1, title.length - 1).trim();
+      }
+      // Hard cap ~70 chars
+      if (title.length > 70) {
+        title = title.substring(0, 70).trimRight();
+      }
+      return title.isEmpty ? null : title;
+    } on TimeoutException {
+      return null;
+    } catch (_) {
       return null;
     }
   }

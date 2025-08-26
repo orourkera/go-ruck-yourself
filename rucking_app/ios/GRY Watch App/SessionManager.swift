@@ -16,12 +16,13 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     private var workoutManager: WorkoutManager!
     // Published properties for SwiftUI
     @Published var status: String = "--"
-    @Published var heartRate: Int = 0
-    @Published var calories: Int = 0
+    @Published var heartRate: Double = 0.0
+    @Published var calories: Double = 0.0
     @Published var elevationGain: Double = 0.0
     @Published var elevationLoss: Double = 0.0
     @Published var distanceValue: Double = 0.0
     @Published var paceValue: Double = 0.0
+    @Published var steps: Int = 0
     @Published var isPaused: Bool = false
     @Published var isSessionActive: Bool = false
     @Published var currentZone: String? = nil
@@ -45,10 +46,13 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         status
     }
     var heartRateText: String {
-        heartRate > 0 ? "\(heartRate)" : "--"
+        heartRate > 0 ? "\(Int(heartRate))" : "--"
     }
     var caloriesText: String {
-        calories > 0 ? "\(calories)" : "--"
+        calories > 0 ? "\(Int(calories))" : "--"
+    }
+    var stepsText: String {
+        steps > 0 ? "\(steps)" : "--"
     }
     var elevationText: String {
         if elevationGain <= 0 {
@@ -150,16 +154,26 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     private func requestHealthKitPermissions() {
         print("[WATCH] Requesting HealthKit permissions...")
         
-        // Set up heart rate handler first
-        workoutManager.setHeartRateHandler { [weak self] (heartRate: Double) in
-            guard let self = self else { return }
-            print("[WATCH] Heart rate received: \(heartRate) BPM")
-            // Update UI with heart rate
+        // Set up heart rate handler
+        workoutManager.setHeartRateHandler { [weak self] heartRate in
             DispatchQueue.main.async {
-                self.heartRate = Int(heartRate)
+                self?.heartRate = heartRate
+                print("[SESSION_MANAGER] Heart rate updated: \(heartRate) BPM")
+                
+                // Send heart rate to phone via WatchConnectivity
+                self?.sendHeartRate(heartRate)
             }
-            // Send heart rate to iOS app
-            self.sendHeartRate(heartRate)
+        }
+        
+        // Set up step count handler
+        workoutManager.setStepCountHandler { [weak self] stepCount in
+            DispatchQueue.main.async {
+                self?.steps = stepCount
+                print("[SESSION_MANAGER] Steps updated: \(stepCount) steps")
+                
+                // Send steps to phone via WatchConnectivity
+                self?.sendSteps(stepCount)
+            }
         }
         
         // Request HealthKit permissions with detailed logging
@@ -213,15 +227,31 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Send with a reply handler to confirm receipt
         if session.activationState == .activated && session.isReachable {
-            session.sendMessage(message, replyHandler: { reply in
-                // Heart rate receipt confirmed - no logging needed
-            }) { error in
-                // Only log errors
-                print("[WATCH] Error sending heart rate: \(error.localizedDescription)")
+            session.sendMessage(message) { reply in
+                // Message sent successfully
+            } errorHandler: { error in
+                print("[WATCH] Failed to send heart rate: \(error.localizedDescription)")
             }
         } else {
             // Queue as user info for background delivery
             session.transferUserInfo(["type": "hr_sample", "bpm": heartRate, "timestamp": Date().timeIntervalSince1970])
+        }
+    }
+    
+    func sendSteps(_ steps: Int) {
+        // Create a dedicated steps message with the command
+        let message: [String: Any] = ["steps": steps, "command": "watchStepUpdate"]
+        
+        // Send with a reply handler to confirm receipt
+        if session.activationState == .activated && session.isReachable {
+            session.sendMessage(message) { reply in
+                // Message sent successfully
+            } errorHandler: { error in
+                print("[WATCH] Failed to send steps: \(error.localizedDescription)")
+            }
+        } else {
+            // Queue as user info for background delivery
+            session.transferUserInfo(["type": "step_sample", "steps": steps, "timestamp": Date().timeIntervalSince1970])
         }
     }
     
@@ -434,6 +464,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     self.calories = 0
                     self.distanceValue = 0.0
                     self.paceValue = 0.0
+                    self.steps = 0
                     self.elevationGain = 0.0
                     self.elevationLoss = 0.0
                     
@@ -502,6 +533,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                             self.calories = 0
                             self.distanceValue = 0.0
                             self.paceValue = 0.0
+                            self.steps = 0
                             self.elevationGain = 0.0
                             self.elevationLoss = 0.0
                             self.workoutManager.stopWorkout()
@@ -618,12 +650,17 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Update heart rate when present (silently)
         if let hr = metrics["heartRate"] as? Double {
-            self.heartRate = Int(hr)
+            self.heartRate = hr
+        }
+        
+        // Update steps when present
+        if let stepCount = metrics["steps"] as? Int {
+            self.steps = stepCount
         }
         
         // Update calories when present
         if let cal = metrics["calories"] as? Double {
-            self.calories = Int(cal)
+            self.calories = cal
         }
         
         // Update elevation data when present
@@ -813,6 +850,7 @@ extension SessionManager {
             self.calories = 0
             self.elevationGain = 0.0
             self.elevationLoss = 0.0
+            self.steps = 0
             self.distanceValue = 0.0
             self.paceValue = 0.0
             self.splitDistance = ""

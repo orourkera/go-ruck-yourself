@@ -46,6 +46,10 @@ struct CompactWorkoutView: View {
                           labelLines: [" ", " "]) // No label text – glyph suffices
                     .padding(.top, -4)
 
+                // Steps
+                metricRow(value: sessionManager.stepsText, labelLines: ["STEPS", " "])
+                    .padding(.top, -4)
+
                 // Pace with label, but value without unit
                 metricRow(value: sessionManager.pace, labelLines: ["AVERAGE", "PACE"])
                     .padding(.top, -4)
@@ -133,6 +137,31 @@ struct CompactWorkoutView: View {
                 }
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.white)
+            }
+        }
+    }
+}
+
+struct MetricView: View {
+    let title: String
+    let value: String
+    let unit: String
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 2) {
+            Text(value)
+                .font(.system(size: 30, weight: .regular, design: .default))
+                .foregroundColor(.white)
+                .monospacedDigit()
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(color)
+                Text(unit)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(color)
             }
         }
     }

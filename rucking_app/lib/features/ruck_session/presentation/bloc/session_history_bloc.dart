@@ -63,6 +63,16 @@ class SessionHistoryBloc extends Bloc<SessionHistoryEvent, SessionHistoryState> 
         endDate: endDate,
       );
       
+      AppLogger.info('[SESSION_HISTORY_BLOC] Fetched ${sessions.length} sessions from repository');
+      if (sessions.isNotEmpty) {
+        AppLogger.info('[SESSION_HISTORY_BLOC] First session: id=${sessions.first.id}, status=${sessions.first.status}, distance=${sessions.first.distance}km');
+        AppLogger.info('[SESSION_HISTORY_BLOC] All session IDs: ${sessions.map((s) => s.id).join(', ')}');
+        AppLogger.info('[SESSION_HISTORY_BLOC] All session statuses: ${sessions.map((s) => s.status).join(', ')}');
+      } else {
+        AppLogger.warning('[SESSION_HISTORY_BLOC] No sessions returned - history will be empty');
+      }
+      
+      AppLogger.info('[SESSION_HISTORY_BLOC] Emitting SessionHistoryLoaded with ${sessions.length} sessions');
       emit(SessionHistoryLoaded(sessions: sessions));
     } catch (e) {
       // Enhanced error handling with Sentry

@@ -1293,14 +1293,20 @@ class SessionRepository {
       AppLogger.info('[SESSION_HISTORY] Fetching sessions with endpoint: $endpoint');
       final response = await _apiClient.get(endpoint);
       
+      AppLogger.info('[SESSION_HISTORY] Raw API response type: ${response?.runtimeType}');
+      AppLogger.info('[SESSION_HISTORY] Raw API response length/keys: ${response is List ? response.length : (response is Map ? response.keys.length : 'N/A')}');
+      
       List<dynamic> sessionsList = [];
       
       // Handle different response formats from the API
       if (response == null) {
+        AppLogger.warning('[SESSION_HISTORY] API response is null');
         sessionsList = [];
       } else if (response is List) {
+        AppLogger.info('[SESSION_HISTORY] API response is List with ${response.length} items');
         sessionsList = response;
       } else if (response is Map) {
+        AppLogger.info('[SESSION_HISTORY] API response is Map with keys: ${response.keys.join(', ')}');
         // Look for common API response patterns
         if (response.containsKey('data')) {
           sessionsList = response['data'] as List;
@@ -1327,15 +1333,34 @@ class SessionRepository {
         AppLogger.warning('[SESSION_HISTORY] Unknown response type from API');
       }
       
-      // Convert to RuckSession objects
-      final sessions = sessionsList
-          .map((session) => RuckSession.fromJson(session))
-          .toList();
+      // Convert to RuckSession objects with debug logging
+      AppLogger.info('[SESSION_HISTORY] Converting ${sessionsList.length} raw sessions to RuckSession objects');
+      final sessions = <RuckSession>[];
+      
+      for (int i = 0; i < sessionsList.length; i++) {
+        try {
+          final rawSession = sessionsList[i];
+          AppLogger.debug('[SESSION_HISTORY] Converting session $i: id=${rawSession['id']}, status=${rawSession['status']}');
+          final session = RuckSession.fromJson(rawSession);
+          sessions.add(session);
+          AppLogger.debug('[SESSION_HISTORY] Successfully converted session ${session.id} with status ${session.status}');
+        } catch (e) {
+          AppLogger.error('[SESSION_HISTORY] Failed to parse session $i: $e');
+          AppLogger.error('[SESSION_HISTORY] Raw session data: ${sessionsList[i]}');
+        }
+      }
           
       // Filter for completed sessions ONLY
+      AppLogger.info('[SESSION_HISTORY] Filtering ${sessions.length} sessions for completed status');
       final completedSessions = sessions
-          .where((s) => s.status == RuckStatus.completed)
+          .where((s) {
+            final isCompleted = s.status == RuckStatus.completed;
+            AppLogger.debug('[SESSION_HISTORY] Session ${s.id}: status=${s.status}, isCompleted=$isCompleted');
+            return isCompleted;
+          })
           .toList();
+      
+      AppLogger.info('[SESSION_HISTORY] Found ${completedSessions.length} completed sessions out of ${sessions.length} total');
           
       // Sort by date (newest first)
       completedSessions.sort((a, b) => b.startTime.compareTo(a.startTime));

@@ -895,6 +895,21 @@ class WatchService {
       await _sendMessageToWatch({
         'command': 'workoutStopped',
       });
+
+      // Also explicitly sync final state to ensure UI resets
+      try {
+        await _sendMessageToWatch({
+          'command': 'updateSessionState',
+          'isPaused': false,
+          'isMetric': true,
+          'isSessionActive': false,
+        });
+        await _sendMessageToWatch({
+          'command': 'sessionEnded',
+        });
+      } catch (e) {
+        AppLogger.debug('[WATCH_SERVICE] Non-fatal: failed to send final state/sessionEnded to watch: $e');
+      }
       
       // Give the watch a moment to process the termination command
       await Future.delayed(const Duration(milliseconds: 500));

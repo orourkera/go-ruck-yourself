@@ -822,6 +822,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       
                       if (state is ActiveSessionCompleted) {
                         print('[UI] ActiveSessionCompleted state received: distance=${state.finalDistanceKm}km, duration=${state.finalDurationSeconds}s, calories=${state.finalCalories}, elevation=${state.elevationGain}m gain/${state.elevationLoss}m loss');
+                        print('[UI] AI insight available: ${state.aiCompletionInsight != null ? 'YES (${state.aiCompletionInsight!.length} chars)' : 'NO'}');
                         
                         // Navigate to SessionCompleteScreen with full session data
                         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -839,6 +840,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 heartRateSamples: state.heartRateSamples,
                                 splits: state.splits.isEmpty ? null : state.splits,
                                 terrainSegments: null, // Can be added later if needed
+                                aiCompletionInsight: state.aiCompletionInsight,
                               ),
                             ),
                           );

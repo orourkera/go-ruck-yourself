@@ -78,6 +78,7 @@ class SessionCompleteScreen extends StatefulWidget {
   final List<TerrainSegment>? terrainSegments;
   final bool isManual;
   final int? steps;
+  final String? aiCompletionInsight;
 
   const SessionCompleteScreen({
     super.key,
@@ -95,6 +96,7 @@ class SessionCompleteScreen extends StatefulWidget {
     this.terrainSegments,
     this.isManual = false,
     this.steps,
+    this.aiCompletionInsight,
   });
 
   @override
@@ -161,8 +163,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Auto-save the main session data immediately
     _autoSaveBasicSession();
     
-    // Generate AI completion insights
-    _generateCompletionInsights();
+    // Check if AI insight was already generated during session completion
+    if (widget.aiCompletionInsight != null) {
+      _aiCompletionInsight = widget.aiCompletionInsight;
+      _isGeneratingInsight = false; // Ensure no loading state
+      AppLogger.info('[AI_COMPLETION] Using pre-generated AI insight from session completion: ${widget.aiCompletionInsight?.substring(0, 50)}...');
+    } else {
+      // Fallback: Generate AI completion insights if not provided
+      AppLogger.warning('[AI_COMPLETION] No pre-generated insight found, falling back to local generation');
+      _generateCompletionInsights();
+    }
   }
 
   @override
@@ -1282,15 +1292,7 @@ Generate exactly ONE sentence that quotes one specific fact from the session dat
           const SizedBox(height: 16),
           
           // AI-generated completion insight or fallback
-          if (_isGeneratingInsight)
-            Column(
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 8),
-                Text('Analyzing your session...', style: AppTextStyles.titleMedium),
-              ],
-            )
-          else if (_aiCompletionInsight != null)
+          if (_aiCompletionInsight != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -1301,6 +1303,14 @@ Generate exactly ONE sentence that quotes one specific fact from the session dat
                 ),
                 textAlign: TextAlign.center,
               ),
+            )
+          else if (_isGeneratingInsight)
+            Column(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 8),
+                Text('Analyzing your session...', style: AppTextStyles.titleMedium),
+              ],
             )
           else
             Column(

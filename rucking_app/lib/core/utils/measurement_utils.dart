@@ -92,7 +92,7 @@ class MeasurementUtils {
     return '+${gain.round()}${metric ? 'm' : 'ft'}/-${loss.round()}${metric ? 'm' : 'ft'}';
   }
 
-  /// Weight formatted with one decimal place + unit label.
+  /// Weight formatted without decimals + unit label.
   /// Shows 'HIKE' when weight is 0 (for hiking without additional weight).
   static String formatWeight(double kg, {required bool metric}) {
     // Show 'HIKE' for zero weight sessions (hiking without additional weight)
@@ -101,10 +101,10 @@ class MeasurementUtils {
     }
     
     if (metric) {
-      return '${kg.toStringAsFixed(1)} kg'; // Show one decimal place for metric
+      return '${kg.round()} kg'; // Show whole numbers for metric
     } else {
       final lbs = kg * AppConfig.kgToLbs;
-      return '${lbs.toStringAsFixed(1)} lbs'; // Show one decimal place for imperial too
+      return '${lbs.round()} lbs'; // Show whole numbers for imperial too
     }
   }
   
