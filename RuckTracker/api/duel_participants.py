@@ -3,7 +3,7 @@ from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError
 from datetime import datetime
 from RuckTracker.supabase_client import get_supabase_client
-from api.auth import auth_required
+from .auth import auth_required
 
 # ============================================================================
 # SCHEMAS
@@ -131,7 +131,7 @@ class DuelParticipantProgressResource(Resource):
                     }], on_conflict='user_id').execute()
                     
                     # Create duel completed notification for all participants
-                    from api.duel_comments import create_duel_completed_notification
+                    from .duel_comments import create_duel_completed_notification
                     create_duel_completed_notification(duel_id)
                 else:
                     # Tie
@@ -142,7 +142,7 @@ class DuelParticipantProgressResource(Resource):
                     }).eq('id', duel_id).execute()
                     
                     # Create duel completed notification for all participants
-                    from api.duel_comments import create_duel_completed_notification
+                    from .duel_comments import create_duel_completed_notification
                     create_duel_completed_notification(duel_id)
             
             return {

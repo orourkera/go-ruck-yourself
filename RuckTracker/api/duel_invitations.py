@@ -4,7 +4,7 @@ from marshmallow import Schema, fields, ValidationError
 from datetime import datetime, timedelta
 import uuid
 from RuckTracker.supabase_client import get_supabase_client
-from api.auth import auth_required
+from .auth import auth_required
 
 # ============================================================================
 # SCHEMAS

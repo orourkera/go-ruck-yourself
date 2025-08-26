@@ -2,7 +2,7 @@ from flask import request, g
 from flask_restful import Resource
 from datetime import datetime, timedelta
 from RuckTracker.supabase_client import get_supabase_client
-from api.auth import auth_required
+from .auth import auth_required
 
 # ============================================================================
 # RESOURCES

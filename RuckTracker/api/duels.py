@@ -4,7 +4,7 @@ from marshmallow import Schema, fields, ValidationError, validates_schema
 from datetime import datetime, timedelta, timezone
 import uuid
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
-from api.auth import auth_required
+from .auth import auth_required
 import logging
 
 # ============================================================================
@@ -698,7 +698,7 @@ class DuelCompletionCheckResource(Resource):
             }).eq('id', duel_id).execute()
             
             # Send push notifications (database notifications handled by trigger)
-            from api.duel_comments import send_duel_completed_push_notifications
+            from .duel_comments import send_duel_completed_push_notifications
             send_duel_completed_push_notifications(duel_id)
             
             return {
@@ -719,7 +719,7 @@ class DuelCompletionCheckResource(Resource):
             }).eq('id', duel_id).execute()
             
             # Send push notifications (database notifications handled by trigger)
-            from api.duel_comments import send_duel_completed_push_notifications
+            from .duel_comments import send_duel_completed_push_notifications
             send_duel_completed_push_notifications(duel_id)
             
             return {
@@ -751,7 +751,7 @@ class DuelCompletionCheckResource(Resource):
             }], on_conflict='user_id').execute()
             
             # Send push notifications (database notifications handled by trigger)
-            from api.duel_comments import send_duel_completed_push_notifications
+            from .duel_comments import send_duel_completed_push_notifications
             send_duel_completed_push_notifications(duel_id)
             
             return {
@@ -768,7 +768,7 @@ class DuelCompletionCheckResource(Resource):
             }).eq('id', duel_id).execute()
             
             # Send push notifications (database notifications handled by trigger)
-            from api.duel_comments import send_duel_completed_push_notifications
+            from .duel_comments import send_duel_completed_push_notifications
             send_duel_completed_push_notifications(duel_id)
             
             return {
