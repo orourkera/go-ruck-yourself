@@ -361,7 +361,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
       _loadData();
       _checkForPhotoUploadError();
       _checkForSessionRecovery();
-      _requestEarlyPermissions(); // Request permissions early for better UX
+      // Removed automatic permission requests - only request when actually needed
       _checkForAppUpdates(); // Check for app updates
     });
   }
@@ -1801,13 +1801,18 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
     if (!mounted) return;
     
     try {
-      // Always request location permissions for all platforms
+      // Check location permissions for all platforms
       final locationService = GetIt.instance<LocationService>();
       final hasLocationPermission = await locationService.hasLocationPermission();
       
+      AppLogger.info('[HOME] Location permission status: $hasLocationPermission');
+      
       if (!hasLocationPermission) {
         AppLogger.info('[HOME] Requesting location permissions early...');
-        await locationService.requestLocationPermission(context: context);
+        final granted = await locationService.requestLocationPermission(context: context);
+        AppLogger.info('[HOME] Location permission request result: $granted');
+      } else {
+        AppLogger.info('[HOME] Location permissions already granted, skipping request');
       }
       
       // Only request health permissions for Android users

@@ -789,7 +789,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // Upload methods now handled by UploadManager
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-    
+    AppLogger.debug('[OLD_BLOC] Tick event received - main bloc is processing events');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
@@ -803,13 +803,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionPaused event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    AppLogger.info('Pausing session with delegation to coordinator');
+    AppLogger.info('[OLD_BLOC] ===== SESSION PAUSE EVENT RECEIVED IN HANDLER =====');
+    AppLogger.info('[OLD_BLOC] ===== SESSION PAUSE EVENT RECEIVED =====');
+    AppLogger.info('[OLD_BLOC] Pausing session with delegation to coordinator');
+    AppLogger.info('[OLD_BLOC] Coordinator exists: ${_coordinator != null}');
+    AppLogger.info('[OLD_BLOC] Event source: ${event.source}');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
+      AppLogger.info('[OLD_BLOC] Delegating SessionPaused event to coordinator...');
       _coordinator!.add(event);
+      AppLogger.info('[OLD_BLOC] SessionPaused event delegated successfully');
     } else {
-      AppLogger.warning('No coordinator available for session pause');
+      AppLogger.warning('[OLD_BLOC] No coordinator available for session pause');
       emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }
   }
@@ -818,13 +824,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionResumed event, 
     Emitter<ActiveSessionState> emit
   ) async {
-    AppLogger.info('Resuming session with delegation to coordinator');
+    AppLogger.info('[OLD_BLOC] ===== SESSION RESUME EVENT RECEIVED =====');
+    AppLogger.info('[OLD_BLOC] Resuming session with delegation to coordinator');
+    AppLogger.info('[OLD_BLOC] Coordinator exists: ${_coordinator != null}');
+    AppLogger.info('[OLD_BLOC] Event source: ${event.source}');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
+      AppLogger.info('[OLD_BLOC] Delegating SessionResumed event to coordinator...');
       _coordinator!.add(event);
+      AppLogger.info('[OLD_BLOC] SessionResumed event delegated successfully');
     } else {
-      AppLogger.warning('No coordinator available for session resume');
+      AppLogger.warning('[OLD_BLOC] No coordinator available for session resume');
       emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }
   }
@@ -833,6 +844,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionCompleted event, 
     Emitter<ActiveSessionState> emit
   ) async {
+    print('🚀🚀🚀 MAIN BLOC SESSION COMPLETION STARTED 🚀🚀🚀');
     AppLogger.info('[OLD_BLOC] Session completion requested');
     AppLogger.info('[OLD_BLOC] Current state: ${state.runtimeType}');
     AppLogger.info('[OLD_BLOC] Session completed event: $event');

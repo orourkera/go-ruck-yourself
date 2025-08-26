@@ -240,10 +240,16 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             ),
             TextButton(
               onPressed: () {
+                AppLogger.info('[UI] ===== END SESSION BUTTON PRESSED =====');
+                AppLogger.info('[UI] About to emit Tick event');
                 // Emit a final Tick event to ensure state is up to date before ending session
                 context.read<ActiveSessionBloc>().add(const Tick());
+                AppLogger.info('[UI] About to emit SessionCompleted event');
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
+                AppLogger.info('[UI] SessionCompleted event dispatched successfully');
+                AppLogger.info('[UI] Closing dialog');
                 Navigator.of(dialogContext).pop();
+                AppLogger.info('[UI] ===== END SESSION SEQUENCE COMPLETE =====');
               },
               child: const Text('Finish Session'),
             ),
@@ -1550,16 +1556,14 @@ class _PauseOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black45,
-        alignment: Alignment.center,
-        child: Text(
-          'PAUSED',
-          style: AppTextStyles.headlineLarge.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+    return Container(
+      color: Colors.black45,
+      alignment: Alignment.center,
+      child: Text(
+        'PAUSED',
+        style: AppTextStyles.headlineLarge.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

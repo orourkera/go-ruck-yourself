@@ -405,13 +405,17 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   
   /// Generate AI completion insight for the session
   Future<String?> _generateCompletionInsight() async {
+    print('🤖🤖🤖 AI COMPLETION INSIGHT GENERATION STARTED 🤖🤖🤖');
+    AppLogger.info('[AI_COMPLETION] ===== STARTING AI COMPLETION INSIGHT GENERATION =====');
     try {
       // Get user data
       final authState = GetIt.instance<AuthBloc>().state;
+      AppLogger.info('[AI_COMPLETION] Auth state type: ${authState.runtimeType}');
       if (authState is! Authenticated) {
         AppLogger.warning('[AI_COMPLETION] User not authenticated - skipping AI insights');
         return null;
       }
+      AppLogger.info('[AI_COMPLETION] User authenticated: ${authState.user.username}');
       
       // Get current session data
       final lifecycleState = _lifecycleManager.currentState;
@@ -422,6 +426,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         AppLogger.warning('[AI_COMPLETION] No session ID available');
         return null;
       }
+      AppLogger.info('[AI_COMPLETION] Session ID: ${lifecycleState.sessionId}');
       
       // Calculate session metrics
       final duration = lifecycleState.duration;
@@ -430,15 +435,19 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       final ruckWeight = lifecycleState.ruckWeightKg;
       final avgHeartRate = heartRateState.averageHeartRate.toInt();
       
+      AppLogger.info('[AI_COMPLETION] Session metrics: duration=${duration.inSeconds}s, distance=${distance}km, elevation=${elevationGain}m, weight=${ruckWeight}kg, hr=${avgHeartRate}bpm');
+      
       // Fetch user history for context
       Map<String, dynamic>? history;
       try {
+        AppLogger.info('[AI_COMPLETION] Fetching user history for context...');
         final historyResp = await _apiClient.get('/ai-cheerleader/user-history', queryParams: {
           'ruck_limit': 20,
           'achievements_limit': 20,
         });
         if (historyResp is Map<String, dynamic>) {
           history = historyResp;
+          AppLogger.info('[AI_COMPLETION] User history fetched successfully');
         }
       } catch (e) {
         AppLogger.warning('[AI_COMPLETION] Failed to fetch user history: $e');
@@ -477,12 +486,20 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         },
       };
       
+      AppLogger.info('[AI_COMPLETION] Built context for OpenAI, calling generateMessage...');
+      AppLogger.info('[AI_COMPLETION] Context keys: ${sessionContext.keys.join(", ")}');
+      
       // Generate completion insight using OpenAI
       final insight = await _openAIService.generateMessage(
         context: sessionContext,
         personality: 'Session Analyst',
         explicitContent: false,
       );
+      
+      AppLogger.info('[AI_COMPLETION] OpenAI generateMessage returned: ${insight != null ? "SUCCESS (${insight.length} chars)" : "NULL"}');
+      if (insight != null) {
+        AppLogger.info('[AI_COMPLETION] Generated insight: "$insight"');
+      }
       
       return insight;
     } catch (e) {
@@ -651,6 +668,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         steps: _currentSteps,
       );
       
+      final isPaused = _lifecycleManager.isPaused;
+      AppLogger.info('[COORDINATOR] State aggregation - lifecycle isPaused: $isPaused, pausedAt: ${_lifecycleManager.currentState.pausedAt}');
+      
       _currentAggregatedState = ActiveSessionRunning(
         sessionId: lifecycleState.sessionId!,
         locationPoints: locationPoints,
@@ -661,7 +681,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         calories: calories.toDouble(),
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
-        isPaused: _lifecycleManager.isPaused,
+        isPaused: isPaused,
         pace: locationState.currentPace,
         originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now(),
         totalPausedDuration: _lifecycleManager.totalPausedDuration,
@@ -681,6 +701,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         plannedRouteDuration: _plannedRouteDuration, // Pass route duration
         steps: _currentSteps,
       );
+      
+      AppLogger.info('[COORDINATOR] Created ActiveSessionRunning state with isPaused: ${(_currentAggregatedState as ActiveSessionRunning).isPaused}');
       // Log steps in running state for UI verification
       AppLogger.info('[STEPS UI] [COORDINATOR] Running state steps: ${_currentSteps ?? 'null'}');
     } else {
@@ -886,21 +908,35 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       AppLogger.info('[COORDINATOR] Stored planned route: ${_plannedRoute!.length} points, ${_plannedRouteDistance}km, ${_plannedRouteDuration}min');
     }
     
-    // First route to managers so lifecycle manager establishes the true session start time
-    await _routeEventToManagers(event);
-
-    // Now that lifecycle has processed start, set up live steps using lifecycle start time
+    // Initialize steps BEFORE routing to managers so UI shows steps widget immediately
     try {
       final prefs = GetIt.instance<SharedPreferences>();
       final enabled = prefs.getBool('live_step_tracking') ?? false;
       AppLogger.info('[STEPS LIVE] [COORDINATOR] Live step tracking preference: $enabled');
+      if (enabled) {
+        // Initialize steps to 0 so UI shows the steps stat card immediately
+        _currentSteps = 0;
+        AppLogger.info('[STEPS LIVE] [COORDINATOR] Pre-initialized steps to 0 for immediate UI display');
+      }
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Failed to pre-initialize steps: $e');
+    }
 
+    // Route to managers so lifecycle manager establishes the true session start time
+    await _routeEventToManagers(event);
+    
+    // Trigger state aggregation to ensure steps widget appears immediately
+    add(const StateAggregationRequested());
+
+    // Now set up live steps tracking using lifecycle start time
+    try {
+      final prefs = GetIt.instance<SharedPreferences>();
+      final enabled = prefs.getBool('live_step_tracking') ?? false;
       if (enabled) {
         final lifecycleStart = _lifecycleManager.currentState.startTime ?? DateTime.now();
         AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting live step tracking from lifecycle start: $lifecycleStart');
-        // Guard against duplicate subscriptions
         try { await _stepsSub?.cancel(); } catch (_) {}
-        _healthService.stopLiveSteps(); // ensure any prior timer is torn down
+        _healthService.stopLiveSteps();
         _stepsSub = _healthService.startLiveSteps(lifecycleStart).listen((total) {
           AppLogger.info('[STEPS LIVE] [COORDINATOR] Received step update: $total');
           _currentSteps = total;
@@ -920,7 +956,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionCompleted event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] Session completion started');
+    print('🔥🔥🔥 COORDINATOR SESSION COMPLETION STARTED 🔥🔥🔥');
+    AppLogger.info('[COORDINATOR] ===== SESSION COMPLETION REQUESTED =====');
+    AppLogger.info('[COORDINATOR] Session completion started for sessionId: ${event.sessionId}');
     // Stop steps
     try { _stepsSub?.cancel(); } catch (_) {}
     try { _healthService.stopLiveSteps(); } catch (_) {}
@@ -974,8 +1012,26 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       final duration = endTime.difference(startTime).inMilliseconds;
       AppLogger.info('[COORDINATOR] AI insight generated in ${duration}ms: ${aiInsight?.substring(0, 50) ?? 'null'}...');
       AppLogger.info('[COORDINATOR] Full AI insight: $aiInsight');
+      
+      // Provide fallback if AI generation failed
+      if (aiInsight == null || aiInsight.isEmpty) {
+        final lifecycleState = _lifecycleManager.currentState;
+        final locationState = _locationManager.currentState;
+        final distance = locationState.totalDistance;
+        final duration = lifecycleState.duration;
+        
+        // Create a personalized fallback message using session data
+        if (distance > 0) {
+          aiInsight = 'Outstanding work completing ${distance.toStringAsFixed(2)} km in ${_formatDuration(duration)}! 🎯';
+        } else {
+          aiInsight = 'Great job completing your ruck session! 🎯';
+        }
+        AppLogger.info('[COORDINATOR] Using fallback AI insight: $aiInsight');
+      }
     } catch (e) {
       AppLogger.error('[COORDINATOR] Failed to generate AI insight: $e');
+      // Ensure we always have some insight message
+      aiInsight = 'Excellent work completing your ruck! 🎯';
     }
     
     try {
@@ -993,6 +1049,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         final completedState = _currentAggregatedState as ActiveSessionCompleted;
         AppLogger.info('[COORDINATOR] Session completed successfully: sessionId=${completedState.sessionId}, distance=${completedState.finalDistanceKm}km, duration=${completedState.finalDurationSeconds}s');
         AppLogger.info('[COORDINATOR] AI insight in completed state: ${completedState.aiCompletionInsight != null ? 'PRESENT (${completedState.aiCompletionInsight!.length} chars)' : 'NULL'}');
+      }
+      
+      // CRITICAL: Ensure all completion processing finishes before UI navigation
+      if (_currentAggregatedState is ActiveSessionCompleted) {
+        await Future.delayed(const Duration(milliseconds: 200));
       }
       
       AppLogger.info('[COORDINATOR] Emitting completed state');
@@ -1085,25 +1146,47 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionPaused event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] Session paused');
+    AppLogger.info('[COORDINATOR] ===== SESSION PAUSE EVENT RECEIVED =====');
+    AppLogger.info('[COORDINATOR] Session paused from source: ${event.source}');
+    AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
+    
     // Stop live steps during pause to avoid timers running in background
     try { await _stepsSub?.cancel(); } catch (_) {}
     try { _healthService.stopLiveSteps(); } catch (_) {}
+    
+    AppLogger.info('[COORDINATOR] Routing pause event to managers...');
     await _routeEventToManagers(event);
+    AppLogger.info('[COORDINATOR] Pause event routed to managers successfully');
+    
+    // Trigger state aggregation to update UI
+    add(const StateAggregationRequested());
+    AppLogger.info('[COORDINATOR] ===== SESSION PAUSE PROCESSING COMPLETE =====');
   }
   
   Future<void> _onSessionResumed(
     SessionResumed event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] Session resumed');
+    AppLogger.info('[COORDINATOR] ===== SESSION RESUME EVENT RECEIVED =====');
+    AppLogger.info('[COORDINATOR] Session resumed from source: ${event.source}');
+    AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
+    
+    AppLogger.info('[COORDINATOR] Routing resume event to managers...');
     await _routeEventToManagers(event);
+    AppLogger.info('[COORDINATOR] Resume event routed to managers successfully');
+    
     // Restart live steps if preference enabled
     try {
       final prefs = GetIt.instance<SharedPreferences>();
       final enabled = prefs.getBool('live_step_tracking') ?? false;
       AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: live step tracking preference: $enabled');
       if (enabled) {
+        // Ensure steps card is visible immediately after resume
+        if (_currentSteps == null) {
+          _currentSteps = 0;
+          AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: initialized steps to 0');
+          add(const StateAggregationRequested());
+        }
         final lifecycleStart = _lifecycleManager.currentState.startTime ?? DateTime.now();
         AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: starting live step tracking from lifecycle start: $lifecycleStart');
         try { await _stepsSub?.cancel(); } catch (_) {}
@@ -1117,6 +1200,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     } catch (e) {
       AppLogger.error('[COORDINATOR] Error restarting live steps on resume: $e');
     }
+    
+    // Trigger state aggregation to update UI
+    add(const StateAggregationRequested());
+    AppLogger.info('[COORDINATOR] ===== SESSION RESUME PROCESSING COMPLETE =====');
   }
   
   Future<void> _onLocationUpdated(

@@ -436,11 +436,14 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                         self.isMetric = true
                     }
                     
-                    // Check if we need to force permission validation
-                    if message["forcePermissionCheck"] as? Bool == true {
-                        print("[WATCH] Force permission check requested - re-requesting permissions")
-                        requestHealthKitPermissions()
-                    }
+                    // CRITICAL: Always reinitialize WorkoutManager for fresh HR streaming
+                    print("[WATCH] Reinitializing WorkoutManager for fresh HR streaming")
+                    self.workoutManager = WorkoutManager()
+                    self.workoutManager.delegate = self
+                    
+                    // Always re-request permissions to ensure fresh HealthKit state
+                    print("[WATCH] Re-requesting HealthKit permissions for session start")
+                    self.requestHealthKitPermissions()
                     
                     // Starting session from phone command - need to start HealthKit workout
                     DispatchQueue.main.async {
@@ -468,11 +471,15 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     self.elevationGain = 0.0
                     self.elevationLoss = 0.0
                     
-                    // Stop the workout manager
+                    // Stop the workout manager and clear handlers
                     self.workoutManager.stopWorkout()
+                    self.workoutManager.setHeartRateHandler { _ in }
+                    self.workoutManager.setStepCountHandler { _ in }
                     
                     // Force UI refresh to clear any background state
                     WKInterfaceDevice.current().play(.stop)
+                    
+                    print("[WATCH] Session terminated, exiting app to return to watch home screen")
                     
                     // Terminate the app to remove from lock screen
                     // Delay slightly to ensure cleanup completes
@@ -486,13 +493,13 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             case "pauseSession":
                 // Pause command from phone
                 DispatchQueue.main.async {
-                    self.isPaused = true
+                    self.pauseCurrentSession()
                 }
                 
             case "resumeSession":
                 // Resume command from phone
                 DispatchQueue.main.async {
-                    self.isPaused = false
+                    self.resumeCurrentSession()
                 }
                 
             case "pauseConfirmed":
@@ -705,62 +712,6 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         } else if let pausedInt = metrics["isPaused"] as? Int {
             self.isPaused = pausedInt == 1
         }
-        
-        // Update active state when present (to handle phone-side session end)
-        if let activeBool = metrics["isSessionActive"] as? Bool {
-            self.isSessionActive = activeBool
-            if !activeBool {
-                // Session ended - comprehensive cleanup
-                self.isPaused = false
-                self.status = "--"
-                
-                // Reset all session metrics
-                self.heartRate = 0
-                self.calories = 0
-                self.distanceValue = 0.0
-                self.paceValue = 0.0
-                self.elevationGain = 0.0
-                self.elevationLoss = 0.0
-                
-                // Ensure workout is stopped and UI reset
-                self.workoutManager.stopWorkout()
-                
-                // Clear any background state
-                WKInterfaceDevice.current().play(.stop)
-            }
-        } else if let activeInt = metrics["isSessionActive"] as? Int {
-            let active = activeInt == 1
-            self.isSessionActive = active
-            if !active {
-                // Session ended - comprehensive cleanup
-                self.isPaused = false
-                self.status = "--"
-                
-                // Reset all session metrics
-                self.heartRate = 0
-                self.calories = 0
-                self.distanceValue = 0.0
-                self.paceValue = 0.0
-                self.elevationGain = 0.0
-                self.elevationLoss = 0.0
-                
-                self.workoutManager.stopWorkout()
-                
-                // Clear any background state
-                WKInterfaceDevice.current().play(.stop)
-            }
-        }
-        
-        // Update timer display from duration
-        if let duration = metrics["duration"] as? Int {
-            let hours = duration / 3600
-            let minutes = (duration % 3600) / 60
-            let seconds = duration % 60
-            
-            // Always use HH:MM:SS format for consistency regardless of duration
-            // This prevents the UI from "wrapping" when going over an hour
-            self.status = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-        }
     }
     
     // Process a split notification message
@@ -835,6 +786,63 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             
             print("[WATCH] Session start alert processed: \(title) - \(alertMessage)")
         }
+    }
+
+    // MARK: - Session Control Methods
+    
+    /// Pause the current session on the watch
+    public func pauseCurrentSession() {
+        guard isSessionActive && !isPaused else {
+            print("[WATCH] Cannot pause - session not active or already paused")
+            return
+        }
+        
+        print("[WATCH] Pausing watch session...")
+        
+        // Update state
+        isPaused = true
+        
+        // Note: HealthKit workouts pause automatically when watch detects no movement
+        // We just track the paused state here for UI purposes
+        print("[WATCH] Session paused successfully - workout will auto-pause on no movement")
+        
+        // Send confirmation to phone
+        sendMessage([
+            "command": "pauseConfirmed",
+            "isPaused": true,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+    }
+
+    /// Resume the current session on the watch
+    public func resumeCurrentSession() {
+        guard isSessionActive && isPaused else {
+            print("[WATCH] Cannot resume - session not active or not paused")
+            return
+        }
+        
+        print("[WATCH] Resuming watch session...")
+        
+        // Update state
+        isPaused = false
+        
+        // Note: HealthKit workouts resume automatically when watch detects movement
+        // We just track the resumed state here for UI purposes
+        print("[WATCH] Session resumed successfully - workout will auto-resume on movement")
+        
+        // Send confirmation to phone
+        sendMessage([
+            "command": "resumeConfirmed",
+            "isPaused": false,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+    }
+    
+    /// Send current session state to phone
+    private func sendSessionStateToPhone() {
+        // This could send pause/resume state to phone via WatchConnectivity
+        // For now just log the intent
+        print("[WATCH] Session state sync - isPaused: \(isPaused), isActive: \(isSessionActive)")
     }
     
 }

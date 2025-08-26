@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:get_it/get_it.dart';
-import 'package:uuid/uuid.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/managers/timer_coordinator.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 
 import '../../../../../core/config/app_config.dart';
@@ -356,43 +359,88 @@ class SessionLifecycleManager implements SessionManager {
   }
 
   Future<void> _onSessionPaused(manager_events.SessionPaused event) async {
-    if (!_currentState.isActive) return;
+    if (!_currentState.isActive) {
+      AppLogger.warning('[LIFECYCLE] Pause requested but session not active - ignoring');
+      return;
+    }
     
+    AppLogger.info('[LIFECYCLE] ===== PAUSING SESSION =====');
     AppLogger.info('[LIFECYCLE] Pausing session - keeping session active but paused');
+    AppLogger.info('[LIFECYCLE] Current state before pause: isActive=${_currentState.isActive}, pausedAt=${_currentState.pausedAt}');
     
     // Pause timers
     _ticker?.cancel();
+    AppLogger.info('[LIFECYCLE] Timer cancelled for pause');
+    
+    // CRITICAL: Pause TimerCoordinator to stop duration increment
+    try {
+      final timerCoordinator = GetIt.instance<TimerCoordinator>();
+      timerCoordinator.pauseTimerSystem();
+      AppLogger.info('[LIFECYCLE] TimerCoordinator paused successfully');
+    } catch (e) {
+      AppLogger.error('[LIFECYCLE] Failed to pause TimerCoordinator: $e');
+    }
     
     // Update watch (the watch service will handle avoiding duplicate calls)
     await _watchService.pauseSessionOnWatch();
+    AppLogger.info('[LIFECYCLE] Watch pause command sent');
     
     _updateState(_currentState.copyWith(
       isActive: true, // Keep session active - just mark as paused
       pausedAt: DateTime.now(), // Use pausedAt to indicate paused state
     ));
+    
+    AppLogger.info('[LIFECYCLE] State updated - pausedAt: ${_currentState.pausedAt}');
+    AppLogger.info('[LIFECYCLE] ===== SESSION PAUSED SUCCESSFULLY =====');
   }
 
   Future<void> _onSessionResumed(manager_events.SessionResumed event) async {
-    if (!_currentState.isActive || _currentState.pausedAt == null) return;
+    if (!_currentState.isActive) {
+      AppLogger.warning('[LIFECYCLE] Resume requested but session not active - ignoring');
+      return;
+    }
     
+    if (_currentState.pausedAt == null) {
+      AppLogger.warning('[LIFECYCLE] Resume requested but session not paused - ignoring');
+      return;
+    }
+    
+    AppLogger.info('[LIFECYCLE] ===== RESUMING SESSION =====');
     AppLogger.info('[LIFECYCLE] Resuming session from paused state');
+    AppLogger.info('[LIFECYCLE] Current state before resume: isActive=${_currentState.isActive}, pausedAt=${_currentState.pausedAt}');
     
     // Calculate pause duration
     final pausedDuration = _currentState.pausedAt != null
         ? DateTime.now().difference(_currentState.pausedAt!)
         : Duration.zero;
     
+    AppLogger.info('[LIFECYCLE] Pause duration was: ${pausedDuration.inSeconds} seconds');
+    
     // Resume timers
     _startTimer();
+    AppLogger.info('[LIFECYCLE] Timer restarted for resume');
+    
+    // CRITICAL: Resume TimerCoordinator to restart duration increment
+    try {
+      final timerCoordinator = GetIt.instance<TimerCoordinator>();
+      timerCoordinator.resumeTimerSystem();
+      AppLogger.info('[LIFECYCLE] TimerCoordinator resumed successfully');
+    } catch (e) {
+      AppLogger.error('[LIFECYCLE] Failed to resume TimerCoordinator: $e');
+    }
     
     // Update watch
     await _watchService.resumeSessionOnWatch();
+    AppLogger.info('[LIFECYCLE] Watch resume command sent');
     
     _updateState(_currentState.copyWith(
       isActive: true,
-      pausedAt: null,
+      pausedAt: null, // Clear paused state
       totalPausedDuration: _currentState.totalPausedDuration + pausedDuration,
     ));
+    
+    AppLogger.info('[LIFECYCLE] State updated - pausedAt: ${_currentState.pausedAt}');
+    AppLogger.info('[LIFECYCLE] ===== SESSION RESUMED SUCCESSFULLY =====');
   }
 
   Future<void> _onTimerStarted(manager_events.TimerStarted event) async {
@@ -405,10 +453,12 @@ class SessionLifecycleManager implements SessionManager {
   }
 
   Future<void> _onTick(manager_events.Tick event) async {
-    if (_currentState.isActive && _sessionStartTime != null) {
+    if (_currentState.isActive && _sessionStartTime != null && _currentState.pausedAt == null) {
+      // Only update duration when NOT paused (pausedAt is null)
       final newDuration = DateTime.now().difference(_sessionStartTime!);
       _updateState(_currentState.copyWith(duration: newDuration));
     }
+    // When paused (pausedAt is not null), duration should remain frozen - no updates
   }
 
   Future<String?> _createInitialSession({
@@ -1065,6 +1115,12 @@ Future<void> clearCrashRecoveryData() async {
   /// Main tick callback - called every second
   void _onMainTick() {
     if (!_currentState.isActive) return;
+    
+    // CRITICAL: Don't update duration when paused - respect pausedAt state
+    if (_currentState.pausedAt != null) {
+      AppLogger.debug('[LIFECYCLE] _onMainTick: Session paused, not updating duration');
+      return;
+    }
     
     final now = DateTime.now();
     final newDuration = _sessionStartTime != null 

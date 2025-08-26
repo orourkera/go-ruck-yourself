@@ -163,15 +163,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Auto-save the main session data immediately
     _autoSaveBasicSession();
     
-    // Check if AI insight was already generated during session completion
-    if (widget.aiCompletionInsight != null) {
+    // Use pre-generated AI insight from session completion
+    if (widget.aiCompletionInsight != null && widget.aiCompletionInsight!.isNotEmpty) {
       _aiCompletionInsight = widget.aiCompletionInsight;
-      _isGeneratingInsight = false; // Ensure no loading state
+      _isGeneratingInsight = false;
       AppLogger.info('[AI_COMPLETION] Using pre-generated AI insight from session completion: ${widget.aiCompletionInsight?.substring(0, 50)}...');
     } else {
-      // Fallback: Generate AI completion insights if not provided
-      AppLogger.warning('[AI_COMPLETION] No pre-generated insight found, falling back to local generation');
-      _generateCompletionInsights();
+      // No AI insight available - set to null without fallback generation
+      _aiCompletionInsight = null;
+      _isGeneratingInsight = false;
+      AppLogger.warning('[AI_COMPLETION] No pre-generated insight available, will show fallback message');
     }
   }
 
@@ -259,182 +260,47 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       // Complete the session with basic data using POST
       final response = await _apiClient.post('/rucks/${widget.ruckId}/complete', completionData);
       
-      if (response.statusCode == 200) {
-        setState(() => _isSessionSaved = true);
-        AppLogger.info('[SESSION_SAVE] Basic session data saved successfully');
+      // ApiClient returns the parsed response data, not the full HTTP response
+      // Check if the response indicates success or if the session was already completed
+      if (response is Map<String, dynamic>) {
+        final status = response['status'] as String?;
+        final message = response['message'] as String?;
         
-        // Show confirmation to user
-        if (mounted) {
-          StyledSnackBar.showSuccess(
-            context: context,
-            message: 'Session saved! 🎉',
-            duration: const Duration(seconds: 2),
-          );
+        if (status == 'already_completed') {
+          // Session was already completed - this is okay, just mark as saved
+          setState(() => _isSessionSaved = true);
+          AppLogger.info('[SESSION_SAVE] Session was already completed: $message');
+          
+          if (mounted) {
+            StyledSnackBar.show(
+              context: context,
+              message: 'Session already saved ✓',
+              type: SnackBarType.normal,
+              duration: const Duration(seconds: 2),
+            );
+          }
+        } else {
+          // Normal successful completion
+          setState(() => _isSessionSaved = true);
+          AppLogger.info('[SESSION_SAVE] Basic session data saved successfully');
+          
+          // Show confirmation to user
+          if (mounted) {
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: 'Session saved! 🎉',
+              duration: const Duration(seconds: 2),
+            );
+          }
         }
+      } else {
+        // Unexpected response format, but assume success if no exception was thrown
+        setState(() => _isSessionSaved = true);
+        AppLogger.info('[SESSION_SAVE] Session completion response: $response');
       }
     } catch (e) {
       AppLogger.error('[SESSION_SAVE] Failed to auto-save basic session: $e');
       // Don't show error to user for auto-save failure - they can still manually save
-    }
-  }
-
-  /// Generate AI completion insights for the session
-  Future<void> _generateCompletionInsights() async {
-    if (_isGeneratingInsight) return;
-    
-    setState(() {
-      _isGeneratingInsight = true;
-    });
-    
-    try {
-      AppLogger.info('[AI_COMPLETION] Generating session completion insights');
-      
-      // Get user data
-      final authState = context.read<AuthBloc>().state;
-      if (authState is! Authenticated) {
-        AppLogger.warning('[AI_COMPLETION] User not authenticated - skipping AI insights');
-        return;
-      }
-      
-      // Fetch user history for context
-      Map<String, dynamic>? history;
-      try {
-        final historyResp = await _apiClient.get('/ai-cheerleader/user-history', queryParams: {
-          'ruck_limit': 20,
-          'achievements_limit': 20,
-        });
-        if (historyResp is Map<String, dynamic>) {
-          history = historyResp;
-        }
-      } catch (e) {
-        AppLogger.warning('[AI_COMPLETION] Failed to fetch user history: $e');
-      }
-      
-      // Build session context for AI with safe access
-      final sessionContext = {
-        'session': {
-          'duration_seconds': widget.duration.inSeconds,
-          'distance_km': widget.distance,
-          'calories_burned': widget.caloriesBurned,
-          'elevation_gain_m': widget.elevationGain,
-          'elevation_loss_m': widget.elevationLoss,
-          'ruck_weight_kg': widget.ruckWeight,
-          'average_pace': widget.duration.inSeconds > 0 && widget.distance > 0 
-              ? (widget.duration.inSeconds / 60) / widget.distance 
-              : 0.0,
-          'is_manual': widget.isManual,
-          'completed_at': DateTime.now().toIso8601String(),
-          if (_avgHeartRate != null) 'avg_heart_rate': _avgHeartRate,
-          if (_maxHeartRate != null) 'max_heart_rate': _maxHeartRate,
-          if (_minHeartRate != null) 'min_heart_rate': _minHeartRate,
-          if (widget.splits != null) 'split_count': widget.splits!.length,
-          // Add formatted time for safe access
-          'elapsedTime': {
-            'formatted': _formatDuration(widget.duration),
-            'seconds': widget.duration.inSeconds,
-          },
-          'distance': {
-            'formatted': widget.distance > 0 
-                ? '${widget.distance.toStringAsFixed(2)} km'
-                : '0.00 km',
-            'km': widget.distance,
-          },
-        },
-        'user': {
-          'username': authState.user.username ?? 'athlete',
-          'prefer_metric': authState.user.preferMetric,
-          'gender': authState.user.gender ?? 'unknown',
-        },
-        'trigger': {
-          'type': 'session_completion',
-          'context': 'post_session_summary',
-        },
-        'history': history ?? {},
-        'environment': {
-          'timeOfDay': _getTimeOfDay(),
-          'sessionPhase': 'completed',
-        },
-      };
-      
-      // Generate completion insight using OpenAI with simplified prompt
-      final openAIService = OpenAIService();
-      
-      // Create a simplified prompt for session completion
-      final completionPrompt = '''
-You are an expert fitness analyst providing a concise, creative congratulation.
-
-Session Data:
-- Duration: ${_formatDuration(widget.duration)}
-- Distance: ${widget.distance.toStringAsFixed(2)} km
-- Calories: ${widget.caloriesBurned}
-- Elevation Gain: ${widget.elevationGain.toStringAsFixed(1)}m
-- Ruck Weight: ${widget.ruckWeight.toStringAsFixed(1)} kg
-- User: ${authState.user.username}
-
-Historical Context:
-${history != null ? 'User has completed ${(history['recent_rucks'] as List?)?.length ?? 0} recent rucks with ${(history['achievements'] as List?)?.length ?? 0} achievements earned.' : 'Limited historical data available.'}
-
-Generate exactly ONE sentence that quotes one specific fact from the session data and congratulates the user in a creative, encouraging way.
-''';
-
-      final insight = await openAIService.generateMessage(
-        context: {
-          'session': {
-            'duration_seconds': widget.duration.inSeconds,
-            'distance_km': widget.distance,
-            'calories_burned': widget.caloriesBurned,
-            'elevation_gain_m': widget.elevationGain,
-            'ruck_weight_kg': widget.ruckWeight,
-            'avg_heart_rate': _avgHeartRate ?? 0,
-            // Provide formatted fields expected by OpenAIService safe access
-            'elapsedTime': {
-              'formatted': _formatDuration(widget.duration),
-              'seconds': widget.duration.inSeconds,
-            },
-            'distance': {
-              'formatted': widget.distance > 0
-                  ? '${widget.distance.toStringAsFixed(2)} km'
-                  : '0.00 km',
-              'km': widget.distance,
-              'unit': 'km',
-            },
-          },
-          'user': {
-            'username': authState.user.username ?? 'Rucker',
-            // Use camelCase key as expected by OpenAIService
-            'preferMetric': authState.user.preferMetric,
-            'gender': authState.user.gender ?? 'unknown',
-          },
-          'trigger': {
-            'type': 'session_completion',
-            'context': completionPrompt,
-          },
-          'history': history ?? {},
-          'environment': {
-            'timeOfDay': _getTimeOfDay(),
-            // Explicitly mark session phase for richer context
-            'sessionPhase': 'completed',
-          },
-        },
-        personality: 'Session Analyst',
-        explicitContent: false,
-      );
-      
-      if (insight != null && insight.isNotEmpty && mounted) {
-        setState(() {
-          _aiCompletionInsight = insight;
-        });
-        AppLogger.info('[AI_COMPLETION] Generated completion insight: ${insight.substring(0, math.min(50, insight.length))}...');
-      }
-      
-    } catch (e) {
-      AppLogger.error('[AI_COMPLETION] Failed to generate completion insights: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isGeneratingInsight = false;
-        });
-      }
     }
   }
 
@@ -1292,7 +1158,7 @@ Generate exactly ONE sentence that quotes one specific fact from the session dat
           const SizedBox(height: 16),
           
           // AI-generated completion insight or fallback
-          if (_aiCompletionInsight != null)
+          if (_aiCompletionInsight != null && _aiCompletionInsight!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -1304,21 +1170,17 @@ Generate exactly ONE sentence that quotes one specific fact from the session dat
                 textAlign: TextAlign.center,
               ),
             )
-          else if (_isGeneratingInsight)
-            Column(
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 8),
-                Text('Analyzing your session...', style: AppTextStyles.titleMedium),
-              ],
-            )
           else
-            Column(
-              children: [
-                Text('Great job rucker!', style: AppTextStyles.headlineLarge.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('You completed your ruck', style: AppTextStyles.titleLarge),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Great job completing your ruck! 🎯',
+                style: AppTextStyles.headlineMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
         ],
       ),

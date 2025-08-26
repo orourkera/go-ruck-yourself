@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 
 /// Coordinates all session timers with sophisticated timing logic
 class TimerCoordinator {
@@ -92,6 +94,37 @@ class TimerCoordinator {
     AppLogger.info('[TIMER_COORDINATOR] All timers started successfully');
   }
   
+  /// Pause the coordinated timer system
+  void pauseTimerSystem() {
+    if (!_isTimerSystemActive) {
+      AppLogger.debug('[TIMER_COORDINATOR] Timer system not active - cannot pause');
+      return;
+    }
+    
+    AppLogger.info('[TIMER_COORDINATOR] Pausing coordinated timer system');
+    
+    // Cancel main timer only - keep other monitoring timers running
+    _mainTimer?.cancel();
+    _mainTimer = null;
+    
+    AppLogger.info('[TIMER_COORDINATOR] Main timer paused successfully');
+  }
+
+  /// Resume the coordinated timer system
+  void resumeTimerSystem() {
+    if (!_isTimerSystemActive) {
+      AppLogger.debug('[TIMER_COORDINATOR] Timer system not active - cannot resume');
+      return;
+    }
+    
+    AppLogger.info('[TIMER_COORDINATOR] Resuming coordinated timer system');
+    
+    // Restart main timer
+    _startMainTimer();
+    
+    AppLogger.info('[TIMER_COORDINATOR] Main timer resumed successfully');
+  }
+
   /// Stop the coordinated timer system
   void stopTimerSystem() {
     if (!_isTimerSystemActive) {
@@ -239,10 +272,26 @@ class TimerCoordinator {
   void _restartUnhealthyTimers() {
     final now = DateTime.now();
     
-    // Restart main timer if unhealthy
-    if (_lastMainTick != null && now.difference(_lastMainTick!).inSeconds > 10) {
+    // Don't restart main timer if session is paused - this prevents automatic resume
+    // The main timer should only run when session is actively running
+    bool isSessionPaused = false;
+    try {
+      if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
+        final bloc = GetIt.I<ActiveSessionBloc>();
+        final state = bloc.state;
+        isSessionPaused = state is ActiveSessionRunning ? state.isPaused : false;
+      }
+    } catch (e) {
+      // If we can't determine pause state, err on the side of caution
+      AppLogger.debug('[TIMER_COORDINATOR] Could not determine pause state: $e');
+    }
+    
+    // Restart main timer if unhealthy AND not paused
+    if (_lastMainTick != null && now.difference(_lastMainTick!).inSeconds > 10 && !isSessionPaused) {
       AppLogger.info('[TIMER_COORDINATOR] Restarting main timer');
       _startMainTimer();
+    } else if (isSessionPaused) {
+      AppLogger.debug('[TIMER_COORDINATOR] Skipping main timer restart - session is paused');
     }
     
     // Restart watchdog timer if unhealthy

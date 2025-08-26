@@ -84,6 +84,7 @@ class LocationTrackingManager implements SessionManager {
   String? _activeSessionId;
   DateTime? _sessionStartTime;
   bool _isPaused = false;
+  DateTime? _pausedAt;
   
   // Cache user preference to avoid repeated API calls
   bool? _cachedIsMetric;
@@ -187,6 +188,7 @@ class LocationTrackingManager implements SessionManager {
     _activeSessionId = event.sessionId ?? const Uuid().v4();
     _sessionStartTime = DateTime.now();
     _isPaused = false;
+    _pausedAt = null;
     
     // CRITICAL FIX: Reset state with explicit memory cleanup
     _locationPoints.clear();
@@ -272,6 +274,7 @@ class LocationTrackingManager implements SessionManager {
     _activeSessionId = null;
     _sessionStartTime = null;
     _isPaused = false;
+    _pausedAt = null;
     
     // CRITICAL FIX: Reset lists and upload tracking
     _locationPoints.clear();
@@ -302,19 +305,21 @@ class LocationTrackingManager implements SessionManager {
 
   Future<void> _onSessionPaused(SessionPaused event) async {
     _isPaused = true;
+    _pausedAt = DateTime.now(); // Track when paused for duration calculation
     _locationSubscription?.pause();
     
-    // Update watch with paused state
+    // Update watch with paused state - duration will now freeze at pause time
     _updateWatchWithSessionData(_currentState);
     
-    AppLogger.info('[LOCATION_MANAGER] Location tracking paused');
+    AppLogger.info('[LOCATION_MANAGER] Location tracking paused at ${_pausedAt!.toIso8601String()}');
   }
 
   Future<void> _onSessionResumed(SessionResumed event) async {
     _isPaused = false;
+    _pausedAt = null; // Clear pause timestamp when resuming
     _locationSubscription?.resume();
     
-    // Update watch with resumed state
+    // Update watch with resumed state - duration will continue incrementing
     _updateWatchWithSessionData(_currentState);
     
     AppLogger.info('[LOCATION_MANAGER] Location tracking resumed');
@@ -1444,10 +1449,17 @@ double _calculateTotalDistanceWithValidation() {
   }) {
     // Note: activeSessionId check is done in callers (_onTick, etc.)
     try {
-      // Calculate session duration from start time
-      final duration = _sessionStartTime != null 
-          ? DateTime.now().difference(_sessionStartTime!)
-          : Duration.zero;
+      // Calculate session duration from start time, but freeze when paused
+      Duration duration = Duration.zero;
+      if (_sessionStartTime != null) {
+        if (_isPaused && _pausedAt != null) {
+          // When paused, use duration up to pause time only
+          duration = _pausedAt!.difference(_sessionStartTime!);
+        } else {
+          // When active, use current time
+          duration = DateTime.now().difference(_sessionStartTime!);
+        }
+      }
       
       // Use values from coordinator if provided, otherwise calculate locally
       final elevationData = _calculateElevation();

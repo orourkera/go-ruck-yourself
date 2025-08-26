@@ -67,6 +67,7 @@ import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/services/share_service.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/managers/timer_coordinator.dart';
 import 'package:rucking_app/core/services/strava_service.dart';
 import 'package:rucking_app/core/services/google_places_service.dart';
 import 'package:rucking_app/core/services/clubs_cache_service.dart';
@@ -188,6 +189,17 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<SplitTrackingService>(
     SplitTrackingService(watchService: getIt<WatchService>()),
   );
+  
+  // Register TimerCoordinator for session pause/resume functionality
+  getIt.registerSingleton<TimerCoordinator>(TimerCoordinator(
+    onMainTick: () {},
+    onPaceCalculation: () {},
+    onWatchdogTick: () {},
+    onPersistenceTick: () {},
+    onBatchUploadTick: () {},
+    onConnectivityCheck: () {},
+    onMemoryCheck: () {},
+  ));
   
   // Register TerrainService
   getIt.registerSingleton<TerrainService>(TerrainService());

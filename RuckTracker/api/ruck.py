@@ -944,11 +944,12 @@ class RuckSessionCompleteResource(Resource):
             distance_missing = not update_data.get('distance_km') or update_data.get('distance_km', 0) == 0
             calories_missing = not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0
             elevation_missing = not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0
+            loss_missing = not update_data.get('elevation_loss_m') or update_data.get('elevation_loss_m', 0) == 0
             pace_missing = not update_data.get('average_pace') or update_data.get('average_pace', 0) == 0
             
-            needs_calculation = distance_missing or calories_missing or elevation_missing or pace_missing
+            needs_calculation = distance_missing or calories_missing or elevation_missing or loss_missing or pace_missing
             
-            logger.info(f"Session {ruck_id} metric check - distance: {update_data.get('distance_km')} (missing: {distance_missing}), calories: {update_data.get('calories_burned')} (missing: {calories_missing}), elevation: {update_data.get('elevation_gain_m')} (missing: {elevation_missing}), pace: {update_data.get('average_pace')} (missing: {pace_missing}), needs_calc: {needs_calculation}")
+            logger.info(f"Session {ruck_id} metric check - distance: {update_data.get('distance_km')} (missing: {distance_missing}), calories: {update_data.get('calories_burned')} (missing: {calories_missing}), elevation_gain: {update_data.get('elevation_gain_m')} (missing: {elevation_missing}), elevation_loss: {update_data.get('elevation_loss_m')} (missing: {loss_missing}), pace: {update_data.get('average_pace')} (missing: {pace_missing}), needs_calc: {needs_calculation}")
         
             if needs_calculation:
                 logger.info(f"Session {ruck_id}: Missing metrics detected, calculating from GPS data...")
@@ -967,6 +968,7 @@ class RuckSessionCompleteResource(Resource):
                         # Calculate distance using haversine formula
                         total_distance_km = 0
                         elevation_gain_m = 0
+                        elevation_loss_m = 0
                         previous_altitude = None
                     
                         for i in range(1, len(points)):
@@ -988,11 +990,13 @@ class RuckSessionCompleteResource(Resource):
                             distance_km = R * c
                             total_distance_km += distance_km
                         
-                            # Calculate elevation gain
+                            # Calculate elevation gain/loss
                             if curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
                                 alt_diff = float(curr_point['altitude']) - float(prev_point['altitude'])
                                 if alt_diff > 0:  # Only count positive elevation changes
                                     elevation_gain_m += alt_diff
+                                elif alt_diff < 0:  # Count negative elevation changes toward loss
+                                    elevation_loss_m += abs(alt_diff)
                     
                         # Calculate missing metrics - use threshold to avoid overwriting small but valid distances
                         if not update_data.get('distance_km') or update_data.get('distance_km', 0) <= 0.001:  # Only override if truly zero or negligible
@@ -1004,6 +1008,9 @@ class RuckSessionCompleteResource(Resource):
                         if not update_data.get('elevation_gain_m') or update_data.get('elevation_gain_m', 0) == 0:
                             update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
                             logger.info(f"Calculated elevation gain: {elevation_gain_m:.1f} m")
+                        if not update_data.get('elevation_loss_m') or update_data.get('elevation_loss_m', 0) == 0:
+                            update_data['elevation_loss_m'] = round(elevation_loss_m, 1)
+                            logger.info(f"Calculated elevation loss: {elevation_loss_m:.1f} m")
                     
                         # Calculate average pace if we have distance and duration
                         final_distance = update_data.get('distance_km', 0)
@@ -1033,7 +1040,7 @@ class RuckSessionCompleteResource(Resource):
                             update_data['calories_burned'] = estimated_calories
                             logger.info(f"Estimated calories: {estimated_calories} (base: {base_calories:.0f}, elevation: {elevation_calories:.0f})")
                     
-                        logger.info(f"Server-calculated metrics for session {ruck_id}: distance={update_data.get('distance_km')}km, pace={update_data.get('average_pace')}s/km, calories={update_data.get('calories_burned')}, elevation={update_data.get('elevation_gain_m')}m")
+                        logger.info(f"Server-calculated metrics for session {ruck_id}: distance={update_data.get('distance_km')}km, pace={update_data.get('average_pace')}s/km, calories={update_data.get('calories_burned')}, elevation_gain={update_data.get('elevation_gain_m')}m, elevation_loss={update_data.get('elevation_loss_m')}m")
                     
                     else:
                         logger.warning(f"Session {ruck_id}: Insufficient GPS data for metric calculation ({len(location_resp.data) if location_resp.data else 0} points)")
