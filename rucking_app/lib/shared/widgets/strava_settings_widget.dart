@@ -12,7 +12,7 @@ class StravaSettingsWidget extends StatefulWidget {
   State<StravaSettingsWidget> createState() => _StravaSettingsWidgetState();
 }
 
-class _StravaSettingsWidgetState extends State<StravaSettingsWidget> {
+class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with WidgetsBindingObserver {
   final StravaService _stravaService = StravaService();
   StravaConnectionStatus? _connectionStatus;
   bool _isLoading = false;
@@ -20,7 +20,23 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadConnectionStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // When returning from external Strava OAuth, the app resumes. Refresh status.
+    if (state == AppLifecycleState.resumed) {
+      _loadConnectionStatus();
+    }
   }
 
   Future<void> _loadConnectionStatus() async {

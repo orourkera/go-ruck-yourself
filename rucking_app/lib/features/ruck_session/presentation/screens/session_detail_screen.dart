@@ -45,6 +45,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
+import 'package:rucking_app/core/services/strava_service.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -69,6 +70,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   Map<String, Color>? _zoneColorMap; // Cache of zone name -> color from HeartRateZoneService
   UserInfo? _authorProfile; // Session author's profile
   bool _isLoadingAuthor = false;
+  final _stravaService = GetIt.I<StravaService>();
+  bool _isExportingToStrava = false;
+  bool _stravaConnected = false;
+  bool _loadingStravaStatus = true;
   
   /// Get the session to use for display - prefers full session if available
   RuckSession get currentSession => _fullSession ?? widget.session;
@@ -153,6 +158,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     } else {
       AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: Session ID is null, cannot load session data');
     }
+
+    // Load Strava connection status for CTA labelling
+    _refreshStravaStatus();
   }
 
   @override
@@ -703,6 +711,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           MeasurementUtils.formatDuration(widget.session.duration),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Strava CTA button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isExportingToStrava ? null : _handleStravaCta,
+                        icon: const Icon(Icons.directions_run),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: _stravaConnected ? const Color(0xFFFC4C02) : Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        label: Text(
+                          _loadingStravaStatus
+                              ? 'Checking Strava...'
+                              : (_stravaConnected ? 'Export to Strava' : 'Connect to Strava'),
+                          style: AppTextStyles.titleMedium.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     ),
                   ],
                 ),

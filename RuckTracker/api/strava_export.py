@@ -66,9 +66,22 @@ class StravaExportResource(Resource):
                 }, 400
             
             # Check if token needs refresh
-            if expires_at:
-                expires_timestamp = datetime.fromisoformat(expires_at.replace('Z', '+00:00')).timestamp()
-                if datetime.now().timestamp() >= expires_timestamp - 300:  # Refresh 5 minutes early
+            if expires_at is not None:
+                # Support both BIGINT epoch seconds and ISO8601 strings just in case
+                try:
+                    if isinstance(expires_at, (int, float)):
+                        expires_ts = int(expires_at)
+                    elif isinstance(expires_at, str):
+                        # If it's all digits, treat as epoch seconds; otherwise parse ISO string
+                        expires_ts = int(expires_at) if expires_at.isdigit() else int(datetime.fromisoformat(expires_at.replace('Z', '+00:00')).timestamp())
+                    else:
+                        expires_ts = 0
+                except Exception:
+                    # If parsing fails, force a refresh attempt
+                    expires_ts = 0
+
+                now_ts = int(datetime.now().timestamp())
+                if now_ts >= (expires_ts - 300):  # Refresh 5 minutes early
                     logger.info(f"[STRAVA] Refreshing expired token for user {g.user.id}")
                     access_token = self._refresh_strava_token(user_data, supabase)
                     if not access_token:
@@ -80,7 +93,7 @@ class StravaExportResource(Resource):
             description = request_data.get('description', '')
             
             # Create Strava activity
-            activity_id = self._create_strava_activity(
+            activity_id, duplicate = self._create_strava_activity(
                 access_token=access_token,
                 session=session,
                 session_name=session_name,
@@ -93,6 +106,14 @@ class StravaExportResource(Resource):
                     'success': True,
                     'message': 'Session successfully exported to Strava',
                     'activity_id': activity_id
+                }, 200
+            if duplicate:
+                logger.info(f"[STRAVA] Session {session_id} already exported previously (duplicate detected)")
+                return {
+                    'success': True,
+                    'message': 'Session already exported to Strava',
+                    'activity_id': None,
+                    'duplicate': True
                 }, 200
             else:
                 return {'success': False, 'message': 'Failed to create Strava activity'}, 500
@@ -141,15 +162,13 @@ class StravaExportResource(Resource):
                 logger.error("[STRAVA] No access token in refresh response")
                 return None
             
-            # Update tokens in database
-            expires_datetime = datetime.fromtimestamp(expires_at).isoformat() if expires_at else None
-            
+            # Update tokens in database (store BIGINT epoch seconds as per schema)
             try:
                 # Correct table is 'user' not 'users'
                 supabase.table('user').update({
                     'strava_access_token': new_access_token,
                     'strava_refresh_token': new_refresh_token,
-                    'strava_expires_at': expires_datetime
+                    'strava_expires_at': expires_at
                 }).eq('id', g.user.id).execute()
             except Exception as db_err:
                 err = str(db_err)
@@ -166,28 +185,50 @@ class StravaExportResource(Resource):
             return None
     
     def _create_strava_activity(self, access_token, session, session_name, description):
-        """Create a Strava activity from session data"""
+        """Create a Strava activity from session data
+        Returns: (activity_id, duplicate)
+        - activity_id: int|str|None
+        - duplicate: bool (True if Strava reported a duplicate based on external_id)
+        """
         try:
             # Parse timestamps
             started_at = session.get('started_at')
             if not started_at:
                 logger.error("[STRAVA] Session missing started_at timestamp")
-                return None
-            
-            # Convert to datetime if it's a string
-            if isinstance(started_at, str):
-                start_time = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
-            else:
-                start_time = started_at
+                return None, False
+
+            # Normalize started_at to a datetime, supporting multiple formats
+            start_time = None
+            try:
+                if isinstance(started_at, (int, float)):
+                    # Epoch seconds
+                    start_time = datetime.fromtimestamp(int(started_at))
+                elif isinstance(started_at, str):
+                    # Try ISO8601 first, fallback to epoch-in-string
+                    s = started_at
+                    try:
+                        start_time = datetime.fromisoformat(s.replace('Z', '+00:00'))
+                    except Exception:
+                        start_time = datetime.fromtimestamp(int(s))
+                elif isinstance(started_at, datetime):
+                    start_time = started_at
+                else:
+                    logger.error(f"[STRAVA] Unsupported started_at type: {type(started_at)}")
+                    return None, False
+            except Exception as e:
+                logger.error(f"[STRAVA] Failed to parse started_at ({started_at}): {e}")
+                return None, False
             
             # Prepare activity data
             activity_data = {
                 'name': session_name,
                 'type': 'Hike',  # Strava activity type for rucking
                 'start_date_local': start_time.isoformat(),
-                'elapsed_time': session.get('duration_seconds', 0),
-                'distance': (session.get('distance_km', 0) * 1000),  # Convert km to meters
+                'elapsed_time': int(session.get('duration_seconds', 0) or 0),
+                'distance': float(session.get('distance_km', 0) or 0) * 1000,  # Convert km to meters
                 'description': description,
+                # Use deterministic external_id so repeated exports are deduped by Strava
+                'external_id': f"ruck_session:{session.get('id')}"
             }
             
             # Add optional fields if available
@@ -228,11 +269,15 @@ class StravaExportResource(Resource):
                 activity = response.json()
                 activity_id = activity.get('id')
                 logger.info(f"[STRAVA] Successfully created activity {activity_id}")
-                return activity_id
+                return activity_id, False
+            elif response.status_code == 409:
+                # Duplicate detected by Strava due to same external_id
+                logger.info(f"[STRAVA] Duplicate activity for session {session.get('id')} (409). Treating as already exported.")
+                return None, True
             else:
                 logger.error(f"[STRAVA] Failed to create activity: {response.status_code} - {response.text}")
-                return None
+                return None, False
                 
         except Exception as e:
             logger.error(f"[STRAVA] Error creating Strava activity: {str(e)}")
-            return None
+            return None, False
