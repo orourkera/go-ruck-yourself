@@ -29,6 +29,9 @@ class HeartRateService {
   // Current heart rate value
   int _latestHeartRate = 0;
   
+  // Latest heart rate sample
+  HeartRateSample? _latestHeartRateSample;
+  
   // Flag to track if we're currently attempting a reconnection
   bool _isReconnecting = false;
   
@@ -55,6 +58,9 @@ class HeartRateService {
 
   /// The most recent heart rate value
   int get latestHeartRate => _latestHeartRate;
+  
+  /// The most recent heart rate sample
+  HeartRateSample? get latestHeartRateSample => _latestHeartRateSample;
 
   /// The current heart rate buffer
   List<HeartRateSample> get heartRateBuffer => List.unmodifiable(_hrBuffer);
@@ -281,6 +287,7 @@ class HeartRateService {
     }
     
     _latestHeartRate = sample.bpm;
+    _latestHeartRateSample = sample; // Store the latest sample
     _lastHeartRateTime = DateTime.now(); // Track when we received this sample
     
     AppLogger.info('HeartRateService: [HR_DEBUG] Received heart rate update from $source: ${sample.bpm} BPM');

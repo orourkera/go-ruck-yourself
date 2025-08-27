@@ -79,50 +79,7 @@ class ActiveSessionArgs {
   });
 }
 
-/// Lightweight on-screen diagnostics HUD for live distance/rebuild monitoring
-class _DebugHud extends StatelessWidget {
-  final int seq;
-  final double distanceKm;
-  final double? deltaKm;
-  final int? dtMs;
-  final bool paused;
-
-  const _DebugHud({
-    Key? key,
-    required this.seq,
-    required this.distanceKm,
-    required this.deltaKm,
-    required this.dtMs,
-    required this.paused,
-  }) : super(key: key);
-
-  String _fmt(double v) => v.toStringAsFixed(3);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: DefaultTextStyle(
-        style: const TextStyle(color: Colors.white, fontSize: 12, fontFeatures: []),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('HUD seq#$seq ${paused ? '(paused)' : ''}'),
-            Text('dist: ${_fmt(distanceKm)} km'),
-            Text('Δ: ${deltaKm != null ? _fmt(deltaKm!) : '—'} km'),
-            Text('dt: ${dtMs != null ? '$dtMs ms' : '—'}'),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// Removed in-app debug HUD for cleaner production UI
 
 /// Thin UI wrapper around ActiveSessionBloc.
 /// All heavy lifting happens in the Bloc – this widget just renders state.
@@ -213,11 +170,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   ActiveSessionRunning? _lastActiveSessionRunning;
   StreamSubscription<ActiveSessionState>? _blocSubscription;
   bool _navigatedToComplete = false;
-  // Lightweight in-app diagnostics HUD (no dependencies)
-  bool _hudVisible = true;
-  int _hudSeq = 0;
-  DateTime? _hudLastBuildAt;
-  double? _hudLastDistanceKm;
+  // Local guard to indicate we are finishing and navigating to the complete screen.
+  // Used to suppress any transient paused UI during the finish transition.
+  bool _finishing = false;
+  // HUD removed
 
   Future<void> _navigateToSessionCompleteWithAi(ActiveSessionCompleted initial) async {
     if (_navigatedToComplete) return;
@@ -331,6 +287,12 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                 AppLogger.info('[UI] ===== END SESSION BUTTON PRESSED =====');
                 AppLogger.info('[UI] About to emit SessionCompleted event');
                 // Remove unnecessary Tick - SessionCompleted handles state aggregation
+                // Mark finishing to suppress transient paused UI until navigation completes
+                if (mounted) {
+                  setState(() {
+                    _finishing = true;
+                  });
+                }
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
                 AppLogger.info('[UI] SessionCompleted event dispatched successfully');
                 AppLogger.info('[UI] Closing dialog');
@@ -364,7 +326,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
                       // If both are ActiveSessionRunning, check for specific significant changes
                       if (previous is ActiveSessionRunning && current is ActiveSessionRunning) {
-                        return previous.isPaused != current.isPaused ||
+                        // While finishing, ignore isPaused toggles to avoid transient pause UI rebuilds
+                        return (!_finishing && previous.isPaused != current.isPaused) ||
                             !listEquals(previous.locationPoints, current.locationPoints) || // More robust list comparison
                             previous.distanceKm != current.distanceKm ||
                             previous.pace != current.pace ||
@@ -598,13 +561,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
                       
                       if (state is ActiveSessionRunning) {
-                        // Update HUD diagnostics
-                        final now = DateTime.now();
-                        final lastAt = _hudLastBuildAt;
-                        final lastDist = _hudLastDistanceKm;
-                        _hudSeq += 1;
-                        _hudLastBuildAt = now;
-                        _hudLastDistanceKm = state.distanceKm;
+                        // HUD removed – no diagnostics updates
                         // Validate state before rendering to prevent white pages
                         if (state.sessionId.isEmpty) {
                           AppLogger.warning('ActiveSessionRunning state has empty sessionId');
@@ -688,31 +645,12 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       right: 12,
                                       child: _WeightChip(weightKg: state.ruckWeightKg),
                                     ),
-                                    if (state.isPaused)
+                                    if (state.isPaused && !_finishing)
                                       const Positioned.fill(child: IgnorePointer(
                                         ignoring: true, // Let touch events pass through
                                         child: _PauseOverlay(),
                                       )),
-                                    // Debug HUD overlay (top-left)
-                                    if (_hudVisible)
-                                      Positioned(
-                                        top: 42,
-                                        left: 12,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              _hudVisible = false;
-                                            });
-                                          },
-                                          child: _DebugHud(
-                                            seq: _hudSeq,
-                                            distanceKm: state.distanceKm,
-                                            deltaKm: (lastDist != null) ? (state.distanceKm - lastDist) : null,
-                                            dtMs: (lastAt != null) ? now.difference(lastAt).inMilliseconds : null,
-                                            paused: state.isPaused,
-                                          ),
-                                        ),
-                                      ),
+                                    // HUD removed
                                   ],
                                 ),
                               ),
@@ -820,16 +758,21 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                     // the paused flag toggles within a running session.
                                     if (prev.runtimeType != curr.runtimeType) return true;
                                     if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
-                                      return prev.isPaused != curr.isPaused;
+                                      // While finishing, ignore isPaused changes to prevent pause icon flip
+                                      return !_finishing && (prev.isPaused != curr.isPaused);
                                     }
                                     return false;
                                   },
                                   builder: (context, state) {
                                     bool isPaused = state is ActiveSessionRunning ? state.isPaused : false;
+                                    if (_finishing) {
+                                      isPaused = false; // suppress paused visual state while finishing
+                                    }
                                     return SessionControls(
                                       isPaused: isPaused,
                                       onTogglePause: () {
                                         if (state is! ActiveSessionRunning) return; // Ignore if not running
+                                        if (_finishing) return; // Ignore toggles while finishing
                                         if (isPaused) {
                                           context.read<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.ui));
                                         } else {

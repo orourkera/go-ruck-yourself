@@ -4,10 +4,10 @@ import 'package:rucking_app/core/models/user.dart';
 
 /// Service for detecting AI Cheerleader triggers and assembling context
 class AICheerleaderService {
-  static const int _milestoneIntervalMeters = 2000; // Every 2km (reduced frequency)
-  static const int _timeCheckIntervalSeconds = 1200; // Every 20 minutes (reduced frequency)
+  static const int _milestoneIntervalMeters = 100; // Every 100m (for testing)
+  static const int _timeCheckIntervalSeconds = 60; // Every 1 minute (for testing)
   static const double _slowPaceThreshold = 0.6; // 60% of average pace = slow (more conservative)
-  static const int _minimumTriggerIntervalSeconds = 240; // Min 4 minutes between triggers (reduced frequency)
+  static const int _minimumTriggerIntervalSeconds = 30; // Min 30 seconds between triggers (for testing)
   static const int _hrSpikeMinElapsedSeconds = 180; // Wait 3 minutes before HR analysis
   static const int _hrSpikeCooldownSeconds = 600; // 10 minutes per HR spike (reduced frequency)
   static const double _hrSpikePercent = 0.20; // 20% above baseline considered spike
@@ -31,8 +31,8 @@ class AICheerleaderService {
       return null;
     }
 
-    // Skip if session just started (less than 2 minutes)
-    if (state.elapsedSeconds < 120) {
+    // Skip if session just started (less than 30 seconds)
+    if (state.elapsedSeconds < 30) {
       return null;
     }
 
@@ -152,7 +152,7 @@ class AICheerleaderService {
 
   /// Check for pace drops that need encouragement
   CheerleaderTrigger? _checkPaceDropTrigger(ActiveSessionRunning state) {
-    if (state.elapsedSeconds < 300) return null; // Need 5min for pace analysis
+    if (state.elapsedSeconds < 60) return null; // Need 1min for pace analysis (for testing)
     
     final currentPace = state.pace;
     if (currentPace == null || currentPace == 0) return null;

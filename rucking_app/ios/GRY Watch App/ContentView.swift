@@ -38,28 +38,14 @@ struct ContentView: View {
                     .padding(.top, 4)
                     
                     Spacer()
-                    
-                    // Removed instructional text per design update
 
-                    // Start button to initiate a ruck directly from the watch
-                    Button(action: {
-                        sessionManager.startSession()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "figure.walk")
-                            Text("Start Ruck")
-                                .font(.headline)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.green.opacity(0.2))
-                        .cornerRadius(10)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.horizontal)
-                    
+                    // Instructional text when no active session
+                    Text("Start a ruck on your phone to begin.")
+                        .font(.footnote)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+
                     Spacer()
                 }
                 .padding(12)

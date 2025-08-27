@@ -183,7 +183,7 @@ class WatchService {
           }
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
-        }
+
 
         return true;
       default:
@@ -634,7 +634,9 @@ class WatchService {
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
-      AppLogger.debug('[WATCH] [HR_DEBUG] Current heart rate for watch update: $_currentHeartRate');
+      // Compute a single effective HR value once (watch HR preferred, else HealthKit fallback)
+      final double? effectiveHr = _getCurrentHeartRateWithFallback();
+      AppLogger.debug('[WATCH] [HR_DEBUG] Effective heart rate for watch update (watch or fallback): $effectiveHr (raw watch HR=$_currentHeartRate)');
       if (steps != null) {
         AppLogger.info('[STEPS LIVE] [WATCH] Including steps in metrics payload: $steps');
       }
@@ -657,8 +659,8 @@ class WatchService {
           'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
           'isMetric': isMetric, // Embed unit preference in nested metrics map as well
           if (steps != null) 'steps': steps,
-          'heartRate': _getCurrentHeartRateWithFallback(),
-          'hrZone': _getCurrentHeartRateWithFallback() != null ? _inferZoneLabel(_getCurrentHeartRateWithFallback()!) : null,
+          'heartRate': effectiveHr,
+          'hrZone': effectiveHr != null ? _inferZoneLabel(effectiveHr) : null,
           'cadence': 160, // Add cadence to metrics
         },
       });

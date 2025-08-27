@@ -346,15 +346,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           // Session was already completed - this is okay, just mark as saved
           setState(() => _isSessionSaved = true);
           AppLogger.info('[SESSION_SAVE] Session was already completed: $message');
-          
-          if (mounted) {
-            StyledSnackBar.show(
-              context: context,
-              message: 'Session already saved ✓',
-              type: SnackBarType.normal,
-              duration: const Duration(seconds: 2),
-            );
-          }
         } else {
           // Normal successful completion
           setState(() => _isSessionSaved = true);
@@ -374,9 +365,170 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         setState(() => _isSessionSaved = true);
         AppLogger.info('[SESSION_SAVE] Session completion response: $response');
       }
+
+      // Kick off non-blocking background chunk uploads and verification
+      // Do not await – this must not block UI/navigation or Strava export
+      // Uses dart:async's unawaited helper implicitly available
+      _startBackgroundChunkUploadAndVerify();
     } catch (e) {
       AppLogger.error('[SESSION_SAVE] Failed to auto-save basic session: $e');
       // Don't show error to user for auto-save failure - they can still manually save
+    }
+  }
+
+  /// Starts background upload of route and heart rate chunks with retry/backoff,
+  /// then verifies the saved session distance against the local distance.
+  Future<void> _startBackgroundChunkUploadAndVerify() async {
+    try {
+      final String sessionId = widget.ruckId;
+      if (sessionId.isEmpty) return;
+
+      // Collect route points from ActiveSession if available; fallback to repository fetch
+      final routePoints = await _collectRoutePoints(sessionId);
+
+      // Prepare heart rate samples if present on this screen
+      final List<Map<String, dynamic>> heartRateSamples =
+          (widget.heartRateSamples ?? [])
+              .map((s) => {
+                    'bpm': s.bpm,
+                    'timestamp': s.timestamp.toIso8601String(),
+                  })
+              .toList();
+
+      // Upload chunks in background with simple retry/backoff
+      await _uploadChunksWithRetry(
+        sessionId: sessionId,
+        routePoints: routePoints,
+        heartRateSamples: heartRateSamples,
+        maxRetries: 3,
+      );
+
+      // After uploads, verify saved distance vs on-screen distance
+      await _verifyAndNotifyDistance(sessionId: sessionId, expectedDistanceKm: widget.distance);
+    } catch (e, st) {
+      AppLogger.error('[SESSION_SAVE][BG_UPLOAD] Background chunk upload init failed: $e', stackTrace: st);
+    }
+  }
+
+  /// Gather route points from the in-memory ActiveSession state or repository as a fallback.
+  Future<List<Map<String, dynamic>>> _collectRoutePoints(String sessionId) async {
+    try {
+      // Try pulling from ActiveSession state first (points captured during the run)
+      final activeState = context.read<ActiveSessionBloc>().state;
+      if (activeState is ActiveSessionRunning && activeState.locationPoints.isNotEmpty) {
+        AppLogger.info('[SESSION_SAVE][BG_UPLOAD] Using ${activeState.locationPoints.length} route points from ActiveSession');
+        return activeState.locationPoints.map((p) => p.toJson()).toList();
+      }
+    } catch (e) {
+      AppLogger.warning('[SESSION_SAVE][BG_UPLOAD] ActiveSession state unavailable: $e');
+    }
+
+    // Fallback: attempt to fetch full session details and use its location points
+    try {
+      final sessionRepository = GetIt.instance<SessionRepository>();
+      final fullSession = await sessionRepository.fetchSessionById(sessionId, forceRefresh: true);
+      final points = fullSession?.locationPoints ?? [];
+      if (points.isNotEmpty) {
+        AppLogger.info('[SESSION_SAVE][BG_UPLOAD] Using ${points.length} route points from repository fetch');
+        // locationPoints is already List<dynamic> (map-like), ensure Map<String, dynamic>
+        return points.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (e) {
+      AppLogger.warning('[SESSION_SAVE][BG_UPLOAD] Repository fetch for route points failed: $e');
+    }
+
+    AppLogger.info('[SESSION_SAVE][BG_UPLOAD] No route points available to upload');
+    return [];
+  }
+
+  /// Uploads route and heart rate data in chunks with retry/backoff using ApiClient endpoints.
+  Future<void> _uploadChunksWithRetry({
+    required String sessionId,
+    required List<Map<String, dynamic>> routePoints,
+    required List<Map<String, dynamic>> heartRateSamples,
+    int maxRetries = 3,
+  }) async {
+    // Chunk sizes matching ApiClient helpers
+    const int routeChunkSize = 100;
+    const int hrChunkSize = 50;
+
+    // Helper to execute an async function with retry/backoff
+    Future<void> withRetry(Future<void> Function() fn, String label) async {
+      int attempt = 0;
+      while (true) {
+        try {
+          attempt++;
+          await fn();
+          return;
+        } catch (e) {
+          if (attempt >= maxRetries) {
+            AppLogger.error('[SESSION_SAVE][BG_UPLOAD] $label failed after $attempt attempts: $e');
+            rethrow;
+          }
+          final backoff = Duration(seconds: attempt * 3);
+          AppLogger.warning('[SESSION_SAVE][BG_UPLOAD] $label failed (attempt $attempt/$maxRetries). Retrying in ${backoff.inSeconds}s... Error: $e');
+          await Future.delayed(backoff);
+        }
+      }
+    }
+
+    // Route chunks
+    if (routePoints.isNotEmpty) {
+      for (int i = 0; i < routePoints.length; i += routeChunkSize) {
+        final chunk = routePoints.skip(i).take(routeChunkSize).toList();
+        await withRetry(() async {
+          await _apiClient.post(
+            '/rucks/$sessionId/route-chunk',
+            {
+              'route_points': chunk,
+              'chunk_index': i ~/ routeChunkSize,
+            },
+          );
+        }, 'route chunk index ${i ~/ routeChunkSize}');
+      }
+    }
+
+    // Heart rate chunks
+    if (heartRateSamples.isNotEmpty) {
+      for (int i = 0; i < heartRateSamples.length; i += hrChunkSize) {
+        final chunk = heartRateSamples.skip(i).take(hrChunkSize).toList();
+        await withRetry(() async {
+          await _apiClient.post(
+            '/rucks/$sessionId/heart-rate-chunk',
+            {
+              'heart_rate_samples': chunk,
+              'chunk_index': i ~/ hrChunkSize,
+            },
+          );
+        }, 'heart rate chunk index ${i ~/ hrChunkSize}');
+      }
+    }
+  }
+
+  /// Verifies the backend-saved distance against the expected local distance.
+  /// If mismatch beyond tolerance, shows a toast and clears caches so history refreshes.
+  Future<void> _verifyAndNotifyDistance({
+    required String sessionId,
+    required double expectedDistanceKm,
+  }) async {
+    try {
+      // Fetch fresh session details
+      final repo = GetIt.instance<SessionRepository>();
+      final session = await repo.fetchSessionById(sessionId, forceRefresh: true);
+      if (session == null) return;
+
+      final savedKm = session.distance;
+      // Allow a tiny tolerance (10 meters)
+      const double toleranceKm = 0.01;
+      final double diff = (savedKm - expectedDistanceKm).abs();
+
+      if (diff > toleranceKm && mounted) {
+        // Clear caches so the history screen reflects the latest server value
+        SessionRepository.clearSessionHistoryCache();
+        // Silent: do not show a toast on the session complete screen
+      }
+    } catch (e) {
+      AppLogger.warning('[SESSION_SAVE][VERIFY] Distance verification failed: $e');
     }
   }
 
@@ -1275,9 +1427,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 _aiCompletionInsight!,
-                style: AppTextStyles.headlineMedium.copyWith(
+                style: AppTextStyles.bodyLarge.copyWith(
                   fontWeight: FontWeight.w600,
-                  height: 1.3,
+                  height: 1.4,
+                  fontSize: 18,
                 ),
                 textAlign: TextAlign.center,
               ),

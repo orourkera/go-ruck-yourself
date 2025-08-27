@@ -411,17 +411,20 @@ import FirebaseCore
                 print("[DEBUG] Received debug_watchEndTapped from Watch")
             case "watchHeartRateUpdate":
                 if let heartRate = message["heartRate"] as? Double {
-                    // Heart rate update received - send via method channel instead of EventChannel
-                    print("[WATCH] Heart rate update received: \(heartRate) BPM - sending via method channel")
+                    // Heart rate update received from WatchConnectivity
+                    print("[WATCH] Heart rate update received: \(heartRate) BPM - forwarding to Flutter via watch_session channel")
                     
-                    // Send to Flutter via WatchConnectivity method channel
-                    if let flutterViewController = self.window?.rootViewController as? FlutterViewController {
-                        let watchConnectivityChannel = FlutterMethodChannel(name: "com.ruckingapp.rucking_app/watch_connectivity", binaryMessenger: flutterViewController.binaryMessenger)
-                        
-                        watchConnectivityChannel.invokeMethod("watchHeartRateUpdate", arguments: [
+                    // Forward to Flutter using the existing watch session channel that Dart listens on
+                    if let controller = self.window?.rootViewController as? FlutterViewController {
+                        let watchSessionChannel = FlutterMethodChannel(name: self.watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                        watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: [
+                            "command": "watchHeartRateUpdate",
                             "heartRate": heartRate,
                             "timestamp": Date().timeIntervalSince1970 * 1000 // milliseconds
-                        ])
+                        ]) { _ in }
+                    } else {
+                        // If Flutter isn't ready, optionally buffer via event stream fallback
+                        HeartRateStreamHandler.sendHeartRate(heartRate)
                     }
                     
                     // Acknowledge the heart rate reception if reply handler is available

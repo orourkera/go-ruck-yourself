@@ -36,7 +36,9 @@ class ElevenLabsService {
   
   final String _apiKey;
 
-  ElevenLabsService(this._apiKey);
+  ElevenLabsService(this._apiKey) {
+    AppLogger.info('[ELEVENLABS] Initialized with V1 API: $_baseUrl');
+  }
 
   /// Synthesizes text to speech audio using personality-specific voice
   Future<Uint8List?> synthesizeSpeech({
@@ -243,6 +245,32 @@ class ElevenLabsService {
         return 0.6; // Smooth, charismatic delivery
       default:
         return 0.5; // Default balanced style
+    }
+  }
+
+  /// Gets speaking rate based on personality (0.25 to 4.0)
+  double _getSpeakingRateForPersonality(String personality) {
+    switch (personality) {
+      case 'Drill Sergeant':
+        return 1.2; // Faster, commanding
+      case 'Sports Commentator':
+        return 1.4; // Fast, energetic
+      case 'Motivational Coach':
+        return 1.1; // Slightly faster, energetic
+      case 'Zen Guide':
+        return 0.8; // Slower, calm
+      case 'Yoga Instructor':
+        return 0.9; // Slower, peaceful
+      case 'British Butler':
+        return 0.9; // Measured, proper
+      case 'Southern Redneck':
+        return 1.0; // Normal pace
+      case 'Tom Selleck':
+        return 0.95; // Slightly slower, smooth
+      case 'Supportive Friend':
+        return 1.0; // Normal pace
+      default:
+        return 1.0; // Default normal pace
     }
   }
 
