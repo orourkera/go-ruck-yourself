@@ -295,6 +295,7 @@ Future<void> setupServiceLocator() async {
     splitTrackingService: getIt<SplitTrackingService>(),
     terrainTracker: getIt<TerrainTracker>(),
     heartRateService: getIt<HeartRateService>(),
+    openAIService: getIt<OpenAIService>(),
   );
   
   // Register as the generic Bloc type that widgets expect

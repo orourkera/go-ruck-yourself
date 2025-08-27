@@ -136,33 +136,39 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
             aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled, // AI Cheerleader toggle
             aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality, // Selected personality
             aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent, // Explicit language preference
+            sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
           ));
           
           // Listen for session state changes
           _blocSubscription = _sessionBloc.stream.listen((state) {
-            AppLogger.debug('[COUNTDOWN] Session state changed: ${state.runtimeType}');
+            AppLogger.error('[COUNTDOWN] 🔥 Session state changed: ${state.runtimeType}');
             
             if (state is ActiveSessionRunning) {
               // Session is now running - mark as ready
-              AppLogger.debug('[COUNTDOWN] ActiveSessionRunning state received - setting isLoading=false');
+              AppLogger.error('[COUNTDOWN] 🔥 ActiveSessionRunning state received - setting isLoading=false');
               if (state.errorMessage != null) {
-                AppLogger.warning('[COUNTDOWN] Session has error but running: ${state.errorMessage} - proceeding anyway');
+                AppLogger.error('[COUNTDOWN] 🔥 Session has error but running: ${state.errorMessage} - proceeding anyway');
               }
               if (mounted) {
                 setState(() {
                   _isLoading = false;
                 });
+                _checkAndNavigateIfReady();
               }
+            } else {
+              AppLogger.error('[COUNTDOWN] 🔥 Still waiting for ActiveSessionRunning, got: ${state.runtimeType}');
             }
           });
           
-          // FAILSAFE: Force navigation after 8 seconds regardless of session state
-          Future.delayed(const Duration(seconds: 8), () {
+          // FAILSAFE: Force navigation after 5 seconds regardless of session state
+          Future.delayed(const Duration(seconds: 5), () {
             if (mounted && _isLoading) {
-              AppLogger.warning('[COUNTDOWN] Timeout reached - forcing navigation despite session not ready');
+              AppLogger.error('[COUNTDOWN] 🔥 TIMEOUT reached - forcing navigation despite session not ready');
+              AppLogger.error('[COUNTDOWN] 🔥 Current bloc state: ${_sessionBloc.state.runtimeType}');
               setState(() {
                 _isLoading = false;
               });
+              _checkAndNavigateIfReady();
             }
           });
         }
@@ -273,6 +279,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled, // Required AI Cheerleader toggle
         aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality, // Optional personality
         aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent, // Required explicit pref
+        sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
       );
       
       // Debug: Log the args being passed to ActiveSessionPage

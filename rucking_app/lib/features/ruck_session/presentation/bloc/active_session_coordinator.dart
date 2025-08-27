@@ -14,6 +14,7 @@ import 'package:rucking_app/core/services/watch_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
+import 'package:rucking_app/core/services/weather_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
@@ -49,7 +50,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   final TerrainTracker _terrainTracker;
   final HeartRateService _heartRateService;
   final HealthService _healthService = GetIt.instance<HealthService>();
-  final OpenAIService _openAIService = GetIt.instance<OpenAIService>();
+  final OpenAIService _openAIService;
   
   // Managers
   late final SessionLifecycleManager _lifecycleManager;
@@ -76,6 +77,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   StreamSubscription<int>? _stepsSub;
   String? _lastCalorieMethod;
   double? _recoveredCalories; // Calories from crash recovery
+  // Diagnostics for emission tracing
+  int _emitSeq = 0;
+  double? _lastEmittedDistanceKm;
+  DateTime? _lastEmitAt;
   
   // Store planned route for navigation
   List<latlong.LatLng>? _plannedRoute;
@@ -93,6 +98,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     required SplitTrackingService splitTrackingService,
     required TerrainTracker terrainTracker,
     required HeartRateService heartRateService,
+    required OpenAIService openAIService,
   })  : _sessionRepository = sessionRepository,
         _locationService = locationService,
         _authService = authService,
@@ -103,6 +109,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         _splitTrackingService = splitTrackingService,
         _terrainTracker = terrainTracker,
         _heartRateService = heartRateService,
+        _openAIService = openAIService,
         super(const ActiveSessionInitial()) {
     
     // Initialize managers
@@ -403,136 +410,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     return null;
   }
   
-  /// Generate AI completion insight for the session
-  Future<String?> _generateCompletionInsight() async {
-    print('🤖🤖🤖 AI COMPLETION INSIGHT GENERATION STARTED 🤖🤖🤖');
-    AppLogger.info('[AI_COMPLETION] ===== STARTING AI COMPLETION INSIGHT GENERATION =====');
-    try {
-      // Get user data
-      final authState = GetIt.instance<AuthBloc>().state;
-      AppLogger.info('[AI_COMPLETION] Auth state type: ${authState.runtimeType}');
-      if (authState is! Authenticated) {
-        AppLogger.warning('[AI_COMPLETION] User not authenticated - skipping AI insights');
-        return null;
-      }
-      AppLogger.info('[AI_COMPLETION] User authenticated: ${authState.user.username}');
-      
-      // Get current session data
-      final lifecycleState = _lifecycleManager.currentState;
-      final locationState = _locationManager.currentState;
-      final heartRateState = _heartRateManager.currentState;
-      
-      if (lifecycleState.sessionId == null) {
-        AppLogger.warning('[AI_COMPLETION] No session ID available');
-        return null;
-      }
-      AppLogger.info('[AI_COMPLETION] Session ID: ${lifecycleState.sessionId}');
-      
-      // Calculate session metrics
-      final duration = lifecycleState.duration;
-      final distance = locationState.totalDistance;
-      final elevationGain = _locationManager.elevationGain;
-      final ruckWeight = lifecycleState.ruckWeightKg;
-      final avgHeartRate = heartRateState.averageHeartRate.toInt();
-      
-      AppLogger.info('[AI_COMPLETION] Session metrics: duration=${duration.inSeconds}s, distance=${distance}km, elevation=${elevationGain}m, weight=${ruckWeight}kg, hr=${avgHeartRate}bpm');
-      
-      // Fetch user history for context
-      Map<String, dynamic>? history;
-      try {
-        AppLogger.info('[AI_COMPLETION] Fetching user history for context...');
-        final historyResp = await _apiClient.get('/ai-cheerleader/user-history', queryParams: {
-          'ruck_limit': 20,
-          'achievements_limit': 20,
-        });
-        if (historyResp is Map<String, dynamic>) {
-          history = historyResp;
-          AppLogger.info('[AI_COMPLETION] User history fetched successfully');
-        }
-      } catch (e) {
-        AppLogger.warning('[AI_COMPLETION] Failed to fetch user history: $e');
-      }
-      
-      // Build context for OpenAI
-      final sessionContext = {
-        'session': {
-          'duration_seconds': duration.inSeconds,
-          'distance_km': distance,
-          'elevation_gain_m': elevationGain,
-          'ruck_weight_kg': ruckWeight,
-          'avg_heart_rate': avgHeartRate,
-          'elapsedTime': {
-            'formatted': _formatDuration(duration),
-            'seconds': duration.inSeconds,
-          },
-          'distance': {
-            'formatted': distance > 0 ? '${distance.toStringAsFixed(2)} km' : '0.00 km',
-            'km': distance,
-          },
-        },
-        'user': {
-          'username': authState.user.username ?? 'Rucker',
-          'preferMetric': authState.user.preferMetric,
-          'gender': authState.user.gender ?? 'unknown',
-        },
-        'trigger': {
-          'type': 'session_completion',
-          'context': 'post_session_summary',
-        },
-        'history': history ?? {},
-        'environment': {
-          'timeOfDay': _getTimeOfDay(),
-          'sessionPhase': 'completed',
-        },
-      };
-      
-      AppLogger.info('[AI_COMPLETION] Built context for OpenAI, calling generateMessage...');
-      AppLogger.info('[AI_COMPLETION] Context keys: ${sessionContext.keys.join(", ")}');
-      
-      // Generate completion insight using OpenAI
-      final insight = await _openAIService.generateMessage(
-        context: sessionContext,
-        personality: 'Session Analyst',
-        explicitContent: false,
-      );
-      
-      AppLogger.info('[AI_COMPLETION] OpenAI generateMessage returned: ${insight != null ? "SUCCESS (${insight.length} chars)" : "NULL"}');
-      if (insight != null) {
-        AppLogger.info('[AI_COMPLETION] Generated insight: "$insight"');
-      }
-      
-      return insight;
-    } catch (e) {
-      AppLogger.error('[AI_COMPLETION] Failed to generate completion insight: $e');
-      return null;
-    }
-  }
-  
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    
-    if (hours > 0) {
-      return '${hours}h ${minutes}m ${seconds}s';
-    } else if (minutes > 0) {
-      return '${minutes}m ${seconds}s';
-    } else {
-      return '${seconds}s';
-    }
-  }
-  
-  String _getTimeOfDay() {
-    final hour = DateTime.now().hour;
-    if (hour < 6) return 'early_morning';
-    if (hour < 12) return 'morning';
-    if (hour < 17) return 'afternoon';
-    if (hour < 21) return 'evening';
-    return 'night';
-  }
-  
   /// Aggregate state from all managers and emit combined state
-  void _aggregateAndEmitState({String? aiCompletionInsight}) {
+  void _aggregateAndEmitState() {
     final lifecycleState = _lifecycleManager.currentState;
     final locationState = _locationManager.currentState;
     final heartRateState = _heartRateManager.currentState;
@@ -588,12 +467,18 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       final route = _locationManager.locationPoints;
       final duration = lifecycleState.duration;
       AppLogger.info('[COORDINATOR] DEBUG: LocationManager state - totalDistance=${_locationManager.currentState.totalDistance}, elevationGain=${_locationManager.elevationGain}, elevationLoss=${_locationManager.elevationLoss}');
-      AppLogger.info('[COORDINATOR] Building completion state: distance=${finalDistance}km, duration=${duration.inSeconds}s, routePoints=${route.length}, calories=${finalCalories}');
+      AppLogger.info('[CALORIE_DEBUG] duration.inSeconds: ${duration.inSeconds}');
+      AppLogger.info('[CALORIE_DEBUG] duration.inMinutes: ${duration.inMinutes}');
+    
+      // CRITICAL FIX: Use actual movement time, not session duration which may include pauses
+      final actualMovementSeconds = finalDistance > 0 ? (finalDistance / (finalDistance / (duration.inSeconds / 3600.0)) * 3600.0).round() : duration.inSeconds;
+      AppLogger.info('[CALORIE_DEBUG] actualMovementSeconds (calculated): $actualMovementSeconds');
+      AppLogger.info('[COORDINATOR] Building completion state: distance=${finalDistance}km, duration=${actualMovementSeconds}s, routePoints=${route.length}, calories=${finalCalories}');
 
       _currentAggregatedState = ActiveSessionCompleted(
         sessionId: lifecycleState.sessionId!,
         finalDistanceKm: finalDistance,
-        finalDurationSeconds: duration.inSeconds,
+        finalDurationSeconds: actualMovementSeconds,
         finalCalories: finalCalories,
         elevationGain: finalElevationGain,
         elevationLoss: finalElevationLoss,
@@ -609,7 +494,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         isOffline: false,
         ruckWeightKg: lifecycleState.ruckWeightKg,
         steps: _currentSteps ?? _estimateStepsFromDistance(finalDistance),
-        aiCompletionInsight: aiCompletionInsight,
       );
       // Log steps in completed state for UI verification
       AppLogger.info('[STEPS UI] [COORDINATOR] Completed state steps: ${_currentSteps ?? _estimateStepsFromDistance(finalDistance)} (${_currentSteps != null ? 'live tracked' : 'estimated from distance'})');
@@ -649,6 +533,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
       final locationPoints = _locationManager.locationPoints;
+      // Diagnostics: capture previous distance if we were already running
+      double? prevDistance;
+      if (_currentAggregatedState is ActiveSessionRunning) {
+        prevDistance = (_currentAggregatedState as ActiveSessionRunning).distanceKm;
+      }
       // Get user and ruck weight from lifecycle state
       final userWeightKg = lifecycleState.userWeightKg;
       final ruckWeightKg = lifecycleState.ruckWeightKg;
@@ -668,9 +557,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         steps: _currentSteps,
       );
       
-      final isPaused = _lifecycleManager.isPaused;
-      AppLogger.info('[COORDINATOR] State aggregation - lifecycle isPaused: $isPaused, pausedAt: ${_lifecycleManager.currentState.pausedAt}');
-      
       _currentAggregatedState = ActiveSessionRunning(
         sessionId: lifecycleState.sessionId!,
         locationPoints: locationPoints,
@@ -681,7 +567,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         calories: calories.toDouble(),
         elevationGain: _locationManager.elevationGain,
         elevationLoss: _locationManager.elevationLoss,
-        isPaused: isPaused,
+        isPaused: _lifecycleManager.isPaused,
         pace: locationState.currentPace,
         originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now(),
         totalPausedDuration: _lifecycleManager.totalPausedDuration,
@@ -701,10 +587,15 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         plannedRouteDuration: _plannedRouteDuration, // Pass route duration
         steps: _currentSteps,
       );
-      
-      AppLogger.info('[COORDINATOR] Created ActiveSessionRunning state with isPaused: ${(_currentAggregatedState as ActiveSessionRunning).isPaused}');
       // Log steps in running state for UI verification
       AppLogger.info('[STEPS UI] [COORDINATOR] Running state steps: ${_currentSteps ?? 'null'}');
+      // Diagnostics: log aggregation distance change
+      if (prevDistance != null) {
+        final delta = (locationState.totalDistance - prevDistance);
+        AppLogger.debug('[COORDINATOR][AGG] distanceKm: prev=${prevDistance.toStringAsFixed(3)} -> new=${locationState.totalDistance.toStringAsFixed(3)} (Δ=${delta.toStringAsFixed(3)} km), elapsed=${lifecycleState.duration.inSeconds}s, paused=${_lifecycleManager.isPaused}');
+      } else {
+        AppLogger.debug('[COORDINATOR][AGG] distanceKm initialized: ${locationState.totalDistance.toStringAsFixed(3)} km, elapsed=${lifecycleState.duration.inSeconds}s, paused=${_lifecycleManager.isPaused}');
+      }
     } else {
       AppLogger.warning('[COORDINATOR] Unmatched state combination: isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage}');
       // Default to initial state for unmatched combinations
@@ -779,13 +670,22 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     double? humidity;
     bool isRaining = false;
 
-    // Use MetCalculator for sophisticated calorie calculation
+    // Use MetCalculator with the user's preferred calorie method (fallback to 'fusion')
     _lastCalorieMethod = (calorieMethod ?? 'fusion');
+    // CRITICAL FIX: Calculate actual movement time to exclude pauses
+    // If we moved distance in duration, what would be reasonable active time?
+    final avgSpeedKmh = distanceKm > 0 && duration.inSeconds > 0 ? (distanceKm / (duration.inSeconds / 3600.0)) : 0.0;
+    final reasonableSpeedKmh = avgSpeedKmh.clamp(3.0, 8.0); // 3-8 km/h reasonable rucking speed
+    final estimatedActiveSeconds = distanceKm > 0 ? ((distanceKm / reasonableSpeedKmh) * 3600.0).round() : duration.inSeconds;
+    
+    // Use the shorter of actual duration or estimated active time to prevent inflation
+    final activeSeconds = duration.inSeconds < estimatedActiveSeconds ? duration.inSeconds : estimatedActiveSeconds;
+    
     final calories = MetCalculator.calculateRuckingCalories(
       userWeightKg: userWeightKg,
       ruckWeightKg: ruckWeightKg,
       distanceKm: distanceKm,
-      elapsedSeconds: duration.inSeconds,
+      elapsedSeconds: activeSeconds,
       elevationGain: elevationGain,
       elevationLoss: elevationLoss,
       gender: gender,
@@ -899,6 +799,36 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.info('[COORDINATOR] Session start requested');
+    // Start live steps if enabled in preferences
+    try {
+      final prefs = GetIt.instance<SharedPreferences>();
+      final enabled = prefs.getBool('live_step_tracking') ?? false;
+      AppLogger.info('[STEPS LIVE] [COORDINATOR] Live step tracking preference: $enabled');
+      
+      if (enabled) {
+        final startTime = DateTime.now();
+        AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting live step tracking from: $startTime');
+        // Initialize steps to 0 immediately so widget shows, will update with live values
+        _currentSteps = 0;
+        add(const StateAggregationRequested());
+        
+        _stepsSub?.cancel();
+        _stepsSub = _healthService.startLiveSteps(startTime).listen((total) {
+          AppLogger.info('[STEPS LIVE] [COORDINATOR] Received step update: $total');
+          _currentSteps = total;
+          add(const StateAggregationRequested());
+        });
+        AppLogger.info('[COORDINATOR] Live step tracking subscription created');
+      } else {
+        AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences - initializing steps to 0 for UI display');
+        // Initialize steps to 0 so the widget appears, will be estimated at session end
+        _currentSteps = 0;
+        add(const StateAggregationRequested());
+      }
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Error setting up live step tracking: $e');
+    }
+    
     // Store planned route data for navigation
     _plannedRoute = event.plannedRoute;
     _plannedRouteDistance = event.plannedRouteDistance;
@@ -908,47 +838,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       AppLogger.info('[COORDINATOR] Stored planned route: ${_plannedRoute!.length} points, ${_plannedRouteDistance}km, ${_plannedRouteDuration}min');
     }
     
-    // Initialize steps BEFORE routing to managers so UI shows steps widget immediately
-    try {
-      final prefs = GetIt.instance<SharedPreferences>();
-      final enabled = prefs.getBool('live_step_tracking') ?? false;
-      AppLogger.info('[STEPS LIVE] [COORDINATOR] Live step tracking preference: $enabled');
-      if (enabled) {
-        // Initialize steps to 0 so UI shows the steps stat card immediately
-        _currentSteps = 0;
-        AppLogger.info('[STEPS LIVE] [COORDINATOR] Pre-initialized steps to 0 for immediate UI display');
-      }
-    } catch (e) {
-      AppLogger.error('[COORDINATOR] Failed to pre-initialize steps: $e');
-    }
-
-    // Route to managers so lifecycle manager establishes the true session start time
     await _routeEventToManagers(event);
-    
-    // Trigger state aggregation to ensure steps widget appears immediately
-    add(const StateAggregationRequested());
-
-    // Now set up live steps tracking using lifecycle start time
-    try {
-      final prefs = GetIt.instance<SharedPreferences>();
-      final enabled = prefs.getBool('live_step_tracking') ?? false;
-      if (enabled) {
-        final lifecycleStart = _lifecycleManager.currentState.startTime ?? DateTime.now();
-        AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting live step tracking from lifecycle start: $lifecycleStart');
-        try { await _stepsSub?.cancel(); } catch (_) {}
-        _healthService.stopLiveSteps();
-        _stepsSub = _healthService.startLiveSteps(lifecycleStart).listen((total) {
-          AppLogger.info('[STEPS LIVE] [COORDINATOR] Received step update: $total');
-          _currentSteps = total;
-          add(const StateAggregationRequested());
-        });
-        AppLogger.info('[COORDINATOR] Live step tracking subscription created');
-      } else {
-        AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences - will estimate steps from distance at session end');
-      }
-    } catch (e) {
-      AppLogger.error('[COORDINATOR] Error setting up live step tracking after lifecycle start: $e');
-    }
     add(const TimerStarted());
   }
   
@@ -956,83 +846,22 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionCompleted event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    print('🔥🔥🔥 COORDINATOR SESSION COMPLETION STARTED 🔥🔥🔥');
-    AppLogger.info('[COORDINATOR] ===== SESSION COMPLETION REQUESTED =====');
-    AppLogger.info('[COORDINATOR] Session completion started for sessionId: ${event.sessionId}');
+    AppLogger.error('[COORDINATOR] ===== SESSION COMPLETION STARTED =====');
+    AppLogger.info('[COORDINATOR] Session completion started');
     // Stop steps
     try { _stepsSub?.cancel(); } catch (_) {}
     try { _healthService.stopLiveSteps(); } catch (_) {}
     AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
     AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
     
-    // Fallback: If live steps were not tracked, compute total steps once at completion
-    try {
-      if (_currentSteps == null) {
-        final startTime = _lifecycleManager.currentState.startTime;
-        if (startTime != null) {
-          final computedSteps = await _healthService.getStepsBetween(startTime, DateTime.now());
-          _currentSteps = computedSteps;
-          AppLogger.info('[COORDINATOR] Computed steps at completion: $_currentSteps');
-          // Fallback to estimation if no steps from health kit
-          if (computedSteps == 0) {
-            // Safely derive distance: use running state's distanceKm if available,
-            // otherwise fall back to LocationTrackingManager's totalDistance
-            final double distance = (_currentAggregatedState is ActiveSessionRunning)
-                ? ( _currentAggregatedState as ActiveSessionRunning ).distanceKm
-                : _locationManager.currentState.totalDistance;
-            double? heightCm;
-            final authState = GetIt.instance<AuthBloc>().state;
-            if (authState is Authenticated && authState.user.heightCm != null) {
-              heightCm = authState.user.heightCm;
-            }
-            _currentSteps = _healthService.estimateStepsFromDistance(distance, userHeightCm: heightCm);
-            AppLogger.info('[COORDINATOR] Estimated steps at completion: $_currentSteps');
-          }
-        } else {
-          AppLogger.debug('[COORDINATOR] No startTime available to compute steps at completion');
-        }
-      } else {
-        AppLogger.debug('[COORDINATOR] Skipping step recompute; live steps already present: $_currentSteps');
-      }
-    } catch (e) {
-      AppLogger.warning('[COORDINATOR] Failed to compute steps at completion: $e');
+    // Steps computation: Start asynchronously, don't block completion
+    if (_currentSteps == null) {
+      _computeStepsAsync();
     }
 
     // Stop the timer by pausing first
     AppLogger.info('[COORDINATOR] Pausing session first');
     add(const SessionPaused());
-    
-    // Generate AI completion insight in background
-    String? aiInsight;
-    try {
-      AppLogger.info('[COORDINATOR] Generating AI completion insight in background');
-      final startTime = DateTime.now();
-      aiInsight = await _generateCompletionInsight();
-      final endTime = DateTime.now();
-      final duration = endTime.difference(startTime).inMilliseconds;
-      AppLogger.info('[COORDINATOR] AI insight generated in ${duration}ms: ${aiInsight?.substring(0, 50) ?? 'null'}...');
-      AppLogger.info('[COORDINATOR] Full AI insight: $aiInsight');
-      
-      // Provide fallback if AI generation failed
-      if (aiInsight == null || aiInsight.isEmpty) {
-        final lifecycleState = _lifecycleManager.currentState;
-        final locationState = _locationManager.currentState;
-        final distance = locationState.totalDistance;
-        final duration = lifecycleState.duration;
-        
-        // Create a personalized fallback message using session data
-        if (distance > 0) {
-          aiInsight = 'Outstanding work completing ${distance.toStringAsFixed(2)} km in ${_formatDuration(duration)}! 🎯';
-        } else {
-          aiInsight = 'Great job completing your ruck session! 🎯';
-        }
-        AppLogger.info('[COORDINATOR] Using fallback AI insight: $aiInsight');
-      }
-    } catch (e) {
-      AppLogger.error('[COORDINATOR] Failed to generate AI insight: $e');
-      // Ensure we always have some insight message
-      aiInsight = 'Excellent work completing your ruck! 🎯';
-    }
     
     try {
       AppLogger.info('[COORDINATOR] Routing event to managers');
@@ -1040,27 +869,27 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       
       AppLogger.info('[COORDINATOR] Lifecycle state after: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
       
-      // Aggregate and emit the completed state with AI insight
-      AppLogger.info('[COORDINATOR] Aggregating state with AI insight: ${aiInsight != null ? 'PRESENT' : 'NULL'}');
-      _aggregateAndEmitState(aiCompletionInsight: aiInsight);
+      // Aggregate and emit the completed state
+      AppLogger.info('[COORDINATOR] Aggregating state');
+      _aggregateAndEmitState();
       AppLogger.info('[COORDINATOR] New aggregated state: ${_currentAggregatedState.runtimeType}');
       
+      AppLogger.info('[COORDINATOR] Checking if current state is ActiveSessionCompleted: ${_currentAggregatedState is ActiveSessionCompleted}');
       if (_currentAggregatedState is ActiveSessionCompleted) {
         final completedState = _currentAggregatedState as ActiveSessionCompleted;
         AppLogger.info('[COORDINATOR] Session completed successfully: sessionId=${completedState.sessionId}, distance=${completedState.finalDistanceKm}km, duration=${completedState.finalDurationSeconds}s');
-        AppLogger.info('[COORDINATOR] AI insight in completed state: ${completedState.aiCompletionInsight != null ? 'PRESENT (${completedState.aiCompletionInsight!.length} chars)' : 'NULL'}');
+        
+        // Emit completion state immediately and let SessionCompleteScreen generate AI summary on-page
+        emit(completedState);
+        AppLogger.info('[COORDINATOR] Emitted completion state (AI summary handled on page)');
+        return;
       }
       
-      // CRITICAL: Ensure all completion processing finishes before UI navigation
-      if (_currentAggregatedState is ActiveSessionCompleted) {
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-      
-      AppLogger.info('[COORDINATOR] Emitting completed state');
+      // If not completed, emit current state normally
       emit(_currentAggregatedState);
       
-      // DELAYED: Clear local storage after a delay to ensure UI navigation completes first
-      Future.delayed(const Duration(seconds: 2), () async {
+      // Clear local storage soon after completion (no UX pause required here)
+      Future.delayed(const Duration(milliseconds: 200), () async {
         try {
           await _storageService.remove('active_session_data');
           await _storageService.remove('active_session_last_save');
@@ -1103,41 +932,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
           emit(_currentAggregatedState);
         }
         
-        AppLogger.info('[COORDINATOR] Session completion recovered from server sync error');
-      } else if (e.toString().contains('NotFoundException') || 
-                 e.toString().contains('Session not found') ||
-                 e.toString().contains('failed to delete') ||
-                 e.toString().contains('status code of 404') ||
-                 e.toString().contains('DioException [bad response]') ||
-                 e.toString().contains('session_delete failed') ||
-                 (e.toString().contains('404') && e.toString().contains('session'))) {
-        AppLogger.warning('[COORDINATOR] Session not found (404) - cleaning up and navigating to homepage: $e');
-        
-        // DELAYED: Clean up local storage for the orphaned session after UI navigation
-        final sessionId = _lifecycleManager.currentState.sessionId ?? 'unknown';
-        Future.delayed(const Duration(seconds: 3), () async {
-          try {
-            // Use storage service to clear session data
-            await _storageService.remove('active_session_data');
-            await _storageService.remove('active_session_last_save');
-            AppLogger.info('[COORDINATOR] Local session storage cleared for session: $sessionId (delayed)');
-          } catch (cleanupError) {
-            AppLogger.error('[COORDINATOR] Failed to clean local storage: $cleanupError');
-          }
-        });
-        
-        // Reset coordinator state to clean state
-        await _lifecycleManager.reset();
-        
-        // Navigate to homepage by emitting initial state
-        // The UI listener will detect this transition and navigate accordingly
-        emit(const ActiveSessionInitial());
-        
-        AppLogger.info('[COORDINATOR] Session not found - reset to initial state');
       } else {
-        // Handle other errors by emitting failure state
-        AppLogger.error('[COORDINATOR] Session completion failed with unexpected error: $e');
-        emit(ActiveSessionFailure(errorMessage: 'Session completion failed: $e'));
+        AppLogger.error('[COORDINATOR] Unexpected error during session completion: $e');
       }
     }
   }
@@ -1146,64 +942,16 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionPaused event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] ===== SESSION PAUSE EVENT RECEIVED =====');
-    AppLogger.info('[COORDINATOR] Session paused from source: ${event.source}');
-    AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
-    
-    // Stop live steps during pause to avoid timers running in background
-    try { await _stepsSub?.cancel(); } catch (_) {}
-    try { _healthService.stopLiveSteps(); } catch (_) {}
-    
-    AppLogger.info('[COORDINATOR] Routing pause event to managers...');
+    AppLogger.info('[COORDINATOR] Session paused');
     await _routeEventToManagers(event);
-    AppLogger.info('[COORDINATOR] Pause event routed to managers successfully');
-    
-    // Trigger state aggregation to update UI
-    add(const StateAggregationRequested());
-    AppLogger.info('[COORDINATOR] ===== SESSION PAUSE PROCESSING COMPLETE =====');
   }
   
   Future<void> _onSessionResumed(
     SessionResumed event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] ===== SESSION RESUME EVENT RECEIVED =====');
-    AppLogger.info('[COORDINATOR] Session resumed from source: ${event.source}');
-    AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
-    
-    AppLogger.info('[COORDINATOR] Routing resume event to managers...');
+    AppLogger.info('[COORDINATOR] Session resumed');
     await _routeEventToManagers(event);
-    AppLogger.info('[COORDINATOR] Resume event routed to managers successfully');
-    
-    // Restart live steps if preference enabled
-    try {
-      final prefs = GetIt.instance<SharedPreferences>();
-      final enabled = prefs.getBool('live_step_tracking') ?? false;
-      AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: live step tracking preference: $enabled');
-      if (enabled) {
-        // Ensure steps card is visible immediately after resume
-        if (_currentSteps == null) {
-          _currentSteps = 0;
-          AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: initialized steps to 0');
-          add(const StateAggregationRequested());
-        }
-        final lifecycleStart = _lifecycleManager.currentState.startTime ?? DateTime.now();
-        AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: starting live step tracking from lifecycle start: $lifecycleStart');
-        try { await _stepsSub?.cancel(); } catch (_) {}
-        _healthService.stopLiveSteps();
-        _stepsSub = _healthService.startLiveSteps(lifecycleStart).listen((total) {
-          AppLogger.info('[STEPS LIVE] [COORDINATOR] Resume: received step update: $total');
-          _currentSteps = total;
-          add(const StateAggregationRequested());
-        });
-      }
-    } catch (e) {
-      AppLogger.error('[COORDINATOR] Error restarting live steps on resume: $e');
-    }
-    
-    // Trigger state aggregation to update UI
-    add(const StateAggregationRequested());
-    AppLogger.info('[COORDINATOR] ===== SESSION RESUME PROCESSING COMPLETE =====');
   }
   
   Future<void> _onLocationUpdated(
@@ -1212,69 +960,61 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   ) async {
     await _routeEventToManagers(event);
   }
-
+  
   Future<void> _onHeartRateUpdated(
     HeartRateUpdated event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Route HR updates to the heart rate manager via the common router
     await _routeEventToManagers(event);
-    // Trigger state aggregation so UI reflects latest HR-derived metrics
-    add(const StateAggregationRequested());
+    _aggregateAndEmitState(); // CRITICAL FIX: Aggregate state to update UI with latest heart rate
   }
-
+  
   Future<void> _onTakePhotoRequested(
     TakePhotoRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Route photo add request to photo manager
     await _routeEventToManagers(event);
-    // Aggregate so UI updates photo list/count
-    add(const StateAggregationRequested());
   }
-
+  
   Future<void> _onDeleteSessionPhotoRequested(
     DeleteSessionPhotoRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Route photo delete request to photo manager
     await _routeEventToManagers(event);
-    // Aggregate so UI updates photo list/count
-    add(const StateAggregationRequested());
+    _aggregateAndEmitState();
   }
-
+  
   Future<void> _onLoadSessionForViewing(
     LoadSessionForViewing event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Restore a past session's state across managers (no live tracking)
+    AppLogger.debug('[COORDINATOR] Loading session for viewing');
     await _routeEventToManagers(event);
-    add(const StateAggregationRequested());
+    _aggregateAndEmitState();
   }
-
+  
   Future<void> _onTimerStarted(
     TimerStarted event,
     Emitter<ActiveSessionState> emit,
   ) async {
     await _routeEventToManagers(event);
-    add(const StateAggregationRequested());
   }
   
   Future<void> _onTick(
     Tick event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    // Periodic tick from lifecycle/timer; propagate to managers
     await _routeEventToManagers(event);
-    add(const StateAggregationRequested());
+    _aggregateAndEmitState();
   }
+  
+  // Note: This method is now handled by _onSessionStopRequested
   
   Future<void> _onSessionRecoveryRequested(
     SessionRecoveryRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
     await _routeEventToManagers(event);
-    add(const StateAggregationRequested());
   }
   
   Future<void> _onSessionReset(
@@ -1282,13 +1022,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.info('[COORDINATOR] Session reset requested');
-    // Ensure any live steps resources are torn down on reset
-    try { await _stepsSub?.cancel(); } catch (_) {}
-    try { _healthService.stopLiveSteps(); } catch (_) {}
-    _stepsSub = null;
-    _currentSteps = null;
     await _routeEventToManagers(event);
-    add(const StateAggregationRequested());
+    
+    // Reset to initial state
+    _currentAggregatedState = const ActiveSessionInitial();
+    emit(_currentAggregatedState);
   }
   
   Future<void> _onBatchLocationUpdated(
@@ -1309,6 +1047,23 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     StateAggregationRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
+    // Diagnostics: log emission details for running state
+    if (_currentAggregatedState is ActiveSessionRunning) {
+      final rs = _currentAggregatedState as ActiveSessionRunning;
+      final now = DateTime.now();
+      final last = _lastEmitAt;
+      final dtMs = last != null ? now.difference(last).inMilliseconds : null;
+      final prev = _lastEmittedDistanceKm;
+      final delta = prev != null ? (rs.distanceKm - prev) : null;
+      _emitSeq += 1;
+      AppLogger.info('[COORDINATOR][EMIT] seq=$_emitSeq distance=${rs.distanceKm.toStringAsFixed(3)} km${delta != null ? ' (Δ='+delta.toStringAsFixed(3)+' km)' : ''}, elapsed=${rs.elapsedSeconds}s, paused=${rs.isPaused}, dt=${dtMs != null ? dtMs.toString()+'ms' : 'n/a'}');
+      _lastEmittedDistanceKm = rs.distanceKm;
+      _lastEmitAt = now;
+    } else {
+      AppLogger.debug('[COORDINATOR][EMIT] seq=${_emitSeq + 1} state=${_currentAggregatedState.runtimeType}');
+      _emitSeq += 1;
+      _lastEmitAt = DateTime.now();
+    }
     emit(_currentAggregatedState);
   }
   
@@ -1361,6 +1116,266 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       // Continue gracefully - not critical for app startup
     }
   }
+
+  /// Compute steps asynchronously without blocking completion
+  void _computeStepsAsync() async {
+    try {
+      final startTime = _lifecycleManager.currentState.startTime;
+      if (startTime != null) {
+        final computedSteps = await _healthService.getStepsBetween(startTime, DateTime.now());
+        _currentSteps = computedSteps;
+        AppLogger.info('[COORDINATOR] Computed steps asynchronously: $_currentSteps');
+        // Fallback to estimation if no steps from health kit
+        if (computedSteps == 0) {
+          final double distance = (_currentAggregatedState is ActiveSessionRunning)
+              ? ( _currentAggregatedState as ActiveSessionRunning ).distanceKm
+              : _locationManager.currentState.totalDistance;
+          double? heightCm;
+          final authState = GetIt.instance<AuthBloc>().state;
+          if (authState is Authenticated && authState.user.heightCm != null) {
+            heightCm = authState.user.heightCm;
+          }
+          _currentSteps = _healthService.estimateStepsFromDistance(distance, userHeightCm: heightCm);
+          AppLogger.info('[COORDINATOR] Estimated steps asynchronously: $_currentSteps');
+        }
+        // Re-emit state with updated steps if session is completed
+        if (_currentAggregatedState is ActiveSessionCompleted) {
+          final currentState = _currentAggregatedState as ActiveSessionCompleted;
+          final updatedState = ActiveSessionCompleted(
+            sessionId: currentState.sessionId,
+            finalDistanceKm: currentState.finalDistanceKm,
+            finalDurationSeconds: currentState.finalDurationSeconds,
+            finalCalories: currentState.finalCalories,
+            elevationGain: currentState.elevationGain,
+            elevationLoss: currentState.elevationLoss,
+            averagePace: currentState.averagePace,
+            route: currentState.route,
+            heartRateSamples: currentState.heartRateSamples,
+            averageHeartRate: currentState.averageHeartRate,
+            minHeartRate: currentState.minHeartRate,
+            maxHeartRate: currentState.maxHeartRate,
+            sessionPhotos: currentState.sessionPhotos,
+            splits: currentState.splits,
+            completedAt: currentState.completedAt,
+            isOffline: currentState.isOffline,
+            ruckWeightKg: currentState.ruckWeightKg,
+            steps: _currentSteps,
+            aiCompletionInsight: currentState.aiCompletionInsight,
+          );
+          _currentAggregatedState = updatedState;
+          emit(updatedState);
+          AppLogger.info('[COORDINATOR] Re-emitted state with updated steps');
+        }
+      } else {
+        AppLogger.debug('[COORDINATOR] No startTime available to compute steps');
+      }
+    } catch (e) {
+      AppLogger.warning('[COORDINATOR] Failed to compute steps asynchronously: $e');
+    }
+  }
+
+  /// Generate AI summary asynchronously and update state when ready
+  void _generateAndUpdateAISummaryAsync(ActiveSessionCompleted state) async {
+    try {
+      AppLogger.info('[COORDINATOR] Generating OpenAI session summary asynchronously...');
+      final aiSummary = await _generateSessionSummary(state);
+      AppLogger.info('[COORDINATOR] OpenAI session summary generated asynchronously: $aiSummary');
+      
+      // Update state with AI summary
+      final updatedState = ActiveSessionCompleted(
+        sessionId: state.sessionId,
+        finalDistanceKm: state.finalDistanceKm,
+        finalDurationSeconds: state.finalDurationSeconds,
+        finalCalories: state.finalCalories,
+        elevationGain: state.elevationGain,
+        elevationLoss: state.elevationLoss,
+        averagePace: state.averagePace,
+        route: state.route,
+        heartRateSamples: state.heartRateSamples,
+        averageHeartRate: state.averageHeartRate,
+        minHeartRate: state.minHeartRate,
+        maxHeartRate: state.maxHeartRate,
+        sessionPhotos: state.sessionPhotos,
+        splits: state.splits,
+        completedAt: state.completedAt,
+        isOffline: state.isOffline,
+        ruckWeightKg: state.ruckWeightKg,
+        steps: state.steps,
+        aiCompletionInsight: aiSummary,
+      );
+      _currentAggregatedState = updatedState;
+      emit(updatedState);
+      AppLogger.info('[COORDINATOR] Re-emitted state with AI summary');
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Failed to generate AI summary asynchronously: $e');
+    }
+  }
+
+  /// Generate OpenAI session summary based on session data
+  Future<String?> _generateSessionSummary(ActiveSessionCompleted state) async {
+    try {
+      // Get user information for context
+      final authState = GetIt.instance<AuthBloc>().state;
+      Map<String, dynamic> userContext = {};
+      if (authState is Authenticated) {
+        userContext = {
+          'user_info': {
+            'user_id': authState.user.userId,
+            'username': authState.user.username,
+            'prefers_metric': authState.user.preferMetric,
+          },
+          'unit_preference': authState.user.preferMetric ? 'metric' : 'imperial',
+        };
+      }
+
+      // Build session context for OpenAI
+      final sessionContext = {
+        'session_id': state.sessionId,
+        'distance_km': state.finalDistanceKm,
+        'distance_miles': state.finalDistanceKm * 0.621371,
+        'duration_minutes': (state.finalDurationSeconds / 60.0).round(),
+        'duration_seconds': state.finalDurationSeconds,
+        'calories_burned': state.finalCalories,
+        'elevation_gain_m': state.elevationGain,
+        'elevation_gain_ft': state.elevationGain * 3.28084,
+        'elevation_loss_m': state.elevationLoss,
+        'elevation_loss_ft': state.elevationLoss * 3.28084,
+        'ruck_weight_kg': state.ruckWeightKg,
+        'ruck_weight_lbs': state.ruckWeightKg * 2.20462,
+        'steps': state.steps,
+        'completed_at': state.completedAt.toIso8601String(),
+      };
+
+      // Add heart rate data if available
+      if (state.averageHeartRate != null) {
+        sessionContext['avg_heart_rate'] = state.averageHeartRate;
+        sessionContext['min_heart_rate'] = state.minHeartRate;
+        sessionContext['max_heart_rate'] = state.maxHeartRate;
+      }
+
+      // Add pace data if available
+      if (state.averagePace != null && state.averagePace! > 0) {
+        final paceMinPerKm = state.averagePace! / 60.0;
+        final paceMinPerMile = paceMinPerKm * 1.60934;
+        sessionContext['pace_min_per_km'] = paceMinPerKm;
+        sessionContext['pace_min_per_mile'] = paceMinPerMile;
+      }
+
+      // Fetch weather data for the session location
+      Map<String, dynamic> weatherContext = {};
+      try {
+        final route = state.route;
+        if (route.isNotEmpty) {
+          final startLocation = route.first;
+          final weatherData = await _fetchWeatherData(
+            startLocation.latitude, 
+            startLocation.longitude
+          );
+          if (weatherData != null) {
+            weatherContext = weatherData;
+          }
+        }
+      } catch (e) {
+        AppLogger.warning('[COORDINATOR] Failed to fetch weather data: $e');
+      }
+
+      // Fetch recent session history for context
+      Map<String, dynamic> historyContext = {};
+      try {
+        final recentSessions = await _fetchRecentUserHistory(limit: 5);
+        if (recentSessions.isNotEmpty) {
+          historyContext = {
+            'recent_rucks': recentSessions.map((session) => {
+              'distance_km': session['distance_km'] ?? 0.0,
+              'duration_seconds': session['duration_seconds'] ?? 0,
+              'calories_burned': session['calories_burned'] ?? 0,
+              'completed_at': session['completed_at'],
+              'ruck_weight_kg': session['ruck_weight_kg'] ?? 0.0,
+            }).toList(),
+          };
+        }
+      } catch (e) {
+        AppLogger.warning('[COORDINATOR] Failed to fetch user history: $e');
+      }
+
+      // Build full context for OpenAI
+      final context = {
+        'trigger': {'type': 'session_completion'},
+        'session': sessionContext,
+        'user': userContext,
+        'environment': weatherContext,
+        'history': historyContext,
+      };
+
+      AppLogger.info('[COORDINATOR] Calling OpenAI with session summary context: $context');
+
+      // Generate summary using OpenAI service
+      final summary = await _openAIService.generateMessage(
+        context: context,
+        personality: 'Session Analyst', // Use Session Analyst personality for completion summaries
+        explicitContent: false,
+      );
+
+      if (summary != null && summary.isNotEmpty) {
+        AppLogger.info('[COORDINATOR] OpenAI session summary generated successfully: $summary');
+        return summary;
+      } else {
+        AppLogger.warning('[COORDINATOR] OpenAI returned empty session summary');
+        return null;
+      }
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Error generating OpenAI session summary: $e');
+      return null;
+    }
+  }
+
+  /// Fetch weather data for the given coordinates
+  Future<Map<String, dynamic>?> _fetchWeatherData(double latitude, double longitude) async {
+    try {
+      final response = await _apiClient.get('/weather', queryParams: {
+        'lat': latitude,
+        'lon': longitude,
+      });
+      
+      if (response != null) {
+        final weatherData = response as Map<String, dynamic>;
+        
+        // Transform to expected format for OpenAI context
+        return {
+          'temperature_f': weatherData['temp_f'],
+          'temperature_c': weatherData['temp_c'],
+          'condition': weatherData['condition'] ?? weatherData['description'],
+          'humidity': weatherData['humidity'],
+          'wind_speed': weatherData['wind_speed'],
+          'visibility': weatherData['visibility'],
+        };
+      }
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Weather API error: $e');
+    }
+    return null;
+  }
+
+  /// Fetch recent user session history
+  Future<List<Map<String, dynamic>>> _fetchRecentUserHistory({int limit = 5}) async {
+    try {
+      final response = await _apiClient.get('/rucks', queryParams: {
+        'limit': limit,
+        'offset': 0,
+      });
+      
+      if (response != null) {
+        final sessions = response as List<dynamic>;
+        return sessions
+            .cast<Map<String, dynamic>>()
+            .where((session) => session['status'] == 'completed')
+            .toList();
+      }
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] User history API error: $e');
+    }
+    return [];
+  }
   
   
   @override
@@ -1371,9 +1386,6 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     for (final subscription in _managerSubscriptions) {
       await subscription.cancel();
     }
-    // Also cancel steps subscription and stop health service timer
-    try { await _stepsSub?.cancel(); } catch (_) {}
-    try { _healthService.stopLiveSteps(); } catch (_) {}
     
     // Dispose all managers
     await _lifecycleManager.dispose();
@@ -1435,4 +1447,9 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     return _sessionCompletionData;
   }
 
+  /// Helper function to check if weather condition code indicates rain
+  bool _isRainyWeather(int conditionCode) {
+    // OpenWeatherMap condition codes for rain/drizzle
+    return (conditionCode >= 200 && conditionCode < 600); // Thunderstorm, drizzle, rain
+  }
 }

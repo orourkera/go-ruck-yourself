@@ -60,6 +60,7 @@ class ActiveSessionArgs {
   final bool aiCheerleaderEnabled; // AI Cheerleader feature toggle
   final String? aiCheerleaderPersonality; // Selected personality type
   final bool aiCheerleaderExplicitContent; // Explicit language preference
+  final String? sessionId; // Existing session ID to prevent duplicate creation
 
   ActiveSessionArgs({
     required this.ruckWeight,
@@ -74,7 +75,53 @@ class ActiveSessionArgs {
     required this.aiCheerleaderEnabled, // Required AI Cheerleader toggle
     this.aiCheerleaderPersonality, // Optional personality selection
     required this.aiCheerleaderExplicitContent, // Required explicit content preference
+    this.sessionId, // Optional existing session ID
   });
+}
+
+/// Lightweight on-screen diagnostics HUD for live distance/rebuild monitoring
+class _DebugHud extends StatelessWidget {
+  final int seq;
+  final double distanceKm;
+  final double? deltaKm;
+  final int? dtMs;
+  final bool paused;
+
+  const _DebugHud({
+    Key? key,
+    required this.seq,
+    required this.distanceKm,
+    required this.deltaKm,
+    required this.dtMs,
+    required this.paused,
+  }) : super(key: key);
+
+  String _fmt(double v) => v.toStringAsFixed(3);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: DefaultTextStyle(
+        style: const TextStyle(color: Colors.white, fontSize: 12, fontFeatures: []),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('HUD seq#$seq ${paused ? '(paused)' : ''}'),
+            Text('dist: ${_fmt(distanceKm)} km'),
+            Text('Δ: ${deltaKm != null ? _fmt(deltaKm!) : '—'} km'),
+            Text('dt: ${dtMs != null ? '$dtMs ms' : '—'}'),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Thin UI wrapper around ActiveSessionBloc.
@@ -164,6 +211,42 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   bool uiInitialized = false;
   bool _terrainExpanded = false; // Changed to false to be collapsed by default
   ActiveSessionRunning? _lastActiveSessionRunning;
+  StreamSubscription<ActiveSessionState>? _blocSubscription;
+  bool _navigatedToComplete = false;
+  // Lightweight in-app diagnostics HUD (no dependencies)
+  bool _hudVisible = true;
+  int _hudSeq = 0;
+  DateTime? _hudLastBuildAt;
+  double? _hudLastDistanceKm;
+
+  Future<void> _navigateToSessionCompleteWithAi(ActiveSessionCompleted initial) async {
+    if (_navigatedToComplete) return;
+    _navigatedToComplete = true;
+    final ActiveSessionCompleted finalState = initial;
+
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => SessionCompleteScreen(
+            completedAt: finalState.completedAt,
+            ruckId: finalState.sessionId,
+            duration: Duration(seconds: finalState.finalDurationSeconds),
+            distance: finalState.finalDistanceKm,
+            caloriesBurned: finalState.finalCalories,
+            elevationGain: finalState.elevationGain,
+            elevationLoss: finalState.elevationLoss,
+            ruckWeight: finalState.ruckWeightKg,
+            heartRateSamples: finalState.heartRateSamples,
+            splits: finalState.splits.isEmpty ? null : finalState.splits,
+            terrainSegments: null,
+            aiCompletionInsight: finalState.aiCompletionInsight,
+            steps: finalState.steps,
+          ),
+        ),
+      );
+    });
+  }
 
   void _checkAnimateOverlay() {
     // No animation needed anymore since we removed the gray overlay
@@ -190,19 +273,23 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     // Wait a short moment for UI to render before initializing the session
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Set UI as initialized to allow conditional rendering
-      setState(() {
-        uiInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          uiInitialized = true;
+        });
+      }
     });
     
     // Listen for session state changes
     final bloc = context.read<ActiveSessionBloc>();
-    bloc.stream.listen((state) {
+    _blocSubscription = bloc.stream.listen((state) {
       if (state is ActiveSessionRunning && !sessionRunning) {
         // When session first starts running, mark it
-        setState(() {
-          sessionRunning = true;
-        });
+        if (mounted) {
+          setState(() {
+            sessionRunning = true;
+          });
+        }
       }
       if (state is ActiveSessionRunning) {
         _lastActiveSessionRunning = state;
@@ -212,6 +299,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
 
   @override
   void dispose() {
+    _blocSubscription?.cancel();
     super.dispose();
   }
 
@@ -241,10 +329,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             TextButton(
               onPressed: () {
                 AppLogger.info('[UI] ===== END SESSION BUTTON PRESSED =====');
-                AppLogger.info('[UI] About to emit Tick event');
-                // Emit a final Tick event to ensure state is up to date before ending session
-                context.read<ActiveSessionBloc>().add(const Tick());
                 AppLogger.info('[UI] About to emit SessionCompleted event');
+                // Remove unnecessary Tick - SessionCompleted handles state aggregation
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
                 AppLogger.info('[UI] SessionCompleted event dispatched successfully');
                 AppLogger.info('[UI] Closing dialog');
@@ -379,6 +465,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                 aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled,
                                 aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality,
                                 aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent,
+                                sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
                                 initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
@@ -409,6 +496,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                   aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled,
                                   aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality,
                                   aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent,
+                                  sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
                                   initialLocation: widget.args.initialCenter == null 
                                     ? null 
                                     : LocationPoint(
@@ -479,6 +567,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                         aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled,
                                         aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality,
                                         aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent,
+                                        sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
                                         initialLocation: widget.args.initialCenter == null 
                                           ? null 
                                           : LocationPoint(
@@ -509,6 +598,13 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       }
                       
                       if (state is ActiveSessionRunning) {
+                        // Update HUD diagnostics
+                        final now = DateTime.now();
+                        final lastAt = _hudLastBuildAt;
+                        final lastDist = _hudLastDistanceKm;
+                        _hudSeq += 1;
+                        _hudLastBuildAt = now;
+                        _hudLastDistanceKm = state.distanceKm;
                         // Validate state before rendering to prevent white pages
                         if (state.sessionId.isEmpty) {
                           AppLogger.warning('ActiveSessionRunning state has empty sessionId');
@@ -539,71 +635,86 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           child: Column(
                             children: [
                               // Map with weight chip overlay - full bleed
-                              Builder(
-                                builder: (context) {
-                                  // Defensive wrapper to prevent ParentData crashes
-                                  return Stack(
-                                    children: [
-                                      SizedBox(
-                                        height: MediaQuery.of(context).size.height * 0.3,
-                                            width: double.infinity,
-                                             child: sessionRunning && uiInitialized
-                                             ? _RouteMap(
-                                                 route: route,
-                                                 initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
-                                                 plannedRoute: () {
-                                                   final activeSessionPage = context.findAncestorWidgetOfExactType<ActiveSessionPage>();
-                                                   final plannedRoute = activeSessionPage?.args.plannedRoute;
-                                                    print('🎯🎯🎯 [ACTIVE_SESSION_PAGE] Debug planned route flow:');
-                                                    print('🎯🎯🎯   ActiveSessionPage found: ${activeSessionPage != null}');
-                                                    print('🎯🎯🎯   args.plannedRoute is null: ${plannedRoute == null}');
-                                                    print('🎯🎯🎯   args.plannedRoute length: ${plannedRoute?.length ?? 0}');
-                                                    if (plannedRoute != null && plannedRoute.isNotEmpty) {
-                                                      print('🎯🎯🎯   First planned route point: ${plannedRoute.first}');
-                                                    }
-                                                    
-                                                    debugPrint('[ACTIVE_SESSION_PAGE] Debug planned route flow:');
-                                                    debugPrint('  ActiveSessionPage found: ${activeSessionPage != null}');
-                                                    debugPrint('  args.plannedRoute is null: ${plannedRoute == null}');
-                                                    debugPrint('  args.plannedRoute length: ${plannedRoute?.length ?? 0}');
-                                                    if (plannedRoute != null && plannedRoute.isNotEmpty) {
-                                                      debugPrint('  First planned route point: ${plannedRoute.first}');
-                                                    }
-                                                   return plannedRoute;
-                                                 }(),
-                                                onMapReady: () {
-                                                  if (!mapReady) {
-                                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                      if (mounted) {
-                                                        setState(() {
-                                                          mapReady = true;
-                                                        });
-                                                      }
-                                                    });
-                                                    _checkAnimateOverlay();
-                                                  }
-                                                },
-                                              )
-                                            : Container(
-                                                color: const Color(0xFFE5E3DF), // Match map color
-                                                child: const Center(
-                                                  child: CircularProgressIndicator(),
-                                                ),
-                                              ),
+                              SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.3,
+                                width: double.infinity,
+                                child: Stack(
+                                  children: [
+                                    sessionRunning && uiInitialized
+                                      ? _RouteMap(
+                                          route: route,
+                                          initialCenter: (context.findAncestorWidgetOfExactType<ActiveSessionPage>()?.args.initialCenter),
+                                          plannedRoute: () {
+                                            final activeSessionPage = context.findAncestorWidgetOfExactType<ActiveSessionPage>();
+                                            final plannedRoute = activeSessionPage?.args.plannedRoute;
+                                            print('🎯🎯🎯 [ACTIVE_SESSION_PAGE] Debug planned route flow:');
+                                            print('🎯🎯🎯   ActiveSessionPage found: ${activeSessionPage != null}');
+                                            print('🎯🎯🎯   args.plannedRoute is null: ${plannedRoute == null}');
+                                            print('🎯🎯🎯   args.plannedRoute length: ${plannedRoute?.length ?? 0}');
+                                            if (plannedRoute != null && plannedRoute.isNotEmpty) {
+                                              print('🎯🎯🎯   First planned route point: ${plannedRoute.first}');
+                                            }
+                                            
+                                            debugPrint('[ACTIVE_SESSION_PAGE] Debug planned route flow:');
+                                            debugPrint('  ActiveSessionPage found: ${activeSessionPage != null}');
+                                            debugPrint('  args.plannedRoute is null: ${plannedRoute == null}');
+                                            debugPrint('  args.plannedRoute length: ${plannedRoute?.length ?? 0}');
+                                            if (plannedRoute != null && plannedRoute.isNotEmpty) {
+                                              debugPrint('  First planned route point: ${plannedRoute.first}');
+                                            }
+                                            return plannedRoute;
+                                          }(),
+                                          onMapReady: () {
+                                            if (!mapReady) {
+                                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                if (mounted) {
+                                                  setState(() {
+                                                    mapReady = true;
+                                                  });
+                                                }
+                                              });
+                                              _checkAnimateOverlay();
+                                            }
+                                          },
+                                        )
+                                      : Container(
+                                          color: const Color(0xFFE5E3DF), // Match map color
+                                          child: const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
                                         ),
-                                        Positioned(
-                                          top: 42,
-                                          right: 12,
-                                          child: _WeightChip(weightKg: state.ruckWeightKg),
+                                    Positioned(
+                                      top: 42,
+                                      right: 12,
+                                      child: _WeightChip(weightKg: state.ruckWeightKg),
+                                    ),
+                                    if (state.isPaused)
+                                      const Positioned.fill(child: IgnorePointer(
+                                        ignoring: true, // Let touch events pass through
+                                        child: _PauseOverlay(),
+                                      )),
+                                    // Debug HUD overlay (top-left)
+                                    if (_hudVisible)
+                                      Positioned(
+                                        top: 42,
+                                        left: 12,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _hudVisible = false;
+                                            });
+                                          },
+                                          child: _DebugHud(
+                                            seq: _hudSeq,
+                                            distanceKm: state.distanceKm,
+                                            deltaKm: (lastDist != null) ? (state.distanceKm - lastDist) : null,
+                                            dtMs: (lastAt != null) ? now.difference(lastAt).inMilliseconds : null,
+                                            paused: state.isPaused,
+                                          ),
                                         ),
-                                        if (state.isPaused)
-                                          const Positioned.fill(child: IgnorePointer(
-                                            ignoring: true, // Let touch events pass through
-                                            child: _PauseOverlay(),
-                                          )),
-                                    ],
-                                  );
-                                },
+                                      ),
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 8.0), // Added for spacing
                               
@@ -776,16 +887,14 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               Builder(
                                 builder: (context) {
                                   final isRunning = state is ActiveSessionRunning;
-                                  final aiEnabled = widget.args.aiCheerleaderEnabled;
                                   final remoteConfigEnabled = RemoteConfigService.instance.getBool('ai_cheerleader_manual_trigger', fallback: true);
                                   
                                   print('[AI_CHEERLEADER_DEBUG] Button visibility check:');
                                   print('[AI_CHEERLEADER_DEBUG] - Session running: $isRunning');
-                                  print('[AI_CHEERLEADER_DEBUG] - AI Cheerleader enabled: $aiEnabled');
                                   print('[AI_CHEERLEADER_DEBUG] - Remote config enabled: $remoteConfigEnabled');
-                                  print('[AI_CHEERLEADER_DEBUG] - Button will show: ${isRunning && aiEnabled && remoteConfigEnabled}');
+                                  print('[AI_CHEERLEADER_DEBUG] - Button will show: ${isRunning && remoteConfigEnabled}');
                                   
-                                  if (isRunning && aiEnabled && remoteConfigEnabled) {
+                                  if (isRunning && remoteConfigEnabled) {
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 8.0),
                                       child: Center(
@@ -829,28 +938,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       if (state is ActiveSessionCompleted) {
                         print('[UI] ActiveSessionCompleted state received: distance=${state.finalDistanceKm}km, duration=${state.finalDurationSeconds}s, calories=${state.finalCalories}, elevation=${state.elevationGain}m gain/${state.elevationLoss}m loss');
                         print('[UI] AI insight available: ${state.aiCompletionInsight != null ? 'YES (${state.aiCompletionInsight!.length} chars)' : 'NO'}');
-                        
-                        // Navigate to SessionCompleteScreen with full session data
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => SessionCompleteScreen(
-                                completedAt: state.completedAt,
-                                ruckId: state.sessionId,
-                                duration: Duration(seconds: state.finalDurationSeconds),
-                                distance: state.finalDistanceKm,
-                                caloriesBurned: state.finalCalories,
-                                elevationGain: state.elevationGain,
-                                elevationLoss: state.elevationLoss,
-                                ruckWeight: state.ruckWeightKg,
-                                heartRateSamples: state.heartRateSamples,
-                                splits: state.splits.isEmpty ? null : state.splits,
-                                terrainSegments: null, // Can be added later if needed
-                                aiCompletionInsight: state.aiCompletionInsight,
-                              ),
-                            ),
-                          );
-                        });
+                        _navigateToSessionCompleteWithAi(state);
                         
                         // Show loading indicator while navigating
                         return const Center(

@@ -236,8 +236,12 @@ class StravaExportResource(Resource):
                 activity_data['total_elevation_gain'] = session['elevation_gain_m']
             
             # Add ruck weight to description if not already included
+            # Check for various weight indicators (kg, lbs, or weight emoji)
             ruck_weight = session.get('ruck_weight_kg', 0)
-            if ruck_weight > 0 and 'kg' not in description.lower():
+            desc_lower = description.lower()
+            has_weight = any(indicator in desc_lower for indicator in ['kg', 'lbs', 'ruck weight', '⚖️'])
+            
+            if ruck_weight > 0 and not has_weight:
                 if description:
                     description += f"\n\nRuck Weight: {ruck_weight:.1f}kg"
                 else:

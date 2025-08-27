@@ -275,23 +275,23 @@ class AICheerleaderLogResource(Resource):
             
             logger.info(f"[AI_CHEERLEADER] Calling OpenAI with {len(context_str)} chars of context")
             
-            # Call OpenAI with stricter length/creativity
+            # Call OpenAI with moderate length for 2-3 sentences
             completion = openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                max_tokens=60,
+                max_tokens=120,  # Increased for 2-3 sentences
                 temperature=0.7,
             )
             
             ai_message = (completion.choices[0].message.content or "").strip()
 
-            # Hard 20-word cap and cleanup (no deps)
+            # Moderate word cap for 2-3 sentences and cleanup (no deps)
             words = ai_message.split()
-            if len(words) > 20:
-                ai_message = ' '.join(words[:20])
+            if len(words) > 75:  # Increased from 20 to 75 words for 2-3 sentences
+                ai_message = ' '.join(words[:75])
             # Remove hashtags entirely
             ai_message = ' '.join(w for w in ai_message.split() if not w.startswith('#'))
             # Final trim

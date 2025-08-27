@@ -142,7 +142,13 @@ class StravaService {
     required double distanceKm,
     required Duration duration,
     required bool preferMetric,
+    String? aiTitle,
   }) {
+    // Use AI-generated title if available, otherwise fall back to default format
+    if (aiTitle != null && aiTitle.trim().isNotEmpty) {
+      return aiTitle.trim();
+    }
+    
     final weightStr = MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric);
     final distanceStr = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
     final durationStr = _formatDuration(duration);
@@ -157,8 +163,16 @@ class StravaService {
     required Duration duration,
     required bool preferMetric,
     int? calories,
+    String? aiInsight,
   }) {
     final buffer = StringBuffer();
+    
+    // Add AI insight at the top if available
+    if (aiInsight != null && aiInsight.trim().isNotEmpty) {
+      buffer.writeln(aiInsight.trim());
+      buffer.writeln();
+    }
+    
     buffer.writeln('🎒 Ruck Session');
     buffer.writeln('📏 Distance: ${MeasurementUtils.formatDistance(distanceKm, metric: preferMetric)}');
     

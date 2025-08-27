@@ -105,9 +105,8 @@ class WatchService {
     // Setup method call handlers
     _watchSessionChannel.setMethodCallHandler(_handleWatchSessionMethod);
 
-    // Setup heart rate event channel
-    _setupNativeHeartRateListener();
-    _startHeartRateWatchdog();
+    // Heart rate handled via WatchConnectivity direct messages (watchHeartRateUpdate command)
+    // No need for separate EventChannel - removed to eliminate dual stream conflict
 
     // Setup steps event channel
     _setupNativeStepsListener();
@@ -153,9 +152,12 @@ class WatchService {
         // Get the command type from the message
         final command = data['command'] as String?;
         
-        if (command == 'startSession' || command == 'startSessionFromWatch' || command == 'workoutStarted') {
-          AppLogger.info('[WATCH] Start command received: $command');
+        if (command == 'startSessionFromWatch') {
+          AppLogger.info('[WATCH] Watch-initiated start received');
           await _handleSessionStartedFromWatch(data);
+        } else if (command == 'startSession' || command == 'workoutStarted') {
+          AppLogger.info('[WATCH] Start ACK received: $command (no-op)');
+          // Do not create/start another session here
         } else if (command == 'pauseSession') {
           await pauseSessionFromWatchCallback();
         } else if (command == 'resumeSession') {
@@ -173,7 +175,7 @@ class WatchService {
           final hr = data['heartRate'];
           if (hr is num) {
             final hrValue = hr.toDouble();
-            AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Heart rate update from WatchConnectivity: $hrValue');
+            AppLogger.info('[WATCH_SERVICE] Heart rate update from WatchConnectivity: $hrValue BPM');
             handleWatchHeartRateUpdate(hrValue);
             _lastHeartRateUpdateTime = DateTime.now();
           } else {
@@ -198,13 +200,15 @@ class WatchService {
     
     // Check if there's already an active session to prevent conflicts
     if (_isSessionActive) {
-      AppLogger.warning('[WATCH] Session already active - ignoring watch start request');
+      AppLogger.info('[WATCH] Session already active - ignoring watch start request to prevent duplicate session creation');
       await _sendMessageToWatch({
         'command': 'sessionAlreadyActive',
         'message': 'Session already running on phone'
       });
       return;
     }
+    
+    AppLogger.info('[WATCH] No active session detected - proceeding with watch session creation');
     
     final double ruckWeight = (data['ruckWeight'] as num?)?.toDouble() ?? 10.0;
     final DateTime? startedAt = _parseEpochOrIso(data['startedAt']);
@@ -380,10 +384,12 @@ class WatchService {
             final String? command = data['command'] as String?;
             if (command == null) continue;
             switch (command) {
-              case 'startSession':
               case 'startSessionFromWatch':
-              case 'workoutStarted':
                 await _handleSessionStartedFromWatch(data);
+                break;
+              case 'startSession':
+              case 'workoutStarted':
+                // ACKs only; do nothing
                 break;
               case 'pauseSession':
                 await pauseSessionFromWatchCallback();
@@ -485,6 +491,7 @@ class WatchService {
     AppLogger.info('[WATCH_SERVICE] Starting session on watch from phone - weight: $ruckWeight, metric: $isMetric');
     
     // Update local state first
+    AppLogger.info('[WATCH] Setting session active before sending command to watch');
     _isSessionActive = true;
     _isPaused = false;
     _ruckWeight = ruckWeight;
@@ -772,7 +779,7 @@ class WatchService {
         'isMetric': isMetric, // Add unit preference at top-level for quick access
         'metrics': {
           'distance': displayDistance,
-          'duration': duration.inSeconds,
+          'durationSeconds': duration.inSeconds.toDouble(), // Send as Double for watch compatibility
           'pace': pace,
           'isPaused': isPaused ? 1 : 0, // Convert bool to int for Swift compatibility
           'calories': calories,
@@ -1177,6 +1184,10 @@ class WatchService {
   }
 
   void _setupNativeHeartRateListener() {
+    // DISABLED: EventChannel heart rate listener removed to eliminate dual stream conflict
+    // Heart rate now handled exclusively via WatchConnectivity 'watchHeartRateUpdate' command
+    AppLogger.info('[WATCH_SERVICE] EventChannel heart rate listener disabled - using WatchConnectivity only');
+    return;
     // Cancel any existing subscription first
     try {
       _nativeHeartRateSubscription?.cancel();
@@ -1285,7 +1296,7 @@ class WatchService {
       // Ignore cancellation errors for streams that may not be active
       AppLogger.debug('[WATCH_SERVICE] Heart rate subscription restart cancellation (safe to ignore): $e');
     }
-    _setupNativeHeartRateListener();
+    // _setupNativeHeartRateListener(); // DISABLED - using WatchConnectivity only
   }
  
   void _setupNativeStepsListener() {

@@ -137,6 +137,70 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   String? _aiCompletionInsight;
   bool _isGeneratingInsight = false;
 
+  Future<void> _generateAiInsightOnPage() async {
+    AppLogger.error('[AI_COMPLETION] ===== STARTING ON-PAGE AI GENERATION =====');
+    AppLogger.info('[AI_COMPLETION] Starting on-page AI generation...');
+    try {
+      final ai = GetIt.I<OpenAIService>();
+      final authState = context.read<AuthBloc>().state;
+      final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+
+      final sessionContext = {
+        'session_id': widget.ruckId,
+        'distance_km': widget.distance,
+        'distance_miles': widget.distance * 0.621371,
+        'duration_minutes': widget.duration.inMinutes,
+        'duration_seconds': widget.duration.inSeconds,
+        'calories_burned': widget.caloriesBurned,
+        'elevation_gain_m': widget.elevationGain,
+        'elevation_loss_m': widget.elevationLoss,
+        'ruck_weight_kg': widget.ruckWeight,
+        'steps': widget.steps,
+        'completed_at': widget.completedAt.toIso8601String(),
+      };
+
+      final userContext = authState is Authenticated
+          ? {
+              'user_info': {
+                'user_id': authState.user.userId,
+                'username': authState.user.username,
+                'prefers_metric': preferMetric,
+              },
+              'unit_preference': preferMetric ? 'metric' : 'imperial',
+            }
+          : {};
+
+      final contextMap = {
+        'trigger': {'type': 'session_completion'},
+        'session': sessionContext,
+        'user': userContext,
+        'environment': {},
+        'history': {},
+      };
+
+      AppLogger.info('[AI_COMPLETION] Calling OpenAI with context: ${contextMap.toString().substring(0, 200)}...');
+      final summary = await ai.generateMessage(
+        context: contextMap,
+        personality: 'Session Analyst',
+        explicitContent: false,
+      );
+
+      AppLogger.info('[AI_COMPLETION] OpenAI response: ${summary ?? 'null'}');
+      if (!mounted) return;
+      setState(() {
+        _aiCompletionInsight = summary;
+        _isGeneratingInsight = false;
+      });
+      AppLogger.info('[AI_COMPLETION] UI updated with AI insight');
+    } catch (e) {
+      AppLogger.error('[AI_COMPLETION] On-page AI generation failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingInsight = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -163,16 +227,18 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     // Auto-save the main session data immediately
     _autoSaveBasicSession();
     
-    // Use pre-generated AI insight from session completion
+    // Prefer pre-generated AI insight; otherwise generate on-page without delaying navigation
+    AppLogger.error('[AI_COMPLETION] ===== SESSION COMPLETE SCREEN INIT =====');
+    AppLogger.info('[AI_COMPLETION] Checking widget.aiCompletionInsight: ${widget.aiCompletionInsight == null ? 'null' : '"${widget.aiCompletionInsight}"'}');
     if (widget.aiCompletionInsight != null && widget.aiCompletionInsight!.isNotEmpty) {
       _aiCompletionInsight = widget.aiCompletionInsight;
       _isGeneratingInsight = false;
       AppLogger.info('[AI_COMPLETION] Using pre-generated AI insight from session completion: ${widget.aiCompletionInsight?.substring(0, 50)}...');
     } else {
-      // No AI insight available - set to null without fallback generation
       _aiCompletionInsight = null;
-      _isGeneratingInsight = false;
-      AppLogger.warning('[AI_COMPLETION] No pre-generated insight available, will show fallback message');
+      _isGeneratingInsight = true;
+      AppLogger.info('[AI_COMPLETION] No pre-generated insight (null: ${widget.aiCompletionInsight == null}, empty: ${widget.aiCompletionInsight?.isEmpty}); generating on page asynchronously');
+      _generateAiInsightOnPage();
     }
   }
 
@@ -200,6 +266,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         'calories_burned': widget.caloriesBurned,
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
+        // Persist user's calorie method when available
+        if (context.read<AuthBloc>().state is Authenticated)
+          'calorie_method': (context.read<AuthBloc>().state as Authenticated).user.calorieMethod,
         // Provide average pace in seconds per km when distance>0
         if (widget.distance > 0)
           'average_pace': widget.duration.inSeconds / widget.distance,
@@ -573,21 +642,38 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final authState = context.read<AuthBloc>().state;
       final preferMetric = authState is Authenticated ? authState.user.preferMetric : false;
 
-      // Format session name using StravaService helper
-      final sessionName = _stravaService.formatSessionName(
+      // Generate AI title for Strava
+      String sessionName = _stravaService.formatSessionName(
         ruckWeightKg: widget.ruckWeight,
         distanceKm: widget.distance,
         duration: widget.duration,
         preferMetric: preferMetric,
       );
 
-      // Format session description
+      try {
+        final ai = GetIt.I<OpenAIService>();
+        final aiTitle = await ai.generateStravaTitle(
+          distanceKm: widget.distance,
+          duration: widget.duration,
+          ruckWeightKg: widget.ruckWeight,
+          preferMetric: preferMetric,
+          startTime: DateTime.now(), // Use current time as fallback
+        );
+        if (aiTitle != null && aiTitle.isNotEmpty) {
+          sessionName = aiTitle;
+        }
+      } catch (e) {
+        AppLogger.warning('[STRAVA][AI] Title generation failed, using fallback: $e');
+      }
+
+      // Format session description with AI insight
       final description = _stravaService.formatSessionDescription(
         ruckWeightKg: widget.ruckWeight,
         distanceKm: widget.distance,
         duration: widget.duration,
         preferMetric: preferMetric,
         calories: widget.caloriesBurned,
+        aiInsight: widget.aiCompletionInsight,
       );
 
       // Export to Strava
@@ -1168,6 +1254,43 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                   height: 1.3,
                 ),
                 textAlign: TextAlign.center,
+              ),
+            )
+          else if (_isGeneratingInsight)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  Text(
+                    'Great job completing your ruck! 🎯',
+                    style: AppTextStyles.headlineMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(_getLadyModeColor(context)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Generating AI summary...',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             )
           else

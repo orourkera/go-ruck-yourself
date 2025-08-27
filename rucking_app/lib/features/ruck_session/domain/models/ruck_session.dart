@@ -51,6 +51,7 @@ class RuckSession {
     int? steps,
     Map<String, int>? timeInZones,
     List<Map<String, dynamic>>? hrZoneSnapshot,
+    String? aiCompletionInsight,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -87,6 +88,7 @@ class RuckSession {
       steps: steps ?? this.steps,
       timeInZones: timeInZones ?? this.timeInZones,
       hrZoneSnapshot: hrZoneSnapshot ?? this.hrZoneSnapshot,
+      aiCompletionInsight: aiCompletionInsight ?? this.aiCompletionInsight,
     );
   }
 
@@ -127,6 +129,7 @@ class RuckSession {
   final int? steps; // Optional step count
   final Map<String, int>? timeInZones; // Optional HR zone distribution
   final List<Map<String, dynamic>>? hrZoneSnapshot; // Optional snapshot of zone thresholds
+  final String? aiCompletionInsight; // AI-generated session summary
 
   RuckSession({
     this.id,
@@ -163,6 +166,7 @@ class RuckSession {
     this.steps,
     this.timeInZones,
     this.hrZoneSnapshot,
+    this.aiCompletionInsight,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -356,6 +360,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         steps: (json['steps'] as num?)?.toInt(),
         timeInZones: (json['time_in_zones'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
         hrZoneSnapshot: (json['hr_zone_snapshot'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+        aiCompletionInsight: json['ai_completion_insight'] as String?,
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -418,6 +423,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       if (steps != null) 'steps': steps,
       if (timeInZones != null) 'time_in_zones': timeInZones,
       if (hrZoneSnapshot != null) 'hr_zone_snapshot': hrZoneSnapshot,
+      if (aiCompletionInsight != null) 'ai_completion_insight': aiCompletionInsight,
     };
   }
 }

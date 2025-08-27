@@ -165,6 +165,10 @@ class CheckSessionAchievementsResource(Resource):
     
     def post(self, session_id):
         try:
+            logger.error(f"🎯 ACHIEVEMENT CHECK CALLED FOR SESSION {session_id}")
+            logger.error(f"🎯 Request headers: {dict(request.headers)}")
+            logger.error(f"🎯 User context - user_id: {getattr(g, 'user_id', 'None')}, access_token: {'Present' if getattr(g, 'access_token', None) else 'None'}")
+            
             # Get the user's JWT token from the request context
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
@@ -172,17 +176,21 @@ class CheckSessionAchievementsResource(Resource):
             session_response = supabase.table('ruck_session').select('*').eq('id', session_id).single().execute()
             
             if not session_response.data:
-                logger.error(f"Session {session_id} not found")
+                logger.error(f"🎯 SESSION {session_id} NOT FOUND IN DATABASE")
                 return {'error': 'Session not found'}, 404
                 
             session = session_response.data
             user_id = session['user_id']
             
-            logger.info(f"Checking achievements for session {session_id}, user {user_id}")
-            logger.info(f"Session data: {session}")
+            logger.error(f"🎯 FOUND SESSION {session_id} FOR USER {user_id}")
+            logger.error(f"🎯 Session key data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s, status={session.get('status')}, weight={session.get('ruck_weight_kg')}kg")
             
             # Global min requirements
-            if not self._validateSessionForAchievements(session):
+            validation_result = self._validateSessionForAchievements(session)
+            logger.error(f"🎯 Session validation result: {validation_result}")
+            
+            if not validation_result:
+                logger.error(f"🎯 SESSION FAILED VALIDATION - RETURNING NO ACHIEVEMENTS")
                 return {
                     'status': 'success', 
                     'new_achievements': [],
@@ -309,9 +317,11 @@ class CheckSessionAchievementsResource(Resource):
                         session_id=session_id
                     )
             
-            logger.info(f"Achievement check complete. New achievements: {len(new_achievements)}")
+            logger.error(f"🎯 ACHIEVEMENT CHECK COMPLETE - FOUND {len(new_achievements)} NEW ACHIEVEMENTS")
             if new_achievements:
-                logger.info(f"New achievements awarded: {[a['name'] for a in new_achievements]}")
+                logger.error(f"🎯 NEW ACHIEVEMENTS AWARDED: {[a['name'] for a in new_achievements]}")
+            else:
+                logger.error(f"🎯 NO NEW ACHIEVEMENTS FOUND - USER ALREADY HAS {len(existing_achievement_ids)} ACHIEVEMENTS")
         
             return {
                 'status': 'success',
@@ -371,18 +381,23 @@ class CheckSessionAchievementsResource(Resource):
             unit_pref = achievement.get('unit_preference')
             
             if criteria_type == 'first_ruck':
-                # Award only if this is the user's first completed ruck (by started_at)
+                # Award only if this is the user's first completed ruck that meets validation requirements
                 try:
                     started_at = session.get('started_at')
                     if not started_at:
                         return False
-                    # Count completed sessions up to and including this session's start time
+                    
+                    # FIXED: Count completed sessions that meet validation requirements up to and including this session's start time
+                    # This ensures consistency with the global validation rules (300s + 0.5km)
                     resp = supabase.table('ruck_session').select('id', count='exact') \
                         .eq('user_id', user_id) \
                         .eq('status', 'completed') \
+                        .gte('duration_seconds', 300) \
+                        .gte('distance_km', 0.5) \
                         .lte('started_at', started_at) \
                         .execute()
                     total = getattr(resp, 'count', None) or 0
+                    logger.info(f"FIRST_RUCK CHECK: Found {total} qualifying sessions up to {started_at}")
                     return total == 1
                 except Exception as e:
                     logger.error(f"Error checking first_ruck: {e}")

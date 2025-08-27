@@ -179,15 +179,15 @@ class HeartRateManager implements SessionManager {
   }
 
   Future<void> _startHeartRateMonitoring() async {
-    AppLogger.info('[HEART_RATE_MANAGER] Starting heart rate monitoring');
+    AppLogger.error('[HEART_RATE_MANAGER] [HR_DEBUG] 🔥 STARTING HEART RATE MONITORING for session: $_activeSessionId');
     _isMonitoring = true;
     
     try {
       // Subscribe to heart rate updates from the service
-      AppLogger.info('[HEART_RATE_MANAGER] [HR_DEBUG] Subscribing to HeartRateService stream');
+      AppLogger.error('[HEART_RATE_MANAGER] [HR_DEBUG] 🔥 SUBSCRIBING to HeartRateService stream');
       _heartRateSubscription = _heartRateService.heartRateStream.listen(
         (sample) {
-          AppLogger.info('[HEART_RATE_MANAGER] [HR_DEBUG] Received heart rate from HeartRateService: ${sample.bpm} BPM');
+          AppLogger.error('[HEART_RATE_MANAGER] [HR_DEBUG] 🎯 RECEIVED HEART RATE from HeartRateService: ${sample.bpm} BPM');
           if (sample.bpm > 0) {
             _heartRateSampleObjects.add(sample);
             

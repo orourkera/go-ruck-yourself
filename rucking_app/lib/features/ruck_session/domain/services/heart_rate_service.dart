@@ -67,13 +67,13 @@ class HeartRateService {
 
   /// Start monitoring heart rate from all available sources
   Future<void> startHeartRateMonitoring() async {
-    // If monitoring is already started, don't initialize again to avoid disrupting existing connections
-    if (_isMonitoringStarted) {
-      AppLogger.info('HeartRateService: Heart rate monitoring already active, skipping initialization');
-      return;
-    }
-    
     AppLogger.info('HeartRateService: Starting heart rate monitoring...');
+    
+    // Reset monitoring state to ensure fresh start for new session
+    if (_isMonitoringStarted) {
+      AppLogger.info('HeartRateService: Heart rate monitoring already active, resetting for new session');
+      stopHeartRateMonitoring(); // Stop existing monitoring first
+    }
     
     // Ensure HealthKit permissions are granted once per app session.
     // IMPORTANT: Even if HealthKit is denied, we still start the Watch feed.
@@ -150,7 +150,7 @@ class HeartRateService {
     
     _watchHeartRateSubscription = _watchService.onHeartRateUpdate.listen(
       (heartRate) {
-        AppLogger.info('HeartRateService: [HR_DEBUG] Raw heart rate from watch: $heartRate');
+        AppLogger.info('HeartRateService: Raw heart rate from WatchService: $heartRate BPM');
         // Validate heart rate before processing
         if (heartRate <= 0) {
           AppLogger.warning('HeartRateService: Invalid heart rate received from watch: $heartRate');
@@ -161,6 +161,7 @@ class HeartRateService {
           timestamp: DateTime.now(),
           bpm: heartRate.toInt(),
         );
+        AppLogger.info('HeartRateService: Processing heart rate sample: ${sample.bpm} BPM');
         _processHeartRateSample(sample, 'Watch');
       },
       onError: (error) {

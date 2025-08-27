@@ -981,10 +981,10 @@ class SessionRepository {
       final uploadedPhotos = await uploadSessionPhotosOptimized(ruckId, photoFiles);
       
       if (uploadedPhotos.isNotEmpty) {
-        // Update the ruck to indicate it has photos
-        await _apiClient.patch('/rucks/$ruckId', {'has_photos': true});
-        AppLogger.info('[PHOTO_DEBUG] Background upload completed successfully for ${uploadedPhotos.length} photos');
-      } else {
+      // Update the ruck to indicate it has photos
+      await _apiClient.patch('/rucks/$ruckId', {'has_photos': true});
+      AppLogger.info('[PHOTO_DEBUG] Background upload completed successfully for ${uploadedPhotos.length} photos');
+    } else {
         AppLogger.warning('[PHOTO_DEBUG] Background upload completed but no photos were successfully uploaded');
       }
       

@@ -192,6 +192,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Creates and starts a new ruck session
   void _createSession() async {
     if (_formKey.currentState!.validate()) {
+      String? ruckId; // Declare ruckId variable at function scope
       final authState = context.read<AuthBloc>().state;
       if (authState is! Authenticated) {
         StyledSnackBar.showError(
@@ -303,7 +304,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           _isCreating = true;
         });
 
-        String? ruckId;
         try {
           // Weight is stored internally in KG
           // Double check the conversion for standard (imperial) weights is correct
@@ -495,6 +495,19 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             AppLogger.warning('  No planned route points available!');
           }
           
+          AppLogger.sessionCompletion('Creating session with event context', context: {
+            'event_id': _eventId,
+            'event_title': _eventTitle,
+            'ruck_weight_kg': _ruckWeight,
+            'planned_duration_seconds': plannedDuration,
+          });
+          
+          // Session was already created earlier in the function - ruckId should be set
+          if (ruckId == null) {
+            throw Exception('Session ID was not created properly');
+          }
+          AppLogger.error('[CREATE_SESSION] 🔥 USING EXISTING SESSION ID: $ruckId');
+          
           final sessionArgs = ActiveSessionArgs(
             ruckWeight: _ruckWeight,
             userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
@@ -507,23 +520,18 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
             aiCheerleaderEnabled: _aiCheerleaderEnabled, // AI Cheerleader toggle
             aiCheerleaderPersonality: _aiCheerleaderPersonality, // Selected personality
             aiCheerleaderExplicitContent: _aiCheerleaderExplicitContent, // Explicit language preference
+            sessionId: ruckId, // Pass the created session ID to prevent duplicate creation
           );
           
           // CRITICAL DEBUG: Print the actual args being created
           print('🔥🔥🔥 [CREATE_SESSION] ActiveSessionArgs created with:');
+          print('🔥🔥🔥   sessionId: $ruckId');
           print('🔥🔥🔥   plannedRoute: ${sessionArgs.plannedRoute?.length ?? 0} points');
           print('🔥🔥🔥   plannedRouteDistance: ${sessionArgs.plannedRouteDistance}');
           print('🔥🔥🔥   plannedRouteDuration: ${sessionArgs.plannedRouteDuration}');
           if (sessionArgs.plannedRoute != null && sessionArgs.plannedRoute!.isNotEmpty) {
             print('🔥🔥🔥   First route point: ${sessionArgs.plannedRoute!.first}');
           }
-          
-          AppLogger.sessionCompletion('Creating session with event context', context: {
-            'event_id': _eventId,
-            'event_title': _eventTitle,
-            'ruck_weight_kg': _ruckWeight,
-            'planned_duration_seconds': plannedDuration,
-          });
           
           // Navigate to CountdownPage which will handle the countdown and transition
           if (!mounted) return;
@@ -619,6 +627,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               elevationLoss: elevationLossM,
               ruckWeight: _ruckWeight,
               isManual: true,
+              aiCompletionInsight: null, // Manual sessions don't have AI insights
             ),
           ),
         );

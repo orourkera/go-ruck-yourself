@@ -250,6 +250,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       splitTrackingService: _splitTrackingService,
       terrainTracker: _terrainTracker,
       heartRateService: _heartRateService,
+      openAIService: _openAIService,
     );
   }
 
@@ -845,16 +846,21 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit
   ) async {
     print('🚀🚀🚀 MAIN BLOC SESSION COMPLETION STARTED 🚀🚀🚀');
+    AppLogger.error('[OLD_BLOC] ===== MAIN BLOC SESSION COMPLETION STARTED =====');
     AppLogger.info('[OLD_BLOC] Session completion requested');
     AppLogger.info('[OLD_BLOC] Current state: ${state.runtimeType}');
     AppLogger.info('[OLD_BLOC] Session completed event: $event');
+    AppLogger.error('[OLD_BLOC] Coordinator null check: _coordinator == null? ${_coordinator == null}');
     
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
+      AppLogger.error('[OLD_BLOC] ===== DELEGATING TO COORDINATOR =====');
       AppLogger.info('[OLD_BLOC] Delegating to coordinator');
       _coordinator!.add(event);
       AppLogger.info('[OLD_BLOC] Event sent to coordinator, waiting for state update');
+      AppLogger.error('[OLD_BLOC] ===== DELEGATION COMPLETE =====');
     } else {
+      AppLogger.error('[OLD_BLOC] ===== NO COORDINATOR AVAILABLE =====');
       AppLogger.error('[OLD_BLOC] No coordinator available for session completion');
       emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
     }

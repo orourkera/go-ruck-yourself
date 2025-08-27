@@ -44,6 +44,7 @@ class LocationTrackingManager implements SessionManager {
   
   // Location tracking state
   StreamSubscription<LocationPoint>? _locationSubscription;
+  Stream<LocationPoint>? _rawLocationStream; // Resilient reference to the source stream
   final List<LocationPoint> _locationPoints = [];
   final Queue<LocationPoint> _pendingLocationPoints = Queue();
 
@@ -199,7 +200,7 @@ class LocationTrackingManager implements SessionManager {
     _lastUploadedLocationIndex = 0; // Reset upload tracking
     _lastValidLocation = null; // Reset validation state
     _lastKnownTotalDistance = 0.0; // Reset cumulative distance
-    _lastProcessedLocationIndex = 0; // Reset processed index
+    _lastProcessedLocationIndex = -1; // Reset to unprocessed state (CRITICAL FIX)
     // Reset inactivity detection state
     _lastMovementTime = DateTime.now();
     _lastInactivityNotificationTime = null;
@@ -480,7 +481,7 @@ class LocationTrackingManager implements SessionManager {
       }
     }
     // Calculate metrics with comprehensive distance filtering
-    final newDistance = _calculateTotalDistanceWithValidation();
+    final newDistance = _calculateTotalDistance();
     final newPace = _calculateCurrentPace(position.speed ?? 0.0);
     final newAveragePace = _calculateAveragePace(newDistance);
     // Movement detection: update lastMovementTime on meaningful progress
@@ -528,10 +529,10 @@ class LocationTrackingManager implements SessionManager {
       elevationLoss = elevationResult['loss']!;
     }
     
-    // Update cumulative elevation (add this segment's elevation to current totals)
-    final currentElevationData = _calculateElevationGain();
-    final newElevationGain = (currentElevationData['gain'] ?? 0.0) + elevationGain;
-    final newElevationLoss = (currentElevationData['loss'] ?? 0.0) + elevationLoss;
+    // CRITICAL FIX: Calculate elevation from location points directly, don't double-accumulate
+    final elevationData = _calculateElevation();
+    final newElevationGain = elevationData['gain'] ?? 0.0;
+    final newElevationLoss = elevationData['loss'] ?? 0.0;
     
     // Update splits
     if (_sessionStartTime != null) {
@@ -734,11 +735,34 @@ class LocationTrackingManager implements SessionManager {
       _locationPoints.removeRange(0, pointsToRemove);
       _lastUploadedLocationIndex -= pointsToRemove;
       
-      // CRITICAL FIX: Adjust the processed index to maintain distance calculation integrity
-      _lastProcessedLocationIndex = math.max(0, _lastProcessedLocationIndex - pointsToRemove);
+      // SOPHISTICATED INDEX MANAGEMENT: Robust adjustment after trimming
+      final oldProcessedIndex = _lastProcessedLocationIndex;
+      
+      // Adjust the processed index based on how many points were removed
+      _lastProcessedLocationIndex = math.max(-1, _lastProcessedLocationIndex - pointsToRemove);
+      
+      // BOUNDARY VALIDATION: Ensure index is within valid range after trimming
+      if (_locationPoints.isNotEmpty) {
+        if (_lastProcessedLocationIndex >= _locationPoints.length) {
+          // Index beyond array bounds - set to last valid index
+          _lastProcessedLocationIndex = _locationPoints.length - 1;
+          AppLogger.warning('[LOCATION_MANAGER] TRIMMING: Index beyond bounds, adjusted to last valid index: $_lastProcessedLocationIndex');
+        } else if (_lastProcessedLocationIndex < -1) {
+          // Index too low - reset to unprocessed state
+          _lastProcessedLocationIndex = -1;
+          AppLogger.warning('[LOCATION_MANAGER] TRIMMING: Index too low, reset to unprocessed state');
+        }
+      } else {
+        // No points remaining - reset to initial state
+        _lastProcessedLocationIndex = -1;
+        _lastKnownTotalDistance = 0.0;
+        AppLogger.info('[LOCATION_MANAGER] TRIMMING: No points remaining, reset distance tracking state');
+      }
+      
+      AppLogger.info('[LOCATION_MANAGER] TRIMMING: Index adjustment: $oldProcessedIndex -> $_lastProcessedLocationIndex (removed $pointsToRemove points)');
       
       AppLogger.info('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Safely trimmed $pointsToRemove uploaded location points '
-          '(${_locationPoints.length} remaining, processed index: $_lastProcessedLocationIndex)');
+          '(${_locationPoints.length} remaining, processed index: $_lastProcessedLocationIndex, distance preserved: ${_lastKnownTotalDistance.toStringAsFixed(3)}km)');
       
       // Force garbage collection after trimming
       _triggerGarbageCollection();
@@ -780,35 +804,63 @@ class LocationTrackingManager implements SessionManager {
     AppLogger.info('[LOCATION_MANAGER] Starting location tracking');
     
     try {
-      _locationSubscription = _locationService.startLocationTracking().listen(
-        (locationPoint) {
-          // Convert LocationPoint to Position for compatibility
-          final position = Position(
-            latitude: locationPoint.latitude,
-            longitude: locationPoint.longitude,
-            timestamp: locationPoint.timestamp,
-            altitude: locationPoint.elevation,
-            accuracy: locationPoint.accuracy,
-            heading: 0,
-            headingAccuracy: 0,
-            speed: locationPoint.speed ?? 0,
-            speedAccuracy: 0,
-            altitudeAccuracy: 0,
-            floor: null,
-            isMocked: false,
-          );
-          handleEvent(LocationUpdated(position: position));
-        },
-        onError: (error) {
-          AppLogger.warning('[LOCATION_MANAGER] Location tracking error (continuing session without GPS): $error');
-          // Don't stop the session - continue in offline mode without location updates
-          // This allows users to ruck indoors, on airplanes, or in poor GPS areas
-          _updateState(_currentState.copyWith(
-            isTracking: false,
-            errorMessage: 'GPS unavailable - session continues in offline mode',
-          ));
-        },
-      );
+      // Lazily create the shared source stream once and reuse on resubscribe
+      _rawLocationStream ??= _locationService.startLocationTracking();
+
+      void _attachLocationListener() {
+        // Cancel any prior listener before re-attaching
+        try { _locationSubscription?.cancel(); } catch (_) {}
+
+        _locationSubscription = _rawLocationStream!.listen(
+          (locationPoint) {
+            // Convert LocationPoint to Position for compatibility
+            final position = Position(
+              latitude: locationPoint.latitude,
+              longitude: locationPoint.longitude,
+              timestamp: locationPoint.timestamp,
+              altitude: locationPoint.elevation,
+              accuracy: locationPoint.accuracy,
+              heading: 0,
+              headingAccuracy: 0,
+              speed: locationPoint.speed ?? 0,
+              speedAccuracy: 0,
+              altitudeAccuracy: 0,
+              floor: null,
+              isMocked: false,
+            );
+            handleEvent(LocationUpdated(position: position));
+          },
+          onError: (error) {
+            AppLogger.warning('[LOCATION_MANAGER] Location stream error – will resubscribe: $error');
+            // Keep UI alive in offline mode while we resubscribe
+            _updateState(_currentState.copyWith(
+              isTracking: false,
+              errorMessage: 'GPS unavailable - attempting recovery',
+            ));
+            // Backoff and resubscribe to the same broadcast stream
+            if (_activeSessionId != null && !_isPaused) {
+              Future.delayed(const Duration(seconds: 2), () {
+                if (_activeSessionId != null && !_isPaused) {
+                  _attachLocationListener();
+                }
+              });
+            }
+          },
+          onDone: () {
+            AppLogger.warning('[LOCATION_MANAGER] Location stream completed – will resubscribe');
+            if (_activeSessionId != null && !_isPaused) {
+              Future.delayed(const Duration(seconds: 1), () {
+                if (_activeSessionId != null && !_isPaused) {
+                  _attachLocationListener();
+                }
+              });
+            }
+          },
+          cancelOnError: false,
+        );
+      }
+
+      _attachLocationListener();
       
       // Start batch upload timer
       _batchUploadTimer?.cancel();
@@ -1120,81 +1172,92 @@ class LocationTrackingManager implements SessionManager {
   }
 
   double _calculateTotalDistance() {
-    // CRITICAL FIX: Use cumulative distance to prevent data loss during memory management
+    // SOPHISTICATED DISTANCE TRACKING: Cumulative calculation with memory management
     if (_locationPoints.length < 2) return _lastKnownTotalDistance;
     
     // Start from the last known total distance (in meters)
     double totalDistance = _lastKnownTotalDistance * 1000;
     
-    // Only process new points that haven't been calculated yet
-    final startIndex = math.max(1, _lastProcessedLocationIndex + 1);
+    // ROBUST INDEX MANAGEMENT: Handle edge cases after trimming
+    int startIndex;
     
-    // If we've already processed all points, return the cached value
+    // If we've never processed any points, start from index 1
+    if (_lastProcessedLocationIndex < 0) {
+      startIndex = 1;
+    } else {
+      // Start from the next unprocessed point
+      startIndex = _lastProcessedLocationIndex + 1;
+    }
+    
+    // BOUNDARY VALIDATION: Ensure indices are within valid range
     if (startIndex >= _locationPoints.length) {
+      // All points already processed
       return _lastKnownTotalDistance;
     }
     
-    // CRITICAL FIX: Ensure startIndex is valid after potential trimming
-    final safeStartIndex = math.max(1, startIndex);
-    if (safeStartIndex >= _locationPoints.length) {
-      return _lastKnownTotalDistance;
+    // Ensure we have a valid previous point for the first calculation
+    if (startIndex <= 0) {
+      startIndex = 1;
     }
     
-    // Calculate distance only for new points
-    for (int i = safeStartIndex; i < _locationPoints.length; i++) {
-      // CRITICAL FIX: Ensure previous point exists (boundary check after trimming)
-      if (i - 1 < 0 || i - 1 >= _locationPoints.length) {
-        AppLogger.warning('[LOCATION_MANAGER] DISTANCE_CALC: Invalid previous point index ${i-1}, skipping distance calculation');
+    // INCREMENTAL DISTANCE CALCULATION: Only process new points
+    for (int i = startIndex; i < _locationPoints.length; i++) {
+      // ROBUST BOUNDARY CHECKING: Verify both current and previous points exist
+      if (i <= 0 || i >= _locationPoints.length || (i - 1) < 0 || (i - 1) >= _locationPoints.length) {
+        AppLogger.warning('[LOCATION_MANAGER] DISTANCE_CALC: Invalid indices i=$i, prev=${i-1}, length=${_locationPoints.length}, skipping');
         continue;
       }
       
-      final distance = Geolocator.distanceBetween(
-        _locationPoints[i - 1].latitude,
-        _locationPoints[i - 1].longitude,
-        _locationPoints[i].latitude,
-        _locationPoints[i].longitude,
-      );
-      
-      // Only filter out completely unrealistic jumps (>100m in <1 second)
-      if (distance < 100 || 
-          _locationPoints[i].timestamp.difference(_locationPoints[i - 1].timestamp).inSeconds >= 1) {
-        totalDistance += distance;
+      try {
+        final prevPoint = _locationPoints[i - 1];
+        final currPoint = _locationPoints[i];
+        
+        final distance = Geolocator.distanceBetween(
+          prevPoint.latitude,
+          prevPoint.longitude,
+          currPoint.latitude,
+          currPoint.longitude,
+        );
+        
+        // GPS NOISE FILTERING: Only add realistic distances with bounded speed
+        final timeDiffSeconds = currPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+        final bool hasMinimumTime = timeDiffSeconds >= 1; // At least 1 second apart
+        final bool isRealisticDistance = distance < 100; // Less than 100m jump
+        final bool boundedSpeed = timeDiffSeconds > 0
+            ? (distance / timeDiffSeconds) <= 4.5 // <= 4.5 m/s (~10 mph) upper bound for rucking
+            : false;
+
+        // Accept segment if it is realistic and timed, OR implied speed is within bounds
+        if ((isRealisticDistance && hasMinimumTime) || boundedSpeed) {
+          totalDistance += distance;
+          AppLogger.debug('[LOCATION_MANAGER] DISTANCE_CALC: Added ${distance.toStringAsFixed(2)}m segment (${i-1} -> $i)');
+        } else {
+          AppLogger.warning('[LOCATION_MANAGER] DISTANCE_CALC: Filtered unrealistic segment: ${distance.toStringAsFixed(2)}m in ${timeDiffSeconds}s');
+        }
+        
+      } catch (e) {
+        AppLogger.error('[LOCATION_MANAGER] DISTANCE_CALC: Error processing segment $i: $e');
+        continue;
       }
     }
     
-    // Update tracking variables
+    // UPDATE TRACKING STATE: Mark all points as processed
     _lastProcessedLocationIndex = _locationPoints.length - 1;
-    _lastKnownTotalDistance = totalDistance / 1000; // Convert to km
+
+    // Convert to km and enforce monotonic non-decreasing total distance
+    double candidateKm = totalDistance / 1000;
+    if (candidateKm < _lastKnownTotalDistance) {
+      candidateKm = _lastKnownTotalDistance;
+    }
+    _lastKnownTotalDistance = candidateKm;
     
-    AppLogger.debug('[LOCATION_MANAGER] Distance update: ${_lastKnownTotalDistance.toStringAsFixed(3)}km, '
-        'processed ${_locationPoints.length} points, start: $safeStartIndex, last: $_lastProcessedLocationIndex');
+    AppLogger.info('[LOCATION_MANAGER] SOPHISTICATED_DISTANCE: Updated to ${_lastKnownTotalDistance.toStringAsFixed(3)}km, '
+        'processed ${_locationPoints.length} points (start: $startIndex, last: $_lastProcessedLocationIndex)');
     
     return _lastKnownTotalDistance;
   }
 
-/// Calculate total distance with v2.5/v2.6 compatible logic
-/// Simplified approach that matches the working versions
-double _calculateTotalDistanceWithValidation() {
-  // Monotonic cumulative method that survives trimming
-  if (_locationPoints.length < 2) return _lastKnownTotalDistance;
 
-  final startIndex = math.max(1, _lastProcessedLocationIndex + 1);
-  if (startIndex >= _locationPoints.length) return _lastKnownTotalDistance;
-
-  double accumulatedMeters = _lastKnownTotalDistance * 1000.0;
-  for (int i = startIndex; i < _locationPoints.length; i++) {
-    final prev = _locationPoints[i - 1];
-    final curr = _locationPoints[i];
-    final d = Geolocator.distanceBetween(
-      prev.latitude, prev.longitude, curr.latitude, curr.longitude,
-    );
-    accumulatedMeters += d;
-  }
-
-  _lastProcessedLocationIndex = _locationPoints.length - 1;
-  _lastKnownTotalDistance = accumulatedMeters / 1000.0; // km
-  return _lastKnownTotalDistance;
-}  
 
   double _calculateCurrentPace(double speedMs) {
     // DEBUG: Log pace calculation inputs

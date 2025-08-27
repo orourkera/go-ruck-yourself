@@ -202,11 +202,13 @@ class MetCalculator {
     double avgSpeedKmh = (durationHours > 0) ? (distanceKm / durationHours) : 0.0;
     double avgSpeedMph = kmhToMph(avgSpeedKmh);
 
-    // Estimate average grade (if available)
-    double avgGrade = 0.0;
+    // Estimate an effective grade using uphill-only elevation gain to avoid
+    // net-zero cancellation on out-and-back routes. This better reflects
+    // the metabolic cost of climbing without averaging away the effort.
+    double effectiveUphillGradePct = 0.0;
     if (distanceKm > 0) {
-      avgGrade = calculateGrade(
-        elevationChangeMeters: elevationGain - elevationLoss,
+      effectiveUphillGradePct = calculateGrade(
+        elevationChangeMeters: math.max(0.0, elevationGain),
         distanceMeters: distanceKm * 1000,
       );
     }
@@ -226,7 +228,7 @@ class MetCalculator {
       userWeightKg: userWeightKg,
       ruckWeightKg: ruckWeightKg,
       speedKmh: avgSpeedKmh,
-      gradePct: avgGrade,
+      gradePct: effectiveUphillGradePct,
       terrainMultiplier: 1.0, // Pure Pandolf uses no terrain adjustment
       elapsedSeconds: elapsedSeconds,
     );
@@ -245,7 +247,7 @@ class MetCalculator {
     // MET path retained (for comparison and fallback)
     final metValue = calculateRuckingMetByGrade(
       speedMph: avgSpeedMph,
-      grade: avgGrade,
+      grade: effectiveUphillGradePct,
       ruckWeightLbs: ruckWeightLbs,
     );
     final baseCalories = calculateCaloriesBurned(
@@ -270,13 +272,21 @@ class MetCalculator {
       // Estimate HR coverage: assume downsample ~20s between saved samples
       final expectedSamples = (elapsedSeconds / 20.0).clamp(1.0, 1e9);
       final coverage = (heartRateSamples!.length / expectedSamples).clamp(0.0, 1.0);
-      final wHr = (0.4 + 0.6 * coverage).clamp(0.4, 1.0); // 0.4→1.0 based on coverage
-      final wMech = 1.0 - wHr;
+      // Reduce HR dominance for load carriage activities to avoid inflation
+      // HR weight range: 0.3 → 0.6 based on coverage
+      final wHr = (0.3 + 0.3 * coverage).clamp(0.3, 0.6);
+      final wMech = 1.0 - wHr; // 0.4 → 0.7
       fusion = wHr * hrCalories + wMech * mechanicalCalories;
     }
 
-    // Apply weather and terrain adjustments ONLY to fusion method
+    // Apply weather and terrain adjustments to both for apples-to-apples capping
+    final mechAdjusted = mechanicalCalories * weatherMultiplier * terrainMultiplier;
     fusion *= weatherMultiplier * terrainMultiplier;
+
+    // Cap fusion within ±15% of adjusted mechanical to prevent runaway inflation/deflation
+    final lowerCap = mechAdjusted * 0.85;
+    final upperCap = mechAdjusted * 1.15;
+    fusion = fusion.clamp(lowerCap, upperCap);
 
     // Apply a small sex adjustment post‑fusion (only if unspecified)
     if (gender == null) fusion *= 0.925; // mid‑way when sex unknown
@@ -303,51 +313,50 @@ class MetCalculator {
   }) {
     double multiplier = 1.0;
 
-    // Temperature adjustments (research-based)
+    // Temperature adjustments (conservative)
     if (temperatureCelsius != null) {
       final temp = temperatureCelsius;
       if (temp > 30) {
-        // Hot weather: 10-20% increase due to thermoregulation
-        multiplier *= 1.15; // 15% increase for very hot conditions
+        // Hot weather: modest increase due to thermoregulation
+        multiplier *= 1.06; // 6%
       } else if (temp > 25) {
-        // Warm weather: 5-10% increase
-        multiplier *= 1.07; // 7% increase for warm conditions
+        // Warm weather
+        multiplier *= 1.03; // 3%
       } else if (temp < 0) {
-        // Very cold: 10-15% increase for body warming
-        multiplier *= 1.12; // 12% increase for freezing conditions
+        // Very cold (assuming clothing mitigates most extra cost)
+        multiplier *= 1.05; // 5%
       } else if (temp < 5) {
-        // Cold weather: 5-10% increase
-        multiplier *= 1.06; // 6% increase for cold conditions
+        // Cold weather
+        multiplier *= 1.03; // 3%
       }
       // Optimal range (5-25°C) has no adjustment (multiplier stays 1.0)
     }
 
-    // Wind resistance adjustments (speed-dependent)
+    // Wind resistance adjustments (speed-dependent, conservative at walking speeds)
     if (windSpeedKmh != null && windSpeedKmh > 10 && speedKmh > 3.0) {
-      // Wind resistance increases with speed squared, significant at higher speeds
-      final windFactor = (windSpeedKmh - 10) / 40.0; // 0-1 factor for 10-50kmh wind
-      final speedFactor = speedKmh / 6.0; // Speed factor (normalized to 6kmh)
-      final windAdjustment = windFactor * speedFactor * 0.08; // Up to 8% increase
-      multiplier *= (1.0 + windAdjustment.clamp(0.0, 0.08));
+      // Keep small at typical ruck speeds
+      final windFactor = (windSpeedKmh - 10) / 40.0; // 0-1 for 10-50 km/h
+      final speedFactor = (speedKmh / 6.0).clamp(0.0, 1.0); // normalize to ~6 km/h
+      final windAdjustment = windFactor * speedFactor * 0.04; // Up to 4%
+      multiplier *= (1.0 + windAdjustment.clamp(0.0, 0.04));
     }
 
-    // Humidity adjustments (affects cooling efficiency)
+    // Humidity adjustments (affects cooling efficiency; mild)
     if (humidity != null && temperatureCelsius != null && temperatureCelsius > 20) {
-      // High humidity reduces cooling efficiency in warm weather
       if (humidity > 80) {
-        multiplier *= 1.05; // 5% increase for very humid conditions
-      } else if (humidity > 60) {
-        multiplier *= 1.02; // 2% increase for humid conditions
+        multiplier *= 1.02; // 2%
+      } else if (humidity > 70) {
+        multiplier *= 1.01; // 1%
       }
     }
 
-    // Precipitation adjustments (affects footing and muscle stabilization)
+    // Precipitation adjustments (affects footing and muscle stabilization; mild)
     if (isRaining) {
-      multiplier *= 1.04; // 4% increase for wet conditions
+      multiplier *= 1.02; // 2%
     }
 
-    // Cap total weather adjustment at reasonable bounds
-    return multiplier.clamp(1.0, 1.25); // Max 25% increase from weather
+    // Cap total weather adjustment at reasonable bounds (more conservative)
+    return multiplier.clamp(1.0, 1.10); // Max 10% increase from weather
   }
 
   /// Enhanced Pandolf equation with GORUCK load-ratio corrections (pure - no terrain/weather)

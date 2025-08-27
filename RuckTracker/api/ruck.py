@@ -243,7 +243,7 @@ class RuckSessionDetailResource(Resource):
         if not location_points or len(location_points) < 5:
             logger.warning(f"[PRIVACY_DEBUG] Route too short ({len(location_points) if location_points else 0} points) - hiding for privacy")
             return []
-        PRIVACY_DISTANCE_METERS = 400.0  # Increased to 400m for better privacy
+        PRIVACY_DISTANCE_METERS = 500.0  # Increased to 500m for better privacy
         sorted_points = sorted(location_points, key=lambda p: p.get('timestamp', ''))
         if len(sorted_points) < 3:
             return sorted_points
@@ -1033,8 +1033,12 @@ class RuckSessionCompleteResource(Resource):
                             duration_hours = duration_seconds / 3600
                             base_calories = base_cal_per_hour * duration_hours
                         
-                            # Add elevation bonus (1 cal per 10m elevation gain per kg body weight)
-                            elevation_calories = (elevation_gain_m / 10) * weight_kg
+                            # Elevation component (physics-based): work = m*g*h, convert J→kcal, adjust for efficiency
+                            # 1 kcal ≈ 4186 J; assume ~25% efficiency
+                            g = 9.81
+                            efficiency = 0.25
+                            elevation_work_joules = total_weight_kg * g * elevation_gain_m
+                            elevation_calories = (elevation_work_joules / (efficiency * 4186.0)) if elevation_gain_m and elevation_gain_m > 0 else 0.0
                         
                             estimated_calories = round(base_calories + elevation_calories)
                             update_data['calories_burned'] = estimated_calories

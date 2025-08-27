@@ -226,6 +226,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         duration: session.duration,
         preferMetric: preferMetric,
         calories: session.caloriesBurned,
+        aiInsight: session.aiCompletionInsight,
       );
 
       final success = await _stravaService.exportRuckSession(

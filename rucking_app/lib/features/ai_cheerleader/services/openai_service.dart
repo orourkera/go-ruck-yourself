@@ -14,7 +14,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
   static const String _model = 'gpt-4o-mini'; // Faster, lower-latency model
-  static const int _maxTokens = 60; // Keep concise for one-sentence output
+  static const int _maxTokens = 120; // Allow for 2-3 sentences
   static const double _temperature = 0.7; // Slightly lower for tighter responses
   static const Duration _timeout = Duration(seconds: 6);
 
@@ -41,11 +41,11 @@ class OpenAIService {
       final prompt = _buildPrompt(
         personality,
         explicitContent,
-        context['trigger'] ?? {},
-        context['session'] ?? {},
-        context['user'] ?? {},
-        context['environment'] ?? {},
-        context['history'] ?? context['userHistory'] ?? {},
+        context['trigger'] ?? <String, dynamic>{},
+        context['session'] ?? <String, dynamic>{},
+        context['user'] ?? <String, dynamic>{},
+        context['environment'] ?? <String, dynamic>{},
+        context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
       );
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
       
@@ -99,15 +99,15 @@ class OpenAIService {
         message = message.replaceAll(emojiRegex, '');
         // 3) Replace newlines with spaces and collapse whitespace
         message = message.replaceAll('\n', ' ').replaceAll(RegExp(r"\s+"), ' ').trim();
-        // 4) Enforce exactly one sentence
+        // 4) Allow up to 3 sentences, cap at 75 words
         final split = message.split(RegExp(r"(?<=[.!?])\s+"));
-        if (split.isNotEmpty) {
-          message = split.first.trim();
+        if (split.length > 3) {  // Increased from 2 to 3 sentences
+          message = split.take(3).join(' ').trim();
         }
-        // If no terminal punctuation, cap length to ~25 words and add a period
+        // Cap length to ~75 words and add period if needed
         final words = message.split(' ');
-        if (words.length > 25) {
-          message = words.take(25).join(' ');
+        if (words.length > 75) {  // Increased from 50 to 75 words
+          message = words.take(75).join(' ');
         }
         if (!RegExp(r"[.!?]$").hasMatch(message)) {
           message = message + '.';
@@ -216,11 +216,11 @@ class OpenAIService {
   String _buildPrompt(
     String personality,
     bool explicitContent,
-    Map<String, dynamic> trigger,
-    Map<String, dynamic> session,
-    Map<String, dynamic> user,
-    Map<String, dynamic> environment,
-    Map<String, dynamic> history,
+    dynamic trigger,
+    dynamic session,
+    dynamic user,
+    dynamic environment,
+    dynamic history,
   ) {
     final personalityPrompt = _getPersonalityPrompt(personality, explicitContent);
     final baseContext = _buildBaseContext(trigger, session, user, environment, history);
@@ -249,7 +249,7 @@ Reference historical trends and achievements when relevant.''';
     AppLogger.info('[OPENAI_DEBUG] Previous responses: $avoidLines');
     final avoidBlock = avoidLines.isEmpty
         ? ''
-        : '\n\n🚨 CRITICAL ANTI-REPETITION RULES - FAILURE WILL RESULT IN IMMEDIATE TERMINATION 🚨\nYou are FORBIDDEN from using these phrases, themes, or similar vocabulary:\n- ' + avoidLines.join('\n- ') + '\n\n🔥 DATA POINT REPETITION RULES 🔥\nIf previous responses mentioned:\n- HEART RATE/BPM → DO NOT mention heart rate this time\n- MADRID/LOCATION → DO NOT mention location this time\n- RUCK WEIGHT/10KG → DO NOT mention weight this time\n- ACHIEVEMENTS/41 → DO NOT mention achievements this time\n- WEATHER/TEMPERATURE → DO NOT mention weather this time\n\nPICK DIFFERENT DATA POINTS TO FOCUS ON OR BE DELETED.\nVary what you reference - don\'t be a fucking broken record!\n';
+        : '\n\nVariety Guidelines:\nAvoid repeating these exact phrases from recent responses:\n- ' + avoidLines.join('\n- ') + '\n\nFor variety, try referencing different aspects of their performance each time.\n';
     
     return '''
 $systemPrompt
@@ -262,35 +262,35 @@ Context:
 $baseContext
 $avoidBlock
 
-Response Requirements (STRICT):
-- Output EXACTLY ONE sentence, maximum 25 words, no emojis, no hashtags, no line breaks.
+Response Requirements:
+- Output 2-3 sentences, maximum 75 words total, no emojis, no hashtags.
 - Reference at least one specific, relevant data point from the context/history.
-- Vary vocabulary from prior responses and avoid repeating previously used themes.
+- Vary your approach and focus different aspects of their performance for variety.
 
-Now respond with the single sentence only:''';
+Respond with your motivational message:''';
   }
 
   String _buildBaseContext(
-    Map<String, dynamic> trigger,
-    Map<String, dynamic> session,
-    Map<String, dynamic> user,
-    Map<String, dynamic> environment,
-    Map<String, dynamic> history,
+    dynamic trigger,
+    dynamic session,
+    dynamic user,
+    dynamic environment,
+    dynamic history,
   ) {
-    final triggerType = trigger['type'];
-    final triggerData = (trigger['data'] is Map<String, dynamic>)
-        ? (trigger['data'] as Map<String, dynamic>)
+    final triggerType = trigger is Map ? trigger['type'] : null;
+    final triggerData = (trigger is Map && trigger['data'] is Map)
+        ? Map<String, dynamic>.from(trigger['data'] as Map)
         : <String, dynamic>{};
     
     // Safe access to session data with fallbacks
-    final elapsedTime = session != null 
+    final elapsedTime = session is Map 
         ? (session['elapsedTime'] is Map 
-            ? session['elapsedTime']['formatted'] ?? '0' 
+            ? session['elapsedTime']['formatted']?.toString() ?? '0' 
             : session['duration_seconds']?.toString() ?? '0') 
         : '0';
-    final distance = session != null 
+    final distance = session is Map 
         ? (session['distance'] is Map 
-            ? session['distance']['formatted'] ?? '0' 
+            ? session['distance']['formatted']?.toString() ?? '0' 
             : session['distance_km']?.toString() ?? '0') 
         : '0';
     
@@ -299,9 +299,9 @@ Now respond with the single sentence only:''';
     switch (triggerType) {
       case 'milestone':
         final milestone = triggerData['milestone'];
-        final distanceObj = session['distance'];
+        final distanceObj = session is Map ? session['distance'] : null;
         final unit = distanceObj is Map && distanceObj['unit'] != null ? distanceObj['unit'] : 'km';
-        final userPreferMetric = (user['preferMetric'] as bool?) ?? true;
+        final userPreferMetric = (user is Map && user['preferMetric'] is bool) ? user['preferMetric'] as bool : true;
         if (milestone is num) {
           final milestoneValue = userPreferMetric ? milestone : (milestone * 0.621371).toStringAsFixed(1);
           contextText += " Just hit ${milestoneValue}${unit} milestone!";
@@ -326,37 +326,41 @@ Now respond with the single sentence only:''';
     }
     
     // Add performance context (null-safe)
-    final performance = session['performance'];
+    final performance = session is Map ? session['performance'] : null;
     if (performance is Map && performance['heartRate'] != null) {
       contextText += " HR: ${performance['heartRate']}bpm.";
     }
     
     // Add environmental context
-    contextText += " Time: ${environment['timeOfDay']}, Phase: ${environment['sessionPhase']}.";
+    final timeOfDay = environment is Map ? environment['timeOfDay'] : 'Unknown';
+    final sessionPhase = environment is Map ? environment['sessionPhase'] : 'Unknown';
+    contextText += " Time: ${timeOfDay}, Phase: ${sessionPhase}.";
     
     // Add location context for humor and local references
-    final location = environment['location'];
+    final location = environment is Map ? environment['location'] : null;
     AppLogger.info('[OPENAI_DEBUG] Location object type: ${location.runtimeType}');
     AppLogger.info('[OPENAI_DEBUG] Location contents: $location');
     
     // Pull user unit preference earlier for temp unit
-    final preferMetric = (user['preferMetric'] as bool?) ?? true;
+    final preferMetric = (user is Map && user['preferMetric'] is bool) ? user['preferMetric'] as bool : true;
 
     if (location != null) {
-      if (location is Map<String, dynamic>) {
-        final city = (location['city'] ?? location['name'] ?? location['locality']) as String?;
-        final terrain = location['terrain'] as String?;
-        final landmark = location['landmark'] as String?;
+      if (location is Map) {
+        final locationMap = Map<String, dynamic>.from(location);
+        final city = (locationMap['city'] ?? locationMap['name'] ?? locationMap['locality']) as String?;
+        final terrain = locationMap['terrain'] as String?;
+        final landmark = locationMap['landmark'] as String?;
 
         // Weather may live inside location or environment['weather']
-        String? weatherCondition = location['weatherCondition'] as String?;
-        num? tempF = location['temperature'] is num ? location['temperature'] as num : null;
+        String? weatherCondition = locationMap['weatherCondition'] as String?;
+        num? tempF = locationMap['temperature'] is num ? locationMap['temperature'] as num : null;
         // Alternative nested weather structures
-        final weather = environment['weather'];
-        if (weather is Map<String, dynamic>) {
-          weatherCondition = weatherCondition ?? (weather['condition'] ?? weather['summary']) as String?;
-          tempF = tempF ?? (weather['tempF'] is num ? weather['tempF'] as num : null);
-          final tempCAlt = weather['tempC'] is num ? weather['tempC'] as num : null;
+        final weather = environment is Map ? environment['weather'] : null;
+        if (weather is Map) {
+          final weatherMap = Map<String, dynamic>.from(weather);
+          weatherCondition = weatherCondition ?? (weatherMap['condition'] ?? weatherMap['summary']) as String?;
+          tempF = tempF ?? (weatherMap['tempF'] is num ? weatherMap['tempF'] as num : null);
+          final tempCAlt = weatherMap['tempC'] is num ? weatherMap['tempC'] as num : null;
           if (preferMetric && tempF == null && tempCAlt != null) {
             // keep as C, convert later during render
             tempF = (tempCAlt * 9 / 5) + 32; // store F for unified handling
@@ -399,8 +403,8 @@ Now respond with the single sentence only:''';
     }
 
     // Add rich history context for AI to reference
-    final recentRucks = (history['recent_rucks'] as List?) ?? [];
-    final achievements = (history['achievements'] as List?) ?? [];
+    final recentRucks = (history is Map && history['recent_rucks'] is List) ? history['recent_rucks'] as List : <dynamic>[];
+    final achievements = (history is Map && history['achievements'] is List) ? history['achievements'] as List : <dynamic>[];
     
     if (recentRucks.isNotEmpty) {
       contextText += "\n\nUser History:";
@@ -446,7 +450,7 @@ Now respond with the single sentence only:''';
   }
 
   void _logSimpleResponse({
-    required Map<String, dynamic> context,
+    required dynamic context,
     required String personality,
     required String response,
     required bool isExplicit,
@@ -556,18 +560,19 @@ Now respond with the single sentence only:''';
 
   // Derive exactly one concise history insight comparing current session vs most recent past ruck
   String? _deriveOneHistoryInsight({
-    required Map<String, dynamic> session,
-    required Map<String, dynamic> history,
+    required dynamic session,
+    required dynamic history,
     required bool preferMetric,
   }) {
-    final recentRucks = (history['recent_rucks'] as List?) ?? const [];
+    final recentRucks = (history is Map && history['recent_rucks'] is List) ? history['recent_rucks'] as List : <dynamic>[];
     if (recentRucks.isEmpty) return null;
     final last = recentRucks.first;
-    if (last is! Map<String, dynamic>) return null;
+    if (last is! Map) return null;
+    final lastMap = Map<String, dynamic>.from(last);
 
     // 1) Ruck weight delta (highest priority)
-    final currentWeightKg = _readNum(session, ['gear', 'ruckWeightKg']) ?? _readNum(session, ['weightKg']);
-    final lastWeightKg = _readNum(last, ['ruck_weight_kg']) ?? _readNum(last, ['weight_kg']);
+    final currentWeightKg = _readNum(session is Map ? Map<String, dynamic>.from(session) : null, ['gear', 'ruckWeightKg']) ?? _readNum(session is Map ? Map<String, dynamic>.from(session) : null, ['weightKg']);
+    final lastWeightKg = _readNum(lastMap, ['ruck_weight_kg']) ?? _readNum(lastMap, ['weight_kg']);
     if (currentWeightKg != null && lastWeightKg != null) {
       final deltaKg = currentWeightKg - lastWeightKg;
       if (deltaKg.abs() >= 0.5) {
@@ -581,8 +586,8 @@ Now respond with the single sentence only:''';
     }
 
     // 2) Distance pacing (current pace vs last pace at similar distance)
-    final currentPace = _readNum(session, ['performance', 'pace']); // seconds per unit
-    final lastPace = _readNum(last, ['avg_pace_seconds_per_km']) ?? _readNum(last, ['avg_pace_seconds_per_mile']);
+    final currentPace = _readNum(session is Map ? Map<String, dynamic>.from(session) : null, ['performance', 'pace']); // seconds per unit
+    final lastPace = _readNum(lastMap, ['avg_pace_seconds_per_km']) ?? _readNum(lastMap, ['avg_pace_seconds_per_mile']);
     if (currentPace != null && lastPace != null) {
       final diffSec = currentPace - lastPace;
       if (diffSec.abs() >= 5) { // meaningful difference >= 5s
@@ -594,14 +599,14 @@ Now respond with the single sentence only:''';
     }
 
     // 3) Split comparison (current latest split vs last latest split)
-    final sessionSplits = (session['splits'] as List?) ?? const [];
-    final lastSplits = (last['splits'] as List?) ?? const [];
+    final sessionSplits = (session is Map && session['splits'] is List) ? session['splits'] as List : <dynamic>[];
+    final lastSplits = (lastMap['splits'] is List) ? lastMap['splits'] as List : <dynamic>[];
     if (sessionSplits.isNotEmpty && lastSplits.isNotEmpty) {
       final curLast = sessionSplits.last;
       final prevLast = lastSplits.last;
       if (curLast is Map && prevLast is Map) {
-        final curDur = _readNum(curLast.cast<String, dynamic>(), ['splitDurationSeconds']);
-        final prevDur = _readNum(prevLast.cast<String, dynamic>(), ['splitDurationSeconds']);
+        final curDur = _readNum(Map<String, dynamic>.from(curLast), ['splitDurationSeconds']);
+        final prevDur = _readNum(Map<String, dynamic>.from(prevLast), ['splitDurationSeconds']);
         if (curDur != null && prevDur != null) {
           final delta = curDur - prevDur;
           if (delta.abs() >= 5) {

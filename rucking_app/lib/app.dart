@@ -594,6 +594,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                                 splits: args['splits'] as List<SessionSplit>?,
                                 terrainSegments: args['terrainSegments'] as List<TerrainSegment>?,
                                 isManual: args['isManual'] as bool? ?? false,
+                                aiCompletionInsight: args['aiCompletionInsight'] as String?,
                               ),
                             ),
                           );

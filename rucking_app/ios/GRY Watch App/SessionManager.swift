@@ -26,6 +26,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     @Published var isPaused: Bool = false
     @Published var isSessionActive: Bool = false
     @Published var currentZone: String? = nil
+    private var sessionStartedFromPhone = false // Track if session was initiated by phone
     
     // Split notification properties
     @Published var showingSplitNotification: Bool = false
@@ -116,21 +117,24 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 self.isSessionActive = true
                 self.isPaused = false
                 
-                // Send start payload with timestamp for backfill
-                let startTs = Date().timeIntervalSince1970
-                let payload: [String: Any] = [
-                    "command": "startSessionFromWatch",
-                    "startedAt": startTs,
-                    "tempId": UUID().uuidString,
-                    "ruckWeightKg": self.lastRuckWeightKg,
-                    "userWeightKg": self.lastUserWeightKg
-                ]
-                self.sendMessage(payload)
+                // Only send start payload if session was initiated from watch, not phone
+                // This prevents duplicate session creation when phone starts the session
+                if !self.sessionStartedFromPhone {
+                    let startTs = Date().timeIntervalSince1970
+                    let payload: [String: Any] = [
+                        "command": "startSessionFromWatch",
+                        "startedAt": startTs,
+                        "tempId": UUID().uuidString,
+                        "ruckWeightKg": self.lastRuckWeightKg,
+                        "userWeightKg": self.lastUserWeightKg
+                    ]
+                    self.sendMessage(payload)
+                }
             }
         }
     }
 
-    static let shared = SessionManager()
+    public static let shared = SessionManager()
     weak var delegate: SessionManagerDelegate?
     private let session: WCSession
     
@@ -449,6 +453,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     DispatchQueue.main.async {
                         self.isSessionActive = true
                         self.isPaused = false
+                        self.sessionStartedFromPhone = true // Mark as phone-initiated
                         self.startSession()
                     }
                 }
@@ -458,6 +463,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 DispatchQueue.main.async {
                     self.isSessionActive = false
                     self.isPaused = false
+                    self.sessionStartedFromPhone = false // Reset flag on session stop
                     
                     // Clear the timer status to prevent lock screen persistence
                     self.status = "--"

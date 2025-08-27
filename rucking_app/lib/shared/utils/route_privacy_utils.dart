@@ -133,6 +133,6 @@ class RoutePrivacyUtils {
   /// Helper method to check if user prefers metric units
   /// This should be called with the actual user preference from AuthBloc
   static double getClipDistance({required bool preferMetric}) {
-    return preferMetric ? 200.0 : 201.0; // 200m vs ~1/8 mile (201m)
+    return preferMetric ? 500.0 : 500.0; // 500m for both to standardize
   }
 }

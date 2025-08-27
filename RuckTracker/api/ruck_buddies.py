@@ -48,7 +48,7 @@ def clip_route_for_privacy(location_points):
         return location_points
     
     # Privacy clipping distance (200m or ~1/8 mile)
-    PRIVACY_DISTANCE_METERS = 200.0
+    PRIVACY_DISTANCE_METERS = 500.0
     
     # Sort points by timestamp to ensure correct order (if timestamps exist)
     sorted_points = sorted(location_points, key=lambda p: p.get('timestamp', ''))
