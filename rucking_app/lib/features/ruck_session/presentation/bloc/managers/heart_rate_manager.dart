@@ -338,6 +338,17 @@ class HeartRateManager implements SessionManager {
     });
   }
   
+  /// Ensure heart rate value is integer for database compatibility
+  int _ensureIntegerBpm(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.round();
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      return parsed?.round() ?? 0;
+    }
+    return 0;
+  }
+  
   /// Trigger immediate heart rate upload to database
   void _triggerImmediateHeartRateUpload() {
     if (_activeSessionId == null) {
@@ -362,7 +373,7 @@ class HeartRateManager implements SessionManager {
             ? _heartRateSampleObjects[index].timestamp 
             : DateTime.now().subtract(Duration(seconds: _heartRateSamples.length - index));
         return {
-          'bpm': (entry.value is num) ? entry.value.round() : entry.value,
+          'bpm': _ensureIntegerBpm(entry.value),
           'timestamp': timestamp.toIso8601String(),
           'session_id': _activeSessionId,
           'uploaded_at': DateTime.now().toIso8601String(),

@@ -343,7 +343,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Map main bloc events to manager events
     if (mainEvent is SessionStarted) {
       return manager_events.SessionStartRequested(
-        sessionId: null, // Let lifecycle manager generate the session ID
+        sessionId: mainEvent.sessionId, // Pass through sessionId from CreateScreen
         ruckWeightKg: mainEvent.ruckWeightKg,
         userWeightKg: mainEvent.userWeightKg,
         plannedRoute: mainEvent.plannedRoute,

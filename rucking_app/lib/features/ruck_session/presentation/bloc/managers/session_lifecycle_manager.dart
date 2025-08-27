@@ -134,110 +134,65 @@ class SessionLifecycleManager implements SessionManager {
         // isLoading: true,
       ));
       
-      // Use existing session ID if provided, otherwise create new one
-      final finalSessionId = event.sessionId;
-      String backendId;
+      // Phone-only session creation: prefer existing sessionId but allow fallback creation
+      final sessionId = event.sessionId;
+      String finalSessionId;
       
-      AppLogger.error('[LIFECYCLE] 🔥 DEBUG: Received sessionId from event: $finalSessionId');
-      AppLogger.error('[LIFECYCLE] 🔥 DEBUG: sessionId is null: ${finalSessionId == null}');
-      AppLogger.error('[LIFECYCLE] 🔥 DEBUG: sessionId is empty: ${finalSessionId?.isEmpty ?? true}');
-      
-      if (finalSessionId != null && finalSessionId.isNotEmpty) {
-        // Session already exists - just use it and start it
-        AppLogger.error('[LIFECYCLE] 🔥 USING EXISTING SESSION ID: $finalSessionId - NO NEW SESSION CREATION');
-        backendId = finalSessionId;
-        _activeSessionId = finalSessionId;
-        _sessionStartTime = DateTime.now();
-        
-        // Convert planned route to backend format if available for existing session
-        List<Map<String, double>>? routePoints;
-        if (event.plannedRoute != null && event.plannedRoute!.isNotEmpty) {
-          routePoints = event.plannedRoute!.map((point) => {
-            'latitude': point.latitude,
-            'longitude': point.longitude,
-          }).toList();
-          AppLogger.info('[LIFECYCLE] Converting ${event.plannedRoute!.length} route points for existing session');
-        }
+      if (sessionId != null && sessionId.isNotEmpty) {
+        AppLogger.info('[LIFECYCLE] Starting existing session: $sessionId');
+        finalSessionId = sessionId;
       } else {
-        // Create new session as before
-        final provisionalId = const Uuid().v4();
-        _activeSessionId = provisionalId;
-        _sessionStartTime = DateTime.now();
+        // Fallback: create session directly (no watch logic)
+        AppLogger.warning('[LIFECYCLE] No sessionId provided - creating session directly');
         
-        // Convert planned route to backend format if available
-        List<Map<String, double>>? routePoints;
-        if (event.plannedRoute != null && event.plannedRoute!.isNotEmpty) {
-          routePoints = event.plannedRoute!.map((point) => {
-            'latitude': point.latitude,
-            'longitude': point.longitude,
-          }).toList();
-          AppLogger.info('[LIFECYCLE] Converting ${event.plannedRoute!.length} route points for backend');
+        try {
+          final createResponse = await _apiClient.post('/rucks', {
+            'ruck_weight_kg': event.ruckWeightKg ?? 0.0,
+            'user_weight_kg': event.userWeightKg ?? 70.0,
+            'is_manual': false,
+          });
+          
+          finalSessionId = createResponse['id'].toString();
+          AppLogger.info('[LIFECYCLE] Created fallback session: $finalSessionId');
+        } catch (e) {
+          AppLogger.error('[LIFECYCLE] Failed to create fallback session: $e');
+          rethrow;
         }
-        
-        final createdId = await _createInitialSession(
-          sessionId: provisionalId,
-          ruckWeightKg: event.ruckWeightKg ?? 0.0,
-          userWeightKg: event.userWeightKg ?? 70.0, // Default user weight
-          notes: null, // Optional field - can be passed in future versions
-          eventId: null, // Optional field - can be passed in future versions
-          plannedRoute: routePoints,
-          plannedRouteDistance: event.plannedRouteDistance,
-          plannedRouteDuration: event.plannedRouteDuration,
-          calorieMethod: (() {
-            try {
-              final authState = GetIt.I<AuthBloc>().state;
-              if (authState is Authenticated) {
-                return authState.user.calorieMethod;
-              }
-            } catch (_) {}
-            return null;
-          })(),
-        );
-        
-        // Use backend ID if available, otherwise use provisional ID for offline mode
-        backendId = createdId ?? provisionalId;
-        _activeSessionId = backendId;
       }
+      
+      _activeSessionId = finalSessionId;
+      _sessionStartTime = DateTime.now();
       
       // Get user metric preference
       final preferMetric = await _getUserMetricPreference();
-      // Update the in-memory active sessionId so all other managers use the correct backend ID
-      _activeSessionId = backendId;
 
       // Ensure backend session transitions from 'created' -> 'in_progress'
-      // This was missing for phone-initiated sessions, leaving many sessions stuck in 'created'.
       try {
-        AppLogger.error('[LIFECYCLE] 🔥 Starting session on backend for $backendId');
-        
-        // Add null safety check
-        if (backendId.isEmpty) {
-          throw Exception('Backend session ID is empty - cannot start session');
-        }
+        AppLogger.info('[LIFECYCLE] Starting session on backend: $finalSessionId');
         
         final startPayload = {
           'started_at': (_sessionStartTime ?? DateTime.now()).toUtc().toIso8601String(),
+          'ruck_weight_kg': event.ruckWeightKg ?? 0.0,
+          'user_weight_kg': event.userWeightKg ?? 70.0,
         };
         
-        AppLogger.error('[LIFECYCLE] 🔥 Start payload: $startPayload');
+        AppLogger.info('[LIFECYCLE] Start payload: $startPayload');
         
-        final startResponse = await _apiClient.post('/rucks/$backendId/start', startPayload);
+        final startResponse = await _apiClient.post('/rucks/$finalSessionId/start', startPayload);
         
-        AppLogger.error('[LIFECYCLE] 🔥 Backend session start confirmed for $backendId - Response: $startResponse');
+        AppLogger.info('[LIFECYCLE] Backend session start confirmed for $finalSessionId');
       } catch (e) {
-        // Continue gracefully; uploads/completion path will auto-start if necessary
-        AppLogger.error('[LIFECYCLE] 🔥 CRITICAL: Failed to start session on backend: $e');
-        AppLogger.error('[LIFECYCLE] 🔥 Session ID: $backendId, SessionStartTime: $_sessionStartTime');
-        
-        // Don't continue if we can't start the session - this leaves orphaned sessions
+        AppLogger.error('[LIFECYCLE] Failed to start session on backend: $e');
+        AppLogger.error('[LIFECYCLE] Session ID: $finalSessionId, SessionStartTime: $_sessionStartTime');
         rethrow;
       }
 
       // Set session ID in watch service for proper sync
-      _watchService.setCurrentSessionId(backendId);
+      _watchService.setCurrentSessionId(finalSessionId);
       
-      AppLogger.error('[LIFECYCLE] [HR_DEBUG] 🚀 STARTING WATCH SESSION with weight: ${event.ruckWeightKg ?? 0.0}kg');
+      AppLogger.info('[LIFECYCLE] Starting watch session with weight: ${event.ruckWeightKg ?? 0.0}kg');
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);
-      AppLogger.error('[LIFECYCLE] [HR_DEBUG] 🚀 WATCH SESSION START COMPLETED');
+      AppLogger.info('[LIFECYCLE] Watch session start completed');
       
       _startTimer();
       _startSophisticatedTimerSystem();
@@ -525,55 +480,6 @@ class SessionLifecycleManager implements SessionManager {
     // When paused (pausedAt is not null), duration should remain frozen - no updates
   }
 
-  Future<String?> _createInitialSession({
-    required String sessionId,
-    required double ruckWeightKg,
-    required double userWeightKg,
-    String? notes,
-    String? eventId,
-    List<Map<String, double>>? plannedRoute,
-    double? plannedRouteDistance,
-    int? plannedRouteDuration,
-    String? calorieMethod,
-  }) async {
-    try {
-      // Create session payload (don't send id - let backend generate it)
-      final payload = {
-        'ruck_weight_kg': ruckWeightKg,
-        'user_weight_kg': userWeightKg,
-        'notes': notes,
-        'event_id': eventId,
-        'platform': Platform.isIOS ? 'iOS' : 'Android',
-        'start_time': _sessionStartTime!.toIso8601String(),
-        'is_manual': false, // Explicitly set for active/tracked sessions
-        'calorie_method': calorieMethod,
-      };
-      
-      // Add route data if available
-      if (plannedRoute != null && plannedRoute.isNotEmpty) {
-        payload['planned_route'] = plannedRoute;
-        payload['planned_route_distance'] = plannedRouteDistance;
-        payload['planned_route_duration'] = plannedRouteDuration;
-        AppLogger.info('[LIFECYCLE] Including route data: ${plannedRoute.length} points, ${plannedRouteDistance?.toStringAsFixed(2)}km');
-      }
-      
-      // Create session in backend
-      final result = await _apiClient.post('/rucks', payload);
-      
-      if (result is Map && (result['id'] != null || result['ruck_id'] != null)) {
-        final backendId = (result['id'] ?? result['ruck_id']).toString();
-        AppLogger.info('Backend assigned session ID: $backendId');
-        return backendId;
-      } else {
-        AppLogger.error('Backend response did not include ID: $result');
-        throw Exception('Backend failed to create session - no ID returned');
-      }
-    } catch (e) {
-      AppLogger.warning('Failed to create initial session in backend: $e');
-      // Continue with offline session
-      return null;
-    }
-  }
 
   Future<bool> _getUserMetricPreference() async {
     bool preferMetric = false; // Default to imperial

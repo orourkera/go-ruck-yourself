@@ -16,50 +16,8 @@ class RuckingApiHandler extends RuckingApi {
   
   @override
   Future<bool> startSessionFromWatch(double ruckWeight) async {
-    AppLogger.debug('[API_HANDLER] Starting session from watch with weight: $ruckWeight');
-    try {
-      // Create new ruck session via backend API
-      final apiClient = GetIt.instance<ApiClient>();
-      final authService = GetIt.instance<AuthService>();
-      final user = await authService.getCurrentUser();
-      if (user == null) {
-        AppLogger.error('[API_HANDLER] No authenticated user found. Cannot create session.');
-        return false;
-      }
-
-      // Use user's default body weight if available
-      final double? userWeightKg = user.weightKg;
-
-      // Minimal payload for session creation
-      final payload = {
-        'ruck_weight_kg': ruckWeight,
-        'user_weight_kg': userWeightKg,
-        'status': 'in_progress',
-        'user_id': user.userId, // Ensure user ID is included
-        'started_from': 'apple_watch',
-        'start_time': DateTime.now().toUtc().toIso8601String(),
-        'is_manual': false, // Watch sessions are active/tracked sessions
-      };
-      
-      final response = await apiClient.post('/rucks', payload);
-      AppLogger.debug('[API_HANDLER] Session created from watch: $response');
-
-      // Update app state in WatchService
-      _watchService.sessionStartedFromWatchCallback(ruckWeight, response);
-
-      // Auto-navigate to active session screen if context is available
-      final navigatorKey = GetIt.instance<GlobalKey<NavigatorState>>();
-      navigatorKey.currentState?.pushNamedAndRemoveUntil(
-        '/active_session',
-        (route) => false,
-        arguments: response, // Pass the session data if needed
-      );
-
-      return true;
-    } catch (e) {
-      AppLogger.error('[API_HANDLER] Failed to create session from watch: $e');
-      return false;
-    }
+    AppLogger.info('[API_HANDLER] Watch session creation disabled - sessions must be started from phone');
+    return false;
   }
   
   @override
