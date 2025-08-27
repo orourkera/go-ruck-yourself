@@ -192,11 +192,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         _isGeneratingInsight = false;
       });
       AppLogger.info('[AI_COMPLETION] UI updated with AI insight');
-    } catch (e) {
+    } catch (e, stackTrace) {
       AppLogger.error('[AI_COMPLETION] On-page AI generation failed: $e');
+      AppLogger.error('[AI_COMPLETION] Stack trace: $stackTrace');
       if (!mounted) return;
       setState(() {
         _isGeneratingInsight = false;
+        // Set a fallback message so user knows AI generation failed but still sees something
+        _aiCompletionInsight = 'Great job completing your ruck! 🎯';
       });
     }
   }

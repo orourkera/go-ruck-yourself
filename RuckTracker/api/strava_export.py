@@ -19,12 +19,26 @@ class StravaExportResource(Resource):
             # Get session data from database
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
-            # Fetch the session
-            session_resp = supabase.table('ruck_session').select(
-                'id, user_id, duration_seconds, distance_km, elevation_gain_m, '
-                'elevation_loss_m, calories_burned, ruck_weight_kg, started_at, '
-                'completed_at, avg_heart_rate, max_heart_rate'
-            ).eq('id', session_id).eq('user_id', g.user.id).execute()
+            # Fetch the session - handle both integer IDs and string offline IDs
+            if str(session_id).startswith('offline_'):
+                # For offline sessions, search by session_id field (string)
+                session_resp = supabase.table('ruck_session').select(
+                    'id, user_id, duration_seconds, distance_km, elevation_gain_m, '
+                    'elevation_loss_m, calories_burned, ruck_weight_kg, started_at, '
+                    'completed_at, avg_heart_rate, max_heart_rate, session_id'
+                ).eq('session_id', session_id).eq('user_id', g.user.id).execute()
+            else:
+                # For regular sessions, search by integer id field
+                try:
+                    session_id_int = int(session_id)
+                    session_resp = supabase.table('ruck_session').select(
+                        'id, user_id, duration_seconds, distance_km, elevation_gain_m, '
+                        'elevation_loss_m, calories_burned, ruck_weight_kg, started_at, '
+                        'completed_at, avg_heart_rate, max_heart_rate'
+                    ).eq('id', session_id_int).eq('user_id', g.user.id).execute()
+                except (ValueError, TypeError):
+                    # Invalid session ID format
+                    return {'message': 'Invalid session ID format'}, 400
             
             if not session_resp.data:
                 return {'message': 'Session not found'}, 404

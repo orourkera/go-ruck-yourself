@@ -408,8 +408,18 @@ import FirebaseCore
                 print("[DEBUG] Received debug_watchEndTapped from Watch")
             case "watchHeartRateUpdate":
                 if let heartRate = message["heartRate"] as? Double {
-                    // Heart rate update received
-                    HeartRateStreamHandler.sendHeartRate(heartRate)
+                    // Heart rate update received - send via method channel instead of EventChannel
+                    print("[WATCH] Heart rate update received: \(heartRate) BPM - sending via method channel")
+                    
+                    // Send to Flutter via WatchConnectivity method channel
+                    if let flutterViewController = self.window?.rootViewController as? FlutterViewController {
+                        let watchConnectivityChannel = FlutterMethodChannel(name: "com.ruckingapp.rucking_app/watch_connectivity", binaryMessenger: flutterViewController.binaryMessenger)
+                        
+                        watchConnectivityChannel.invokeMethod("watchHeartRateUpdate", arguments: [
+                            "heartRate": heartRate,
+                            "timestamp": Date().timeIntervalSince1970 * 1000 // milliseconds
+                        ])
+                    }
                     
                     // Acknowledge the heart rate reception if reply handler is available
                     replyHandler?(["status": "success", "heartRateReceived": heartRate])

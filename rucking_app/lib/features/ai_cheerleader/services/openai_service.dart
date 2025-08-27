@@ -38,16 +38,23 @@ class OpenAIService {
       AppLogger.info('[OPENAI] Generating message for $personality personality');
       
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 2: About to build prompt');
-      final prompt = _buildPrompt(
-        personality,
-        explicitContent,
-        context['trigger'] ?? <String, dynamic>{},
-        context['session'] ?? <String, dynamic>{},
-        context['user'] ?? <String, dynamic>{},
-        context['environment'] ?? <String, dynamic>{},
-        context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
-      );
-      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
+      String prompt;
+      try {
+        prompt = _buildPrompt(
+          personality,
+          explicitContent,
+          context['trigger'] ?? <String, dynamic>{},
+          context['session'] ?? <String, dynamic>{},
+          context['user'] ?? <String, dynamic>{},
+          context['environment'] ?? <String, dynamic>{},
+          context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
+        );
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
+      } catch (e, stackTrace) {
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] FATAL: _buildPrompt failed with error: $e');
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] Stack trace: $stackTrace');
+        return null;
+      }
       
       // Debug logging: Show full prompt being sent to OpenAI
       AppLogger.info('[OPENAI_DEBUG] Full prompt being sent to OpenAI:');
@@ -63,7 +70,9 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG] - Environment: ${context['environment']}');
       
       // Make OpenAI API call with timeout
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 4: About to call OpenAI.instance.chat.create...');
       AppLogger.info('[OPENAI_DEBUG] About to call OpenAI.instance.chat.create...');
+      
       final completion = await OpenAI.instance.chat.create(
         model: _model,
         messages: [
@@ -81,10 +90,10 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG] OpenAI API call completed successfully');
       AppLogger.info('[OPENAI_DEBUG] Response choices count: ${completion.choices.length}');
 
-      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 4: OpenAI API call completed successfully');
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 5: OpenAI API call completed successfully');
       
       var message = completion.choices.first.message.content?.first.text?.trim();
-      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 5: Extracted message from response');
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 6: Extracted message from response');
       AppLogger.info('[OPENAI_DEBUG] Extracted message: $message');
       
       if (message != null && message.isNotEmpty) {
@@ -120,7 +129,7 @@ class OpenAIService {
         if (_localRecentLines.length > 6) {
           _localRecentLines.removeRange(6, _localRecentLines.length);
         }
-        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 6: Message is valid, about to log to database');
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 7: Message is valid, about to log to database');
         AppLogger.info('[OPENAI_DEBUG] Generated message: "${message.substring(0, 50)}..."');
         AppLogger.info('[OPENAI_DEBUG] About to call _logSimpleResponse...');
         
@@ -131,7 +140,7 @@ class OpenAIService {
           response: message,
           isExplicit: explicitContent,
         );
-        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 7: _logSimpleResponse call completed');
+        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 8: _logSimpleResponse call completed');
         AppLogger.info('[OPENAI_DEBUG] _logSimpleResponse call completed');
         return message;
       } else {
@@ -139,13 +148,19 @@ class OpenAIService {
         return null;
       }
       
-    } on TimeoutException {
+    } on TimeoutException catch (e, stackTrace) {
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] FATAL: Request timed out after ${_timeout.inSeconds}s: $e');
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Timeout stack trace: $stackTrace');
       AppLogger.error('[OPENAI] Request timed out');
       return null;
-    } on SocketException {
+    } on SocketException catch (e, stackTrace) {
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] FATAL: Network error - no internet connection: $e');
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Socket error stack trace: $stackTrace');
       AppLogger.error('[OPENAI] Network error - no internet connection');
       return null;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] FATAL: Unexpected error in generateMessage: $e');
+      AppLogger.error('[OPENAI_SERVICE_DEBUG] Full stack trace: $stackTrace');
       AppLogger.error('[OPENAI] Failed to generate message: $e');
       return null;
     }
