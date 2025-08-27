@@ -1035,9 +1035,9 @@ class RuckSessionCompleteResource(Resource):
                         
                             # Elevation component (physics-based): work = m*g*h, convert J→kcal, adjust for efficiency
                             # 1 kcal ≈ 4186 J; assume ~25% efficiency
-                            g = 9.81
+                            gravity = 9.81
                             efficiency = 0.25
-                            elevation_work_joules = total_weight_kg * g * elevation_gain_m
+                            elevation_work_joules = total_weight_kg * gravity * elevation_gain_m
                             elevation_calories = (elevation_work_joules / (efficiency * 4186.0)) if elevation_gain_m and elevation_gain_m > 0 else 0.0
                         
                             estimated_calories = round(base_calories + elevation_calories)

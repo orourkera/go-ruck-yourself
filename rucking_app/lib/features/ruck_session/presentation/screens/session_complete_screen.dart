@@ -242,7 +242,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       _aiCompletionInsight = null;
       _isGeneratingInsight = true;
       AppLogger.info('[AI_COMPLETION] No pre-generated insight (null: ${widget.aiCompletionInsight == null}, empty: ${widget.aiCompletionInsight?.isEmpty}); generating on page asynchronously');
-      _generateAiInsightOnPage();
+      // Schedule AI generation for next frame to avoid blocking initState
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _generateAiInsightOnPage();
+      });
     }
   }
 

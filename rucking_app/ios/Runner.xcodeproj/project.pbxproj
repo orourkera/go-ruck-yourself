@@ -18,6 +18,7 @@
 		98CF8D1E2DCA4B28003BA7BC /* GRY Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 98CF8CFE2DCA4B26003BA7BC /* GRY Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F774061D64B4E93D78FBA456 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05A03E7DDD84AF0A915EEE86 /* Pods_RunnerTests.framework */; };
 		FAF11B2C3D4E5F6A7B8C9D01 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = FAF11B2C3D4E5F6A7B8C9D00 /* GoogleService-Info.plist */; };
+		1A2B3C4D5E6F789000112234 /* RuckingApi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F789000112233 /* RuckingApi.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,6 +91,7 @@
 		DEBBED5E6AF750C611CAD1B1 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E385B5D78AD2B16E4789342D /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		FAF11B2C3D4E5F6A7B8C9D00 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		1A2B3C4D5E6F789000112233 /* RuckingApi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuckingApi.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -250,6 +252,7 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				FAF11B2C3D4E5F6A7B8C9D00 /* GoogleService-Info.plist */,
+				1A2B3C4D5E6F789000112233 /* RuckingApi.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -606,6 +609,7 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				1A2B3C4D5E6F789000112234 /* RuckingApi.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
