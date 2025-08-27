@@ -5,7 +5,7 @@ import UserNotifications
 import FirebaseCore
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate {
+@objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate, FlutterRuckingApi {
     
     private var session: WCSession?
     private let watchSessionChannelName = "com.getrucky.gfy/watch_session"
@@ -199,6 +199,9 @@ import FirebaseCore
                 }
             }
         }
+
+        // Set up FlutterRuckingApi to handle Flutter -> Watch calls
+        FlutterRuckingApiSetup.setUp(binaryMessenger: controller.binaryMessenger, api: self)
 
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
@@ -808,5 +811,42 @@ class HeartRateStreamHandler: NSObject, FlutterStreamHandler {
                 sendHeartRate(lastHR)
             }
         }
+    }
+}
+
+// MARK: - FlutterRuckingApi Implementation
+extension AppDelegate {
+    func updateSessionOnWatch(distance: Double, duration: Double, pace: Double, isPaused: Bool, calories: Double, elevationGain: Double, elevationLoss: Double) throws {
+        // This is handled by the existing updateMetrics method call mechanism
+        // No additional implementation needed as Flutter calls updateMetrics directly
+    }
+    
+    func startSessionOnWatch(ruckWeight: Double) throws {
+        print("[WATCH] startSessionOnWatch called with ruckWeight: \(ruckWeight)")
+        
+        // Send startSession command to watch to begin heart rate monitoring
+        let message: [String: Any] = [
+            "command": "startSession",
+            "ruckWeight": ruckWeight,
+            "startHeartRateMonitoring": true,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+        
+        sendMessageToWatch(message)
+    }
+    
+    func pauseSessionOnWatch() throws {
+        print("[WATCH] pauseSessionOnWatch called")
+        sendMessageToWatch(["command": "pauseSession"])
+    }
+    
+    func resumeSessionOnWatch() throws {
+        print("[WATCH] resumeSessionOnWatch called")
+        sendMessageToWatch(["command": "resumeSession"])
+    }
+    
+    func endSessionOnWatch() throws {
+        print("[WATCH] endSessionOnWatch called")
+        sendMessageToWatch(["command": "endSession"])
     }
 }

@@ -1,10 +1,13 @@
 import logging
 import requests as http_requests
+import xml.etree.ElementTree as ET
+import io
 from datetime import datetime
 from flask import g
 from flask_restful import Resource, request
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.api.auth import auth_required
+from typing import Dict, List, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +109,27 @@ class StravaExportResource(Resource):
             session_name = request_data.get('session_name', f'Ruck Session {session_id}')
             description = request_data.get('description', '')
             
-            # Create Strava activity
-            activity_id, duplicate = self._create_strava_activity(
-                access_token=access_token,
-                session=session,
-                session_name=session_name,
-                description=description
-            )
+            # Fetch location points for GPS route
+            location_points = self._fetch_location_points(supabase, session_id)
+            
+            # Upload to Strava with GPS data if available, otherwise fallback to basic activity
+            if location_points and len(location_points) > 2:
+                logger.info(f"[STRAVA] Uploading GPS route with {len(location_points)} location points")
+                activity_id, duplicate = self._upload_gpx_to_strava(
+                    access_token=access_token,
+                    session=session,
+                    session_name=session_name,
+                    description=description,
+                    location_points=location_points
+                )
+            else:
+                logger.info("[STRAVA] No GPS data available, using basic activity creation")
+                activity_id, duplicate = self._create_strava_activity(
+                    access_token=access_token,
+                    session=session,
+                    session_name=session_name,
+                    description=description
+                )
             
             if activity_id:
                 logger.info(f"[STRAVA] Successfully exported session {session_id} to Strava as activity {activity_id}")
@@ -233,40 +250,67 @@ class StravaExportResource(Resource):
                 logger.error(f"[STRAVA] Failed to parse started_at ({started_at}): {e}")
                 return None, False
             
-            # Prepare activity data
+            # Calculate additional metrics
+            elapsed_time = int(session.get('duration_seconds', 0) or 0)
+            paused_time = int(session.get('paused_duration_seconds', 0) or 0)
+            moving_time = max(0, elapsed_time - paused_time)
+            distance_meters = float(session.get('distance_km', 0) or 0) * 1000
+            
+            # Prepare activity data with ALL supported fields
             activity_data = {
                 'name': session_name,
                 'type': 'Hike',  # Strava activity type for rucking
                 'start_date_local': start_time.isoformat(),
-                'elapsed_time': int(session.get('duration_seconds', 0) or 0),
-                'distance': float(session.get('distance_km', 0) or 0) * 1000,  # Convert km to meters
+                'elapsed_time': elapsed_time,
+                'distance': distance_meters,
                 'description': description,
                 # Use deterministic external_id so repeated exports are deduped by Strava
                 'external_id': f"ruck_session:{session.get('id')}"
             }
             
-            # Add optional fields if available
+            # Add moving_time if we have pause data
+            if moving_time > 0 and moving_time != elapsed_time:
+                activity_data['moving_time'] = moving_time
+            
+            # Add elevation data
             if session.get('elevation_gain_m'):
-                activity_data['total_elevation_gain'] = session['elevation_gain_m']
+                activity_data['total_elevation_gain'] = float(session['elevation_gain_m'])
+            
+            # Add average speed (m/s) if we have distance and time
+            if distance_meters > 0 and moving_time > 0:
+                average_speed = distance_meters / moving_time  # m/s
+                activity_data['average_speed'] = average_speed
+            
+            # Add heart rate data if available
+            if session.get('avg_heart_rate'):
+                activity_data['average_heartrate'] = float(session['avg_heart_rate'])
+            if session.get('max_heart_rate'):
+                activity_data['max_heartrate'] = float(session['max_heart_rate'])
+            
+            # Add calories if available
+            if session.get('calories_burned'):
+                activity_data['calories'] = float(session['calories_burned'])
             
             # Add ruck weight to description if not already included
-            # Check for various weight indicators (kg, lbs, or weight emoji)
+            # Check for various weight indicators (kg, lbs, weight emoji, or pound symbol)
             ruck_weight = session.get('ruck_weight_kg', 0)
             desc_lower = description.lower()
-            has_weight = any(indicator in desc_lower for indicator in ['kg', 'lbs', 'ruck weight', '⚖️'])
             
-            if ruck_weight > 0 and not has_weight:
+            # More comprehensive weight detection
+            weight_indicators = ['kg', 'lbs', 'lb', 'pounds', 'ruck weight', '⚖️', 'weight:', 'weight =']
+            has_weight = any(indicator in desc_lower for indicator in weight_indicators)
+            
+            # Also check for weight patterns like "20 lb" or "9 kg" (number followed by weight unit)
+            import re
+            weight_pattern = re.compile(r'\d+(\.\d+)?\s*(kg|lbs?|pounds?)', re.IGNORECASE)
+            has_weight_pattern = weight_pattern.search(description)
+            
+            if ruck_weight > 0 and not has_weight and not has_weight_pattern:
                 if description:
                     description += f"\n\nRuck Weight: {ruck_weight:.1f}kg"
                 else:
                     description = f"Ruck Weight: {ruck_weight:.1f}kg"
                 activity_data['description'] = description
-            
-            # Add heart rate data if available
-            if session.get('avg_heart_rate'):
-                activity_data['average_heartrate'] = session['avg_heart_rate']
-            if session.get('max_heart_rate'):
-                activity_data['max_heartrate'] = session['max_heart_rate']
             
             logger.info(f"[STRAVA] Creating activity with data: {activity_data}")
             
@@ -299,3 +343,196 @@ class StravaExportResource(Resource):
         except Exception as e:
             logger.error(f"[STRAVA] Error creating Strava activity: {str(e)}")
             return None, False
+            
+    def _fetch_location_points(self, supabase, session_id: int) -> List[Dict[str, Any]]:
+        """Fetch location points for the session from the database."""
+        try:
+            # Query location_point table for this session
+            location_resp = supabase.table('location_point').select(
+                'latitude, longitude, altitude, timestamp'
+            ).eq('session_id', session_id).order('timestamp').execute()
+            
+            if location_resp.data:
+                logger.info(f"[STRAVA] Found {len(location_resp.data)} location points for session {session_id}")
+                return location_resp.data
+            else:
+                logger.info(f"[STRAVA] No location points found for session {session_id}")
+                return []
+        except Exception as e:
+            logger.error(f"[STRAVA] Error fetching location points: {e}")
+            return []
+    
+    def _generate_gpx_content(self, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]]) -> str:
+        """Generate GPX XML content from session data and location points."""
+        # Create root GPX element
+        gpx = ET.Element('gpx')
+        gpx.set('version', '1.1')
+        gpx.set('creator', 'Rucking App - https://getrucky.com')
+        gpx.set('xmlns', 'http://www.topografix.com/GPX/1/1')
+        gpx.set('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
+        gpx.set('xsi:schemaLocation', 'http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd')
+        
+        # Add metadata
+        metadata = ET.SubElement(gpx, 'metadata')
+        
+        name_elem = ET.SubElement(metadata, 'name')
+        name_elem.text = session_name
+        
+        desc_elem = ET.SubElement(metadata, 'desc')
+        desc_elem.text = description or f"Rucking session with {session.get('ruck_weight_kg', 0):.1f}kg pack"
+        
+        time_elem = ET.SubElement(metadata, 'time')
+        started_at = session.get('started_at')
+        if started_at:
+            if isinstance(started_at, str):
+                time_elem.text = started_at
+            else:
+                time_elem.text = started_at.isoformat() + 'Z'
+        else:
+            time_elem.text = datetime.utcnow().isoformat() + 'Z'
+        
+        # Add track
+        trk = ET.SubElement(gpx, 'trk')
+        
+        trk_name = ET.SubElement(trk, 'name')
+        trk_name.text = session_name
+        
+        trk_type = ET.SubElement(trk, 'type')
+        trk_type.text = 'Hike'  # Strava activity type
+        
+        # Add track segment
+        trkseg = ET.SubElement(trk, 'trkseg')
+        
+        for point in location_points:
+            trkpt = ET.SubElement(trkseg, 'trkpt')
+            trkpt.set('lat', str(point['latitude']))
+            trkpt.set('lon', str(point['longitude']))
+            
+            # Add elevation if available
+            if point.get('altitude'):
+                ele = ET.SubElement(trkpt, 'ele')
+                ele.text = str(point['altitude'])
+            
+            # Add timestamp
+            if point.get('timestamp'):
+                time_pt = ET.SubElement(trkpt, 'time')
+                timestamp = point['timestamp']
+                if isinstance(timestamp, str):
+                    time_pt.text = timestamp
+                else:
+                    time_pt.text = timestamp.isoformat() + 'Z'
+        
+        # Convert to string
+        return ET.tostring(gpx, encoding='unicode')
+    
+    def _upload_gpx_to_strava(self, access_token: str, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]]) -> Tuple[Optional[int], bool]:
+        """Upload GPX file to Strava and poll for completion."""
+        try:
+            # Generate GPX content
+            gpx_content = self._generate_gpx_content(session, session_name, description, location_points)
+            
+            # Prepare upload data
+            files = {
+                'file': ('activity.gpx', gpx_content, 'application/gpx+xml'),
+            }
+            
+            data = {
+                'data_type': 'gpx',
+                'name': session_name,
+                'description': description,
+                'activity_type': 'Hike',
+                'external_id': f"ruck_session:{session.get('id')}",
+            }
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+            }
+            
+            logger.info(f"[STRAVA] Uploading GPX file with {len(location_points)} points")
+            
+            # Upload to Strava
+            response = http_requests.post(
+                'https://www.strava.com/api/v3/uploads',
+                files=files,
+                data=data,
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code == 201:
+                upload_data = response.json()
+                upload_id = upload_data.get('id')
+                logger.info(f"[STRAVA] Upload started with ID: {upload_id}")
+                
+                # Poll for completion
+                activity_id = self._poll_upload_status(access_token, upload_id)
+                if activity_id:
+                    return activity_id, False
+                else:
+                    logger.error("[STRAVA] Upload processing failed or timed out")
+                    return None, False
+            elif response.status_code == 409:
+                # Duplicate detected
+                logger.info(f"[STRAVA] Duplicate upload for session {session.get('id')} (409)")
+                return None, True
+            else:
+                logger.error(f"[STRAVA] Upload failed: {response.status_code} - {response.text}")
+                return None, False
+                
+        except Exception as e:
+            logger.error(f"[STRAVA] Error uploading GPX: {str(e)}")
+            return None, False
+    
+    def _poll_upload_status(self, access_token: str, upload_id: int, max_attempts: int = 12, delay: int = 5) -> Optional[int]:
+        """Poll upload status until completion or timeout."""
+        import time
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+        }
+        
+        for attempt in range(max_attempts):
+            try:
+                response = http_requests.get(
+                    f'https://www.strava.com/api/v3/uploads/{upload_id}',
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    status_data = response.json()
+                    status = status_data.get('status')
+                    activity_id = status_data.get('activity_id')
+                    error = status_data.get('error')
+                    
+                    logger.info(f"[STRAVA] Upload {upload_id} status: {status} (attempt {attempt + 1})")
+                    
+                    if status == 'Your activity is ready.':
+                        return activity_id
+                    elif status == 'There was an error processing your activity.':
+                        logger.error(f"[STRAVA] Upload processing error: {error}")
+                        return None
+                    elif status in ['Your activity is still being processed.', 'Your activity is being processed.']:
+                        if attempt < max_attempts - 1:
+                            time.sleep(delay)
+                            continue
+                        else:
+                            logger.error("[STRAVA] Upload processing timeout")
+                            return None
+                    else:
+                        logger.warning(f"[STRAVA] Unknown upload status: {status}")
+                        if attempt < max_attempts - 1:
+                            time.sleep(delay)
+                            continue
+                else:
+                    logger.error(f"[STRAVA] Status check failed: {response.status_code}")
+                    return None
+                    
+            except Exception as e:
+                logger.error(f"[STRAVA] Error checking upload status: {e}")
+                if attempt < max_attempts - 1:
+                    time.sleep(delay)
+                    continue
+                return None
+        
+        return None

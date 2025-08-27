@@ -657,14 +657,32 @@ class WatchService {
           'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
           'isMetric': isMetric, // Embed unit preference in nested metrics map as well
           if (steps != null) 'steps': steps,
-          if (_currentHeartRate != null) 'heartRate': _currentHeartRate,
-          if (_currentHeartRate != null) 'hrZone': _inferZoneLabel(_currentHeartRate!),
+          'heartRate': _getCurrentHeartRateWithFallback(),
+          'hrZone': _getCurrentHeartRateWithFallback() != null ? _inferZoneLabel(_getCurrentHeartRateWithFallback()!) : null,
           'cadence': 160, // Add cadence to metrics
         },
       });
       AppLogger.debug('[WATCH] Metrics updated successfully with calories=$calories, elevation gain=$elevation, loss=${elevationLoss ?? 0.0}, steps=${steps ?? 'null'}');
     } catch (e) {
       AppLogger.error('[WATCH] Failed to send metrics to watch: $e');
+    }
+  }
+
+  /// Get current heart rate with HealthKit fallback
+  /// Returns watch heart rate if available (primary), otherwise HealthKit heart rate (fallback)
+  double? _getCurrentHeartRateWithFallback() {
+    // Primary: Watch heart rate
+    if (_currentHeartRate != null) {
+      return _currentHeartRate;
+    }
+    
+    // Fallback: HealthKit heart rate
+    try {
+      final healthService = GetIt.instance<HealthService>();
+      return healthService.currentHeartRate;
+    } catch (e) {
+      AppLogger.debug('[WATCH] HealthKit heart rate fallback failed: $e');
+      return null;
     }
   }
 

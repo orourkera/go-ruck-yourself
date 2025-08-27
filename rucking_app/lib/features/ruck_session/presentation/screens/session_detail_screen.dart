@@ -47,6 +47,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/core/services/strava_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
@@ -205,13 +206,30 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
       try {
         final ai = GetIt.I<OpenAIService>();
+        
+        // Try to get city from session location data
+        String? cityName;
+        try {
+          if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
+            final locationPoint = session.locationPoints!.first;
+            final locationContextService = LocationContextService();
+            final locationContext = await locationContextService.getLocationContext(
+              locationPoint.latitude,
+              locationPoint.longitude,
+            );
+            cityName = locationContext?.city;
+          }
+        } catch (e) {
+          AppLogger.warning('[STRAVA][AI] Location extraction failed: $e');
+        }
+        
         final aiTitle = await ai.generateStravaTitle(
           distanceKm: session.distance,
           duration: session.duration,
           ruckWeightKg: session.ruckWeightKg ?? 0.0,
           preferMetric: preferMetric,
+          city: cityName,
           startTime: session.startTime,
-          // city: could be derived from route in future; omitted for now
         );
         if (aiTitle != null && aiTitle.isNotEmpty) {
           sessionName = aiTitle;

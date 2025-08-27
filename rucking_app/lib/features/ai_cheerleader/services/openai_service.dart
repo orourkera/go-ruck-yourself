@@ -679,7 +679,7 @@ Respond with your motivational message:''';
   }
 
   // Extract recent AI cheerleader responses to avoid repeating phrasing
-  List<String> _recentAICheerleaderLines(Map<String, dynamic> history, {int max = 2}) {
+  List<String> _recentAICheerleaderLines(Map<dynamic, dynamic> history, {int max = 2}) {
     AppLogger.error('[ANTI_REPEAT_DEBUG] _recentAICheerleaderLines called with max=$max');
     AppLogger.error('[ANTI_REPEAT_DEBUG] History keys: ${history.keys.toList()}');
     AppLogger.error('[ANTI_REPEAT_DEBUG] ai_cheerleader_history type: ${history['ai_cheerleader_history'].runtimeType}');

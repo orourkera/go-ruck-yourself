@@ -188,6 +188,21 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     private func processCommand(_ command: String, from data: [String: Any]) {
         DispatchQueue.main.async { // Ensure UI updates are on the main thread
             switch command {
+            case "startSession":
+                self.statusLabel.setText("Session Started")
+                // Extract ruck weight if present
+                if let ruckWeight = data["ruckWeight"] as? Double {
+                    print("🔔 [WATCH UI] Starting session with ruck weight: \(ruckWeight)")
+                }
+                // Start heart rate monitoring
+                self.workoutManager?.startWorkout { error in
+                    if let error = error {
+                        self.statusLabel.setText("Session Error: \(error.localizedDescription)")
+                    } else {
+                        print("🔔 [WATCH UI] Heart rate monitoring started")
+                    }
+                }
+                
             case "workoutStarted":
                 self.statusLabel.setText("Workout Active")
                 // Extract ruck weight if present

@@ -34,6 +34,7 @@ import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ruck_session/data/models/location_point.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_photo.dart';
@@ -655,11 +656,30 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
 
       try {
         final ai = GetIt.I<OpenAIService>();
+        
+        // Try to get city from session location data
+        String? cityName;
+        try {
+          final activeSessionState = GetIt.instance<Bloc<ActiveSessionEvent, ActiveSessionState>>().state;
+          if (activeSessionState is ActiveSessionRunning && activeSessionState.locationPoints.isNotEmpty) {
+            final locationPoint = activeSessionState.locationPoints.first;
+            final locationContextService = LocationContextService();
+            final locationContext = await locationContextService.getLocationContext(
+              locationPoint.latitude,
+              locationPoint.longitude,
+            );
+            cityName = locationContext?.city;
+          }
+        } catch (e) {
+          AppLogger.warning('[STRAVA][AI] Location extraction failed: $e');
+        }
+        
         final aiTitle = await ai.generateStravaTitle(
           distanceKm: widget.distance,
           duration: widget.duration,
           ruckWeightKg: widget.ruckWeight,
           preferMetric: preferMetric,
+          city: cityName,
           startTime: DateTime.now(), // Use current time as fallback
         );
         if (aiTitle != null && aiTitle.isNotEmpty) {
