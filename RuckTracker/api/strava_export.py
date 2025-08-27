@@ -291,25 +291,11 @@ class StravaExportResource(Resource):
             if session.get('calories_burned'):
                 activity_data['calories'] = float(session['calories_burned'])
             
-            # Add ruck weight to description if not already included
-            # Check for various weight indicators (kg, lbs, weight emoji, or pound symbol)
-            ruck_weight = session.get('ruck_weight_kg', 0)
-            desc_lower = description.lower()
-            
-            # More comprehensive weight detection
-            weight_indicators = ['kg', 'lbs', 'lb', 'pounds', 'ruck weight', '⚖️', 'weight:', 'weight =']
-            has_weight = any(indicator in desc_lower for indicator in weight_indicators)
-            
-            # Also check for weight patterns like "20 lb" or "9 kg" (number followed by weight unit)
-            import re
-            weight_pattern = re.compile(r'\d+(\.\d+)?\s*(kg|lbs?|pounds?)', re.IGNORECASE)
-            has_weight_pattern = weight_pattern.search(description)
-            
-            if ruck_weight > 0 and not has_weight and not has_weight_pattern:
-                if description:
-                    description += f"\n\nRuck Weight: {ruck_weight:.1f}kg"
-                else:
-                    description = f"Ruck Weight: {ruck_weight:.1f}kg"
+            # Generate fun AI summary for description instead of technical details
+            # (Technical metrics are now sent as structured data to Strava)
+            if not description or description.strip() == "":
+                # Generate a motivational summary if no custom description provided
+                description = self._generate_fun_summary(session, distance_meters, elapsed_time, moving_time)
                 activity_data['description'] = description
             
             logger.info(f"[STRAVA] Creating activity with data: {activity_data}")
@@ -379,7 +365,7 @@ class StravaExportResource(Resource):
         name_elem.text = session_name
         
         desc_elem = ET.SubElement(metadata, 'desc')
-        desc_elem.text = description or f"Rucking session with {session.get('ruck_weight_kg', 0):.1f}kg pack"
+        desc_elem.text = description
         
         time_elem = ET.SubElement(metadata, 'time')
         started_at = session.get('started_at')
@@ -428,6 +414,14 @@ class StravaExportResource(Resource):
     def _upload_gpx_to_strava(self, access_token: str, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]]) -> Tuple[Optional[int], bool]:
         """Upload GPX file to Strava and poll for completion."""
         try:
+            # Generate fun AI summary for description if none provided
+            if not description or description.strip() == "":
+                distance_meters = float(session.get('distance_km', 0) or 0) * 1000
+                elapsed_time = int(session.get('duration_seconds', 0) or 0)
+                paused_time = int(session.get('paused_duration_seconds', 0) or 0)
+                moving_time = max(0, elapsed_time - paused_time)
+                description = self._generate_fun_summary(session, distance_meters, elapsed_time, moving_time)
+            
             # Generate GPX content
             gpx_content = self._generate_gpx_content(session, session_name, description, location_points)
             
@@ -536,3 +530,79 @@ class StravaExportResource(Resource):
                 return None
         
         return None
+
+    def _generate_fun_summary(self, session: Dict[str, Any], distance_meters: float, elapsed_time: int, moving_time: int) -> str:
+        """Generate a fun, motivational summary for the Strava description."""
+        import random
+        
+        # Get session metrics
+        distance_km = distance_meters / 1000
+        ruck_weight = session.get('ruck_weight_kg', 0)
+        elevation_gain = session.get('elevation_gain_m', 0)
+        calories = session.get('calories_burned', 0)
+        
+        # Calculate pace (min/km)
+        pace_min_km = (moving_time / 60) / distance_km if distance_km > 0 else 0
+        
+        # Fun opening phrases
+        openings = [
+            "Crushed another ruck! 💪",
+            "Pack on, head up, feet moving! 🎯",
+            "Another day, another ruck conquered! 🔥",
+            "Ruck life is the good life! 🎒",
+            "Miles earned, not given! ⚡",
+            "Heavy pack, light heart! ❤️",
+            "Embracing the suck, loving the journey! 🚶‍♂️",
+            "Ruck hard or go home! 💯"
+        ]
+        
+        # Achievement highlights based on metrics
+        achievements = []
+        
+        if ruck_weight >= 20:
+            achievements.append(f"Carrying {ruck_weight:.0f}kg like a beast! 🦍")
+        elif ruck_weight >= 10:
+            achievements.append(f"Solid {ruck_weight:.0f}kg load handled with style! 💼")
+        
+        if distance_km >= 10:
+            achievements.append("Double digits on the distance - legendary! 🏆")
+        elif distance_km >= 5:
+            achievements.append("Solid mileage in the books! 📚")
+        
+        if elevation_gain and elevation_gain >= 200:
+            achievements.append(f"Conquered {elevation_gain:.0f}m of elevation - hill crushing mode! ⛰️")
+        elif elevation_gain and elevation_gain >= 100:
+            achievements.append("Hills didn't stand a chance! 🏔️")
+        
+        if pace_min_km > 0 and pace_min_km <= 8:
+            achievements.append("Keeping that pace tight! ⚡")
+        
+        if calories and calories >= 500:
+            achievements.append(f"Torched {calories:.0f} calories - furnace mode! 🔥")
+        
+        # Motivational endings
+        endings = [
+            "One step closer to greatness! 🌟",
+            "The grind never stops! 💪",
+            "Building that mental toughness! 🧠",
+            "Earned every step! 👟",
+            "Ruck on! 🎯",
+            "Stay hard! 💎",
+            "Progress over perfection! 📈",
+            "This is the way! 🛡️"
+        ]
+        
+        # Construct the summary
+        summary_parts = [random.choice(openings)]
+        
+        if achievements:
+            if len(achievements) == 1:
+                summary_parts.append(achievements[0])
+            else:
+                # Pick 1-2 achievements randomly
+                selected = random.sample(achievements, min(2, len(achievements)))
+                summary_parts.extend(selected)
+        
+        summary_parts.append(random.choice(endings))
+        
+        return " ".join(summary_parts)

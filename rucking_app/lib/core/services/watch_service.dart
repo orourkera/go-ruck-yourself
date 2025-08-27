@@ -679,7 +679,7 @@ class WatchService {
     // Fallback: HealthKit heart rate
     try {
       final healthService = GetIt.instance<HealthService>();
-      return healthService.currentHeartRate;
+      return healthService.latestHeartRate;
     } catch (e) {
       AppLogger.debug('[WATCH] HealthKit heart rate fallback failed: $e');
       return null;

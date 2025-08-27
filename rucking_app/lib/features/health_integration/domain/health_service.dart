@@ -24,6 +24,7 @@ class HealthService {
   // --- Heart Rate Streaming ---
   StreamController<HeartRateSample>? _heartRateController;
   Timer? _heartRateTimer;
+  double? _latestHeartRate; // Cached latest HR for synchronous access
 
   /// Expose a stream of live heart rate samples (every 5 seconds)
   Stream<HeartRateSample> get heartRateStream {
@@ -41,6 +42,8 @@ class HealthService {
       final hr = await getHeartRate();
       AppLogger.info('[HealthService] polled HR → ${hr?.toString() ?? 'null'}');
       if (hr != null) {
+        // Cache latest heart rate for synchronous fallback consumers
+        _latestHeartRate = hr.toDouble();
         _heartRateController?.add(HeartRateSample(
           timestamp: DateTime.now(),
           bpm: hr.round(),
@@ -53,6 +56,9 @@ class HealthService {
     _heartRateTimer?.cancel();
     _heartRateTimer = null;
   }
+
+  /// Latest known heart rate value (BPM) from polling or watch updates
+  double? get latestHeartRate => _latestHeartRate;
 
   // Set the current user ID to make settings user-specific
   void setUserId(String userId) {
@@ -731,6 +737,8 @@ class HealthService {
   /// Update heart rate from Watch (called from native code)
   void updateHeartRate(double heartRate) {
     AppLogger.info('Received heart rate update from Watch: $heartRate BPM');
+    // Cache as latest heart rate for synchronous access
+    _latestHeartRate = heartRate;
     // Push to the heart rate stream so UI updates
     _heartRateController?.add(HeartRateSample(
       timestamp: DateTime.now(),
