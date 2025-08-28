@@ -4,10 +4,10 @@ import 'package:rucking_app/core/models/user.dart';
 
 /// Service for detecting AI Cheerleader triggers and assembling context
 class AICheerleaderService {
-  static const int _milestoneIntervalMeters = 100; // Every 100m (for testing)
-  static const int _timeCheckIntervalSeconds = 60; // Every 1 minute (for testing)
+  static const int _milestoneIntervalMeters = 1000; // Every 1km milestone
+  static const int _timeCheckIntervalSeconds = 900; // Every 15 minutes
   static const double _slowPaceThreshold = 0.6; // 60% of average pace = slow (more conservative)
-  static const int _minimumTriggerIntervalSeconds = 30; // Min 30 seconds between triggers (for testing)
+  static const int _minimumTriggerIntervalSeconds = 300; // Min 5 minutes between triggers
   static const int _hrSpikeMinElapsedSeconds = 180; // Wait 3 minutes before HR analysis
   static const int _hrSpikeCooldownSeconds = 600; // 10 minutes per HR spike (reduced frequency)
   static const double _hrSpikePercent = 0.20; // 20% above baseline considered spike

@@ -508,7 +508,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       
       // Store completion data for lifecycle manager
       _sessionCompletionData = {
-        'distance_km': finalDistance,
+        // DON'T send distance_km - let backend calculate from already-uploaded location points
+        // 'distance_km': finalDistance,  // REMOVED - backend calculates this
         'calories_burned': finalCalories,
         if (_lastCalorieMethod != null) 'calorie_method': _lastCalorieMethod,
         'elevation_gain_m': finalElevationGain,
@@ -527,6 +528,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         'avg_heart_rate': _heartRateManager.currentState.averageHeartRate?.round(),
         'min_heart_rate': _heartRateManager.currentState.minHeartRate,
         'max_heart_rate': _heartRateManager.currentState.maxHeartRate,
+        // Don't send location_points - they're already uploaded during session via location-batch endpoint
+        // Don't send heart_rate_samples - they're uploaded via heart-rate-chunk endpoint if needed
       };
       AppLogger.info('[COORDINATOR] Stored completion data: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m');
     } else if (lifecycleState.sessionId != null && lifecycleState.isActive) {

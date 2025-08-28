@@ -125,8 +125,34 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
             
             return ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: sessions.length,
+              itemCount: sessions.length + (state.hasMoreData ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == sessions.length) {
+                  // Load more button or loading indicator
+                  if (state.isLoadingMore) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  } else {
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            context.read<SessionHistoryBloc>().add(
+                              const LoadSessionHistory(loadMore: true),
+                            );
+                          },
+                          child: const Text('Load More Sessions'),
+                        ),
+                      ),
+                    );
+                  }
+                }
+                
                 final session = sessions[index];
                 AppLogger.debug('[SESSION_HISTORY_SCREEN] Building SessionCard for session ${session.id}');
                 return SessionCard(

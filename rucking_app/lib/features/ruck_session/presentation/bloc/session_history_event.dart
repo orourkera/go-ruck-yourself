@@ -19,15 +19,17 @@ class LoadSessionHistory extends SessionHistoryEvent {
   final SessionFilter? filter;
   final DateTime? customStartDate;
   final DateTime? customEndDate;
+  final bool loadMore;
   
   const LoadSessionHistory({
     this.filter,
     this.customStartDate,
     this.customEndDate,
+    this.loadMore = false,
   });
   
   @override
-  List<Object?> get props => [filter, customStartDate, customEndDate];
+  List<Object?> get props => [filter, customStartDate, customEndDate, loadMore];
 }
 
 class FilterSessionHistory extends SessionHistoryEvent {

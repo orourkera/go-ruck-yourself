@@ -42,11 +42,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   @override
   void dispose() {
     AppLogger.info('[STATS_SCREEN] Disposing StatisticsScreen');
-    final route = ModalRoute.of(context);
-    if (route is PageRoute) {
-      final routeObserver = Navigator.of(context).widget.observers.whereType<RouteObserver<PageRoute>>().firstOrNull;
-      routeObserver?.unsubscribe(this);
-    }
     _tabController.dispose();
     super.dispose();
   }

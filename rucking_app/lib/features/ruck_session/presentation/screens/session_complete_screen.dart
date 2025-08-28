@@ -146,44 +146,33 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final authState = context.read<AuthBloc>().state;
       final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
 
-      final sessionContext = {
-        'session_id': widget.ruckId,
+      // Build flat context map expected by OpenAIService._buildSessionSummaryPrompt
+      final Map<String, dynamic> summaryContext = {
+        // Unit preference
+        'prefer_metric': preferMetric,
+
+        // Core session metrics (always in km for source distance)
         'distance_km': widget.distance,
         'distance_miles': widget.distance * 0.621371,
         'duration_minutes': widget.duration.inMinutes,
-        'duration_seconds': widget.duration.inSeconds,
         'calories_burned': widget.caloriesBurned,
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
         'ruck_weight_kg': widget.ruckWeight,
-        'steps': widget.steps,
-        'completed_at': widget.completedAt.toIso8601String(),
+
+        // Optional metrics
+        if (widget.steps != null) 'steps': widget.steps,
+        if (_avgHeartRate != null) 'avg_hr': _avgHeartRate,
+        if (_maxHeartRate != null) 'max_hr': _maxHeartRate,
+
+        // Presence flags for richer hints
+        if (widget.splits != null && widget.splits!.isNotEmpty) 'splits': widget.splits,
+        if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) 'heart_rate_zones': {'has_data': true},
       };
 
-      final userContext = authState is Authenticated
-          ? {
-              'user_info': {
-                'user_id': authState.user.userId,
-                'username': authState.user.username,
-                'prefers_metric': preferMetric,
-              },
-              'unit_preference': preferMetric ? 'metric' : 'imperial',
-            }
-          : {};
-
-      final contextMap = {
-        'trigger': {'type': 'session_completion'},
-        'session': sessionContext,
-        'user': userContext,
-        'environment': {},
-        'history': {},
-      };
-
-      AppLogger.info('[AI_COMPLETION] Calling OpenAI with context: ${contextMap.toString().substring(0, 200)}...');
-      final summary = await ai.generateMessage(
-        context: contextMap,
-        personality: 'Session Analyst',
-        explicitContent: false,
+      AppLogger.info('[AI_COMPLETION] Calling OpenAI generateSessionSummary with context: ${summaryContext.toString()}');
+      final summary = await ai.generateSessionSummary(
+        context: summaryContext,
       );
 
       AppLogger.info('[AI_COMPLETION] OpenAI response: ${summary ?? 'null'}');
@@ -266,16 +255,25 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final completionData = <String, dynamic>{
         'completed_at': widget.completedAt.toIso8601String(),
         'duration_seconds': widget.duration.inSeconds,
-        // Always send metric fields expected by backend
-        'distance_km': widget.distance,
+        // DON'T send distance_km - let backend calculate from uploaded location points
+        // 'distance_km': widget.distance,  // REMOVED - backend calculates this
         'ruck_weight_kg': widget.ruckWeight,
         'is_manual': widget.isManual,
         'calories_burned': widget.caloriesBurned,
         'elevation_gain_m': widget.elevationGain,
         'elevation_loss_m': widget.elevationLoss,
         // Persist user's calorie method when available
-        if (context.read<AuthBloc>().state is Authenticated)
-          'calorie_method': (context.read<AuthBloc>().state as Authenticated).user.calorieMethod,
+        ...() {
+          if (context.read<AuthBloc>().state is Authenticated) {
+            final authState = context.read<AuthBloc>().state as Authenticated;
+            final calorieMethod = authState.user.calorieMethod;
+            AppLogger.info('[SESSION_SAVE] User calorie method: $calorieMethod');
+            if (calorieMethod != null && calorieMethod.isNotEmpty) {
+              return {'calorie_method': calorieMethod};
+            }
+          }
+          return <String, dynamic>{};
+        }(),
         // Provide average pace in seconds per km when distance>0
         if (widget.distance > 0)
           'average_pace': widget.duration.inSeconds / widget.distance,
@@ -619,7 +617,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         }
         
         if (updateData.isNotEmpty) {
-          await _apiClient.patch('/rucks/${widget.ruckId}', updateData);
+          await _apiClient.patch('/rucks/${widget.ruckId}/details', updateData);
           AppLogger.info('[SESSION_PATCH] User data updated successfully');
         }
       }

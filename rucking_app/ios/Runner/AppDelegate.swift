@@ -585,11 +585,8 @@ class StepCountStreamHandler: NSObject, FlutterStreamHandler {
     private static func sendStepCountOnMainThread(_ stepCount: Int) {
         if isListening, let sink = eventSink {
             print("[WATCH] Sending step count to Flutter: \(stepCount)")
-            let message = [
-                "command": "watchStepUpdate",
-                "steps": stepCount
-            ] as [String: Any]
-            sink(message)
+            // Emit plain integer to match Flutter listener expectations
+            sink(stepCount)
             
             pendingStepCounts.removeAll { $0 == stepCount }
         } else {

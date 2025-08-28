@@ -60,14 +60,22 @@ class MeasurementUtils {
     // Correct conversion: seconds/mile = seconds/km × 1.609344 = seconds/km ÷ 0.621371
     final pace = metric ? paceSeconds : paceSeconds / _kmToMi;
     
-    // Cap extremely slow paces (>90min/km or mile) to avoid UI glitches
-    // Also handles if conversion resulted in non-finite or if original pace was too high
-    if (!pace.isFinite || pace > 5400) return '--';
+    // Cap extremely slow paces (>6 hours/km or mile) to avoid UI glitches
+    // Increased from 90min to 6 hours to handle test sessions and very slow rucks
+    if (!pace.isFinite || pace > 21600) return '--';
     
-    // Format pace as minutes:seconds (always MM:SS, never HH:MM)
-    final totalMinutes = (pace / 60).floor();
-    final seconds = (pace % 60).floor().toString().padLeft(2, '0');
-    return '$totalMinutes:$seconds/${metric ? 'km' : 'mi'}';
+    // Format pace as minutes:seconds or hours:minutes for very slow paces
+    if (pace >= 3600) {
+      // For paces over 1 hour, show as H:MM format
+      final hours = (pace / 3600).floor();
+      final minutes = ((pace % 3600) / 60).floor();
+      return '${hours}:${minutes.toString().padLeft(2, '0')}h/${metric ? 'km' : 'mi'}';
+    } else {
+      // Standard MM:SS format for paces under 1 hour
+      final totalMinutes = (pace / 60).floor();
+      final seconds = (pace % 60).floor().toString().padLeft(2, '0');
+      return '$totalMinutes:$seconds/${metric ? 'km' : 'mi'}';
+    }
   }
 
   /// Elevation gain/loss formatted to 0 decimals (+X m/ft).

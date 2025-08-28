@@ -73,11 +73,11 @@ class HeartRateService {
 
   /// Start monitoring heart rate from all available sources
   Future<void> startHeartRateMonitoring() async {
-    AppLogger.info('HeartRateService: Starting heart rate monitoring...');
+    AppLogger.error('HeartRateService: [HR_DEBUG] 🚀 STARTING HEART RATE MONITORING...');
     
     // Reset monitoring state to ensure fresh start for new session
     if (_isMonitoringStarted) {
-      AppLogger.info('HeartRateService: Heart rate monitoring already active, resetting for new session');
+      AppLogger.error('HeartRateService: [HR_DEBUG] 🔄 Heart rate monitoring already active, resetting for new session');
       stopHeartRateMonitoring(); // Stop existing monitoring first
     }
     
@@ -112,7 +112,10 @@ class HeartRateService {
     
     // Mark monitoring as started
     _isMonitoringStarted = true;
-    AppLogger.info('HeartRateService: Heart rate monitoring successfully started');
+    AppLogger.error('HeartRateService: [HR_DEBUG] ✅ HEART RATE MONITORING SUCCESSFULLY STARTED');
+    
+    // Log final state for debugging
+    AppLogger.error('HeartRateService: [HR_DEBUG] 📊 Final state - Watch subscription: ${_watchHeartRateSubscription != null}, HealthKit authorized: ${_healthService.isAuthorized}, Monitoring active: $_isMonitoringStarted');
   }
   
   /// Stop heart rate monitoring
@@ -145,21 +148,22 @@ class HeartRateService {
   
   /// Set up subscription to watch heart rate updates with auto-reconnect
   void _setupWatchHeartRateSubscription() {
-    AppLogger.info('HeartRateService: Setting up watch heart rate subscription');
+    AppLogger.error('HeartRateService: [HR_DEBUG] 🎧 SETTING UP WATCH HEART RATE SUBSCRIPTION');
     
     // Cancel existing subscription if present to avoid duplicates
     _watchHeartRateSubscription?.cancel();
     
     // Log current heart rate from WatchService to debug timing issues
     final currentHR = _watchService.getCurrentHeartRate();
-    AppLogger.info('HeartRateService: [HR_DEBUG] Current WatchService HR at subscription: $currentHR');
+    AppLogger.error('HeartRateService: [HR_DEBUG] 📱 Current WatchService HR at subscription: $currentHR BPM');
+    AppLogger.error('HeartRateService: [HR_DEBUG] 📱 WatchService onHeartRateUpdate stream available: ${_watchService.onHeartRateUpdate != null}');
     
     _watchHeartRateSubscription = _watchService.onHeartRateUpdate.listen(
       (heartRate) {
-        AppLogger.info('HeartRateService: Raw heart rate from WatchService: $heartRate BPM');
+        AppLogger.error('HeartRateService: [HR_DEBUG] 🎯 RECEIVED RAW HEART RATE from WatchService: $heartRate BPM');
         // Validate heart rate before processing
         if (heartRate <= 0) {
-          AppLogger.warning('HeartRateService: Invalid heart rate received from watch: $heartRate');
+          AppLogger.error('HeartRateService: [HR_DEBUG] ❌ INVALID heart rate received from watch: $heartRate BPM');
           return;
         }
         
@@ -167,16 +171,16 @@ class HeartRateService {
           timestamp: DateTime.now(),
           bpm: heartRate.toInt(),
         );
-        AppLogger.info('HeartRateService: Processing heart rate sample: ${sample.bpm} BPM');
+        AppLogger.error('HeartRateService: [HR_DEBUG] ✅ PROCESSING valid heart rate sample: ${sample.bpm} BPM');
         _processHeartRateSample(sample, 'Watch');
       },
       onError: (error) {
-        AppLogger.error('HeartRateService: Error in watch heart rate stream: $error');
+        AppLogger.error('HeartRateService: [HR_DEBUG] ❌ ERROR in watch heart rate stream: $error');
         // Auto-reconnect after error
         _tryReconnectWatchService();
       },
       onDone: () {
-        AppLogger.warning('HeartRateService: Watch heart rate stream closed');
+        AppLogger.error('HeartRateService: [HR_DEBUG] ⚠️ WATCH HEART RATE STREAM CLOSED unexpectedly');
         // Auto-reconnect when stream closes unexpectedly
         _tryReconnectWatchService();
       },
@@ -185,15 +189,22 @@ class HeartRateService {
     
     // If there's already a current heart rate, process it immediately
     if (currentHR != null && currentHR > 0) {
-      AppLogger.info('HeartRateService: [HR_DEBUG] Processing existing heart rate immediately: $currentHR');
+      AppLogger.error('HeartRateService: [HR_DEBUG] ⚡ PROCESSING existing heart rate immediately: $currentHR BPM');
       final sample = HeartRateSample(
         timestamp: DateTime.now(),
         bpm: currentHR.toInt(),
       );
       _processHeartRateSample(sample, 'Watch-Initial');
+    } else {
+      AppLogger.error('HeartRateService: [HR_DEBUG] 📭 No existing heart rate from WatchService (currentHR: $currentHR)');
     }
     
-    AppLogger.info('HeartRateService: Watch heart rate subscription successfully set up');
+    AppLogger.error('HeartRateService: [HR_DEBUG] ✅ WATCH HEART RATE SUBSCRIPTION SUCCESSFULLY SET UP');
+    
+    // Add a test to verify the stream is working
+    Future.delayed(const Duration(seconds: 5), () {
+      AppLogger.error('HeartRateService: [HR_DEBUG] 🔍 STREAM CHECK: Subscription active: ${_watchHeartRateSubscription != null}, WatchService current HR: ${_watchService.getCurrentHeartRate()}');
+    });
   }
   
   /// Set up subscription to HealthKit heart rate updates
@@ -282,7 +293,7 @@ class HeartRateService {
   void _processHeartRateSample(HeartRateSample sample, String source) {
     // Only process valid heart rate values
     if (sample.bpm <= 0) {
-      AppLogger.warning('HeartRateService: Ignoring invalid heart rate value: ${sample.bpm} from $source');
+      AppLogger.error('HeartRateService: [HR_DEBUG] ❌ IGNORING invalid heart rate value: ${sample.bpm} from $source');
       return;
     }
     
@@ -290,7 +301,7 @@ class HeartRateService {
     _latestHeartRateSample = sample; // Store the latest sample
     _lastHeartRateTime = DateTime.now(); // Track when we received this sample
     
-    AppLogger.info('HeartRateService: [HR_DEBUG] Received heart rate update from $source: ${sample.bpm} BPM');
+    AppLogger.error('HeartRateService: [HR_DEBUG] 💓 RECEIVED heart rate update from $source: ${sample.bpm} BPM');
     
     // Downsampling: only add to buffer if enough time has passed since last saved sample
     final now = DateTime.now();
@@ -308,15 +319,15 @@ class HeartRateService {
     // Broadcast individual sample - this is critical for UI updates
     if (!_heartRateController.isClosed) {
       _heartRateController.add(sample);
-      AppLogger.info('HeartRateService: [HR_DEBUG] Successfully broadcast heart rate: ${sample.bpm} BPM to ${_heartRateController.hasListener ? 'listeners' : 'NO LISTENERS'}');
+      AppLogger.error('HeartRateService: [HR_DEBUG] 📢 SUCCESSFULLY BROADCAST heart rate: ${sample.bpm} BPM to ${_heartRateController.hasListener ? 'ACTIVE LISTENERS' : 'NO LISTENERS ⚠️'}');
     } else {
-      AppLogger.error('HeartRateService: Cannot broadcast heart rate sample - controller is closed!');
+      AppLogger.error('HeartRateService: [HR_DEBUG] ❌ CANNOT broadcast heart rate sample - controller is CLOSED!');
       // Try to recover by recreating the controller
       _recreateControllers();
       // Try to send again after recreation
       if (!_heartRateController.isClosed) {
         _heartRateController.add(sample);
-        AppLogger.info('HeartRateService: [HR_DEBUG] Broadcast heart rate after controller recreation: ${sample.bpm} BPM');
+        AppLogger.error('HeartRateService: [HR_DEBUG] 🔄 BROADCAST heart rate after controller recreation: ${sample.bpm} BPM');
       }
     }
     

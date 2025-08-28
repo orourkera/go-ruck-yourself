@@ -112,8 +112,10 @@ BEGIN
                 'timestamp', "timestamp"
             )
         ) INTO route_points
-        FROM get_sampled_route_points(
-            session_record.id, 
+        FROM get_privacy_clipped_sampled_points(
+            session_record.id,
+            -- Clip first/last N meters for privacy (server-side)
+            250.0,
             -- Sampling interval based on distance
             CASE
                 WHEN session_record.distance_km <= 3 THEN 4

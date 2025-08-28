@@ -47,6 +47,17 @@ struct ContentView: View {
                         .padding(.horizontal)
 
                     Spacer()
+                    
+                    // Version and build info at bottom
+                    VStack(spacing: 2) {
+                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                           let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                            Text("v\(version) (\(build))")
+                                .font(.caption2)
+                                .foregroundColor(.gray.opacity(0.7))
+                        }
+                    }
+                    .padding(.bottom, 4)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

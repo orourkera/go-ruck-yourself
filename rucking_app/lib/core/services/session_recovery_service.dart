@@ -55,8 +55,8 @@ class SessionRecoveryService {
             completionData['splits'] = sessionData['splits'];
           }
           
-          // Attempt to upload to server
-          await apiClient.patch('/rucks/$ruckId', completionData);
+          // Attempt to upload to server via completion endpoint
+          await apiClient.post('/rucks/$ruckId/complete', completionData);
           
           // Success! Remove the backup
           await prefs.remove(key);

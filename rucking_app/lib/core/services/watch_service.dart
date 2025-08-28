@@ -73,6 +73,9 @@ class WatchService {
   int _heartRateReconnectAttempts = 0;
   Timer? _heartRateWatchdogTimer;
   DateTime? _lastHeartRateUpdateTime;
+  // Steps watchdog
+  Timer? _stepsWatchdogTimer;
+  DateTime? _lastStepsUpdateTime;
 
   // Heart rate samples list
   List<HeartRateSample> _currentSessionHeartRateSamples = [];
@@ -110,6 +113,8 @@ class WatchService {
 
     // Setup steps event channel
     _setupNativeStepsListener();
+    // Start steps watchdog to ensure updates continue
+    _startStepsWatchdog();
 
     // Register Pigeon handler
     RuckingApi.setUp(RuckingApiHandler(this));
@@ -156,8 +161,15 @@ class WatchService {
           AppLogger.info('[WATCH] Watch-initiated start received');
           await _handleSessionStartedFromWatch(data);
         } else if (command == 'startSession' || command == 'workoutStarted') {
-          AppLogger.info('[WATCH] Start ACK received: $command (no-op)');
-          // Do not create/start another session here
+          AppLogger.info('[WATCH] Start ACK received: $command');
+          // Do not create/start another session here; just ensure HR monitoring is active
+          try {
+            _startHeartRateWatchdog();
+            await _sendMessageToWatch({'command': 'startHeartRateMonitoring'});
+            AppLogger.debug('[WATCH_SERVICE] HR monitoring explicitly triggered after start ACK');
+          } catch (e) {
+            AppLogger.debug('[WATCH_SERVICE] Failed to trigger HR after start ACK: $e');
+          }
         } else if (command == 'pauseSession') {
           await pauseSessionFromWatchCallback();
         } else if (command == 'resumeSession') {
@@ -173,17 +185,22 @@ class WatchService {
           await _handleSessionEndedFromWatch(data);
         } else if (command == 'watchHeartRateUpdate') {
           final hr = data['heartRate'];
+          AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🎯 RECEIVED watchHeartRateUpdate command - raw data: $data');
           if (hr is num) {
             final hrValue = hr.toDouble();
-            AppLogger.info('[WATCH_SERVICE] Heart rate update from WatchConnectivity: $hrValue BPM');
+            AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🎯 PROCESSING valid heart rate: $hrValue BPM');
             handleWatchHeartRateUpdate(hrValue);
             _lastHeartRateUpdateTime = DateTime.now();
           } else {
-            AppLogger.warning('[WATCH_SERVICE] [HR_DEBUG] Invalid heart rate from WatchConnectivity: $hr');
+            AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ INVALID heart rate from WatchConnectivity: $hr (type: ${hr.runtimeType})');
           }
+        } else if (command == 'heartRateDebug') {
+          AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 📊 Heart rate debug from watch: $data');
+        } else if (command == 'healthKitStatus') {
+          AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🏥 HealthKit status from watch: $data');
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
-
+        }
 
         return true;
       default:
@@ -214,11 +231,9 @@ class WatchService {
       final meters = await health.getDistanceMetersBetween(startedAt, endedAt);
       if (meters <= 0) return;
       final km = meters / 1000.0;
-      await GetIt.instance<ApiClient>().patch('/rucks/$sessionId', {
-        'distance_km': km,
-        // Optionally set completed_at if this is a finalization path
-      });
-      AppLogger.info('[WATCH] Backfilled distance ${km.toStringAsFixed(3)} km from Health');
+      // Do not attempt partial PUT here; backend requires full edit payload.
+      // Let the normal completion/patch flow handle persistence.
+      AppLogger.info('[WATCH] Computed backfill distance ${km.toStringAsFixed(3)} km from Health (deferred persist)');
     } catch (e) {
       AppLogger.error('[WATCH] Failed to backfill distance from Health: $e');
     }
@@ -365,6 +380,10 @@ class WatchService {
     _ruckWeight = ruckWeight;
     _resetHeartRateSamplingVariables();
     _currentSessionHeartRateSamples = [];
+    
+    // CRITICAL DEBUG: Log heart rate stream controller state
+    AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Heart rate controller info: isClosed=${_heartRateController.isClosed}, hasListener=${_heartRateController.hasListener}');
+    AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Current heart rate before session start: $_currentHeartRate');
 
     try {
       // Send comprehensive session start data to watch with workout start command
@@ -377,10 +396,16 @@ class WatchService {
         'source': 'phone',
         'startHeartRateMonitoring': true, // Explicitly request heart rate monitoring
         'forcePermissionCheck': true, // Force permission validation
+        'debugHeartRate': true, // Request debug heart rate info from watch
+        'requestInitialHeartRate': true, // Request initial heart rate reading
       };
+      
+      AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Sending workout start with HR monitoring request');
       
       AppLogger.info('[WATCH_SERVICE] Sending workout start command to watch: $message');
       await _sendMessageToWatch(message);
+      // Start watchdog to ensure we recover if HR updates stall
+      _startHeartRateWatchdog();
       
       // Send follow-up sync and permission requests asynchronously (non-blocking)
       Future.delayed(const Duration(milliseconds: 100), () async {
@@ -393,6 +418,16 @@ class WatchService {
           await syncSessionStateWithWatch();
         } catch (e) {
           AppLogger.debug('[WATCH] Background sync failed: $e');
+        }
+      });
+      // Some watch builds ignore the startHeartRateMonitoring flag in workoutStarted.
+      // Send an explicit command shortly after to guarantee HR begins streaming.
+      Future.delayed(const Duration(seconds: 1), () async {
+        try {
+          await _sendMessageToWatch({'command': 'startHeartRateMonitoring'});
+          AppLogger.debug('[WATCH_SERVICE] Explicit startHeartRateMonitoring command sent');
+        } catch (e) {
+          AppLogger.debug('[WATCH_SERVICE] Failed to send explicit startHeartRateMonitoring: $e');
         }
       });
       
@@ -634,9 +669,9 @@ class WatchService {
   }) async {
     try {
       AppLogger.info('[WATCH] Sending updated metrics to watch');
-      // Compute a single effective HR value once (watch HR preferred, else HealthKit fallback)
-      final double? effectiveHr = _getCurrentHeartRateWithFallback();
-      AppLogger.debug('[WATCH] [HR_DEBUG] Effective heart rate for watch update (watch or fallback): $effectiveHr (raw watch HR=$_currentHeartRate)');
+      // NEVER send heart rate to watch - watch is the source of HR data
+      // The watch will use its own heart rate sensor data
+      // Phone only receives HR from watch, never sends it
       if (steps != null) {
         AppLogger.info('[STEPS LIVE] [WATCH] Including steps in metrics payload: $steps');
       }
@@ -659,8 +694,7 @@ class WatchService {
           'elevationLoss': elevationLoss ?? 0.0, // Use provided loss or default to 0
           'isMetric': isMetric, // Embed unit preference in nested metrics map as well
           if (steps != null) 'steps': steps,
-          'heartRate': effectiveHr,
-          'hrZone': effectiveHr != null ? _inferZoneLabel(effectiveHr) : null,
+          // DO NOT send heartRate or hrZone - watch manages its own HR data
           'cadence': 160, // Add cadence to metrics
         },
       });
@@ -887,15 +921,23 @@ class WatchService {
 
   /// Handle heart rate updates from the watch
   void handleWatchHeartRateUpdate(double heartRate) {
-    AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] handleWatchHeartRateUpdate called with: $heartRate');
+    AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🎯 handleWatchHeartRateUpdate called with: $heartRate BPM');
     
     // Update our local heart rate value
     _currentHeartRate = heartRate;
-    AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Updated _currentHeartRate to: $_currentHeartRate');
+    AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🎯 Updated _currentHeartRate to: $_currentHeartRate');
     
     // Add to heart rate stream for UI components (always update UI in real-time)
-    _heartRateController.add(heartRate);
-    AppLogger.debug('[WATCH_SERVICE] [HR_DEBUG] Added heart rate to UI stream controller: $heartRate');
+    try {
+      if (!_heartRateController.isClosed) {
+        _heartRateController.add(heartRate);
+        AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ✅ Successfully added heart rate to UI stream: $heartRate BPM (hasListener: ${_heartRateController.hasListener})');
+      } else {
+        AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ Cannot add to heart rate stream - controller is closed!');
+      }
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ Error adding to heart rate stream: $e');
+    }
     
     // Add to session heart rate samples with throttling to reduce database load
     if (_isSessionActive) {
@@ -1031,6 +1073,7 @@ class WatchService {
 
   void dispose() {
     _heartRateWatchdogTimer?.cancel();
+    _stepsWatchdogTimer?.cancel();
     
     // Cancel heart rate subscription with error handling
     try {
@@ -1064,7 +1107,17 @@ class WatchService {
       if (lastUpdateTime != null) {
         final timeSinceLastUpdate = DateTime.now().difference(lastUpdateTime);
         if (timeSinceLastUpdate > const Duration(seconds: 60) && !_isReconnectingHeartRate) {
-          AppLogger.warning('[WATCH_SERVICE] No heart rate updates received for ${timeSinceLastUpdate.inSeconds} seconds - restarting listener');
+          AppLogger.warning('[WATCH_SERVICE] No heart rate updates for ${timeSinceLastUpdate.inSeconds}s - attempting recovery');
+          // Try explicit HR start again via WatchConnectivity
+          () async {
+            try {
+              await _sendMessageToWatch({'command': 'startHeartRateMonitoring'});
+              AppLogger.debug('[WATCH_SERVICE] Watchdog resent startHeartRateMonitoring');
+            } catch (e) {
+              AppLogger.debug('[WATCH_SERVICE] Watchdog failed to resend HR start: $e');
+            }
+          }();
+          // Keep legacy restart hook (no-op when EventChannel disabled)
           _restartNativeHeartRateListener();
         }
       }
@@ -1186,7 +1239,7 @@ class WatchService {
     }
     // _setupNativeHeartRateListener(); // DISABLED - using WatchConnectivity only
   }
- 
+
   void _setupNativeStepsListener() {
     // Cancel any existing steps subscription
     try {
@@ -1208,34 +1261,23 @@ class WatchService {
           } else if (event is num) {
             steps = event.toInt();
           } else if (event is Map) {
-            final map = Map<Object?, Object?>.from(event);
-            // Common shapes from native:
-            // { 'steps': 123 }
-            // { 'command': 'watchStepUpdate', 'value': 123 }
-            // { 'command': 'watchStepUpdate', 'count': 123 }
-            final cmd = map['command']?.toString();
-            if (map.containsKey('steps')) {
-              final val = map['steps'];
-              if (val is int) steps = val;
-              if (val is num) steps = val.toInt();
-            }
-            if (steps == null && cmd == 'watchStepUpdate') {
-              final dynamic alt = map['value'] ?? map['count'];
-              if (alt is int) steps = alt;
-              if (alt is num) steps = alt.toInt();
-            }
-          }
-
-          // Only forward step updates while a session is active and not paused
-          if (steps != null) {
-            if (_isSessionActive && !_isPaused) {
-              AppLogger.info('[STEPS LIVE] Received step update from watch (active): $steps');
-              _stepsController.add(steps);
-            } else {
-              AppLogger.debug('[WATCH_SERVICE] [STEPS] Dropping step update because session is not active or is paused (active=$_isSessionActive, paused=$_isPaused): $steps');
+            final map = event as Map;
+            final dynamic value = map['steps'] ?? map['count'] ?? map['value'];
+            if (value is int) {
+              steps = value;
+            } else if (value is num) {
+              steps = value.toInt();
             }
           } else {
             AppLogger.debug('[WATCH_SERVICE] [STEPS] Unrecognized steps event payload: $event');
+          }
+
+          if (steps != null) {
+            _stepsController.add(steps);
+            _lastStepsUpdateTime = DateTime.now();
+            AppLogger.info('[WATCH_SERVICE] [STEPS] Steps update received: $steps');
+          } else {
+            AppLogger.debug('[WATCH_SERVICE] [STEPS] Null steps parsed from event: $event');
           }
         } catch (e) {
           AppLogger.error('[WATCH_SERVICE] [STEPS] Error processing steps event: $e');
@@ -1249,7 +1291,25 @@ class WatchService {
       AppLogger.error('[WATCH_SERVICE] Failed to set up steps listener: $e');
     }
   }
-  
+
+  /// Start a watchdog to ensure steps updates continue; restart listener if stale
+  void _startStepsWatchdog() {
+    _stepsWatchdogTimer?.cancel();
+    _stepsWatchdogTimer = Timer.periodic(const Duration(seconds: 45), (timer) {
+      final last = _lastStepsUpdateTime;
+      if (last == null) return;
+      final since = DateTime.now().difference(last);
+      if (since > const Duration(minutes: 2)) {
+        AppLogger.warning('[WATCH_SERVICE] [STEPS] No steps updates for ${since.inSeconds}s – restarting steps listener');
+        try {
+          _setupNativeStepsListener();
+        } catch (e) {
+          AppLogger.debug('[WATCH_SERVICE] [STEPS] Failed to restart steps listener: $e');
+        }
+      }
+    });
+  }
+
   /// Public method to force restart the heart rate monitoring from outside this class
   void restartHeartRateMonitoring() {
     // Manual restart of heart rate monitoring

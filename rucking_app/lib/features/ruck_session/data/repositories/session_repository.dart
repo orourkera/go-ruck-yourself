@@ -981,8 +981,7 @@ class SessionRepository {
       final uploadedPhotos = await uploadSessionPhotosOptimized(ruckId, photoFiles);
       
       if (uploadedPhotos.isNotEmpty) {
-      // Update the ruck to indicate it has photos
-      await _apiClient.patch('/rucks/$ruckId', {'has_photos': true});
+      // No explicit update needed: backend sets has_photos in RuckPhotosResource
       AppLogger.info('[PHOTO_DEBUG] Background upload completed successfully for ${uploadedPhotos.length} photos');
     } else {
         AppLogger.warning('[PHOTO_DEBUG] Background upload completed but no photos were successfully uploaded');
@@ -1259,36 +1258,42 @@ class SessionRepository {
   /// Fetch session history with caching for improved performance
   /// 
   /// Returns a list of completed ruck sessions, cached for 5 minutes to reduce API calls
-  /// Supports filtering by date ranges
+  /// Supports filtering by date ranges and pagination
   Future<List<RuckSession>> fetchSessionHistory({
     DateTime? startDate,
     DateTime? endDate,
+    int limit = 50,
+    int offset = 0,
   }) async {
     try {
-      // Check if we have cached data that's still valid
+      // Check if we have cached data that's still valid (only for first page of all sessions)
       final now = DateTime.now();
       if (_sessionHistoryCache != null && 
           _sessionHistoryCacheTime != null &&
           now.difference(_sessionHistoryCacheTime!) < _sessionHistoryCacheValidity &&
-          startDate == null && endDate == null) { // Only use cache for "all sessions" requests
+          startDate == null && endDate == null && offset == 0) { // Only use cache for first page of all sessions
         AppLogger.debug('[SESSION_HISTORY] Using cached session history (${_sessionHistoryCache!.length} sessions)');
-        return _sessionHistoryCache!;
+        return _sessionHistoryCache!.take(limit).toList();
       }
       
       // Build endpoint based on filter
       String endpoint = '/rucks';
+      List<String> params = [];
+      
+      // Add pagination parameters
+      params.add('limit=$limit');
+      params.add('offset=$offset');
+      
       if (startDate != null || endDate != null) {
-        List<String> params = [];
         if (startDate != null) {
           params.add('start_date=${startDate.toIso8601String()}');
         }
         if (endDate != null) {
           params.add('end_date=${endDate.toIso8601String()}');
         }
-        if (params.isNotEmpty) {
-          endpoint = '/rucks?${params.join('&')}';
-        }
       }
+      
+      endpoint = '/rucks?${params.join('&')}';
       
       AppLogger.info('[SESSION_HISTORY] Fetching sessions with endpoint: $endpoint');
       final response = await _apiClient.get(endpoint);

@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/remote_config_service.dart';
@@ -225,6 +227,162 @@ class OpenAIService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Generates a concise post-session summary message focused on metrics and insights.
+  /// This uses a dedicated system prompt separate from the cheerleader prompt.
+  Future<String?> generateSessionSummary({
+    required Map<String, dynamic> context,
+  }) async {
+    try {
+      // Build session-summary-specific prompt
+      final prompt = _buildSessionSummaryPrompt(context);
+
+      // Debug logging: Show full prompt being sent to OpenAI
+      AppLogger.info('[OPENAI_DEBUG][SUMMARY] ===== START PROMPT =====');
+      AppLogger.info('[OPENAI_DEBUG][SUMMARY] $prompt');
+      AppLogger.info('[OPENAI_DEBUG][SUMMARY] ===== END PROMPT =====');
+
+      final completion = await OpenAI.instance.chat
+          .create(
+            model: _model,
+            messages: [
+              OpenAIChatCompletionChoiceMessageModel(
+                content: [OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)],
+                role: OpenAIChatMessageRole.user,
+              ),
+            ],
+            maxTokens: _maxTokens,
+            temperature: 0.5, // slightly tighter for summaries
+          )
+          .timeout(_timeout);
+
+      var message = completion.choices.first.message.content?.first.text?.trim();
+
+      if (message == null || message.isEmpty) return null;
+
+      // Reuse sanitization rules from generateMessage
+      message = message
+          .split(RegExp(r"\s+"))
+          .where((w) => !w.startsWith('#'))
+          .join(' ')
+          .trim();
+      final emojiRegex = RegExp(r"[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]", unicode: true);
+      message = message.replaceAll(emojiRegex, '');
+      message = message.replaceAll('\n', ' ').replaceAll(RegExp(r"\s+"), ' ').trim();
+      final split = message.split(RegExp(r"(?<=[.!?])\s+"));
+      if (split.length > 3) {
+        message = split.take(3).join(' ').trim();
+      }
+      final words = message.split(' ');
+      if (words.length > 75) {
+        message = words.take(75).join(' ');
+      }
+      if (!RegExp(r"[.!?]$").hasMatch(message)) {
+        message = message + '.';
+      }
+
+      return message;
+    } on TimeoutException {
+      AppLogger.error('[OPENAI][SUMMARY] Request timed out');
+      return null;
+    } on SocketException {
+      AppLogger.error('[OPENAI][SUMMARY] Network error - no internet connection');
+      return null;
+    } catch (e, st) {
+      AppLogger.error('[OPENAI][SUMMARY] Unexpected error: $e', stackTrace: st);
+      return null;
+    }
+  }
+
+  /// Build a focused session summary prompt separate from the cheerleader system prompt.
+  String _buildSessionSummaryPrompt(Map<String, dynamic> context) {
+    // Get dedicated system prompt from Remote Config if present, else fallback
+    String systemPrompt;
+    try {
+      final remoteConfig = RemoteConfigService.instance;
+      // Use generic getString to allow shipping without adding new keys remotely yet
+      systemPrompt = remoteConfig.getString('ai_session_summary_system_prompt', fallback: '''You are an expert fitness analyst generating a concise post-ruck session summary.
+Focus on factual metrics, notable achievements, and one meaningful insight. Keep it clear and encouraging without hype.''');
+    } catch (_) {
+      systemPrompt = '''You are an expert fitness analyst generating a concise post-ruck session summary.
+Focus on factual metrics, notable achievements, and one meaningful insight. Keep it clear and encouraging without hype.''';
+    }
+
+    // Extract common fields (null-safe)
+    final distanceKm = (context['distance_km'] as num?)?.toDouble();
+    final distanceMi = (context['distance_miles'] as num?)?.toDouble();
+    final durationMin = (context['duration_minutes'] as num?)?.toInt();
+    final calories = (context['calories_burned'] as num?)?.toInt();
+    final elevGain = (context['elevation_gain_m'] as num?)?.toDouble();
+    final elevLoss = (context['elevation_loss_m'] as num?)?.toDouble();
+    final ruckWeightKg = (context['ruck_weight_kg'] as num?)?.toDouble();
+    final preferMetric = (context['prefer_metric'] as bool?) ?? true;
+    final avgHr = (context['avg_hr'] as num?)?.toInt();
+    final maxHr = (context['max_hr'] as num?)?.toInt();
+    final steps = (context['steps'] as num?)?.toInt();
+
+    // Assemble a compact JSON-like context block for determinism
+    final sb = StringBuffer();
+    sb.writeln('{');
+    if (preferMetric) {
+      if (distanceKm != null) sb.writeln('  "distance_km": ${distanceKm.toStringAsFixed(distanceKm >= 10 ? 0 : 2)},');
+    } else {
+      if (distanceMi != null) sb.writeln('  "distance_miles": ${distanceMi.toStringAsFixed(distanceMi >= 10 ? 0 : 2)},');
+    }
+    if (durationMin != null) sb.writeln('  "duration_min": $durationMin,');
+    if (ruckWeightKg != null) {
+      if (preferMetric) {
+        sb.writeln('  "ruck_weight_kg": ${ruckWeightKg.toStringAsFixed(1)},');
+      } else {
+        // Use AppConfig constant for consistent conversion
+        final ruckWeightLb = ruckWeightKg * AppConfig.kgToLbs;
+        sb.writeln('  "ruck_weight_lb": ${ruckWeightLb.toStringAsFixed(1)},');
+      }
+    }
+    if (calories != null) sb.writeln('  "calories": $calories,');
+    if (preferMetric) {
+      if (elevGain != null) sb.writeln('  "elev_gain_m": ${elevGain.toStringAsFixed(0)},');
+      if (elevLoss != null) sb.writeln('  "elev_loss_m": ${elevLoss.toStringAsFixed(0)},');
+    } else {
+      if (elevGain != null) {
+        final elevGainFt = elevGain * 3.28084; // MeasurementUtils doesn't have direct elevation conversion method
+        sb.writeln('  "elev_gain_ft": ${elevGainFt.toStringAsFixed(0)},');
+      }
+      if (elevLoss != null) {
+        final elevLossFt = elevLoss * 3.28084; // MeasurementUtils doesn't have direct elevation conversion method
+        sb.writeln('  "elev_loss_ft": ${elevLossFt.toStringAsFixed(0)},');
+      }
+    }
+    if (avgHr != null) sb.writeln('  "avg_hr": $avgHr,');
+    if (maxHr != null) sb.writeln('  "max_hr": $maxHr,');
+    if (steps != null) sb.writeln('  "steps": $steps,');
+    // split pace and heart rate zones if provided
+    if (context['splits'] is List) sb.writeln('  "has_splits": true,');
+    if (context['heart_rate_zones'] is Map) sb.writeln('  "has_hr_zones": true,');
+    sb.writeln('}');
+
+    final guidelines = [
+      '- 2-3 sentences, max 75 words. No hashtags.',
+      '- Reference at least one concrete metric (distance, duration, pace, HR, elevation, weight).',
+      '- If available, note one standout: best split, higher ruck weight, elevation challenge, or HR control.',
+      '- Keep tone concise and confident; avoid generic hype.',
+      preferMetric 
+        ? '- Use metric units (km, kg, meters) when referencing measurements.'
+        : '- Use imperial units (miles, lb, feet) when referencing measurements.',
+    ].join('\n');
+
+    return [
+      systemPrompt,
+      '',
+      'Context:',
+      sb.toString(),
+      '',
+      'Response Requirements:',
+      guidelines,
+      '',
+      'Respond with the post-session summary text only:'
+    ].join('\n');
   }
 
   /// Builds personality-specific prompt based on context
