@@ -1344,4 +1344,16 @@ class WatchService {
     _isReconnectingHeartRate = false;
     _restartNativeHeartRateListener();
   }
+
+  /// Public method to explicitly request heart rate streaming from the watch app.
+  /// This uses WatchConnectivity and is the most reliable way to kick off HR updates
+  /// regardless of workout session state on the watch.
+  Future<void> ensureHeartRateStreaming() async {
+    try {
+      await _sendMessageToWatch({'command': 'startHeartRateMonitoring'});
+      AppLogger.debug('[WATCH_SERVICE] ensureHeartRateStreaming: startHeartRateMonitoring sent');
+    } catch (e) {
+      AppLogger.debug('[WATCH_SERVICE] ensureHeartRateStreaming failed to send HR start: $e');
+    }
+  }
 }

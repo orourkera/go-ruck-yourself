@@ -363,6 +363,7 @@ from .api.ai_cheerleader import (
     AICheerleaderLogsResource,
     AICheerleaderUserHistoryResource,
 )
+from .api.user_insights import UserInsightsResource
 from .api.goals import (
     GoalsListResource,
     GoalsWithProgressResource,
@@ -516,6 +517,9 @@ except AttributeError as e:
 # Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
 api.add_resource(RuckSessionEditResource, '/api/rucks/<string:ruck_id>/edit')
+
+# User insights snapshot
+api.add_resource(UserInsightsResource, '/api/user-insights')
 
 # Chunked upload endpoints for session completion (no rate limits - only used post-completion)
 api.add_resource(RuckSessionRouteChunkResource, '/api/rucks/<string:ruck_id>/route-chunk')

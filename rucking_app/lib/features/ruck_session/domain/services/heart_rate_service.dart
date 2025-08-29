@@ -40,6 +40,8 @@ class HeartRateService {
   
   // Timer to detect and recover from lost connections
   Timer? _watchdogTimer;
+  // Periodic nudge timer to kick off watch HR streaming when WCSession was initially unreachable
+  Timer? _hrKickTimer;
   
   // Track the last time we received a heart rate update
   DateTime? _lastHeartRateTime;
@@ -116,6 +118,23 @@ class HeartRateService {
     
     // Log final state for debugging
     AppLogger.error('HeartRateService: [HR_DEBUG] 📊 Final state - Watch subscription: ${_watchHeartRateSubscription != null}, HealthKit authorized: ${_healthService.isAuthorized}, Monitoring active: $_isMonitoringStarted');
+
+    // Nudge the watch to begin streaming HR immediately, regardless of start order.
+    // This complements the watch-session start path and covers resume/crash-recovery cases.
+    try {
+      await _watchService.ensureHeartRateStreaming();
+    } catch (_) {}
+
+    // Re-check shortly after; if still no HR, nudge again.
+    Future.delayed(const Duration(seconds: 4), () async {
+      final current = _watchService.getCurrentHeartRate();
+      if (current == null || current <= 0) {
+        AppLogger.error('HeartRateService: [HR_DEBUG] ⏰ No HR yet after 4s – sending another ensureHeartRateStreaming');
+        try {
+          await _watchService.ensureHeartRateStreaming();
+        } catch (_) {}
+      }
+    });
   }
   
   /// Stop heart rate monitoring
@@ -125,10 +144,12 @@ class HeartRateService {
     
     // Cancel the watchdog timer
     _watchdogTimer?.cancel();
+    _hrKickTimer?.cancel();
     
     _watchHeartRateSubscription = null;
     _healthHeartRateSubscription = null;
     _watchdogTimer = null;
+    _hrKickTimer = null;
     
     // Reset monitoring flag and downsampling state
     _isMonitoringStarted = false;
@@ -204,6 +225,28 @@ class HeartRateService {
     // Add a test to verify the stream is working
     Future.delayed(const Duration(seconds: 5), () {
       AppLogger.error('HeartRateService: [HR_DEBUG] 🔍 STREAM CHECK: Subscription active: ${_watchHeartRateSubscription != null}, WatchService current HR: ${_watchService.getCurrentHeartRate()}');
+    });
+
+    // Nudge the watch to begin streaming HR immediately, and retry for ~30s until a sample arrives
+    try { _watchService.ensureHeartRateStreaming(); } catch (_) {}
+    int attempts = 0;
+    _hrKickTimer?.cancel();
+    _hrKickTimer = Timer.periodic(const Duration(seconds: 5), (t) async {
+      if (_lastHeartRateTime != null && DateTime.now().difference(_lastHeartRateTime!) < const Duration(seconds: 10)) {
+        AppLogger.error('HeartRateService: [HR_DEBUG] ✅ HR streaming confirmed; stopping kick timer');
+        t.cancel();
+        _hrKickTimer = null;
+        return;
+      }
+      attempts += 1;
+      if (attempts > 6) {
+        AppLogger.error('HeartRateService: [HR_DEBUG] ⛔ HR kick attempts exceeded; giving up');
+        t.cancel();
+        _hrKickTimer = null;
+        return;
+      }
+      AppLogger.error('HeartRateService: [HR_DEBUG] ⏰ No HR yet – sending ensureHeartRateStreaming (attempt $attempts)');
+      try { await _watchService.ensureHeartRateStreaming(); } catch (_) {}
     });
   }
   

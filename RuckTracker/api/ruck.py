@@ -1034,6 +1034,16 @@ class RuckSessionCompleteResource(Resource):
         
             completed_session = update_resp.data[0]
 
+            # Trigger user_insights refresh (facts) on completion
+            try:
+                supabase.rpc('upsert_user_insights', {
+                    'u_id': g.user.id,
+                    'src': 'on_complete'
+                }).execute()
+                logger.info(f"[INSIGHTS] Refreshed user_insights facts for user {g.user.id} after completion")
+            except Exception as insights_err:
+                logger.warning(f"[INSIGHTS] Failed to refresh user_insights on completion: {insights_err}")
+
             # Always check for heart rate samples and aggregate them (they may have been uploaded via chunk endpoints during session)
             try:
                 stats_resp = supabase.table('heart_rate_sample') \
@@ -1058,14 +1068,14 @@ class RuckSessionCompleteResource(Resource):
                         max_hr = max(bpm_values)
                         hr_update_resp = supabase.table('ruck_session').update({
                             'avg_heart_rate': round(avg_hr, 1),
-                            'min_heart_rate': int(min_hr),
-                            'max_heart_rate': int(max_hr)
+                            'min_heart_rate': int(round(min_hr)),
+                            'max_heart_rate': int(round(max_hr))
                         }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
                         logger.info(f"[HR_AGGREGATE] HR update response: {hr_update_resp.data}")
                         # Also reflect into completed_session for response
                         completed_session['avg_heart_rate'] = round(avg_hr, 1)
-                        completed_session['min_heart_rate'] = int(min_hr)
-                        completed_session['max_heart_rate'] = int(max_hr)
+                        completed_session['min_heart_rate'] = int(round(min_hr))
+                        completed_session['max_heart_rate'] = int(round(max_hr))
                         logger.info(f"[HR_AGGREGATE] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr} from {len(bpm_values)} samples")
                     else:
                         logger.warning(f"[HR_AGGREGATE] No valid BPM values found for session {ruck_id}")
@@ -1171,13 +1181,13 @@ class RuckSessionCompleteResource(Resource):
                             max_hr = max(bpm_values)
                             supabase.table('ruck_session').update({
                                 'avg_heart_rate': round(avg_hr, 1),
-                                'min_heart_rate': int(min_hr),
-                                'max_heart_rate': int(max_hr)
+                                'min_heart_rate': int(round(min_hr)),
+                                'max_heart_rate': int(round(max_hr))
                             }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
                             # Also reflect into completed_session for response
                             completed_session['avg_heart_rate'] = round(avg_hr, 1)
-                            completed_session['min_heart_rate'] = int(min_hr)
-                            completed_session['max_heart_rate'] = int(max_hr)
+                            completed_session['min_heart_rate'] = int(round(min_hr))
+                            completed_session['max_heart_rate'] = int(round(max_hr))
                             logger.info(f"[HR_DEBUG] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr}")
                 except Exception as hr_err:
                     logger.error(f"[HR_DEBUG] Error handling heart rate samples for session {ruck_id}: {hr_err}")
