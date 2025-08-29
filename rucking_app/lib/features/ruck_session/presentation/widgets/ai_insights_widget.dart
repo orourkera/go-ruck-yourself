@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/services/ai_insights_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -7,6 +8,8 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/shared/widgets/skeleton/skeleton_loader.dart';
 
 /// Widget that displays AI-powered insights on the homepage
 class AIInsightsWidget extends StatefulWidget {
@@ -43,9 +46,9 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     }
   }
 
-  Future<void> _generateInsights() async {
+  Future<void> _generateInsights({bool force = false}) async {
     // Skip if current insight is fresh
-    if (_currentInsight != null && !_currentInsight!.isStale) {
+    if (!force && _currentInsight != null && !_currentInsight!.isStale) {
       return;
     }
 
@@ -65,13 +68,27 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
 
       final user = authState.user;
       final aiService = GetIt.instance<AIInsightsService>();
-      
+
       // Get current time context
       final now = DateTime.now();
       final timeOfDay = _getTimeOfDay(now);
       final dayOfWeek = DateFormat('EEEE').format(now);
 
       AppLogger.info('[AI_INSIGHTS] Generating insights for ${user.username}');
+
+      // Try cache first (daily)
+      if (!force) {
+        final cached = await _loadCachedInsight(user.userId);
+        if (cached != null) {
+          if (mounted) {
+            setState(() {
+              _currentInsight = cached;
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      }
 
       final insight = await aiService.generateHomepageInsights(
         preferMetric: user.preferMetric,
@@ -86,6 +103,9 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
           _isLoading = false;
         });
       }
+
+      // Persist cache for the day
+      await _saveCachedInsight(user.userId, insight);
 
     } catch (e) {
       AppLogger.error('[AI_INSIGHTS] Failed to generate insights: $e');
@@ -162,21 +182,28 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
   }
 
   Widget _buildLoadingState() {
-    return Row(
-      children: [
-        const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'Generating personalized insights...',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: Colors.grey[600],
-          ),
-        ),
-      ],
+    return SkeletonLoader(
+      isLoading: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          // Header skeleton
+          SkeletonLine(width: 180, height: 22),
+          SizedBox(height: 16),
+          // Three lines for sections
+          SkeletonLine(width: 120, height: 14),
+          SizedBox(height: 8),
+          SkeletonLine(width: double.infinity, height: 16),
+          SizedBox(height: 14),
+          SkeletonLine(width: 160, height: 14),
+          SizedBox(height: 8),
+          SkeletonLine(width: double.infinity, height: 16),
+          SizedBox(height: 14),
+          SkeletonLine(width: 140, height: 14),
+          SizedBox(height: 8),
+          SkeletonLine(width: double.infinity, height: 16),
+        ],
+      ),
     );
   }
 
@@ -240,7 +267,7 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
                 setState(() {
                   _currentInsight = null; // Force refresh
                 });
-                _generateInsights();
+                _generateInsights(force: true);
               },
               tooltip: 'Refresh insights',
               visualDensity: VisualDensity.compact,
@@ -278,4 +305,44 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       ],
     );
   }
+}
+
+extension on DateTime {
+  String get yyyymmdd => DateFormat('yyyy-MM-dd').format(this);
+}
+
+Future<AIInsight?> _loadCachedInsight(String userId) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ai_home_cache_${userId}_${DateTime.now().yyyymmdd}';
+    final json = prefs.getString(key);
+    if (json == null) return null;
+    final map = Map<String, dynamic>.from(jsonDecode(json) as Map);
+    return AIInsight(
+      greeting: map['greeting'] ?? '',
+      insight: map['insight'] ?? '',
+      recommendation: map['recommendation'] ?? '',
+      motivation: map['motivation'] ?? '',
+      emoji: map['emoji'] ?? '💪',
+      generatedAt: DateTime.tryParse(map['generatedAt'] ?? '') ?? DateTime.now(),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<void> _saveCachedInsight(String userId, AIInsight insight) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ai_home_cache_${userId}_${DateTime.now().yyyymmdd}';
+    final map = {
+      'greeting': insight.greeting,
+      'insight': insight.insight,
+      'recommendation': insight.recommendation,
+      'motivation': insight.motivation,
+      'emoji': insight.emoji,
+      'generatedAt': insight.generatedAt.toIso8601String(),
+    };
+    await prefs.setString(key, jsonEncode(map));
+  } catch (_) {}
 }

@@ -221,6 +221,34 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         }
     }
     
+    /// Set up workout handlers for heart rate and steps (called after WorkoutManager reinitialization)
+    private func setupWorkoutHandlers() {
+        print("[WATCH] Setting up heart rate handler...")
+        workoutManager.setHeartRateHandler { [weak self] heartRate in
+            DispatchQueue.main.async {
+                self?.heartRate = heartRate
+                print("[SESSION_MANAGER] Heart rate updated: \(heartRate) BPM")
+                
+                // Send heart rate to phone via WatchConnectivity
+                self?.sendHeartRate(heartRate)
+            }
+        }
+        
+        print("[WATCH] Setting up step count handler...")
+        workoutManager.setStepCountHandler { [weak self] stepCount in
+            DispatchQueue.main.async {
+                self?.steps = stepCount
+                print("[SESSION_MANAGER] Steps updated: \(stepCount) steps")
+                self?.lastStepsUpdateAt = Date()
+                
+                // Send steps to phone via WatchConnectivity
+                self?.sendSteps(stepCount)
+            }
+        }
+        
+        print("[WATCH] ✅ Workout handlers configured successfully")
+    }
+    
     /// Check permission status without requesting (used for diagnostics)
     func checkHealthKitPermissionStatus() {
         print("[WATCH] Checking current HealthKit permission status...")
@@ -478,6 +506,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     print("[WATCH] Reinitializing WorkoutManager for fresh HR streaming")
                     self.workoutManager = WorkoutManager()
                     self.workoutManager.delegate = self
+                    
+                    // CRITICAL: Reconnect handlers after WorkoutManager reinitialization
+                    print("[WATCH] Setting up heart rate and step handlers...")
+                    self.setupWorkoutHandlers()
                     
                     // Use existing permissions (already requested on launch)
                     

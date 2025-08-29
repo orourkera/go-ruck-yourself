@@ -73,9 +73,9 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
             }
         }
         
-        // Initialize WorkoutManager for HealthKit
+        // Initialize WorkoutManager for HealthKit (SwiftUI ContentView handles permissions now)
         workoutManager = WorkoutManager()
-        setupHealthKit()
+        print("[INTERFACE_CONTROLLER] Initialized - permissions handled by SwiftUI ContentView")
     }
     
     override func willActivate() {

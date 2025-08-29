@@ -19,6 +19,7 @@ struct ContentView: View {
     // Use the singleton instance so UI and connectivity logic share the same state
     @StateObject private var sessionManager = SessionManager.shared
     @State private var showingEndConfirmation: Bool = false
+    @State private var hasRequestedPermissions = false
     
     var body: some View {
         ZStack {
@@ -132,6 +133,40 @@ struct ContentView: View {
             Text("Are you sure you want to end your current ruck?")
         }
         .edgesIgnoringSafeArea(.bottom)
+        .onAppear {
+            requestHealthKitPermissionsIfNeeded()
+        }
+    }
+    
+    private func requestHealthKitPermissionsIfNeeded() {
+        guard !hasRequestedPermissions else {
+            print("[CONTENTVIEW] HealthKit permissions already requested")
+            return
+        }
+        
+        hasRequestedPermissions = true
+        print("[CONTENTVIEW] Requesting HealthKit permissions on first launch...")
+        
+        // Create a WorkoutManager to request permissions
+        let workoutManager = WorkoutManager()
+        
+        if workoutManager.isHealthKitAvailable {
+            print("[CONTENTVIEW] HealthKit available, requesting authorization...")
+            workoutManager.requestAuthorization { success, error in
+                DispatchQueue.main.async {
+                    if success {
+                        print("[CONTENTVIEW] ✅ HealthKit authorization successful!")
+                    } else {
+                        print("[CONTENTVIEW] ❌ HealthKit authorization failed")
+                        if let error = error {
+                            print("[CONTENTVIEW] Authorization error: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
+        } else {
+            print("[CONTENTVIEW] ❌ HealthKit not available on this device")
+        }
     }
     
     // Extracted view for active session UI

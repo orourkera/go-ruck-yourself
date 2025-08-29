@@ -88,6 +88,10 @@ public class WorkoutManager: NSObject {
             // Set the data source
             builder.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore, workoutConfiguration: configuration)
             
+            // Data collection is automatically enabled by the HKLiveWorkoutDataSource for walking workouts
+            // This includes steps, heart rate, distance, and active energy burned
+            print("[WORKOUT_MANAGER] HKLiveWorkoutDataSource configured - automatic data collection enabled for walking workout")
+            
             // Assign delegates
             session.delegate = self
             builder.delegate = self

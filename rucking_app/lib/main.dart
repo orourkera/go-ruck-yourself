@@ -58,8 +58,8 @@ void main() async {
       // Critical: Set binary messenger instance
       _setUpBinaryMessenger();
       
-      // Run app with proper error handling
-      await _initializeApp();
+      // Run app with proper error handling + Sentry initialization
+      await _runApp();
     },
     (error, stackTrace) async {
       // This catches ALL uncaught async exceptions that would otherwise crash the app silently
@@ -111,7 +111,11 @@ Future<void> _runApp() async {
     (options) {
       options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
       options.environment = dotenv.env['SENTRY_ENVIRONMENT'] ?? 'production';
-      options.release = '2.8.0+65';
+      // Avoid hardcoding release; optionally provide via env
+      final release = dotenv.env['SENTRY_RELEASE'];
+      if (release != null && release.isNotEmpty) {
+        options.release = release;
+      }
       
       // Performance Monitoring
       options.tracesSampleRate = 0.1; // 10% of transactions for performance monitoring
@@ -133,10 +137,11 @@ Future<void> _runApp() async {
   );
   
   // Set global tags after initialization
+  final appVersion = await _getAppVersion();
   Sentry.configureScope((scope) => scope
     ..setTag('platform', 'flutter')
     ..setTag('app', 'rucking_app')
-    ..setTag('version', '2.8.0+65')
+    ..setTag('version', appVersion)
   );
 }
 

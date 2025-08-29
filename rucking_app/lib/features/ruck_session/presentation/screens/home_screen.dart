@@ -1094,7 +1094,26 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                       ),
                     ),
                   ),
-                  
+
+                  // "My Routes" link directly under Start button
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pushNamed('/my_rucks');
+                      },
+                      child: Text(
+                        'My Routes',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Reduce vertical gap above AI insights
+                  const SizedBox(height: 4),
+
                   // AI Insights Widget (behind feature flag)
                   Builder(
                     builder: (context) {
@@ -1109,10 +1128,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                       if (featureFlagEnabled || forceEnable) {
                         AppLogger.info('[HOME_SCREEN] Showing AI Insights Widget (featureFlag=$featureFlagEnabled, forceEnable=$forceEnable)');
                         return Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            const AIInsightsWidget(),
-                            const SizedBox(height: 16),
+                          children: const [
+                            // Halve spacing between "My Routes" link and AI card
+                            SizedBox(height: 8),
+                            AIInsightsWidget(),
+                            SizedBox(height: 16),
                           ],
                         );
                       } else {
@@ -1122,23 +1142,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                     },
                   ),
                   
-                  // My Routes navigation link
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        // Navigate to My Routes page
-                        Navigator.of(context).pushNamed('/my_rucks');
-                      },
-                      child: Text(
-                        'My Routes',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 24),
                   
                   // Achievements summary

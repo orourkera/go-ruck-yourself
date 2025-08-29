@@ -406,10 +406,11 @@ class CheckSessionAchievementsResource(Resource):
             elif criteria_type == 'single_session_distance':
                 target = criteria.get('target', 0)
                 distance = session.get('distance_km', 0)
-                # Convert target to km if achievement is in standard (miles)
-                target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
+                # BUG FIX: Targets are already stored in km regardless of unit_preference
+                # unit_preference is only for display purposes, not conversion
+                target_km = target
                 result = distance >= target_km
-                logger.info(f"DISTANCE CHECK: distance={distance}km, target={target_km}km (orig={target} {'miles' if unit_pref=='standard' else 'km'}), result={result}")
+                logger.info(f"DISTANCE CHECK: distance={distance}km, target_km={target_km} (unit_pref={unit_pref}), result={result}")
                 return result
             
             elif criteria_type == 'session_duration':
@@ -541,10 +542,11 @@ class CheckSessionAchievementsResource(Resource):
                         return False
             
                 target = criteria.get('target', 0)
-                # Convert target to km if achievement is in standard (miles)
-                target_km = target if unit_pref in [None, 'metric'] else target * 1.60934
+                # BUG FIX: Targets are already stored in km regardless of unit_preference
+                # unit_preference is only for display purposes, not conversion
+                target_km = target
                 result = total_distance >= target_km
-                logger.debug(f"CUMULATIVE DISTANCE CHECK: total={total_distance}km, target_km={target_km} (orig={target} {'miles' if unit_pref=='standard' else 'km'}), result={result}")
+                logger.debug(f"CUMULATIVE DISTANCE CHECK: total={total_distance}km, target_km={target_km} (unit_pref={unit_pref}), result={result}")
                 return result
         
             elif criteria_type == 'time_of_day':

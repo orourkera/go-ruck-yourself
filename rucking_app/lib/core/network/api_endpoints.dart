@@ -39,6 +39,9 @@ class ApiEndpoints {
   static const String aiCheerleader = '$baseApi/ai-cheerleader';
   static const String aiCheerleaderLogs = '$baseApi/ai-cheerleader/logs';
   static const String aiCheerleaderUserHistory = '$baseApi/ai-cheerleader/user-history';
+  
+  // User insights snapshot (facts + triggers + optional LLM candidates)
+  static const String userInsights = '$baseApi/user-insights';
 
   // AI Goals
   static const String goals = '$baseApi/goals';

@@ -212,7 +212,21 @@ class WatchService {
         } else if (command == 'heartRateDebug') {
           AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 📊 Heart rate debug from watch: $data');
         } else if (command == 'healthKitStatus') {
-          AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🏥 HealthKit status from watch: $data');
+          final stepsAuth = data['stepsAuth'] ?? -1;
+          final heartRateAuth = data['heartRateAuth'] ?? -1;
+          AppLogger.info('[WATCH_SERVICE] 📊 HealthKit status from Watch - Steps: $stepsAuth, HeartRate: $heartRateAuth');
+          
+          if (stepsAuth == 2 || stepsAuth == 4) {
+            AppLogger.info('[WATCH_SERVICE] ✅ Steps permission authorized');
+          } else {
+            AppLogger.warning('[WATCH_SERVICE] ❌ Steps permission not authorized: $stepsAuth');
+          }
+          
+          if (heartRateAuth == 2 || heartRateAuth == 4) {
+            AppLogger.info('[WATCH_SERVICE] ✅ Heart rate permission authorized');  
+          } else {
+            AppLogger.warning('[WATCH_SERVICE] ❌ Heart rate permission not authorized: $heartRateAuth');
+          }
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
         }

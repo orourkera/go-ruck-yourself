@@ -389,7 +389,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     
     return {
       'id': id,
-      'start_time': startTime, // Use the startTime variable directly
+      // Ensure DateTimes are JSON-serializable
+      'start_time': dateFormat.format(startTime),
       'average_pace': averagePace,
       'end_time': dateFormat.format(endTime),
       'duration_seconds': duration.inSeconds,
