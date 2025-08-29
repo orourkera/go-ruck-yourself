@@ -81,12 +81,8 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     override func willActivate() {
         super.willActivate()
         
-        // Request HealthKit permissions when watch app becomes active
-        print("[INTERFACE] Watch app activated - requesting HealthKit permissions")
-        SessionManager.shared.requestPermissionsOnAppOpen()
-        
-        // Also set up HealthKit through the local workout manager as backup
-        setupHealthKit()
+        // Don't request permissions again - already done in awake()
+        print("[INTERFACE] Watch app activated - permissions already requested in awake()")
     }
     
     override func didDeactivate() {
@@ -95,22 +91,36 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     
     // Setup HealthKit authorization and heart rate handling
     private func setupHealthKit() {
-        guard let manager = workoutManager else { return }
+        guard let manager = workoutManager else { 
+            print("[INTERFACE_CONTROLLER] ERROR: workoutManager is nil")
+            return 
+        }
         
+        print("[INTERFACE_CONTROLLER] HealthKit available: \(manager.isHealthKitAvailable)")
         if manager.isHealthKitAvailable {
+            print("[INTERFACE_CONTROLLER] Requesting HealthKit authorization...")
             manager.requestAuthorization { [weak self] (success, error) in
                 guard let self = self else { return }
                 if success {
                     // Set handler for heart rate updates
                     manager.setHeartRateHandler { heartRate in
-                        self.heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))
-                        self.sendHeartRate(heartRate)
+                        DispatchQueue.main.async {
+                            self.heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))
+                            self.sendHeartRate(heartRate)
+                        }
                     }
-                } else if let error = error {
-                    self.statusLabel.setText("HealthKit Error: \(error.localizedDescription)")
+                } else {
+                    print("[INTERFACE_CONTROLLER] ❌ HealthKit authorization denied or failed")
+                    if let error = error {
+                        print("[INTERFACE_CONTROLLER] Authorization error: \(error.localizedDescription)")
+                        self.statusLabel.setText("HealthKit Error: \(error.localizedDescription)")
+                    } else {
+                        self.statusLabel.setText("HealthKit authorization denied")
+                    }
                 }
             }
         } else {
+            print("[INTERFACE_CONTROLLER] ❌ HealthKit not available on this device")
             statusLabel.setText("HealthKit Not Available")
         }
     }

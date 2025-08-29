@@ -458,6 +458,17 @@ class HealthService {
     try {
     AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
     
+    // If not authorized, try to get authorization first
+    if (!_isAuthorized) {
+      AppLogger.info('[STEPS DEBUG] Not authorized, requesting authorization...');
+      final authorized = await requestAuthorization();
+      AppLogger.info('[STEPS DEBUG] Authorization request result: $authorized');
+      if (!authorized) {
+        AppLogger.warning('[STEPS DEBUG] Authorization failed, returning 0 steps');
+        return 0;
+      }
+    }
+    
     // Always check authorization status fresh (don't rely on cached _isAuthorized)
     final authStatuses = await _health.hasPermissions(
       [HealthDataType.STEPS],
@@ -657,10 +668,22 @@ class HealthService {
     // Check if we can get real-time steps from Apple Watch
     try {
       final watchService = GetIt.instance<WatchService>();
-      AppLogger.info('[STEPS LIVE] Using Apple Watch for real-time step tracking');
+      AppLogger.info('[STEPS LIVE] WatchService found - checking session status');
+      AppLogger.info('[STEPS LIVE] Watch session active: ${watchService.isSessionActive}');
       
-      // Return the watch service steps stream directly
-      return watchService.stepsStream;
+      // Only use watch stream if session is actually active
+      if (watchService.isSessionActive) {
+        final watchStream = watchService.stepsStream;
+        AppLogger.info('[STEPS LIVE] ✅ Using Apple Watch steps stream (session active)');
+        
+        // Add debugging to the watch stream
+        return watchStream.map((steps) {
+          AppLogger.info('[STEPS LIVE] 📊 Watch stream emitted: $steps steps');
+          return steps;
+        });
+      } else {
+        AppLogger.warning('[STEPS LIVE] ⚠️  Watch session not active, falling back to polling');
+      }
     } catch (e) {
       AppLogger.warning('[STEPS LIVE] WatchService not available, falling back to HealthKit polling: $e');
     }

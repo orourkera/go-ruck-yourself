@@ -833,7 +833,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Start live steps if enabled in preferences
     try {
       final prefs = GetIt.instance<SharedPreferences>();
-      final enabled = prefs.getBool('live_step_tracking') ?? false;
+      final enabled = prefs.getBool('live_step_tracking') ?? true; // Default to true for Watch users
       AppLogger.info('[STEPS LIVE] [COORDINATOR] Live step tracking preference: $enabled');
       
       if (enabled) {
@@ -843,13 +843,26 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         _currentSteps = 0;
         add(const StateAggregationRequested());
         
-        _stepsSub?.cancel();
-        _stepsSub = _healthService.startLiveSteps(startTime).listen((total) {
-          AppLogger.info('[STEPS LIVE] [COORDINATOR] Received step update: $total');
-          _currentSteps = total;
-          add(const StateAggregationRequested());
-        });
+        // Delay step tracking to allow Watch session to initialize
+        AppLogger.info('[STEPS LIVE] [COORDINATOR] Delaying step tracking by 3 seconds for Watch session startup');
+        Future.delayed(const Duration(seconds: 3), () {
+          AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting delayed step tracking');
+          _stepsSub?.cancel();
+          _stepsSub = _healthService.startLiveSteps(startTime).listen(
+          (total) {
+            AppLogger.info('[STEPS LIVE] [COORDINATOR] ✅ Received step update: $total');
+            _currentSteps = total;
+            add(const StateAggregationRequested());
+          },
+          onError: (error) {
+            AppLogger.error('[STEPS LIVE] [COORDINATOR] ❌ Steps stream error: $error');
+          },
+          onDone: () {
+            AppLogger.warning('[STEPS LIVE] [COORDINATOR] ⚠️  Steps stream ended unexpectedly');
+          },
+        );
         AppLogger.info('[COORDINATOR] Live step tracking subscription created');
+        }); // Close the Future.delayed block
       } else {
         AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences - initializing steps to 0 for UI display');
         // Initialize steps to 0 so the widget appears, will be estimated at session end

@@ -11,9 +11,9 @@ class LocationValidationService {
   static const double minMovingSpeedKmh = 0.3; // 0.3 km/h min speed to be considered moving (more lenient)
   static const Duration idleDuration = Duration(minutes: 3); // 3 minutes without movement to auto-pause
   static const Duration longIdleDuration = Duration(minutes: 5); // 5 minutes idle to suggest ending session
-  static const double maxPositionJumpMeters = 100.0; // 100 meters max jump in position (prevent GPS jumps like 5.8km)
+  static const double maxPositionJumpMeters = 100.0; // 100 meters max jump (industry standard like Nike)
   static const Duration maxPositionJumpDuration = Duration(seconds: 2); // 2 seconds minimum between location points (prevent microsecond noise)
-  static const double minGpsAccuracyMeters = 30.0; // 30 meters minimum GPS accuracy (more tolerant)
+  static const double minGpsAccuracyMeters = 100.0; // 100 meters minimum GPS accuracy (Nike/industry standard)
   static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour
   static const double maxCaloriesPerHour = 800.0; // 800 calories maximum per hour
   static const Duration lowGpsWarningDelay = Duration(seconds: 30); // 30 seconds delay before showing GPS warning
@@ -65,19 +65,19 @@ class LocationValidationService {
     final distance = distanceMeters ?? _calculateDistanceBetweenPoints(point, previousPoint);
     final duration = point.timestamp.difference(previousPoint.timestamp);
 
-    // 1. GPS accuracy check
+    // 1. GPS accuracy check (more lenient for older phones)
     if (point.accuracy > minGpsAccuracyMeters) {
       if (_lowGpsStartTime == null) {
         _lowGpsStartTime = point.timestamp;
       } else if (point.timestamp.difference(_lowGpsStartTime!) > lowGpsWarningDelay) {
-        // Only reject if accuracy is REALLY bad (>50m) or has been bad for too long
-        if (point.accuracy > 50.0) {
+        // Only reject if accuracy is extremely bad (>150m) or has been bad for too long  
+        if (point.accuracy > 150.0) {
           _validationErrorCount++;
           results['isValid'] = false;
-          results['message'] = 'Low GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
+          results['message'] = 'Extremely poor GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
           return results;
         }
-        // For moderate accuracy (30-50m), accept but warn
+        // For moderate accuracy (50-100m), accept but warn
         results['message'] = 'GPS accuracy reduced (${point.accuracy.toStringAsFixed(1)}m)';
       }
       // Don't return yet if we're still in the buffer period - continue processing the point

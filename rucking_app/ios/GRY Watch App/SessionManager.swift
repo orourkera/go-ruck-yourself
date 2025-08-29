@@ -11,6 +11,7 @@ public protocol SessionManagerDelegate: AnyObject {
     func didReceiveMessage(_ message: [String: Any])
 }
 
+@MainActor
 public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, WorkoutManagerDelegate {
     // WorkoutManager for HealthKit access
     private var workoutManager: WorkoutManager!
@@ -27,6 +28,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     @Published var isSessionActive: Bool = false
     @Published var currentZone: String? = nil
     private var sessionStartedFromPhone = false // Track if session was initiated by phone
+    
+    // Steps monitoring debug state
+    private var lastStepsUpdateAt: Date? = nil
+    private var stepsWatchdogTimer: Timer? = nil
     
     // Split notification properties
     @Published var showingSplitNotification: Bool = false
@@ -114,8 +119,10 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 print("[WATCH] Workout started successfully")
                 
                 // CRITICAL: Set session as active to show pause/stop buttons
-                self.isSessionActive = true
-                self.isPaused = false
+                DispatchQueue.main.async {
+                    self.isSessionActive = true
+                    self.isPaused = false
+                }
                 
                 // Only send start payload if session was initiated from watch, not phone
                 // This prevents duplicate session creation when phone starts the session
@@ -130,6 +137,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     ]
                     self.sendMessage(payload)
                 }
+
+                // Start steps watchdog for debugging stale updates
+                self.startStepsWatchdog()
             }
         }
     }
@@ -142,6 +152,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         session = WCSession.default
         // Initialize WorkoutManager after super.init()
         super.init()
+        print("[WATCH BOOT] SessionManager init")
         workoutManager = WorkoutManager()
         session.delegate = self
         if session.activationState != .activated {
@@ -150,9 +161,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         // Ensure we receive callbacks when the workout ends
         workoutManager.delegate = self
         
-        // Request HealthKit permissions immediately when app opens
-        // This ensures we're ready for heart rate monitoring when sessions start from phone
-        requestHealthKitPermissions()
+        // HealthKit permissions will be requested by InterfaceController on first launch
+        print("[WATCH BOOT] SessionManager initialized - permissions will be requested by InterfaceController")
     }
     
     private func requestHealthKitPermissions() {
@@ -174,38 +184,60 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
             DispatchQueue.main.async {
                 self?.steps = stepCount
                 print("[SESSION_MANAGER] Steps updated: \(stepCount) steps")
+                self?.lastStepsUpdateAt = Date()
                 
                 // Send steps to phone via WatchConnectivity
                 self?.sendSteps(stepCount)
             }
         }
         
-        // Request HealthKit permissions with detailed logging
-        workoutManager.requestAuthorization { success, error in
-            if success {
-                print("[WATCH] ✅ HealthKit authorization successful - heart rate monitoring ready")
-                // Send success confirmation to phone
-                self.sendMessage([
-                    "command": "healthKitPermissionGranted",
-                    "success": true,
-                    "timestamp": Date().timeIntervalSince1970
-                ])
-            } else if let error = error {
-                print("[WATCH] ❌ HealthKit authorization failed: \(error.localizedDescription)")
-                // Send failure notification to phone
-                self.sendMessage([
-                    "command": "healthKitPermissionDenied", 
-                    "error": error.localizedDescription,
-                    "timestamp": Date().timeIntervalSince1970
-                ])
-            }
+        // Check HealthKit authorization status (don't request again - already done on app launch)
+        print("[WATCH] Checking existing HealthKit authorization status...")
+        let stepType = HKObjectType.quantityType(forIdentifier: .stepCount)!
+        let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate)!
+        let stepsAuth = workoutManager.healthStore.authorizationStatus(for: stepType)
+        let heartRateAuth = workoutManager.healthStore.authorizationStatus(for: heartRateType)
+        
+        print("[WATCH] Steps authorization: \(stepsAuth.rawValue), Heart rate authorization: \(heartRateAuth.rawValue)")
+        
+        if stepsAuth == .sharingAuthorized && heartRateAuth == .sharingAuthorized {
+            print("[WATCH] ✅ HealthKit already authorized - proceeding with session")
+            // Send success confirmation to phone
+            self.sendMessage([
+                "command": "healthKitPermissionGranted",
+                "success": true,
+                "timestamp": Date().timeIntervalSince1970
+            ])
+        } else {
+            print("[WATCH] ❌ HealthKit not fully authorized - steps: \(stepsAuth.rawValue), heartRate: \(heartRateAuth.rawValue)")
+            // Send failure notification to phone
+            self.sendMessage([
+                "command": "healthKitPermissionDenied",
+                "success": false,
+                "stepsAuth": stepsAuth.rawValue,
+                "heartRateAuth": heartRateAuth.rawValue,
+                "timestamp": Date().timeIntervalSince1970
+            ])
         }
     }
     
-    /// Request permissions when watch app becomes active
-    func requestPermissionsOnAppOpen() {
-        print("[WATCH] Watch app opened - checking/requesting permissions")
-        requestHealthKitPermissions()
+    /// Check permission status without requesting (used for diagnostics)
+    func checkHealthKitPermissionStatus() {
+        print("[WATCH] Checking current HealthKit permission status...")
+        let stepType = HKObjectType.quantityType(forIdentifier: .stepCount)!
+        let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate)!
+        let stepsAuth = workoutManager.healthStore.authorizationStatus(for: stepType)
+        let heartRateAuth = workoutManager.healthStore.authorizationStatus(for: heartRateType)
+        
+        print("[WATCH] Current status - Steps: \(stepsAuth.rawValue), Heart rate: \(heartRateAuth.rawValue)")
+        
+        // Send status to phone
+        self.sendMessage([
+            "command": "healthKitStatus",
+            "stepsAuth": stepsAuth.rawValue,
+            "heartRateAuth": heartRateAuth.rawValue,
+            "timestamp": Date().timeIntervalSince1970
+        ])
     }
     
     func sendMessage(_ message: [String: Any]) {
@@ -405,6 +437,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
+        print("[WATCH] WC didReceiveMessage payload: \(message)")
         
         // Heart rate update received silently
         
@@ -415,7 +448,7 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         // Check message command
         if let command = message["command"] as? String {
-            // Processing command from message
+            print("[WATCH] Processing command: \(command)")
             
             switch command {
             case "splitNotification":
@@ -425,13 +458,14 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 processSessionStartAlert(message)
                 
             case "requestHealthKitPermissions":
-                // Explicitly request HealthKit permissions
-                print("[WATCH] Received permission request from phone")
-                requestHealthKitPermissions()
+                // Check existing permissions status (don't request again)
+                print("[WATCH] Received permission check request from phone")
+                checkHealthKitPermissionStatus()
                 
             case "startSession", "workoutStarted":
                 // Start the session if not already active
                 if !isSessionActive {
+                    print("[WATCH] startSession/workoutStarted received – beginning workout start flow")
                     // Check for unit preference in the message
                     if let unitPref = message["isMetric"] as? Bool {
                         self.isMetric = unitPref
@@ -445,12 +479,11 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     self.workoutManager = WorkoutManager()
                     self.workoutManager.delegate = self
                     
-                    // Always re-request permissions to ensure fresh HealthKit state
-                    print("[WATCH] Re-requesting HealthKit permissions for session start")
-                    self.requestHealthKitPermissions()
+                    // Use existing permissions (already requested on launch)
                     
                     // Starting session from phone command - need to start HealthKit workout
                     DispatchQueue.main.async {
+                        print("[WATCH] Setting session flags and calling startSession()")
                         self.isSessionActive = true
                         self.isPaused = false
                         self.sessionStartedFromPhone = true // Mark as phone-initiated
@@ -462,9 +495,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 // Explicit request from phone to ensure HR streaming starts
                 print("[WATCH] Received startHeartRateMonitoring command from phone")
                 if !isSessionActive {
-                    // Initialize permissions and start a fresh workout
+                    // Start session with existing permissions
                     print("[WATCH] HR monitoring requested while inactive – starting session")
-                    self.requestHealthKitPermissions()
                     DispatchQueue.main.async {
                         self.isSessionActive = true
                         self.isPaused = false
@@ -475,6 +507,23 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     // Nudge immediate HR update
                     self.workoutManager.nudgeHeartRateUpdate()
                 }
+
+            case "startStepsMonitoring":
+                // Explicit request from phone to ensure steps streaming
+                print("[WATCH] Received startStepsMonitoring command from phone")
+                self.workoutManager.nudgeStepCountUpdate()
+
+            case "stepsDebugRequest":
+                // Send a steps snapshot back to the phone for debugging
+                let snapshot: [String: Any] = [
+                    "command": "stepsDebug",
+                    "steps": self.steps,
+                    "isSessionActive": self.isSessionActive,
+                    "isPaused": self.isPaused,
+                    "timestamp": Date().timeIntervalSince1970
+                ]
+                print("[WATCH] Sending stepsDebug snapshot: \(snapshot)")
+                self.sendMessage(snapshot)
                 
             case "stopSession", "workoutStopped", "endSession", "sessionEnded", "sessionComplete":
                 // Always perform cleanup on stop commands, regardless of current flags
@@ -482,6 +531,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     self.isSessionActive = false
                     self.isPaused = false
                     self.sessionStartedFromPhone = false // Reset flag on session stop
+                    // Stop steps watchdog
+                    self.stepsWatchdogTimer?.invalidate()
+                    self.stepsWatchdogTimer = nil
                     
                     // Clear the timer status to prevent lock screen persistence
                     self.status = "--"
@@ -569,6 +621,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                             self.elevationLoss = 0.0
                             self.workoutManager.stopWorkout()
                             WKInterfaceDevice.current().play(.stop)
+                            // Stop steps watchdog
+                            self.stepsWatchdogTimer?.invalidate()
+                            self.stepsWatchdogTimer = nil
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 exit(0)
                             }
@@ -580,24 +635,27 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 print("[SessionManager] Processing updateMetrics command")
                 print("[SessionManager] updateMetrics message: \(message)")
                 
-                // Update current metrics from the phone
-                if let distance = message["distance"] as? Double {
-                    self.distanceValue = distance
-                }
-                if let metrics = message["metrics"] as? [String: Any] {
-                    if let zone = metrics["hrZone"] as? String {
-                        DispatchQueue.main.async { self.currentZone = zone }
+                // Ensure UI/state mutations occur on main
+                DispatchQueue.main.async {
+                    // Update current metrics from the phone
+                    if let distance = message["distance"] as? Double {
+                        self.distanceValue = distance
                     }
-                }
-                
-                if let pace = message["pace"] as? Double {
-                    self.paceValue = pace
-                }
-                
-                if let isMetricValue = message["isMetric"] as? Bool {
-                    self.isMetric = isMetricValue
-                    print("[SessionManager] Updated user's metric preference to: \(self.isMetric)")
-                    print("[SessionManager] updateMetrics - Set isMetric to: \(self.isMetric)")
+                    if let metrics = message["metrics"] as? [String: Any] {
+                        if let zone = metrics["hrZone"] as? String {
+                            self.currentZone = zone
+                        }
+                    }
+                    
+                    if let pace = message["pace"] as? Double {
+                        self.paceValue = pace
+                    }
+                    
+                    if let isMetricValue = message["isMetric"] as? Bool {
+                        self.isMetric = isMetricValue
+                        print("[SessionManager] Updated user's metric preference to: \(self.isMetric)")
+                        print("[SessionManager] updateMetrics - Set isMetric to: \(self.isMetric)")
+                    }
                 }
                 
             default:
@@ -676,65 +734,67 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     
     // Helper method to consistently update metrics from received data
     private func updateMetricsFromData(_ metrics: [String: Any]) {
-        // Mark session as active when receiving metrics
-        self.isSessionActive = true
-        
-        // Update heart rate when present (silently)
-        if let hr = metrics["heartRate"] as? Double {
-            self.heartRate = hr
-        }
-        
-        // Update steps when present
-        if let stepCount = metrics["steps"] as? Int {
-            self.steps = stepCount
-        }
-        
-        // Update calories when present
-        if let cal = metrics["calories"] as? Double {
-            self.calories = cal
-        }
-        
-        // Update elevation data when present
-        if let elGain = metrics["elevationGain"] as? Double {
-            self.elevationGain = elGain
-        }
-        if let elLoss = metrics["elevationLoss"] as? Double {
-            self.elevationLoss = elLoss
-        }
-        
-        // Update distance when present
-        if let dist = metrics["distance"] as? Double {
-            self.distanceValue = dist
-        }
-        
-        // Update pace when present
-        if let pace = metrics["pace"] as? Double {
-            self.paceValue = pace
-        }
-        
-        // Update metric/imperial preference when present
-        if let isMetricValue = metrics["isMetric"] as? Bool {
-            print("[DEBUG] Setting isMetric from nested metrics: \(isMetricValue)")
-            self.isMetric = isMetricValue
-        } else {
-            print("[DEBUG] No isMetric found in nested metrics")
-        }
-        
-        // Update timer/duration when present (for realtime tick updates)
-        if let duration = metrics["duration"] as? String {
-            self.status = duration
-        } else if let durationSeconds = metrics["durationSeconds"] as? Double {
-            // Convert seconds to MM:SS format
-            let minutes = Int(durationSeconds) / 60
-            let seconds = Int(durationSeconds) % 60
-            self.status = String(format: "%02d:%02d", minutes, seconds)
-        }
-        
-        // Update paused state when present
-        if let pausedBool = metrics["isPaused"] as? Bool {
-            self.isPaused = pausedBool
-        } else if let pausedInt = metrics["isPaused"] as? Int {
-            self.isPaused = pausedInt == 1
+        // Ensure mutations on main (redundant with @MainActor but safe when called from non-main contexts)
+        DispatchQueue.main.async {
+            // Do not force sessionActive here; await explicit start/ACK from phone
+            
+            // Update heart rate when present (silently)
+            if let hr = metrics["heartRate"] as? Double {
+                self.heartRate = hr
+            }
+            
+            // Update steps when present
+            if let stepCount = metrics["steps"] as? Int {
+                self.steps = stepCount
+            }
+            
+            // Update calories when present
+            if let cal = metrics["calories"] as? Double {
+                self.calories = cal
+            }
+            
+            // Update elevation data when present
+            if let elGain = metrics["elevationGain"] as? Double {
+                self.elevationGain = elGain
+            }
+            if let elLoss = metrics["elevationLoss"] as? Double {
+                self.elevationLoss = elLoss
+            }
+            
+            // Update distance when present
+            if let dist = metrics["distance"] as? Double {
+                self.distanceValue = dist
+            }
+            
+            // Update pace when present
+            if let pace = metrics["pace"] as? Double {
+                self.paceValue = pace
+            }
+            
+            // Update metric/imperial preference when present
+            if let isMetricValue = metrics["isMetric"] as? Bool {
+                print("[DEBUG] Setting isMetric from nested metrics: \(isMetricValue)")
+                self.isMetric = isMetricValue
+            } else {
+                print("[DEBUG] No isMetric found in nested metrics")
+            }
+            
+            // Update timer/duration when present (for realtime tick updates)
+            if let duration = metrics["duration"] as? String {
+                self.status = duration
+            } else if let durationSeconds = metrics["durationSeconds"] as? Double {
+                // Convert seconds to MM:SS format
+                let minutes = Int(durationSeconds) / 60
+                let seconds = Int(durationSeconds) % 60
+                self.status = String(format: "%02d:%02d", minutes, seconds)
+            }
+            
+            // Update paused state when present
+            if let pausedBool = metrics["isPaused"] as? Bool {
+                self.isPaused = pausedBool
+            } else if let pausedInt = metrics["isPaused"] as? Int {
+                self.isPaused = pausedInt == 1
+            }
         }
     }
     
@@ -889,6 +949,9 @@ extension SessionManager {
             self.splitTime = ""
             self.totalDistance = ""
             self.totalTime = ""
+            // Stop steps watchdog
+            self.stepsWatchdogTimer?.invalidate()
+            self.stepsWatchdogTimer = nil
             
             // Clear any background activities and force app state refresh
             WKInterfaceDevice.current().play(.stop)
@@ -902,6 +965,45 @@ extension SessionManager {
                 // Exit the app completely
                 // This will remove it from the lock screen and prevent battery drain
                 exit(0)
+            }
+        }
+    }
+}
+
+// MARK: - Steps Watchdog (Debugging)
+extension SessionManager {
+    private func startStepsWatchdog() {
+        stepsWatchdogTimer?.invalidate()
+        stepsWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            let now = Date()
+            if let last = self.lastStepsUpdateAt {
+                let delta = now.timeIntervalSince(last)
+                if delta > 90.0 { // 1.5 minutes without steps
+                    print("[WATCH] [STEPS_DEBUG] No steps for \(Int(delta))s – nudging update and sending snapshot")
+                    self.workoutManager.nudgeStepCountUpdate()
+                    let snapshot: [String: Any] = [
+                        "command": "stepsDebug",
+                        "steps": self.steps,
+                        "isSessionActive": self.isSessionActive,
+                        "isPaused": self.isPaused,
+                        "timestamp": Date().timeIntervalSince1970,
+                        "note": "watchdog_nudge"
+                    ]
+                    self.sendMessage(snapshot)
+                }
+            } else {
+                print("[WATCH] [STEPS_DEBUG] No steps received yet – sending initial snapshot and nudge")
+                self.workoutManager.nudgeStepCountUpdate()
+                let snapshot: [String: Any] = [
+                    "command": "stepsDebug",
+                    "steps": self.steps,
+                    "isSessionActive": self.isSessionActive,
+                    "isPaused": self.isPaused,
+                    "timestamp": Date().timeIntervalSince1970,
+                    "note": "initial_nudge"
+                ]
+                self.sendMessage(snapshot)
             }
         }
     }

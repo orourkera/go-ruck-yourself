@@ -1066,33 +1066,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                   ),
                   const SizedBox(height: 16),
                   
-                  // AI Insights Widget (behind feature flag)
-                  Builder(
-                    builder: (context) {
-                      final featureFlagEnabled = FeatureFlags.enableAIHomepageInsights;
-                      AppLogger.debug('[HOME_SCREEN] AI Homepage Insights feature flag: $featureFlagEnabled');
-                      AppLogger.debug('[HOME_SCREEN] kDebugMode: ${kDebugMode}');
-                      AppLogger.debug('[HOME_SCREEN] Remote config debug: ${FeatureFlags.getRemoteConfigDebugInfo()}');
-                      
-                      // TEMPORARILY FORCE ENABLE FOR DEBUGGING
-                      const forceEnable = true;
-                      
-                      if (featureFlagEnabled || forceEnable) {
-                        AppLogger.info('[HOME_SCREEN] Showing AI Insights Widget (featureFlag=$featureFlagEnabled, forceEnable=$forceEnable)');
-                        return Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            const AIInsightsWidget(),
-                            const SizedBox(height: 16),
-                          ],
-                        );
-                      } else {
-                        AppLogger.info('[HOME_SCREEN] AI Insights Widget hidden by feature flag');
-                        return const SizedBox.shrink();
-                      }
-                    },
-                  ),
-                  
                   // Create session button - full width and orange
                   SizedBox(
                     width: double.infinity,
@@ -1120,6 +1093,33 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                         minimumSize: const Size.fromHeight(56),
                       ),
                     ),
+                  ),
+                  
+                  // AI Insights Widget (behind feature flag)
+                  Builder(
+                    builder: (context) {
+                      final featureFlagEnabled = FeatureFlags.enableAIHomepageInsights;
+                      AppLogger.debug('[HOME_SCREEN] AI Homepage Insights feature flag: $featureFlagEnabled');
+                      AppLogger.debug('[HOME_SCREEN] kDebugMode: ${kDebugMode}');
+                      AppLogger.debug('[HOME_SCREEN] Remote config debug: ${FeatureFlags.getRemoteConfigDebugInfo()}');
+                      
+                      // TEMPORARILY FORCE ENABLE FOR DEBUGGING
+                      const forceEnable = true;
+                      
+                      if (featureFlagEnabled || forceEnable) {
+                        AppLogger.info('[HOME_SCREEN] Showing AI Insights Widget (featureFlag=$featureFlagEnabled, forceEnable=$forceEnable)');
+                        return Column(
+                          children: [
+                            const SizedBox(height: 16),
+                            const AIInsightsWidget(),
+                            const SizedBox(height: 16),
+                          ],
+                        );
+                      } else {
+                        AppLogger.info('[HOME_SCREEN] AI Insights Widget hidden by feature flag');
+                        return const SizedBox.shrink();
+                      }
+                    },
                   ),
                   
                   // My Routes navigation link

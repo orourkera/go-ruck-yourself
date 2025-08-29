@@ -91,6 +91,9 @@ class WatchService {
 
   /// Public stream of live step count updates from the watch
   Stream<int> get stepsStream => _stepsController.stream;
+  
+  /// Check if a workout session is currently active
+  bool get isSessionActive => _isSessionActive;
 
   void _initPlatformChannels() {
     // Initialize platform channels - use different prefixes for iOS vs Android
@@ -204,6 +207,8 @@ class WatchService {
           } else {
             AppLogger.error('[WATCH_SERVICE] [STEPS_DEBUG] ❌ INVALID step count from WatchConnectivity: $steps (type: ${steps.runtimeType})');
           }
+        } else if (command == 'stepsDebug') {
+          AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🧪 Steps debug snapshot from watch: $data');
         } else if (command == 'heartRateDebug') {
           AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 📊 Heart rate debug from watch: $data');
         } else if (command == 'healthKitStatus') {
@@ -407,6 +412,10 @@ class WatchService {
     _ruckWeight = ruckWeight;
     _resetHeartRateSamplingVariables();
     _currentSessionHeartRateSamples = [];
+    
+    // Ensure steps streaming starts immediately
+    await ensureStepsStreaming();
+    AppLogger.info('[WATCH_SERVICE] Steps streaming initiated for session start');
     
     // CRITICAL DEBUG: Log heart rate stream controller state
     AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Heart rate controller info: isClosed=${_heartRateController.isClosed}, hasListener=${_heartRateController.hasListener}');
@@ -1333,8 +1342,28 @@ class WatchService {
         } catch (e) {
           AppLogger.debug('[WATCH_SERVICE] [STEPS] Failed to restart steps listener: $e');
         }
+        // Also nudge the watch to push steps via WCSession and request a debug snapshot
+        () async {
+          try {
+            await _sendMessageToWatch({'command': 'startStepsMonitoring'});
+            await _sendMessageToWatch({'command': 'stepsDebugRequest'});
+            AppLogger.debug('[WATCH_SERVICE] [STEPS_DEBUG] Sent startStepsMonitoring and stepsDebugRequest');
+          } catch (e) {
+            AppLogger.debug('[WATCH_SERVICE] [STEPS_DEBUG] Failed to send steps nudge/debug request: $e');
+          }
+        }();
       }
     });
+  }
+
+  /// Public method to explicitly request steps streaming from the watch app.
+  Future<void> ensureStepsStreaming() async {
+    try {
+      await _sendMessageToWatch({'command': 'startStepsMonitoring'});
+      AppLogger.debug('[WATCH_SERVICE] ensureStepsStreaming: startStepsMonitoring sent');
+    } catch (e) {
+      AppLogger.debug('[WATCH_SERVICE] ensureStepsStreaming failed: $e');
+    }
   }
 
   /// Public method to force restart the heart rate monitoring from outside this class

@@ -13,6 +13,7 @@ struct GRY_Watch_AppApp: App {
         WindowGroup {
             #if os(watchOS)
             ContentView()
+                .onAppear { print("[WATCH BOOT] ContentView appeared") }
             #else
             Text("Not a watchOS build")
             #endif

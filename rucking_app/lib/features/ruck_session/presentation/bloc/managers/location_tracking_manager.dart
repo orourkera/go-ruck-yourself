@@ -120,11 +120,13 @@ class LocationTrackingManager implements SessionManager {
   static const double _movementDistanceMetersThreshold = 12.0; // 10–15m
   static const double _movementSpeedThreshold = 0.1; // m/s (lowered from 0.3 to reduce false idle detection)
 
-  // Distance stall detection
+  // Distance stall detection and recovery
   DateTime? _lastDistanceIncreaseTime;
   double _lastDistanceValueForStall = 0.0;
   DateTime? _lastStallReportTime;
   DateTime? _lastDistanceRecalcAttempt;
+  int _stallRecoveryAttempts = 0;
+  static const int _maxStallRecoveryAttempts = 3;
 
   // Validation rejection analytics and adaptive recovery
   final Map<String, int> _validationRejectCounts = {};
@@ -376,6 +378,14 @@ class LocationTrackingManager implements SessionManager {
       speed: position.speed,
     );
     
+    // Apply LENIENT backend validation before database storage
+    if (_shouldAcceptForDatabase(newPoint)) {
+      _pendingLocationPoints.add(newPoint);
+      AppLogger.debug('[LOCATION_MANAGER] Added location to pending batch. Total pending: ${_pendingLocationPoints.length}');
+    } else {
+      AppLogger.warning('[LOCATION_MANAGER] Rejected point for database: extreme GPS error detected');
+    }
+    
     // Use comprehensive validation from version 2.5
     final validationResult = _validationService.validateLocationPoint(newPoint, _lastValidLocation);
     
@@ -428,7 +438,7 @@ class LocationTrackingManager implements SessionManager {
       if (isLowAccuracy && (_lowAccuracyBypassUntil != null) && now.isBefore(_lowAccuracyBypassUntil!)) {
         AppLogger.info('[LOCATION_MANAGER] Accepting low-accuracy point due to temporary bypass');
       } else {
-        // Conservative raw-point fallback to keep UI distance progressing
+        // ENHANCED fallback for older phones - more aggressive acceptance to prevent distance stalls
         bool acceptedFallback = false;
         try {
           if (_lastValidLocation != null) {
@@ -440,14 +450,43 @@ class LocationTrackingManager implements SessionManager {
                   newPoint.longitude,
                 ) * 1000.0;
             final double speedMs = dt > 0 ? dMeters / dt : 0.0;
-            if (dt >= 1.0 && dMeters <= 30.0 && speedMs <= 4.2) {
-              AppLogger.info('[LOCATION_MANAGER] Fallback-accepting conservative point (dt=${dt.toStringAsFixed(1)}s, d=${dMeters.toStringAsFixed(1)}m, v=${speedMs.toStringAsFixed(2)}m/s)');
+            
+            // More generous fallback criteria for distance continuity
+            final bool timeOk = dt >= 1.0 && dt <= 60.0; // 1-60 seconds apart
+            final bool distanceOk = dMeters <= 50.0; // Up to 50m movement (increased from 30m)
+            final bool speedOk = speedMs <= 6.0; // Up to 6 m/s (~13 mph) for brief spurts
+            final bool emergencyAcceptance = dt >= 10.0 && dMeters <= 100.0 && speedMs <= 10.0; // Emergency for very delayed points
+            
+            if ((timeOk && distanceOk && speedOk) || emergencyAcceptance) {
+              AppLogger.info('[LOCATION_MANAGER] Fallback-accepting point for continuity (dt=${dt.toStringAsFixed(1)}s, d=${dMeters.toStringAsFixed(1)}m, v=${speedMs.toStringAsFixed(2)}m/s)${emergencyAcceptance ? ' [EMERGENCY]' : ''}');
               acceptedFallback = true;
             }
           }
         } catch (_) {}
 
         if (!acceptedFallback) {
+          // CRITICAL: Even if we reject the point for distance calculation,
+          // we should still check for distance stall recovery every 30 seconds
+          final now = DateTime.now();
+          final timeSinceLastDistance = _lastDistanceIncreaseTime != null 
+              ? now.difference(_lastDistanceIncreaseTime!) 
+              : Duration.zero;
+              
+          if (timeSinceLastDistance.inSeconds >= 30 && _locationPoints.isNotEmpty) {
+            // Try to recalculate distance from existing points to detect if we're stuck
+            try {
+              final recalcDistance = _calculateTotalDistance();
+              if (recalcDistance != _currentState.totalDistance) {
+                AppLogger.info('[LOCATION_MANAGER] VALIDATION_BYPASS: Distance recalc shows ${recalcDistance.toStringAsFixed(3)}km vs displayed ${_currentState.totalDistance.toStringAsFixed(3)}km - updating UI');
+                _updateState(_currentState.copyWith(totalDistance: recalcDistance));
+              }
+            } catch (e) {
+              AppLogger.debug('[LOCATION_MANAGER] VALIDATION_BYPASS: Distance recalc failed: $e');
+            }
+          }
+          
+          // Log the rejection for debugging older phones
+          AppLogger.warning('[LOCATION_MANAGER] Point fully rejected: ${validationResult['message']} - ${position.accuracy.toStringAsFixed(1)}m accuracy');
           return;
         }
       }
@@ -526,9 +565,7 @@ class LocationTrackingManager implements SessionManager {
       );
     }
     
-    // Add to pending batch
-    _pendingLocationPoints.add(newPoint);
-    AppLogger.debug('[LOCATION_MANAGER] Added location to pending batch. Total pending: ${_pendingLocationPoints.length}');
+    // Note: Already added to pending batch before validation above
     
     // Convert to Position list for state
     final positions = _locationPoints.map((lp) => Position(
@@ -577,15 +614,42 @@ class LocationTrackingManager implements SessionManager {
       if (newDistance > _lastDistanceValueForStall + 0.005) { // >5 meters
         _lastDistanceIncreaseTime = now;
         _lastDistanceValueForStall = newDistance;
+        _stallRecoveryAttempts = 0; // Reset recovery attempts on successful distance increase
       } else if (gpsHealthy && appearsMoving && _lastDistanceIncreaseTime != null) {
         final stallMins = now.difference(_lastDistanceIncreaseTime!).inMinutes;
         final recentlyReported = _lastStallReportTime != null && now.difference(_lastStallReportTime!).inMinutes < 10;
+        
+        // Try emergency recovery after 2 minutes of stall
+        if (stallMins >= 2 && _stallRecoveryAttempts < _maxStallRecoveryAttempts) {
+          _stallRecoveryAttempts++;
+          AppLogger.warning('[LOCATION_MANAGER] DISTANCE_STALL_RECOVERY: Attempting recovery #$_stallRecoveryAttempts after ${stallMins}m stall');
+          
+          try {
+            // Force full distance recalculation from all points
+            _lastProcessedLocationIndex = -1; // Reset to recalculate all
+            final recoveredDistance = _calculateTotalDistance();
+            
+            if (recoveredDistance > _lastDistanceValueForStall + 0.01) {
+              AppLogger.info('[LOCATION_MANAGER] DISTANCE_STALL_RECOVERY: Successfully recovered distance from ${_lastDistanceValueForStall.toStringAsFixed(3)}km to ${recoveredDistance.toStringAsFixed(3)}km');
+              _lastDistanceIncreaseTime = now;
+              _lastDistanceValueForStall = recoveredDistance;
+              _stallRecoveryAttempts = 0;
+              
+              // Update state with recovered distance
+              _updateState(_currentState.copyWith(totalDistance: recoveredDistance));
+              return; // Exit early, recovery successful
+            }
+          } catch (e) {
+            AppLogger.error('[LOCATION_MANAGER] DISTANCE_STALL_RECOVERY: Recovery attempt failed: $e');
+          }
+        }
+        
         if (stallMins >= 3 && !recentlyReported) {
           _lastStallReportTime = now;
           // Non-fatal telemetry to Crashlytics/Sentry
           await AppErrorHandler.handleError(
             'distance_stall_detected',
-            'No distance increase for ${stallMins}m while GPS healthy',
+            'No distance increase for ${stallMins}m while GPS healthy (recovery attempts: $_stallRecoveryAttempts)',
             context: {
               'session_id': _activeSessionId ?? 'unknown',
               'total_distance_km': newDistance.toStringAsFixed(3),
@@ -595,10 +659,11 @@ class LocationTrackingManager implements SessionManager {
               'time_since_last_valid_s': timeSinceLastValid,
               'speed_ms': position.speed ?? 0.0,
               'accuracy_m': position.accuracy,
+              'recovery_attempts': _stallRecoveryAttempts,
             },
             severity: ErrorSeverity.warning,
           );
-          AppLogger.warning('[LOCATION_MANAGER] DISTANCE_STALL: ${stallMins}m without increase while GPS healthy');
+          AppLogger.warning('[LOCATION_MANAGER] DISTANCE_STALL: ${stallMins}m without increase while GPS healthy (recovery attempts: $_stallRecoveryAttempts)');
         }
       }
     } catch (e) {
@@ -818,11 +883,18 @@ class LocationTrackingManager implements SessionManager {
               isTracking: false,
               errorMessage: 'GPS unavailable - attempting recovery',
             ));
-            // Backoff and resubscribe to the same broadcast stream
+            // Aggressive backoff and resubscribe to the same broadcast stream
             if (_activeSessionId != null && !_isPaused) {
               Future.delayed(const Duration(seconds: 2), () {
                 if (_activeSessionId != null && !_isPaused) {
-                  _attachLocationListener();
+                  AppLogger.info('[LOCATION_MANAGER] Restarting location service after stream error');
+                  // Full restart of location service instead of just reattaching listener
+                  _locationService.stopLocationTracking();
+                  Future.delayed(const Duration(seconds: 1), () {
+                    if (_activeSessionId != null && !_isPaused) {
+                      _startLocationTracking();
+                    }
+                  });
                 }
               });
             }
@@ -1113,7 +1185,19 @@ class LocationTrackingManager implements SessionManager {
 
   double _calculateTotalDistance() {
     // SOPHISTICATED DISTANCE TRACKING: Cumulative calculation with memory management
-    if (_locationPoints.length < 2) return _lastKnownTotalDistance;
+    if (_locationPoints.length < 2) {
+      // CRITICAL FIX: If frontend validation has blocked too many points,
+      // try to calculate distance from pending points that went to database
+      if (_pendingLocationPoints.isNotEmpty && _pendingLocationPoints.length >= 2) {
+        AppLogger.info('[LOCATION_MANAGER] FRONTEND_RECOVERY: Frontend has insufficient points (${_locationPoints.length}), attempting distance calc from ${_pendingLocationPoints.length} pending points');
+        try {
+          return _calculateDistanceFromPendingPoints();
+        } catch (e) {
+          AppLogger.warning('[LOCATION_MANAGER] FRONTEND_RECOVERY: Failed to calculate from pending points: $e');
+        }
+      }
+      return _lastKnownTotalDistance;
+    }
     
     // Start from the last known total distance (in meters)
     double totalDistance = _lastKnownTotalDistance * 1000;
@@ -1132,12 +1216,25 @@ class LocationTrackingManager implements SessionManager {
     // BOUNDARY VALIDATION: Ensure indices are within valid range
     if (startIndex >= _locationPoints.length) {
       // All points already processed
+      AppLogger.debug('[LOCATION_MANAGER] DISTANCE_CALC: All points processed, returning cached distance: ${_lastKnownTotalDistance.toStringAsFixed(3)}km');
+      return _lastKnownTotalDistance;
+    }
+    
+    // Ensure we have at least 2 points and a valid starting index
+    if (_locationPoints.length < 2) {
+      AppLogger.debug('[LOCATION_MANAGER] DISTANCE_CALC: Insufficient points (${_locationPoints.length}), returning cached distance: ${_lastKnownTotalDistance.toStringAsFixed(3)}km');
       return _lastKnownTotalDistance;
     }
     
     // Ensure we have a valid previous point for the first calculation
     if (startIndex <= 0) {
       startIndex = 1;
+    }
+    
+    // Final boundary check after adjustments
+    if (startIndex >= _locationPoints.length) {
+      AppLogger.debug('[LOCATION_MANAGER] DISTANCE_CALC: Start index beyond bounds after adjustment, returning cached distance: ${_lastKnownTotalDistance.toStringAsFixed(3)}km');
+      return _lastKnownTotalDistance;
     }
     
     // INCREMENTAL DISTANCE CALCULATION: Only process new points
@@ -1253,6 +1350,91 @@ class LocationTrackingManager implements SessionManager {
         'processed ${_locationPoints.length} points (start: $startIndex, last: $_lastProcessedLocationIndex)');
     
     return _lastKnownTotalDistance;
+  }
+
+  /// Lenient validation for database storage - only reject extreme GPS errors
+  bool _shouldAcceptForDatabase(LocationPoint newPoint) {
+    // Very lenient validation - only reject completely impossible points
+    
+    // 1. Reject points with impossible accuracy (>1000m suggests major GPS failure)
+    if (newPoint.accuracy > 1000.0) {
+      return false;
+    }
+    
+    // 2. Reject impossible coordinates
+    if (newPoint.latitude.abs() > 90.0 || newPoint.longitude.abs() > 180.0) {
+      return false;
+    }
+    
+    // 3. If we have a previous point, check for extreme jumps (>5km suggests GPS reset/airplane)
+    if (_lastValidLocation != null) {
+      final distance = _haversineDistance(
+        _lastValidLocation!.latitude,
+        _lastValidLocation!.longitude,
+        newPoint.latitude,
+        newPoint.longitude,
+      ) * 1000.0; // Convert to meters
+      
+      final timeDiff = newPoint.timestamp.difference(_lastValidLocation!.timestamp).inSeconds;
+      
+      // Reject jumps >5km in <60 seconds (impossible for walking/running)
+      if (distance > 5000.0 && timeDiff < 60) {
+        return false;
+      }
+      
+      // Reject speeds >50 m/s (180 km/h) - clearly not rucking
+      if (timeDiff > 0 && (distance / timeDiff) > 50.0) {
+        return false;
+      }
+    }
+    
+    // 4. Reject points with impossible elevation (below Dead Sea or above Everest)
+    if (newPoint.elevation < -500.0 || newPoint.elevation > 9000.0) {
+      return false;
+    }
+    
+    // If it passes all extreme checks, accept for database
+    return true;
+  }
+
+  /// Calculate distance from pending points (database queue) as emergency fallback
+  double _calculateDistanceFromPendingPoints() {
+    if (_pendingLocationPoints.length < 2) return _lastKnownTotalDistance;
+    
+    double totalMeters = 0.0;
+    final points = _pendingLocationPoints.toList();
+    
+    AppLogger.info('[LOCATION_MANAGER] EMERGENCY_DISTANCE: Calculating from ${points.length} pending points');
+    
+    for (int i = 1; i < points.length; i++) {
+      try {
+        final prevPoint = points[i - 1];
+        final currPoint = points[i];
+        
+        final distance = Geolocator.distanceBetween(
+          prevPoint.latitude,
+          prevPoint.longitude,
+          currPoint.latitude,
+          currPoint.longitude,
+        );
+        
+        // Apply basic filtering - more lenient than frontend validation
+        final timeDiffSeconds = currPoint.timestamp.difference(prevPoint.timestamp).inSeconds;
+        final isReasonable = distance < 200 && timeDiffSeconds >= 1; // More lenient 200m vs 100m
+        
+        if (isReasonable) {
+          totalMeters += distance;
+        }
+      } catch (e) {
+        AppLogger.debug('[LOCATION_MANAGER] EMERGENCY_DISTANCE: Error processing segment $i: $e');
+        continue;
+      }
+    }
+    
+    final distanceKm = totalMeters / 1000.0;
+    AppLogger.info('[LOCATION_MANAGER] EMERGENCY_DISTANCE: Calculated ${distanceKm.toStringAsFixed(3)}km from pending points');
+    
+    return math.max(distanceKm, _lastKnownTotalDistance); // Ensure non-decreasing
   }
 
   // Recompute distance from recent points to recover from index drift or over-filtering
