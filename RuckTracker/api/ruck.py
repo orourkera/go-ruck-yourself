@@ -943,6 +943,9 @@ class RuckSessionCompleteResource(Resource):
             # Always compute canonical distance/elevation/pace from GPS data when sufficient points exist.
             # This ensures consistency across devices and long sessions.
             try:
+                # Import datetime parsing (once, outside loop)
+                from dateutil import parser as date_parser
+                
                 # Fetch GPS location points for this session
                 location_resp = supabase.table('location_point') \
                     .select('latitude,longitude,altitude,timestamp') \
@@ -970,7 +973,7 @@ class RuckSessionCompleteResource(Resource):
                         lat1, lon1 = float(prev_point['latitude']), float(prev_point['longitude'])
                         lat2, lon2 = float(curr_point['latitude']), float(curr_point['longitude'])
 
-                        # Haversine formula
+                        # Calculate segment distance using Haversine formula
                         R = 6371  # Earth's radius in km
                         dlat = math.radians(lat2 - lat1)
                         dlon = math.radians(lon2 - lon1)
@@ -979,7 +982,33 @@ class RuckSessionCompleteResource(Resource):
                              math.sin(dlon/2) * math.sin(dlon/2))
                         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
                         distance_km = R * c
-                        total_distance_km += distance_km
+                        distance_meters = distance_km * 1000
+                        
+                        # GPS VALIDATION: Apply same filters as frontend to remove GPS noise
+                        try:
+                            # Parse timestamps for time validation
+                            from dateutil import parser
+                            prev_time = parser.isoparse(prev_point['timestamp'])
+                            curr_time = parser.isoparse(curr_point['timestamp'])
+                            time_diff_seconds = (curr_time - prev_time).total_seconds()
+                            
+                            # Industry-standard GPS validation (matching frontend)
+                            has_minimum_time = time_diff_seconds >= 1  # At least 1 second apart
+                            is_realistic_distance = distance_meters < 100  # Less than 100m jump
+                            bounded_speed = (distance_meters / time_diff_seconds) <= 4.5 if time_diff_seconds > 0 else False  # <= 4.5 m/s (~10 mph)
+                            
+                            # Accept segment if realistic and timed, OR speed is within bounds
+                            if (is_realistic_distance and has_minimum_time) or bounded_speed:
+                                total_distance_km += distance_km
+                                logger.debug(f"[GPS_VALIDATION] Added segment: {distance_meters:.1f}m in {time_diff_seconds:.1f}s")
+                            else:
+                                logger.warning(f"[GPS_VALIDATION] Filtered unrealistic segment: {distance_meters:.1f}m in {time_diff_seconds:.1f}s (speed: {distance_meters/time_diff_seconds if time_diff_seconds > 0 else 0:.1f} m/s)")
+                                
+                        except Exception as validation_err:
+                            # If validation fails, fall back to basic distance check
+                            logger.warning(f"[GPS_VALIDATION] Validation failed, using basic filter: {validation_err}")
+                            if distance_meters < 200:  # Basic fallback: reject only extreme outliers
+                                total_distance_km += distance_km
 
                         # Elevation gain/loss with 2m threshold
                         if curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
@@ -989,6 +1018,8 @@ class RuckSessionCompleteResource(Resource):
                             elif alt_diff < -ELEV_THRESHOLD_M:
                                 elevation_loss_m += abs(alt_diff)
 
+                    logger.info(f"[CANONICAL] Processed {len(points)} GPS points, calculated distance: {total_distance_km:.3f}km")
+                    
                     # SAFETY CHECK: Only overwrite distance if backend calculation is greater than frontend
                     # This prevents GPS calculation errors from reducing accurate frontend distance tracking
                     client_distance_km = data.get('distance_km', 0.0)
