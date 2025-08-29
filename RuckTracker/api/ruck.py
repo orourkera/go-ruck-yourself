@@ -942,10 +942,15 @@ class RuckSessionCompleteResource(Resource):
             # SERVER-SIDE CANONICAL METRIC CALCULATION
             # Always compute canonical distance/elevation/pace from GPS data when sufficient points exist.
             # This ensures consistency across devices and long sessions.
+            
+            # Import datetime parsing (once, at function scope)
             try:
-                # Import datetime parsing (once, outside loop)
                 from dateutil import parser as date_parser
-                
+            except ImportError:
+                logger.error(f"dateutil not available for GPS validation on session {ruck_id}")
+                date_parser = None
+            
+            try:
                 # Fetch GPS location points for this session
                 location_resp = supabase.table('location_point') \
                     .select('latitude,longitude,altitude,timestamp') \
@@ -988,7 +993,10 @@ class RuckSessionCompleteResource(Resource):
                         segment_accepted = False
                         
                         try:
-                            # Parse timestamps for time validation
+                            # Parse timestamps for time validation (skip if dateutil unavailable)
+                            if date_parser is None:
+                                raise Exception("dateutil not available for timestamp validation")
+                                
                             prev_time = date_parser.isoparse(prev_point['timestamp'])
                             curr_time = date_parser.isoparse(curr_point['timestamp'])
                             time_diff_seconds = (curr_time - prev_time).total_seconds()
