@@ -158,24 +158,19 @@ class RuckCommentsResource(Resource):
                 return build_api_response(success=False, error="Failed to create comment in database.", status_code=500)
 
             created_comment = insert_result.data[0] if insert_result.data else None
-            
-            # Send push notifications to ruck owner AND all other commenters
+
+            # Notifications: owner-specific and prior participants
             try:
-                # Get ruck owner info
+                # Ruck owner (if present)
+                ruck_owner_id = None
                 ruck_response = supabase.table('ruck_session') \
                     .select('user_id') \
                     .eq('id', ruck_id) \
                     .execute()
-                
-                users_to_notify = set()
-                
-                # Add ruck owner to notification list (if not the commenter)
-                if ruck_response.data and ruck_response.data[0]['user_id'] != user_id:
+                if ruck_response.data:
                     ruck_owner_id = ruck_response.data[0]['user_id']
-                    users_to_notify.add(ruck_owner_id)
-                
-                # Get all previous commenters on this ruck (excluding current commenter and the just-created comment)
-                # Limit to 50 most recent to avoid timeout on popular rucks
+
+                # Prior commenters (excluding current commenter and owner)
                 previous_comments = supabase.table('ruck_comments') \
                     .select('user_id') \
                     .eq('ruck_id', ruck_id) \
@@ -184,93 +179,59 @@ class RuckCommentsResource(Resource):
                     .order('created_at', desc=True) \
                     .limit(50) \
                     .execute()
-                
+
+                participant_ids = set()
                 if previous_comments.data:
-                    # Add all unique commenters to notification list
                     logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Found {len(previous_comments.data)} previous commenters")
-                    for comment in previous_comments.data:
-                        users_to_notify.add(comment['user_id'])
-                        logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Added previous commenter {comment['user_id']} to notification list")
+                    for c in previous_comments.data:
+                        uid = c['user_id']
+                        if ruck_owner_id and uid == ruck_owner_id:
+                            continue
+                        participant_ids.add(uid)
                 else:
                     logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: No previous commenters found")
-                
-                # Get all users who liked this ruck (excluding current commenter)
-                # Limit to 100 most recent to avoid timeout on popular rucks
-                ruck_likes = supabase.table('ruck_likes') \
+
+                # Prior likers (excluding current commenter and owner)
+                likes_resp = supabase.table('ruck_likes') \
                     .select('user_id') \
                     .eq('ruck_id', ruck_id) \
                     .neq('user_id', user_id) \
                     .order('created_at', desc=True) \
-                    .limit(100) \
+                    .limit(200) \
                     .execute()
-                
-                if ruck_likes.data:
-                    # Add all users who liked the ruck to notification list
-                    logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Found {len(ruck_likes.data)} previous likers")
-                    for like in ruck_likes.data:
-                        users_to_notify.add(like['user_id'])
-                        logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Added previous liker {like['user_id']} to notification list")
+                if likes_resp.data:
+                    logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Found {len(likes_resp.data)} previous likers")
+                    for l in likes_resp.data:
+                        uid = l['user_id']
+                        if ruck_owner_id and uid == ruck_owner_id:
+                            continue
+                        participant_ids.add(uid)
                 else:
                     logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: No previous likers found")
-                
-                # Send notifications to all users who should be notified
-                logger.info(f"🔔 COMMENT NOTIFICATION DEBUG: Final users_to_notify set: {list(users_to_notify)}")
-                if users_to_notify:
-                    commenter_name = user_profile['username']
-                    
-                    # Send push notification
-                    logger.info(f"🔔 PUSH NOTIFICATION: Notifying {len(users_to_notify)} users about new comment from {commenter_name} on ruck {ruck_id}")
-                    logger.info(f"🔔 PUSH NOTIFICATION: User IDs to notify: {list(users_to_notify)}")
-                    
-                    device_tokens = get_user_device_tokens(list(users_to_notify))
-                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens")
-                    
-                    if device_tokens:
-                        logger.info(f"🔔 PUSH NOTIFICATION: Calling send_ruck_comment_notification...")
-                        result = push_service.send_ruck_comment_notification(
-                            device_tokens=device_tokens,
+
+                commenter_name = user_profile['username']
+
+                # 1) Notify owner with owner-specific message
+                if ruck_owner_id and ruck_owner_id != user_id:
+                    owner_tokens = get_user_device_tokens([ruck_owner_id])
+                    if owner_tokens:
+                        push_service.send_ruck_comment_notification(
+                            device_tokens=owner_tokens,
                             commenter_name=commenter_name,
                             ruck_id=ruck_id,
                             comment_id=str(created_comment['id'])
                         )
-                else:
-                    logger.warning(f"🔔 COMMENT NOTIFICATION DEBUG: No users to notify for comment on ruck {ruck_id} by {user_profile.get('username', 'unknown')}")
-                    
-                # Notify other prior participants (likers) besides commenters and owner
-                try:
-                    participant_ids = set()
-                    # previous likers excluding current commenter and owner
-                    if ruck_response.data:
-                        ruck_owner_id = ruck_response.data[0]['user_id']
-                    else:
-                        ruck_owner_id = None
 
-                    ruck_likes = supabase.table('ruck_likes') \
-                        .select('user_id') \
-                        .eq('ruck_id', ruck_id) \
-                        .neq('user_id', user_id) \
-                        .order('created_at', desc=True) \
-                        .limit(200) \
-                        .execute()
-                    if ruck_likes.data:
-                        for like in ruck_likes.data:
-                            uid = like['user_id']
-                            if ruck_owner_id and uid == ruck_owner_id:
-                                continue
-                            participant_ids.add(uid)
-
-                    if participant_ids:
-                        tokens = get_user_device_tokens(list(participant_ids))
-                        if tokens:
-                            push_service.send_ruck_participant_activity_notification(
-                                device_tokens=tokens,
-                                actor_name=user_profile['username'],
-                                ruck_id=str(ruck_id),
-                                activity_type='comment'
-                            )
-                except Exception as e:
-                    logger.error(f"Failed to notify prior participants about comment: {e}")
-                        
+                # 2) Notify prior participants with participant activity message
+                if participant_ids:
+                    tokens = get_user_device_tokens(list(participant_ids))
+                    if tokens:
+                        push_service.send_ruck_participant_activity_notification(
+                            device_tokens=tokens,
+                            actor_name=commenter_name,
+                            ruck_id=str(ruck_id),
+                            activity_type='comment'
+                        )
             except Exception as e:
                 logger.error(f"Failed to send comment notifications: {e}")
                 # Don't fail the comment if notification fails

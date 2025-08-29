@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/models/user.dart';
@@ -13,6 +14,12 @@ class AICheerleaderService {
   static const double _hrSpikePercent = 0.20; // 20% above baseline considered spike
   static const int _hrSpikeAbsoluteBpm = 150; // or absolute threshold
   
+  // Randomization controls
+  static const double _milestoneJitterPct = 0.20; // ±20%
+  static const int _timeCheckMinSec = 12 * 60; // 12 minutes
+  static const int _timeCheckMaxSec = 18 * 60; // 18 minutes
+  static const double _paceThresholdJitter = 0.05; // ±5% jitter on pace threshold
+
   DateTime? _lastTriggerTime;
   double? _lastDistance;
   DateTime? _lastTimeCheck;
@@ -20,9 +27,14 @@ class AICheerleaderService {
   int _triggerCount = 0;
   double? _hrBaseline; // smoothed baseline BPM
   DateTime? _lastHeartRateSpikeTime;
+  int? _lastHrSpikeCooldownSec;
+  int? _nextMilestoneMeters;
+  DateTime? _nextTimeCheckAt;
+  TriggerType? _lastTriggerType;
+  final math.Random _rand = math.Random();
 
   /// Analyzes session state and returns trigger type if one should fire
-  CheerleaderTrigger? analyzeTriggers(ActiveSessionRunning state) {
+  CheerleaderTrigger? analyzeTriggers(ActiveSessionRunning state, {required bool preferMetric}) {
     final now = DateTime.now();
     
     // Respect minimum interval between triggers
@@ -36,34 +48,35 @@ class AICheerleaderService {
       return null;
     }
 
-    // 1. Distance Milestone Trigger
-    final distanceTrigger = _checkDistanceMilestone(state);
-    if (distanceTrigger != null) {
-      _lastTriggerTime = now;
-      _triggerCount++;
-      return distanceTrigger;
-    }
-
-    // 2. Heart Rate Spike Trigger
+    // Prefer momentary conditions first (HR spike, pace drop), then milestone, then time check-in
     final hrTrigger = _checkHeartRateSpike(state, now);
-    if (hrTrigger != null) {
+    if (hrTrigger != null && _shouldAllowRepeat(TriggerType.heartRateSpike)) {
       _lastTriggerTime = now;
+      _lastTriggerType = hrTrigger.type;
       _triggerCount++;
       return hrTrigger;
     }
 
-    // 3. Pace Drop Trigger
     final paceTrigger = _checkPaceDropTrigger(state);
-    if (paceTrigger != null) {
+    if (paceTrigger != null && _shouldAllowRepeat(TriggerType.paceDrop)) {
       _lastTriggerTime = now;
+      _lastTriggerType = paceTrigger.type;
       _triggerCount++;
       return paceTrigger;
     }
 
-    // 4. Time Check-in Trigger
-    final timeTrigger = _checkTimeCheckTrigger(state);
-    if (timeTrigger != null) {
+    final distanceTrigger = _checkDistanceMilestone(state, preferMetric: preferMetric);
+    if (distanceTrigger != null && _shouldAllowRepeat(TriggerType.milestone)) {
       _lastTriggerTime = now;
+      _lastTriggerType = distanceTrigger.type;
+      _triggerCount++;
+      return distanceTrigger;
+    }
+
+    final timeTrigger = _checkTimeCheckTrigger(state);
+    if (timeTrigger != null && _shouldAllowRepeat(TriggerType.timeCheckIn)) {
+      _lastTriggerTime = now;
+      _lastTriggerType = timeTrigger.type;
       _triggerCount++;
       return timeTrigger;
     }
@@ -72,36 +85,24 @@ class AICheerleaderService {
   }
 
   /// Check for distance milestone achievements
-  CheerleaderTrigger? _checkDistanceMilestone(ActiveSessionRunning state) {
-    final distanceKm = state.distanceKm;
-    final distanceMeters = distanceKm * 1000.0;
-    final interval = _milestoneIntervalMeters;
+  CheerleaderTrigger? _checkDistanceMilestone(ActiveSessionRunning state, {required bool preferMetric}) {
+    final distanceMeters = state.distanceKm * 1000.0;
+    final base = preferMetric ? _milestoneIntervalMeters : 1609; // meters
 
-    // Handle first milestone when interval reached (e.g., 2km)
-    if (_lastDistance == null) {
-      if (distanceMeters >= interval) {
-        _lastDistance = distanceKm;
-        final currentMilestone = (distanceMeters ~/ interval);
-        return CheerleaderTrigger(
-          type: TriggerType.milestone,
-          data: {'distance': distanceKm, 'milestone': currentMilestone},
-        );
-      }
-      return null;
-    }
+    // Initialize next milestone with jitter
+    _nextMilestoneMeters ??= _jitteredInterval(base).toInt();
 
-    // Subsequent milestones based on the configured interval
-    final lastMilestone = (((_lastDistance! * 1000).toInt()) ~/ interval);
-    final currentMilestone = (distanceMeters.toInt() ~/ interval);
-
-    if (currentMilestone > lastMilestone) {
-      _lastDistance = distanceKm;
+    if (distanceMeters >= _nextMilestoneMeters!) {
+      // Compute milestone count in user's unit for context
+      final milestoneCount = (distanceMeters ~/ base);
+      // Schedule the next milestone
+      _nextMilestoneMeters = _nextMilestoneMeters! + _jitteredInterval(base).toInt();
+      _lastDistance = state.distanceKm;
       return CheerleaderTrigger(
         type: TriggerType.milestone,
-        data: {'distance': distanceKm, 'milestone': currentMilestone},
+        data: {'distance': state.distanceKm, 'milestone': milestoneCount},
       );
     }
-
     return null;
   }
 
@@ -113,8 +114,9 @@ class AICheerleaderService {
     }
 
     // Respect cooldown period between HR spike triggers
+    final cooldownSec = _lastHrSpikeCooldownSec ?? _hrSpikeCooldownSeconds;
     if (_lastHeartRateSpikeTime != null && 
-        now.difference(_lastHeartRateSpikeTime!).inSeconds < _hrSpikeCooldownSeconds) {
+        now.difference(_lastHeartRateSpikeTime!).inSeconds < cooldownSec) {
       return null;
     }
 
@@ -134,17 +136,23 @@ class AICheerleaderService {
     final isSpike = currentHR > spikeThreshold || currentHR >= _hrSpikeAbsoluteBpm;
     
     if (isSpike) {
-      _lastHeartRateSpikeTime = now;
-      AppLogger.info('[AI_CHEERLEADER] Heart rate spike detected: ${currentHR}bpm (baseline: ${_hrBaseline!.round()}bpm)');
-      
-      return CheerleaderTrigger(
-        type: TriggerType.heartRateSpike,
-        data: {
-          'heartRate': currentHR,
-          'baseline': _hrBaseline!.round(),
-          'spikePercent': (((currentHR - _hrBaseline!) / _hrBaseline!) * 100).round(),
-        },
-      );
+      final spikePct = ((currentHR - _hrBaseline!) / _hrBaseline!).clamp(0.0, 10.0);
+      // Probability increases with spike magnitude; 0.4..1.0
+      final p = _clamp(0.4 + (spikePct / 0.25) * 0.1, 0.4, 1.0);
+      if (_rand.nextDouble() <= p) {
+        _lastHeartRateSpikeTime = now;
+        // Randomize cooldown between 8–12 minutes
+        _lastHrSpikeCooldownSec = _randomInt(_timeCheckMinSec, _timeCheckMaxSec);
+        AppLogger.info('[AI_CHEERLEADER] Heart rate spike detected: ${currentHR}bpm (baseline: ${_hrBaseline!.round()}bpm, p=${p.toStringAsFixed(2)})');
+        return CheerleaderTrigger(
+          type: TriggerType.heartRateSpike,
+          data: {
+            'heartRate': currentHR,
+            'baseline': _hrBaseline!.round(),
+            'spikePercent': (spikePct * 100).round(),
+          },
+        );
+      }
     }
     
     return null;
@@ -161,14 +169,19 @@ class AICheerleaderService {
     _averagePace ??= currentPace;
     _averagePace = (_averagePace! * 0.8) + (currentPace * 0.2); // Smooth average
     
-    // Check if current pace is significantly slower than average
-    if (currentPace < (_averagePace! * _slowPaceThreshold)) {
+    // Check if current pace is significantly slower than average with jittered threshold
+    final effThreshold = _slowPaceThreshold + (_rand.nextDouble() * 2 * _paceThresholdJitter - _paceThresholdJitter);
+    if (currentPace < (_averagePace! * effThreshold)) {
+      final slowdownPercent = ((1 - (currentPace / _averagePace!)) * 100).clamp(0.0, 100.0).round();
+      // Probability scales with severity: 0.3..1.0 across 0–30%
+      final p = _clamp(slowdownPercent / 30.0, 0.3, 1.0);
+      if (_rand.nextDouble() > p) return null;
       return CheerleaderTrigger(
         type: TriggerType.paceDrop,
         data: {
           'currentPace': currentPace,
           'averagePace': _averagePace,
-          'slowdownPercent': ((1 - (currentPace / _averagePace!)) * 100).round(),
+          'slowdownPercent': slowdownPercent,
         },
       );
     }
@@ -179,14 +192,9 @@ class AICheerleaderService {
   /// Check for regular time-based check-ins
   CheerleaderTrigger? _checkTimeCheckTrigger(ActiveSessionRunning state) {
     final now = DateTime.now();
-    
-    if (_lastTimeCheck == null) {
-      _lastTimeCheck = now;
-      return null;
-    }
-    
-    if (now.difference(_lastTimeCheck!).inSeconds >= _timeCheckIntervalSeconds) {
-      _lastTimeCheck = now;
+    _nextTimeCheckAt ??= now.add(Duration(seconds: _randomInt(_timeCheckMinSec, _timeCheckMaxSec)));
+    if (now.isAfter(_nextTimeCheckAt!)) {
+      _nextTimeCheckAt = now.add(Duration(seconds: _randomInt(_timeCheckMinSec, _timeCheckMaxSec)));
       return CheerleaderTrigger(
         type: TriggerType.timeCheckIn,
         data: {
@@ -195,7 +203,6 @@ class AICheerleaderService {
         },
       );
     }
-    
     return null;
   }
 
@@ -320,7 +327,24 @@ class AICheerleaderService {
     _triggerCount = 0;
     _hrBaseline = null;
     _lastHeartRateSpikeTime = null;
+    _lastHrSpikeCooldownSec = null;
+    _nextMilestoneMeters = null;
+    _nextTimeCheckAt = null;
+    _lastTriggerType = null;
     AppLogger.info('[AI_CHEERLEADER] Service reset for new session');
+  }
+
+  int _randomInt(int min, int max) => min + _rand.nextInt((max - min) + 1);
+  double _clamp(double v, double lo, double hi) => v < lo ? lo : (v > hi ? hi : v);
+  double _jitteredInterval(int baseMeters) {
+    final jitter = 1.0 + (_rand.nextDouble() * 2 * _milestoneJitterPct - _milestoneJitterPct);
+    return baseMeters * jitter;
+  }
+
+  bool _shouldAllowRepeat(TriggerType type) {
+    // Prefer variety: if same as last type, allow only with small probability
+    if (_lastTriggerType == null || _lastTriggerType != type) return true;
+    return _rand.nextDouble() < 0.3; // 30% chance to allow immediate repeat of same type
   }
 }
 

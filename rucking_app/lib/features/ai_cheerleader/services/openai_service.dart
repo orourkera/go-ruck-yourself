@@ -482,10 +482,9 @@ Respond with your motivational message:''';
         final milestone = triggerData['milestone'];
         final distanceObj = session is Map ? session['distance'] : null;
         final unit = distanceObj is Map && distanceObj['unit'] != null ? distanceObj['unit'] : 'km';
-        final userPreferMetric = (user is Map && user['preferMetric'] is bool) ? user['preferMetric'] as bool : true;
         if (milestone is num) {
-          final milestoneValue = userPreferMetric ? milestone : (milestone * 0.621371).toStringAsFixed(1);
-          contextText += " Just hit ${milestoneValue}${unit} milestone!";
+          // Milestone is already in the user's preferred unit (km or miles)
+          contextText += " Just hit ${milestone}${unit} milestone!";
         }
         break;
       case 'paceDrop':

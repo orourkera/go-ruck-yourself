@@ -336,7 +336,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   Future<void> _checkAICheerleaderTriggers(ActiveSessionRunning state) async {
     try {
       AppLogger.info('[AI_DEBUG] Analyzing triggers for state: distance=${state.distanceKm}km, time=${state.elapsedSeconds}s');
-      final trigger = _aiCheerleaderService.analyzeTriggers(state);
+      final trigger = _aiCheerleaderService.analyzeTriggers(
+        state,
+        preferMetric: _currentUser!.preferMetric,
+      );
       AppLogger.info('[AI_DEBUG] Trigger analysis result: ${trigger?.type.name ?? 'null'}');
       if (trigger != null) {
         AppLogger.info('[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
