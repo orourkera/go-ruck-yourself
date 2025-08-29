@@ -1129,10 +1129,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                         AppLogger.info('[HOME_SCREEN] Showing AI Insights Widget (featureFlag=$featureFlagEnabled, forceEnable=$forceEnable)');
                         return Column(
                           children: const [
-                            // Halve spacing between "My Routes" link and AI card
+                            // Tight top gap before AI card
                             SizedBox(height: 8),
                             AIInsightsWidget(),
-                            SizedBox(height: 16),
+                            // Reduce space after AI card
+                            SizedBox(height: 8),
                           ],
                         );
                       } else {

@@ -989,16 +989,31 @@ class RuckSessionCompleteResource(Resource):
                             elif alt_diff < -ELEV_THRESHOLD_M:
                                 elevation_loss_m += abs(alt_diff)
 
-                    # Overwrite with canonical metrics
-                    update_data['distance_km'] = round(total_distance_km, 3)
+                    # SAFETY CHECK: Only overwrite distance if backend calculation is greater than frontend
+                    # This prevents GPS calculation errors from reducing accurate frontend distance tracking
+                    client_distance_km = data.get('distance_km', 0.0)
+                    server_distance_km = round(total_distance_km, 3)
+                    
+                    if server_distance_km >= client_distance_km or client_distance_km == 0:
+                        # Backend calculation is greater or equal, or no client data - use server calculation
+                        update_data['distance_km'] = server_distance_km
+                        logger.info(f"[DISTANCE_SAFETY] Using server distance: {server_distance_km}km (client: {client_distance_km}km)")
+                    else:
+                        # Backend calculation is less than client - keep client value for safety
+                        # This preserves accurate frontend tracking when backend has GPS gaps
+                        update_data['distance_km'] = client_distance_km
+                        logger.warning(f"[DISTANCE_SAFETY] Keeping client distance: {client_distance_km}km (server would be: {server_distance_km}km) - backend calculation appears incomplete")
+                    
+                    # Always use server-calculated elevation as it's more reliable with larger datasets
                     update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
                     update_data['elevation_loss_m'] = round(elevation_loss_m, 1)
 
-                    # Average pace (sec/km) from canonical distance
-                    if total_distance_km > 0 and duration_seconds > 0:
-                        calculated_pace = duration_seconds / total_distance_km
+                    # Average pace (sec/km) from final distance (after safety check)
+                    final_distance_km = update_data.get('distance_km', 0.0)
+                    if final_distance_km > 0 and duration_seconds > 0:
+                        calculated_pace = duration_seconds / final_distance_km
                         update_data['average_pace'] = calculated_pace
-                        logger.info(f"[CANONICAL][PACE] {duration_seconds}s ÷ {total_distance_km:.3f}km = {calculated_pace:.2f} sec/km")
+                        logger.info(f"[CANONICAL][PACE] {duration_seconds}s ÷ {final_distance_km:.3f}km = {calculated_pace:.2f} sec/km")
 
                     # Calorie estimate if client didn't send a value
                     if not update_data.get('calories_burned') or update_data.get('calories_burned', 0) == 0:
@@ -1761,10 +1776,10 @@ class RuckSessionEditResource(Resource):
             return {
                 'message': 'Session completed successfully',
                 'session_id': ruck_id,
-                'distance_km': update_data.get('distance_km', 0),
-                'calories_burned': update_data.get('calories_burned', 0),
-                'duration_seconds': update_data.get('duration_seconds', 0),
-                'average_pace': update_data.get('average_pace', 0)
+                'distance_km': data.get('distance_km', 0),
+                'calories_burned': data.get('calories_burned', 0),
+                'duration_seconds': data.get('duration_seconds', 0),
+                'average_pace': data.get('average_pace_min_per_km', 0)
             }, 200
             
         except Exception as e:

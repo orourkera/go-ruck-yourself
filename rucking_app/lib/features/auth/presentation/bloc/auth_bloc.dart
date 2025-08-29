@@ -9,6 +9,7 @@ import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:rucking_app/core/services/ai_insights_service.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -54,6 +55,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             
             emit(Authenticated(user));
             _registerFirebaseTokenAfterAuth();
+            // Pre-warm AI insights cache for faster home render
+            _prewarmHomepageInsights(user);
           } else {
             // Could not fetch user data even though token exists – treating as unauthenticated
             AppLogger.warning('[AuthBloc] Could not get user data, emitting Unauthenticated.');
@@ -95,6 +98,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (fullUser != null) {
          emit(Authenticated(fullUser));
          _registerFirebaseTokenAfterAuth();
+         _prewarmHomepageInsights(fullUser);
       } else {
          // Should not happen if login succeeded, but handle defensively
          // Maybe emit Authenticated with just loginUser? Or an error?
@@ -102,6 +106,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
          emit(Authenticated(loginUser)); 
          _registerFirebaseTokenAfterAuth();
          emit(AuthError('Login succeeded but failed to fetch full user profile afterward.'));
+         _prewarmHomepageInsights(loginUser);
       }
 
     } catch (e) {
@@ -142,6 +147,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       // Register Firebase token after successful authentication
       _registerFirebaseTokenAfterAuth();
+      _prewarmHomepageInsights(user);
     } catch (e) {
       AppLogger.error('Google login failed', exception: e);
       
@@ -176,6 +182,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       // Register Firebase token after successful authentication
       _registerFirebaseTokenAfterAuth();
+      _prewarmHomepageInsights(user);
     } catch (e) {
       AppLogger.error('Apple login failed', exception: e);
       emit(AuthError('Apple login failed: $e'));
@@ -203,6 +210,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       emit(Authenticated(user));
       _registerFirebaseTokenAfterAuth();
+      _prewarmHomepageInsights(user);
     } catch (e) {
       if (e.toString().contains('ConflictException') || e.toString().contains('already exists')) {
         emit(AuthUserAlreadyExists('An account with this email already exists. Please sign in instead.'));
@@ -233,8 +241,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       emit(Authenticated(user)); 
       _registerFirebaseTokenAfterAuth();
+      _prewarmHomepageInsights(user);
     } catch (e) {
       emit(AuthError('Google registration failed: $e'));
+    }
+  }
+
+  void _prewarmHomepageInsights(User user) {
+    try {
+      // Fire-and-forget; do not await to avoid blocking auth flow
+      final service = GetIt.instance<AIInsightsService>();
+      // Use microtask to ensure it runs after current event loop
+      Future.microtask(() => service.prewarmHomepageInsights(
+            userId: user.userId,
+            preferMetric: user.preferMetric,
+            username: user.username,
+          ));
+    } catch (e) {
+      AppLogger.warning('[AuthBloc] Failed to prewarm AI insights: $e');
     }
   }
 

@@ -8,6 +8,8 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/models/weather.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 /// Service that analyzes user patterns and generates AI-powered insights for the homepage
 class AIInsightsService {
@@ -113,6 +115,55 @@ class AIInsightsService {
         'preferMetric': preferMetric,
       });
     }
+  }
+
+  /// Pre-warm the daily homepage insight cache so the widget renders instantly.
+  /// Safe to call on app start or right after login.
+  Future<void> prewarmHomepageInsights({
+    required String userId,
+    required bool preferMetric,
+    required String username,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final timeOfDay = _getTimeOfDay(now);
+      final dayOfWeek = DateFormat('EEEE').format(now);
+      final insight = await generateHomepageInsights(
+        preferMetric: preferMetric,
+        timeOfDay: timeOfDay,
+        dayOfWeek: dayOfWeek,
+        username: username,
+      );
+      await _saveHomeCache(userId, insight);
+      AppLogger.info('[AI_INSIGHTS] Prewarmed homepage insight cache for $userId');
+    } catch (e) {
+      AppLogger.warning('[AI_INSIGHTS] Failed to prewarm homepage insights: $e');
+    }
+  }
+
+  // --- Helpers for prewarming ---
+  String _getTimeOfDay(DateTime time) {
+    final hour = time.hour;
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    if (hour < 21) return 'evening';
+    return 'night';
+  }
+
+  Future<void> _saveHomeCache(String userId, AIInsight insight) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'ai_home_cache_${userId}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}';
+      final map = {
+        'greeting': insight.greeting,
+        'insight': insight.insight,
+        'recommendation': insight.recommendation,
+        'motivation': insight.motivation,
+        'emoji': insight.emoji,
+        'generatedAt': insight.generatedAt.toIso8601String(),
+      };
+      await prefs.setString(key, jsonEncode(map));
+    } catch (_) {}
   }
 
   /// Fetch user insights snapshot from the API

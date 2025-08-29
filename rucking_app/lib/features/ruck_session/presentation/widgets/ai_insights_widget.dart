@@ -144,7 +144,8 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     AppLogger.debug('[AI_INSIGHTS] Widget rendering: loading=$_isLoading, hasInsight=${_currentInsight != null}, hasError=$_hasError');
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16.0),
+      // Tighter outer spacing so the card blends into the feed
+      margin: const EdgeInsets.only(bottom: 8.0),
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -162,7 +163,8 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          // Slightly reduce inner padding for a denser look
+          padding: const EdgeInsets.all(16.0),
           child: _buildContent(),
         ),
       ),
