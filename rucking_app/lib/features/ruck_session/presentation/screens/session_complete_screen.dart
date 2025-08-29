@@ -200,8 +200,16 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     _apiClient = GetIt.I<ApiClient>();
     _notesController.text = widget.initialNotes ?? '';
     
-    // Debug logging for splits received
-    print('[DEBUG] SessionCompleteScreen received splits:');
+    // Debug logging for all metrics received
+    print('[DEBUG] SessionCompleteScreen received metrics:');
+    print('[DEBUG] Duration: ${widget.duration}');
+    print('[DEBUG] Distance: ${widget.distance} km');
+    print('[DEBUG] Calories: ${widget.caloriesBurned}');
+    print('[DEBUG] Elevation Gain: ${widget.elevationGain} m');
+    print('[DEBUG] Elevation Loss: ${widget.elevationLoss} m');
+    print('[DEBUG] Ruck Weight: ${widget.ruckWeight} kg');
+    print('[DEBUG] Steps: ${widget.steps}');
+    print('[DEBUG] Heart Rate Samples: ${widget.heartRateSamples?.length ?? 'null'}');
     print('[DEBUG] Splits type: ${widget.splits.runtimeType}');
     print('[DEBUG] Splits length: ${widget.splits?.length ?? 'null'}');
     if (widget.splits != null && widget.splits!.isNotEmpty) {
@@ -255,8 +263,8 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final completionData = <String, dynamic>{
         'completed_at': widget.completedAt.toIso8601String(),
         'duration_seconds': widget.duration.inSeconds,
-        // DON'T send distance_km - let backend calculate from uploaded location points
-        // 'distance_km': widget.distance,  // REMOVED - backend calculates this
+        // Send distance_km as fallback - backend will use this if GPS calculation fails
+        'distance_km': widget.distance,
         'ruck_weight_kg': widget.ruckWeight,
         'is_manual': widget.isManual,
         'calories_burned': widget.caloriesBurned,

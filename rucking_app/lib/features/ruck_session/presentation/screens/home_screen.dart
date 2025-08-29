@@ -36,10 +36,12 @@ import 'package:rucking_app/core/services/app_update_service.dart';
 import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/user_avatar.dart';
 import 'package:get_it/get_it.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
-import '../../../../shared/widgets/map/robust_tile_layer.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
@@ -58,6 +60,9 @@ import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/active_session_page.dart';
+import 'package:rucking_app/features/ruck_session/presentation/widgets/ai_insights_widget.dart';
+import 'package:rucking_app/core/config/feature_flags.dart';
+import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -1061,6 +1066,33 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                   ),
                   const SizedBox(height: 32),
                   
+                  // AI Insights Widget (behind feature flag)
+                  Builder(
+                    builder: (context) {
+                      final featureFlagEnabled = FeatureFlags.enableAIHomepageInsights;
+                      AppLogger.debug('[HOME_SCREEN] AI Homepage Insights feature flag: $featureFlagEnabled');
+                      AppLogger.debug('[HOME_SCREEN] kDebugMode: ${kDebugMode}');
+                      AppLogger.debug('[HOME_SCREEN] Remote config debug: ${FeatureFlags.getRemoteConfigDebugInfo()}');
+                      
+                      // TEMPORARILY FORCE ENABLE FOR DEBUGGING
+                      const forceEnable = true;
+                      
+                      if (featureFlagEnabled || forceEnable) {
+                        AppLogger.info('[HOME_SCREEN] Showing AI Insights Widget (featureFlag=$featureFlagEnabled, forceEnable=$forceEnable)');
+                        return Column(
+                          children: [
+                            const SizedBox(height: 20),
+                            const AIInsightsWidget(),
+                          ],
+                        );
+                      } else {
+                        AppLogger.info('[HOME_SCREEN] AI Insights Widget hidden by feature flag');
+                        return const SizedBox.shrink();
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  
                   // Create session button - full width and orange
                   SizedBox(
                     width: double.infinity,
@@ -1128,9 +1160,8 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                         padding: EdgeInsets.symmetric(vertical: 30),
                         child: Column(
                           children: [
-                            SessionCardSkeleton(),
-                            SessionCardSkeleton(),
-                            SessionCardSkeleton(),
+                            const SizedBox(height: 20),
+                            const AIInsightsWidget(),
                           ],
                         ),
                       ),

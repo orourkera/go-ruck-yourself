@@ -340,6 +340,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                         focusNode: _commentFocusNode,
                         maxLines: 3,
                         minLines: 1,
+                        textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
                           hintText: _editingCommentId != null
                               ? 'Edit your comment...'
@@ -585,6 +586,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                       child: TextField(
                         controller: _commentController,
                         focusNode: _commentFocusNode,
+                        textCapitalization: TextCapitalization.sentences,
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           border: OutlineInputBorder(

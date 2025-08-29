@@ -194,6 +194,16 @@ class WatchService {
           } else {
             AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ INVALID heart rate from WatchConnectivity: $hr (type: ${hr.runtimeType})');
           }
+        } else if (command == 'watchStepUpdate') {
+          final steps = data['steps'];
+          AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🚶 RECEIVED watchStepUpdate command - raw data: $data');
+          if (steps is num) {
+            final stepValue = steps.toInt();
+            AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🚶 PROCESSING valid steps: $stepValue steps');
+            _handleWatchStepUpdate(stepValue);
+          } else {
+            AppLogger.error('[WATCH_SERVICE] [STEPS_DEBUG] ❌ INVALID step count from WatchConnectivity: $steps (type: ${steps.runtimeType})');
+          }
         } else if (command == 'heartRateDebug') {
           AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 📊 Heart rate debug from watch: $data');
         } else if (command == 'healthKitStatus') {
@@ -359,6 +369,23 @@ class WatchService {
       
     } catch (e) {
       AppLogger.error('[WATCH] Failed to handle session end from Watch: $e');
+    }
+  }
+
+  /// Handle step update from Apple Watch
+  void _handleWatchStepUpdate(int stepCount) {
+    try {
+      AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 📊 Processing step update: $stepCount steps');
+      
+      // Broadcast step count to the steps stream
+      if (!_stepsController.isClosed) {
+        _stepsController.add(stepCount);
+        AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] ✅ Step count broadcasted to stream: $stepCount steps');
+      } else {
+        AppLogger.warning('[WATCH_SERVICE] [STEPS_DEBUG] ❌ Steps controller is closed, cannot broadcast');
+      }
+    } catch (e) {
+      AppLogger.error('[WATCH_SERVICE] [STEPS_DEBUG] ❌ Failed to handle step update: $e');
     }
   }
 

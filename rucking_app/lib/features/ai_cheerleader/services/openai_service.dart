@@ -190,8 +190,9 @@ class OpenAIService {
 
       final prompt = [
         'You are naming a Strava activity for a weighted ruck workout.',
-        'Write ONE catchy title, 8-12 words. Emojis allowed. No hashtags.',
-        'Avoid generic words like "Workout" or "Activity". Prefer unique phrasing.',
+        'Write ONE catchy, creative title, 8-12 words. Emojis encouraged. No hashtags.',
+        'Be imaginative and fun - avoid generic words like "Workout" or "Activity".',
+        'Use wordplay, alliteration, or cultural references when appropriate.',
         'Context:',
         'distance=$distance, duration=${mins}m, ruck_weight=$weight, city=${city ?? 'Unknown'}, day=$timeOfDay.',
         'Output just the title text.'
@@ -206,7 +207,7 @@ class OpenAIService {
           ),
         ],
         maxTokens: 32,
-        temperature: 0.8,
+        temperature: 0.9, // Increased for more creative titles
       ).timeout(const Duration(seconds: 4));
 
       var title = completion.choices.first.message.content?.first.text?.trim();

@@ -174,7 +174,11 @@ class StravaService {
     }
     
     buffer.writeln('🎒 Ruck Session');
-    buffer.writeln('📏 Distance: ${MeasurementUtils.formatDistance(distanceKm, metric: preferMetric)}');
+    
+    // Only show distance if it's greater than 0
+    if (distanceKm > 0) {
+      buffer.writeln('📏 Distance: ${MeasurementUtils.formatDistance(distanceKm, metric: preferMetric)}');
+    }
     
     if (ruckWeightKg > 0) {
       buffer.writeln('⚖️ Ruck Weight: ${MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric)}');
@@ -182,7 +186,8 @@ class StravaService {
     
     buffer.writeln('⏱️ Duration: ${_formatDuration(duration)}');
     
-    if (calories != null) {
+    // Only show calories if they're greater than 0
+    if (calories != null && calories > 0) {
       buffer.writeln('🔥 Estimated Calories: $calories');
     }
     

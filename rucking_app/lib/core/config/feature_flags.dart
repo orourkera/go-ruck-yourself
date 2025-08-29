@@ -62,7 +62,18 @@ class FeatureFlags {
   /// Keep Mailjet marketing integration
   /// ✅ ALWAYS ENABLED: Custom marketing automation
   static bool get keepMailjetIntegration => true;
+
+  // ============================================================================
+  // 🤖 AI PERSONALIZATION FEATURES
+  // ============================================================================
   
+  /// Enable AI-powered homepage insights and personalization
+  /// 🌐 REMOTE CONTROLLED: Can be toggled instantly via Firebase Console
+  /// 🔒 FALLBACK: Disabled in production, enabled in debug for testing
+  static bool get enableAIHomepageInsights {
+    return _remoteConfig.getBool('enable_ai_homepage_insights', fallback: kDebugMode);
+  }
+
   // ============================================================================
   // 📊 STATUS & UTILITY METHODS
   // ============================================================================

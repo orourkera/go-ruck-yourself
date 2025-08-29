@@ -113,14 +113,10 @@ class LocationTrackingManager implements SessionManager {
   double _lastKnownTotalDistance = 0.0;
   int _lastProcessedLocationIndex = 0;
 
-  // Inactivity detection state
-  DateTime? _lastMovementTime;
-  DateTime? _lastInactivityNotificationTime;
-  bool _inactiveNotified = false;
-  double _lastNotifiedDistanceKm = 0.0;
+  // Inactivity detection moved to SessionCompletionDetectionService
   // Thresholds
-  static const Duration _inactivityThreshold = Duration(minutes: 12);
-  static const Duration _inactivityCooldown = Duration(minutes: 20);
+  // Inactivity detection moved to SessionCompletionDetectionService
+  // Movement thresholds kept for distance tracking but not for idle detection
   static const double _movementDistanceMetersThreshold = 12.0; // 10–15m
   static const double _movementSpeedThreshold = 0.1; // m/s (lowered from 0.3 to reduce false idle detection)
 
@@ -201,11 +197,7 @@ class LocationTrackingManager implements SessionManager {
     _lastValidLocation = null; // Reset validation state
     _lastKnownTotalDistance = 0.0; // Reset cumulative distance
     _lastProcessedLocationIndex = -1; // Reset to unprocessed state (CRITICAL FIX)
-    // Reset inactivity detection state
-    _lastMovementTime = DateTime.now();
-    _lastInactivityNotificationTime = null;
-    _inactiveNotified = false;
-    _lastNotifiedDistanceKm = 0.0;
+    // Inactivity detection moved to SessionCompletionDetectionService
     
     // Cache user metric preference at session start to avoid repeated API calls
     try {
@@ -288,11 +280,7 @@ class LocationTrackingManager implements SessionManager {
     _lastLocationTimestamp = null;
     _sessionStartTime = null;
     _isPaused = false;
-    // Clear inactivity detection state
-    _lastMovementTime = null;
-    _lastInactivityNotificationTime = null;
-    _inactiveNotified = false;
-    _lastNotifiedDistanceKm = 0.0;
+    // Inactivity detection moved to SessionCompletionDetectionService
     
     // Clear cached user preference
     _cachedIsMetric = null;
@@ -484,35 +472,8 @@ class LocationTrackingManager implements SessionManager {
     final newDistance = _calculateTotalDistance();
     final newPace = _calculateCurrentPace(position.speed ?? 0.0);
     final newAveragePace = _calculateAveragePace(newDistance);
-    // Movement detection: update lastMovementTime on meaningful progress
-    try {
-      final hasMeaningfulDistance = (() {
-        if (_locationPoints.length < 2) return false;
-        final prev = _locationPoints[_locationPoints.length - 2];
-        final dMeters = _haversineDistance(prev.latitude, prev.longitude, newPoint.latitude, newPoint.longitude) * 1000.0;
-        return dMeters >= _movementDistanceMetersThreshold;
-      })();
-      final hasMeaningfulSpeed = (position.speed ?? 0.0) >= _movementSpeedThreshold;
-      
-      // Also check heart rate as movement indicator (if HR is elevated, user is likely moving)
-      bool hasElevatedHeartRate = false;
-      final hr = _watchService.getCurrentHeartRate();
-      if (hr != null) {
-        final currentHR = hr.toInt();
-        // If HR is >100 BPM, assume user is moving (even if GPS doesn't detect it)
-        hasElevatedHeartRate = currentHR > 100;
-      }
-      
-      if (hasMeaningfulDistance || hasMeaningfulSpeed || hasElevatedHeartRate) {
-        _lastMovementTime = DateTime.now();
-        if (_inactiveNotified) {
-          // Reset notification flag if user started moving again by 30m from last notified distance
-          if ((newDistance - _lastNotifiedDistanceKm) * 1000.0 >= 30.0) {
-            _inactiveNotified = false;
-          }
-        }
-      }
-    } catch (_) {}
+    // Movement detection moved to SessionCompletionDetectionService
+    // This eliminates duplicate notifications and improves accuracy
     
     // Calculate elevation gain/loss using sophisticated iOS/Android platform-specific processing
     double elevationGain = 0.0;
@@ -1002,49 +963,8 @@ class LocationTrackingManager implements SessionManager {
         AppLogger.info('[LOCATION] Watchdog: GPS health restored, reset restart counter');
       }
 
-      // Inactivity detection check (runs alongside watchdog every 30s)
-      try {
-        if (_activeSessionId != null && !_isPaused) {
-          // Skip if GPS unhealthy (to avoid false positives)
-          final gpsHealthy = _validLocationCount > 5 && timeSinceLastValid < 60 && (_currentState.isGpsReady == true);
-          if (!gpsHealthy) return;
-
-          // Establish baseline movement time
-          _lastMovementTime ??= _sessionStartTime ?? now;
-          final inactiveFor = now.difference(_lastMovementTime!);
-
-          if (inactiveFor >= _inactivityThreshold) {
-            final cooledDown = _lastInactivityNotificationTime == null || now.difference(_lastInactivityNotificationTime!) >= _inactivityCooldown;
-            if (cooledDown && !_inactiveNotified) {
-              // Foreground/background awareness
-              final lifecycle = GetIt.I<AppLifecycleService>();
-              final inBackground = lifecycle.isInBackground;
-              final minutes = inactiveFor.inMinutes;
-
-              if (inBackground) {
-                // Send local notification
-                final fcm = GetIt.I<FirebaseMessagingService>();
-                final notifId = _activeSessionId!.hashCode;
-                fcm.showNotification(
-                  id: notifId,
-                  title: 'Inactive Ruck Session',
-                  body: 'Your ruck has been inactive for $minutes minutes. Pause or End?',
-                  payload: 'inactive_session:${_activeSessionId!}',
-                ).catchError((e) => AppLogger.error('[LOCATION_MANAGER] Failed to show inactivity notification: $e'));
-              } else {
-                // App in foreground – prefer UI prompt; log for now to avoid cross-file edits
-                AppLogger.info('[LOCATION_MANAGER] Inactivity detected ($minutes min) – app in foreground; suppressing push.');
-              }
-
-              _lastInactivityNotificationTime = now;
-              _inactiveNotified = true;
-              _lastNotifiedDistanceKm = _lastKnownTotalDistance;
-            }
-          }
-        }
-      } catch (e) {
-        AppLogger.error('[LOCATION_MANAGER] Inactivity check error: $e');
-      }
+        // Inactivity detection removed - now handled by SessionCompletionDetectionService
+  // This eliminates duplicate notifications and improves accuracy
     });
   }
   

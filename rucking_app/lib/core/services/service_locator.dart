@@ -31,6 +31,7 @@ import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/core/services/ai_insights_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
@@ -175,6 +176,13 @@ Future<void> setupServiceLocator() async {
   
   // Register OpenAIService with logger dependency
   GetIt.I.registerSingleton<OpenAIService>(OpenAIService(logger: GetIt.I<SimpleAILogger>()));
+  
+  // Register AI Insights Service for homepage personalization
+  GetIt.I.registerSingleton<AIInsightsService>(AIInsightsService(
+    openAIService: GetIt.I<OpenAIService>(),
+    apiClient: GetIt.I<ApiClient>(),
+  ));
+  
   GetIt.I.registerSingleton<ElevenLabsService>(ElevenLabsService(elevenLabsApiKey));
   GetIt.I.registerSingleton<LocationContextService>(LocationContextService());
   GetIt.I.registerSingleton<AIAudioService>(AIAudioService());

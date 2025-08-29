@@ -70,8 +70,14 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   // Manager state subscriptions
   final List<StreamSubscription> _managerSubscriptions = [];
   
-  // State tracking
+  // Current aggregated state
   ActiveSessionState _currentAggregatedState = const ActiveSessionInitial();
+  
+  // Store last known running state metrics to use during completion
+  double _lastRunningDistance = 0.0;
+  int _lastRunningCalories = 0;
+  double _lastRunningElevationGain = 0.0;
+  double _lastRunningElevationLoss = 0.0;
   Map<String, dynamic>? _sessionCompletionData;
   int? _currentSteps;
   StreamSubscription<int>? _stepsSub;
@@ -437,6 +443,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       double finalElevationGain = 0.0;
       double finalElevationLoss = 0.0;
       
+      AppLogger.info('[COORDINATOR] Current aggregated state type: ${_currentAggregatedState.runtimeType}');
+      AppLogger.info('[COORDINATOR] Location manager distance: ${_locationManager.currentState.totalDistance}km');
+      AppLogger.info('[COORDINATOR] Location manager elevation: ${_locationManager.elevationGain}m gain/${_locationManager.elevationLoss}m loss');
+      
       if (_currentAggregatedState is ActiveSessionRunning) {
         final runningState = _currentAggregatedState as ActiveSessionRunning;
         finalDistance = runningState.distanceKm;
@@ -444,8 +454,15 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         finalElevationGain = runningState.elevationGain;
         finalElevationLoss = runningState.elevationLoss;
         AppLogger.info('[COORDINATOR] Using calculated values from running state: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m gain/${finalElevationLoss}m loss');
+      } else if (_lastRunningDistance > 0.0 || _lastRunningCalories > 0 || _lastRunningElevationGain > 0.0) {
+        // Use preserved running state metrics from last known good state
+        finalDistance = _lastRunningDistance;
+        finalCalories = _lastRunningCalories;
+        finalElevationGain = _lastRunningElevationGain;
+        finalElevationLoss = _lastRunningElevationLoss;
+        AppLogger.info('[COORDINATOR] Using preserved running state metrics: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m gain/${finalElevationLoss}m loss');
       } else {
-        // Fallback to location manager if no running state available
+        // Final fallback to location manager if no preserved state available
         finalDistance = _locationManager.currentState.totalDistance;
         finalElevationGain = _locationManager.elevationGain;
         finalElevationLoss = _locationManager.elevationLoss;
@@ -485,7 +502,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         averagePace: finalDistance > 0 ? duration.inSeconds / finalDistance : null,
         route: route,
         heartRateSamples: _heartRateManager.heartRateSampleObjects,
-        averageHeartRate: _heartRateManager.currentState.averageHeartRate.toInt(),
+        averageHeartRate: _heartRateManager.currentState.averageHeartRate?.toInt(),
         minHeartRate: _heartRateManager.currentState.minHeartRate,
         maxHeartRate: _heartRateManager.currentState.maxHeartRate,
         sessionPhotos: _photoManager.photos,
@@ -508,8 +525,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       
       // Store completion data for lifecycle manager
       _sessionCompletionData = {
-        // DON'T send distance_km - let backend calculate from already-uploaded location points
-        // 'distance_km': finalDistance,  // REMOVED - backend calculates this
+        // Send distance_km as fallback - backend will use this if GPS calculation fails
+        'distance_km': finalDistance,
         'calories_burned': finalCalories,
         if (_lastCalorieMethod != null) 'calorie_method': _lastCalorieMethod,
         'elevation_gain_m': finalElevationGain,
@@ -562,34 +579,40 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       
       _currentAggregatedState = ActiveSessionRunning(
         sessionId: lifecycleState.sessionId!,
+        userWeightKg: lifecycleState.userWeightKg,
+        ruckWeightKg: lifecycleState.ruckWeightKg,
         locationPoints: locationPoints,
         elapsedSeconds: lifecycleState.duration.inSeconds,
         distanceKm: locationState.totalDistance,
-        ruckWeightKg: ruckWeightKg,
-        userWeightKg: userWeightKg,
+        elevationGain: locationState.elevationGain,
+        elevationLoss: locationState.elevationLoss,
         calories: calories.toDouble(),
-        elevationGain: _locationManager.elevationGain,
-        elevationLoss: _locationManager.elevationLoss,
-        isPaused: _lifecycleManager.isPaused,
         pace: locationState.currentPace,
-        originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now(),
-        totalPausedDuration: _lifecycleManager.totalPausedDuration,
-        heartRateSamples: _heartRateManager.heartRateSampleObjects,
+        isPaused: _lifecycleManager.isPaused,
+        originalSessionStartTimeUtc: lifecycleState.startTime ?? DateTime.now().toUtc(),
+        totalPausedDuration: lifecycleState.totalPausedDuration ?? Duration.zero,
         latestHeartRate: heartRateState.currentHeartRate,
         minHeartRate: heartRateState.minHeartRate,
         maxHeartRate: heartRateState.maxHeartRate,
+        heartRateSamples: _heartRateManager.heartRateSampleObjects,
         isGpsReady: _locationManager.isGpsReady,
-        hasGpsAccess: locationState.isTracking,
+        plannedRoute: null, // TODO: Get planned route from correct source
+        plannedRouteDistance: null,
+        plannedRouteDuration: null,
         photos: _photoManager.photos,
         isPhotosLoading: _photoManager.isPhotosLoading,
         isUploading: _uploadManager.isUploading,
         splits: _locationManager.splits,
         terrainSegments: _locationManager.terrainSegments,
-        plannedRoute: _plannedRoute, // Pass planned route for navigation
-        plannedRouteDistance: _plannedRouteDistance, // Pass route distance
-        plannedRouteDuration: _plannedRouteDuration, // Pass route duration
         steps: _currentSteps,
       );
+      
+      // Preserve running state metrics for use during completion
+      _lastRunningDistance = locationState.totalDistance;
+      _lastRunningCalories = calories;
+      _lastRunningElevationGain = locationState.elevationGain;
+      _lastRunningElevationLoss = locationState.elevationLoss;
+      
       // Log steps in running state for UI verification
       AppLogger.info('[STEPS UI] [COORDINATOR] Running state steps: ${_currentSteps ?? 'null'}');
       // Diagnostics: log aggregation distance change

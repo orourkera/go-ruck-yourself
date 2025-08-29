@@ -1266,14 +1266,25 @@ class SessionRepository {
     int offset = 0,
   }) async {
     try {
-      // Check if we have cached data that's still valid (only for first page of all sessions)
+      // Check if we have cached data that's still valid and can satisfy this request
       final now = DateTime.now();
       if (_sessionHistoryCache != null && 
           _sessionHistoryCacheTime != null &&
           now.difference(_sessionHistoryCacheTime!) < _sessionHistoryCacheValidity &&
-          startDate == null && endDate == null && offset == 0) { // Only use cache for first page of all sessions
-        AppLogger.debug('[SESSION_HISTORY] Using cached session history (${_sessionHistoryCache!.length} sessions)');
-        return _sessionHistoryCache!.take(limit).toList();
+          startDate == null && endDate == null) { // Use cache for all pagination of unfiltered sessions
+        
+        AppLogger.debug('[SESSION_HISTORY] Using cached session history (${_sessionHistoryCache!.length} total sessions, requesting offset=$offset, limit=$limit)');
+        
+        // Return the appropriate slice from cache
+        final endIndex = offset + limit;
+        if (offset < _sessionHistoryCache!.length) {
+          final cacheSlice = _sessionHistoryCache!.skip(offset).take(limit).toList();
+          AppLogger.debug('[SESSION_HISTORY] Returning ${cacheSlice.length} sessions from cache (offset=$offset)');
+          return cacheSlice;
+        } else {
+          AppLogger.debug('[SESSION_HISTORY] Offset ($offset) beyond cache size (${_sessionHistoryCache!.length}), returning empty list');
+          return [];
+        }
       }
       
       // Build endpoint based on filter
@@ -1371,10 +1382,22 @@ class SessionRepository {
       completedSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
       
       // Cache the results only for "all sessions" requests (no date filters)
+      // For offset=0, replace cache completely. For offset>0, extend cache if we got new data.
       if (startDate == null && endDate == null) {
-        _sessionHistoryCache = completedSessions;
-        _sessionHistoryCacheTime = now;
-        AppLogger.debug('[SESSION_HISTORY] Cached ${completedSessions.length} sessions');
+        if (offset == 0) {
+          // First page - replace entire cache
+          _sessionHistoryCache = completedSessions;
+          _sessionHistoryCacheTime = now;
+          AppLogger.debug('[SESSION_HISTORY] Cached ${completedSessions.length} sessions (first page)');
+        } else if (_sessionHistoryCache != null && completedSessions.isNotEmpty) {
+          // Subsequent page - extend cache if we have new sessions
+          final existingIds = _sessionHistoryCache!.map((s) => s.id).toSet();
+          final newSessions = completedSessions.where((s) => !existingIds.contains(s.id)).toList();
+          if (newSessions.isNotEmpty) {
+            _sessionHistoryCache!.addAll(newSessions);
+            AppLogger.debug('[SESSION_HISTORY] Extended cache with ${newSessions.length} new sessions (total: ${_sessionHistoryCache!.length})');
+          }
+        }
       }
       
       AppLogger.info('[SESSION_HISTORY] Fetched ${completedSessions.length} completed sessions');
