@@ -985,32 +985,43 @@ class RuckSessionCompleteResource(Resource):
                         distance_meters = distance_km * 1000
                         
                         # GPS VALIDATION: Apply same filters as frontend to remove GPS noise
+                        segment_accepted = False
+                        
                         try:
                             # Parse timestamps for time validation
-                            from dateutil import parser
-                            prev_time = parser.isoparse(prev_point['timestamp'])
-                            curr_time = parser.isoparse(curr_point['timestamp'])
+                            prev_time = date_parser.isoparse(prev_point['timestamp'])
+                            curr_time = date_parser.isoparse(curr_point['timestamp'])
                             time_diff_seconds = (curr_time - prev_time).total_seconds()
                             
+                            # Skip invalid time segments
+                            if time_diff_seconds <= 0:
+                                logger.warning(f"[GPS_VALIDATION] Invalid time difference: {time_diff_seconds}s, skipping segment")
+                                continue  # Skip to next GPS point
+                            
                             # Industry-standard GPS validation (matching frontend)
-                            has_minimum_time = time_diff_seconds >= 1  # At least 1 second apart
-                            is_realistic_distance = distance_meters < 100  # Less than 100m jump
-                            bounded_speed = (distance_meters / time_diff_seconds) <= 4.5 if time_diff_seconds > 0 else False  # <= 4.5 m/s (~10 mph)
+                            has_minimum_time = time_diff_seconds >= 1.0  # At least 1 second apart
+                            is_realistic_distance = distance_meters < 100.0  # Less than 100m jump
+                            speed_ms = distance_meters / time_diff_seconds
+                            bounded_speed = speed_ms <= 4.5  # <= 4.5 m/s (~10 mph)
                             
                             # Accept segment if realistic and timed, OR speed is within bounds
                             if (is_realistic_distance and has_minimum_time) or bounded_speed:
                                 total_distance_km += distance_km
-                                logger.debug(f"[GPS_VALIDATION] Added segment: {distance_meters:.1f}m in {time_diff_seconds:.1f}s")
+                                segment_accepted = True
+                                logger.debug(f"[GPS_VALIDATION] Added segment: {distance_meters:.1f}m in {time_diff_seconds:.1f}s (speed: {speed_ms:.1f} m/s)")
                             else:
-                                logger.warning(f"[GPS_VALIDATION] Filtered unrealistic segment: {distance_meters:.1f}m in {time_diff_seconds:.1f}s (speed: {distance_meters/time_diff_seconds if time_diff_seconds > 0 else 0:.1f} m/s)")
+                                logger.warning(f"[GPS_VALIDATION] Filtered unrealistic segment: {distance_meters:.1f}m in {time_diff_seconds:.1f}s (speed: {speed_ms:.1f} m/s)")
                                 
                         except Exception as validation_err:
                             # If validation fails, fall back to basic distance check
-                            logger.warning(f"[GPS_VALIDATION] Validation failed, using basic filter: {validation_err}")
-                            if distance_meters < 200:  # Basic fallback: reject only extreme outliers
+                            logger.warning(f"[GPS_VALIDATION] Validation failed for segment {i}, using basic filter: {validation_err}")
+                            if distance_meters < 200.0:  # Basic fallback: reject only extreme outliers (200m vs 100m)
                                 total_distance_km += distance_km
-
-                        # Elevation gain/loss with 2m threshold
+                                segment_accepted = True
+                                logger.debug(f"[GPS_VALIDATION] Added segment via fallback: {distance_meters:.1f}m")
+                        
+                        # Process elevation gain/loss (independent of distance validation)
+                        # Elevation is processed for all points to maintain continuity
                         if curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
                             alt_diff = float(curr_point['altitude']) - float(prev_point['altitude'])
                             if alt_diff > ELEV_THRESHOLD_M:
