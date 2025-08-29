@@ -221,9 +221,10 @@ class MeasurementUtils {
   static double totalElevationGain(List<LocationPoint> points) {
     if (points.length < 2) return 0.0;
     double gain = 0.0;
+    const double thresholdM = 2.0; // ignore small noise
     for (int i = 1; i < points.length; i++) {
       final diff = points[i].elevation - points[i - 1].elevation;
-      if (diff > 0) gain += diff;
+      if (diff > thresholdM) gain += diff;
     }
     return gain;
   }
@@ -232,9 +233,10 @@ class MeasurementUtils {
   static double totalElevationLoss(List<LocationPoint> points) {
     if (points.length < 2) return 0.0;
     double loss = 0.0;
+    const double thresholdM = 2.0; // ignore small noise
     for (int i = 1; i < points.length; i++) {
       final diff = points[i].elevation - points[i - 1].elevation;
-      if (diff < 0) loss -= diff;
+      if (diff < -thresholdM) loss -= diff;
     }
     return loss;
   }

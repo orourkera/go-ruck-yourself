@@ -189,18 +189,24 @@ public class WorkoutManager: NSObject {
             if let statistics = builder.statistics(for: stepType) {
                 print("[WORKOUT_MANAGER] Got step statistics: \(statistics)")
                 
-                if let mostRecent = statistics.mostRecentQuantity() {
-                    let stepCount = Int(mostRecent.doubleValue(for: HKUnit.count()))
-                    print("[WORKOUT_MANAGER] Found recent step count: \(stepCount) steps")
-                    
+                var totalSteps: Int? = nil
+                if let sumQ = statistics.sumQuantity()?.doubleValue(for: HKUnit.count()) {
+                    totalSteps = Int(sumQ)
+                    print("[WORKOUT_MANAGER] Found cumulative step count: \(totalSteps!) steps")
+                } else if let mostRecent = statistics.mostRecentQuantity()?.doubleValue(for: HKUnit.count()) {
+                    totalSteps = Int(mostRecent)
+                    print("[WORKOUT_MANAGER] Fallback most-recent step count: \(totalSteps!) steps")
+                } else {
+                    print("[WORKOUT_MANAGER] No step count quantity available")
+                }
+
+                if let stepCount = totalSteps {
                     if let handler = stepCountHandler {
-                        print("[WORKOUT_MANAGER] Calling step count handler...")
+                        print("[WORKOUT_MANAGER] Calling step count handler with value: \(stepCount)")
                         handler(stepCount)
                     } else {
                         print("[WORKOUT_MANAGER] ERROR: Step count handler is nil!")
                     }
-                } else {
-                    print("[WORKOUT_MANAGER] No recent step count quantity available")
                 }
             } else {
                 print("[WORKOUT_MANAGER] No statistics available for step count")
@@ -261,6 +267,16 @@ public class WorkoutManager: NSObject {
     // Set handler for step count updates
     func setStepCountHandler(_ handler: @escaping (Int) -> Void) {
         self.stepCountHandler = handler
+    }
+
+    // Public nudge to force an immediate heart rate read if possible
+    public func nudgeHeartRateUpdate() {
+        requestHeartRateUpdate()
+    }
+
+    // Public nudge to force an immediate step count read if possible
+    public func nudgeStepCountUpdate() {
+        requestStepCountUpdate()
     }
 }
 
@@ -323,14 +339,20 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                 }
             }
             
-            // Handle step count data
+            // Handle step count data (use cumulative sum during workout)
             if quantityType == HKQuantityType.quantityType(forIdentifier: .stepCount) {
                 print("[WORKOUT_MANAGER] Processing step count data...")
-                
-                if let value = statistics.mostRecentQuantity()?.doubleValue(for: HKUnit.count()) {
-                    let stepCount = Int(value)
-                    print("[WORKOUT_MANAGER] Got step count value: \(stepCount) steps")
-                    
+
+                var totalSteps: Int? = nil
+                if let sumQ = statistics.sumQuantity()?.doubleValue(for: HKUnit.count()) {
+                    totalSteps = Int(sumQ)
+                    print("[WORKOUT_MANAGER] Sum step count value: \(totalSteps!) steps (cumulative)")
+                } else if let mostRecent = statistics.mostRecentQuantity()?.doubleValue(for: HKUnit.count()) {
+                    totalSteps = Int(mostRecent)
+                    print("[WORKOUT_MANAGER] Fallback most-recent step count: \(totalSteps!) steps")
+                }
+
+                if let stepCount = totalSteps {
                     if let handler = stepCountHandler {
                         print("[WORKOUT_MANAGER] Calling step count handler with value: \(stepCount)")
                         handler(stepCount)
@@ -338,7 +360,7 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                         print("[WORKOUT_MANAGER] ERROR: Step count handler is nil!")
                     }
                 } else {
-                    print("[WORKOUT_MANAGER] No recent step count quantity available")
+                    print("[WORKOUT_MANAGER] No step count statistics available")
                 }
             }
         }

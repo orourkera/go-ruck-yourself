@@ -1375,8 +1375,11 @@ class _RouteMapState extends State<_RouteMap> {
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
+    final bool preferMetric = context.read<AuthBloc>().state is Authenticated
+        ? (context.read<AuthBloc>().state as Authenticated).user.preferMetric
+        : false;
     final String weightText = widget.ruckWeightKg != null 
-        ? (widget.ruckWeightKg == 0.0 ? 'Hike' : MeasurementUtils.formatWeight(widget.ruckWeightKg!, metric: true)) // Show 'Hike' for zero weight
+        ? (widget.ruckWeightKg == 0.0 ? 'Hike' : MeasurementUtils.formatWeight(widget.ruckWeightKg!, metric: preferMetric)) // Show 'Hike' for zero weight
         : '';
     
     // If no route points, show empty state with weight if available

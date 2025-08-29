@@ -479,7 +479,25 @@ import FirebaseCore
                 // Heart rate batches
                 if let type = userInfo["type"] as? String, type == "hr_sample" {
                     if let bpm = userInfo["bpm"] as? Double {
+                        // Forward HR via method channel to match Flutter's WatchConnectivity path
+                        let watchSessionChannel = FlutterMethodChannel(name: self.watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                        let payload: [String: Any] = [
+                            "command": "watchHeartRateUpdate",
+                            "heartRate": bpm,
+                            "timestamp": Date().timeIntervalSince1970 * 1000 // ms
+                        ]
+                        watchSessionChannel.invokeMethod("onWatchSessionUpdated", arguments: payload) { _ in }
+                        // Also send through EventChannel for legacy listeners (harmless if unused)
                         HeartRateStreamHandler.sendHeartRate(bpm)
+                    }
+                }
+                // Step batches
+                if let type = userInfo["type"] as? String, type == "step_sample" {
+                    // Accept steps as Int or Double
+                    if let steps = userInfo["steps"] as? Int {
+                        StepCountStreamHandler.sendStepCount(steps)
+                    } else if let stepsD = userInfo["steps"] as? Double {
+                        StepCountStreamHandler.sendStepCount(Int(stepsD))
                     }
                 }
                 // Command-based messages

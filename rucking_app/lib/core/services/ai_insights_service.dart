@@ -26,7 +26,14 @@ class AIInsightsService {
       AppLogger.info('[AI_INSIGHTS] Generating homepage insights for user');
       
       // Fetch user history data from the same endpoint used by AI cheerleader
-      final userHistory = await _fetchUserHistory();
+      var userHistory = await _fetchUserHistory();
+      // If history is empty (e.g., token not ready or slow network), retry once after a short delay
+      if ((userHistory.isEmpty || (userHistory['recent_rucks'] as List?)?.isEmpty == true) &&
+          (userHistory['aggregates'] == null)) {
+        AppLogger.info('[AI_INSIGHTS] User history empty on first attempt – retrying shortly');
+        await Future.delayed(const Duration(milliseconds: 600));
+        userHistory = await _fetchUserHistory();
+      }
       
       final context = _buildInsightContext(
         userHistory: userHistory,
@@ -38,9 +45,10 @@ class AIInsightsService {
 
       final prompt = _buildInsightPrompt(context);
       final aiResponse = await _openAIService.generateMessage(
-      context: {'prompt': prompt},
-      personality: 'motivational',
-    );
+        context: {'prompt': prompt},
+        personality: 'motivational',
+      );
+      AppLogger.info('[AI_INSIGHTS] Raw AI response: ${aiResponse != null ? aiResponse.substring(0, aiResponse.length > 200 ? 200 : aiResponse.length) : 'null'}');
       
       return _parseAIResponse(aiResponse ?? '', context);
       
@@ -132,13 +140,38 @@ Generate a JSON response with:
   "emoji": "Single relevant emoji"
 }
 
+Respond with ONLY the JSON object. Do not include any other text or formatting.
 Keep it concise, personal, and motivating. Use their preferred units.
 ''';
   }
 
   AIInsight _parseAIResponse(String response, Map<String, dynamic> context) {
     try {
-      final parsed = jsonDecode(response);
+      // Normalize common wrappers like fenced code blocks
+      String cleaned = response.trim();
+      if (cleaned.startsWith('```')) {
+        // Remove optional language identifier and closing fence
+        final firstNewline = cleaned.indexOf('\n');
+        if (firstNewline != -1) {
+          cleaned = cleaned.substring(firstNewline + 1);
+        }
+        if (cleaned.endsWith('```')) {
+          cleaned = cleaned.substring(0, cleaned.length - 3).trim();
+        }
+      }
+
+      Map<String, dynamic> parsed;
+      try {
+        parsed = Map<String, dynamic>.from(jsonDecode(cleaned));
+      } catch (_) {
+        // Try to extract the first JSON object from the text (fallback)
+        final extracted = _extractJsonObjectFromText(cleaned);
+        if (extracted != null) {
+          parsed = extracted;
+        } else {
+          throw FormatException('No JSON object found in AI response');
+        }
+      }
       return AIInsight(
         greeting: parsed['greeting'] ?? _getDefaultGreeting(context['timeOfDay'], context['username']),
         insight: parsed['insight'] ?? 'You\'re building great consistency!',
@@ -151,6 +184,30 @@ Keep it concise, personal, and motivating. Use their preferred units.
       AppLogger.warning('[AI_INSIGHTS] Failed to parse AI response, using fallback: $e');
       return _getFallbackInsight(context['timeOfDay'], context['username'], context['preferMetric']);
     }
+  }
+
+  /// Extracts the first top-level JSON object from text, tolerating extra prose.
+  Map<String, dynamic>? _extractJsonObjectFromText(String text) {
+    final start = text.indexOf('{');
+    if (start == -1) return null;
+    int depth = 0;
+    for (int i = start; i < text.length; i++) {
+      final ch = text[i];
+      if (ch == '{') depth++;
+      if (ch == '}') {
+        depth--;
+        if (depth == 0) {
+          final candidate = text.substring(start, i + 1);
+          try {
+            final obj = jsonDecode(candidate);
+            if (obj is Map<String, dynamic>) return obj;
+          } catch (_) {
+            // continue scanning in case of nested braces in strings
+          }
+        }
+      }
+    }
+    return null;
   }
 
   AIInsight _getFallbackInsight(String timeOfDay, String username, bool preferMetric) {

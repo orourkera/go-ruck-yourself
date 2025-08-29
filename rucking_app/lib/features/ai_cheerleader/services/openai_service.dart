@@ -40,22 +40,29 @@ class OpenAIService {
       AppLogger.info('[OPENAI] Generating message for $personality personality');
       
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 2: About to build prompt');
+      // Support a direct prompt override when provided in context (e.g., AIInsightsService)
       String prompt;
-      try {
-        prompt = _buildPrompt(
-          personality,
-          explicitContent,
-          context['trigger'] ?? <String, dynamic>{},
-          context['session'] ?? <String, dynamic>{},
-          context['user'] ?? <String, dynamic>{},
-          context['environment'] ?? <String, dynamic>{},
-          context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
-        );
-        AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
-      } catch (e, stackTrace) {
-        AppLogger.error('[OPENAI_SERVICE_DEBUG] FATAL: _buildPrompt failed with error: $e');
-        AppLogger.error('[OPENAI_SERVICE_DEBUG] Stack trace: $stackTrace');
-        return null;
+      final directPrompt = context['prompt'];
+      if (directPrompt is String && directPrompt.trim().isNotEmpty) {
+        prompt = directPrompt;
+        AppLogger.info('[OPENAI_DEBUG] Using direct prompt override from context');
+      } else {
+        try {
+          prompt = _buildPrompt(
+            personality,
+            explicitContent,
+            context['trigger'] ?? <String, dynamic>{},
+            context['session'] ?? <String, dynamic>{},
+            context['user'] ?? <String, dynamic>{},
+            context['environment'] ?? <String, dynamic>{},
+            context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
+          );
+          AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
+        } catch (e, stackTrace) {
+          AppLogger.error('[OPENAI_SERVICE_DEBUG] FATAL: _buildPrompt failed with error: $e');
+          AppLogger.error('[OPENAI_SERVICE_DEBUG] Stack trace: $stackTrace');
+          return null;
+        }
       }
       
       // Debug logging: Show full prompt being sent to OpenAI
@@ -648,8 +655,9 @@ Respond with your motivational message:''';
       AppLogger.error('[AI_LOG_DEBUG] Got sessionId from ActiveSessionBloc: $sessionId');
 
       if (sessionId == null || sessionId.isEmpty) {
-        AppLogger.error('[AI_LOG_DEBUG] ❌ BLOCKING ISSUE: No active session ID available');
-        AppLogger.error('[AI_LOG_DEBUG] ActiveSessionBloc state: ${activeState.runtimeType}');
+        // This is expected for homepage insights or any context outside an active ruck.
+        AppLogger.warning('[AI_LOG_DEBUG] No active session ID; skipping AI log.');
+        AppLogger.warning('[AI_LOG_DEBUG] ActiveSessionBloc state: ${activeState.runtimeType}');
         return;
       }
 

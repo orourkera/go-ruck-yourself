@@ -419,10 +419,16 @@ class FirebaseMessagingService {
 
   /// Handle local notification taps
   void _onLocalNotificationTap(NotificationResponse response) {
-    if (response.payload != null) {
-      final data = jsonDecode(response.payload!);
-      _navigateFromNotification(data);
+    if (response.payload == null) return;
+    final raw = response.payload!;
+    Map<String, dynamic>? data;
+    try {
+      data = jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      // Backward-compat for simple string payloads
+      data = {'type': raw, 'message': raw};
     }
+    _navigateFromNotification(data);
   }
 
   /// Navigate based on notification data
@@ -584,7 +590,7 @@ class FirebaseMessagingService {
     required int id,
     required String title,
     required String body,
-    String? payload,
+    dynamic payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'rucking_app_notifications',
@@ -606,12 +612,23 @@ class FirebaseMessagingService {
       iOS: iosDetails,
     );
     
+    // Support both raw strings and Map payloads; encode Map to JSON
+    final String? encodedPayload = (() {
+      if (payload == null) return null;
+      if (payload is String) return payload;
+      try {
+        return jsonEncode(payload);
+      } catch (_) {
+        return payload.toString();
+      }
+    })();
+
     await _localNotifications.show(
       id,
       title,
       body,
       details,
-      payload: payload,
+      payload: encodedPayload,
     );
   }
 

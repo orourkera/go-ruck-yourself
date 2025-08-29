@@ -458,6 +458,24 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     }
                 }
                 
+            case "startHeartRateMonitoring":
+                // Explicit request from phone to ensure HR streaming starts
+                print("[WATCH] Received startHeartRateMonitoring command from phone")
+                if !isSessionActive {
+                    // Initialize permissions and start a fresh workout
+                    print("[WATCH] HR monitoring requested while inactive – starting session")
+                    self.requestHealthKitPermissions()
+                    DispatchQueue.main.async {
+                        self.isSessionActive = true
+                        self.isPaused = false
+                        self.sessionStartedFromPhone = true
+                        self.startSession()
+                    }
+                } else {
+                    // Nudge immediate HR update
+                    self.workoutManager.nudgeHeartRateUpdate()
+                }
+                
             case "stopSession", "workoutStopped", "endSession", "sessionEnded", "sessionComplete":
                 // Always perform cleanup on stop commands, regardless of current flags
                 DispatchQueue.main.async {

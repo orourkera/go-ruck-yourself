@@ -250,8 +250,10 @@ class MetCalculator {
       grade: effectiveUphillGradePct,
       ruckWeightLbs: ruckWeightLbs,
     );
+    // Important: MET already includes load via ruckWeightLbs adjustment above.
+    // To avoid double-counting, use BODY WEIGHT ONLY here.
     final baseCalories = calculateCaloriesBurned(
-      weightKg: userWeightKg + ruckWeightKg,
+      weightKg: userWeightKg,
       durationMinutes: elapsedSeconds / 60.0,
       metValue: metValue,
     ) * terrainMultiplier;

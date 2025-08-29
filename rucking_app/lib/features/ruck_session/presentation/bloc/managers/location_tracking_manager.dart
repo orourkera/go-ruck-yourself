@@ -124,6 +124,7 @@ class LocationTrackingManager implements SessionManager {
   DateTime? _lastDistanceIncreaseTime;
   double _lastDistanceValueForStall = 0.0;
   DateTime? _lastStallReportTime;
+  DateTime? _lastDistanceRecalcAttempt;
 
   // Validation rejection analytics and adaptive recovery
   final Map<String, int> _validationRejectCounts = {};
@@ -137,6 +138,13 @@ class LocationTrackingManager implements SessionManager {
   DateTime? _estimationStartTime;
   double _estimatedDistance = 0.0;
   double _estimatedDirection = 0.0; // in degrees
+
+  // Elevation smoothing and gating (no barometer dependency)
+  double? _filteredAltitude; // EMA-smoothed altitude for gain/loss computation
+  DateTime? _lastAltitudeTs;
+  static const double _emaAlpha = 0.3; // Smoothing factor for altitude EMA
+  static const double _maxVerticalSpeedMs = 5.0; // Reject spikes faster than 5 m/s
+  static const double _verticalAccuracyGateM = 15.0; // Ignore altitude updates with worse accuracy
 
   LocationTrackingManager({
     required LocationService locationService,
@@ -219,6 +227,10 @@ class LocationTrackingManager implements SessionManager {
     _cachedCurrentPace = null;
     _cachedAveragePace = null;
     _lastPaceCalculation = null;
+
+    // Reset elevation smoothing state
+    _filteredAltitude = null;
+    _lastAltitudeTs = null;
     
     // Reset distance stall detection
     _lastDistanceIncreaseTime = DateTime.now();
@@ -346,13 +358,21 @@ class LocationTrackingManager implements SessionManager {
     // Track raw update time separately from valid accepted locations
     _lastRawLocationTimestamp = DateTime.now();
     
-    // Create location point
+    // Filter altitude with EMA + vertical accuracy + vertical speed gating
+    final DateTime nowUtc = DateTime.now().toUtc();
+    final double filteredAlt = _filterAltitude(
+      rawAltitude: position.altitude,
+      altitudeAccuracy: position.altitudeAccuracy,
+      timestamp: nowUtc,
+    );
+
+    // Create location point using filtered altitude to stabilize elevation gain/loss
     final newPoint = LocationPoint(
       latitude: position.latitude,
       longitude: position.longitude,
-      elevation: position.altitude,
+      elevation: filteredAlt,
       accuracy: position.accuracy,
-      timestamp: DateTime.now().toUtc(),
+      timestamp: nowUtc,
       speed: position.speed,
     );
     
@@ -536,7 +556,7 @@ class LocationTrackingManager implements SessionManager {
       currentPace: newPace,
       averagePace: newAveragePace,
       currentSpeed: position.speed,
-      altitude: position.altitude,
+      altitude: filteredAlt,
       isGpsReady: _validLocationCount > 5, // GPS ready state from version 2.5
       elevationGain: newElevationGain,
       elevationLoss: newElevationLoss,
@@ -1169,12 +1189,98 @@ class LocationTrackingManager implements SessionManager {
     if (candidateKm < _lastKnownTotalDistance) {
       candidateKm = _lastKnownTotalDistance;
     }
+    // If distance did not increase despite new points, run a recovery recompute occasionally
+    final bool noIncrease = (candidateKm <= _lastKnownTotalDistance + 1e-6);
+    final now = DateTime.now();
+    if (noIncrease && _locationPoints.length > (_lastProcessedLocationIndex + 1) &&
+        (_lastDistanceRecalcAttempt == null || now.difference(_lastDistanceRecalcAttempt!).inSeconds >= 60)) {
+      _lastDistanceRecalcAttempt = now;
+      try {
+        final double recomputedKm = _recomputeTotalDistanceFromPoints(maxLookback: 2000);
+        if (recomputedKm > candidateKm) {
+          AppLogger.warning('[LOCATION_MANAGER] DISTANCE_RECOVERY: Recomputed distance=${recomputedKm.toStringAsFixed(3)}km (prev candidate=${candidateKm.toStringAsFixed(3)}km)');
+          // Sentry/SaaS telemetry for successful recovery adoption
+          try {
+            AppErrorHandler.handleError(
+              'distance_recovery_adopted',
+              'Adopted recomputed distance after stall',
+              context: {
+                'prev_candidate_km': candidateKm.toStringAsFixed(3),
+                'recomputed_km': recomputedKm.toStringAsFixed(3),
+                'points': _locationPoints.length,
+                'last_processed_index': _lastProcessedLocationIndex,
+              },
+              severity: ErrorSeverity.info,
+            );
+          } catch (_) {}
+          candidateKm = recomputedKm;
+        } else {
+          // Telemetry when recovery ran but did not improve distance
+          try {
+            AppErrorHandler.handleError(
+              'distance_recovery_no_change',
+              'Recompute did not increase distance',
+              context: {
+                'candidate_km': candidateKm.toStringAsFixed(3),
+                'recomputed_km': recomputedKm.toStringAsFixed(3),
+                'points': _locationPoints.length,
+                'last_processed_index': _lastProcessedLocationIndex,
+              },
+              severity: ErrorSeverity.warning,
+            );
+          } catch (_) {}
+        }
+      } catch (e) {
+        AppLogger.debug('[LOCATION_MANAGER] DISTANCE_RECOVERY: Recompute failed: $e');
+        try {
+          AppErrorHandler.handleError(
+            'distance_recovery_failed',
+            e,
+            context: {
+              'candidate_km': candidateKm.toStringAsFixed(3),
+              'points': _locationPoints.length,
+              'last_processed_index': _lastProcessedLocationIndex,
+            },
+            severity: ErrorSeverity.error,
+          );
+        } catch (_) {}
+      }
+    }
+
     _lastKnownTotalDistance = candidateKm;
     
     AppLogger.info('[LOCATION_MANAGER] SOPHISTICATED_DISTANCE: Updated to ${_lastKnownTotalDistance.toStringAsFixed(3)}km, '
         'processed ${_locationPoints.length} points (start: $startIndex, last: $_lastProcessedLocationIndex)');
     
     return _lastKnownTotalDistance;
+  }
+
+  // Recompute distance from recent points to recover from index drift or over-filtering
+  double _recomputeTotalDistanceFromPoints({int maxLookback = 2000}) {
+    if (_locationPoints.length < 2) return _lastKnownTotalDistance;
+    final int start = (_locationPoints.length > maxLookback)
+        ? _locationPoints.length - maxLookback
+        : 1;
+    double meters = (_lastKnownTotalDistance * 1000);
+    // If recomputing from a shorter window, drop baseline to avoid double-counting only when starting beyond index 1
+    if (start > 1) {
+      meters = 0.0;
+    }
+    int prevIndex = start - 1;
+    for (int i = start; i < _locationPoints.length; i++) {
+      final prev = _locationPoints[prevIndex];
+      final curr = _locationPoints[i];
+      final d = Geolocator.distanceBetween(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+      final dt = curr.timestamp.difference(prev.timestamp).inSeconds;
+      final bool realistic = d < 120; // slightly relaxed threshold for recovery
+      final bool timed = dt >= 1;
+      final bool bounded = dt > 0 ? (d / dt) <= 5.0 : false;
+      if ((realistic && timed) || bounded) {
+        meters += d;
+        prevIndex = i;
+      }
+    }
+    return meters / 1000.0;
   }
 
 
@@ -1387,15 +1493,21 @@ class LocationTrackingManager implements SessionManager {
     double gain = 0.0;
     double loss = 0.0;
     
+    // Use more conservative threshold to filter GPS noise
+    const double elevationThreshold = 2.0; // 2 meters minimum change
+    
     for (int i = 1; i < _locationPoints.length; i++) {
       final diff = _locationPoints[i].elevation - _locationPoints[i - 1].elevation;
-      if (diff > 0.5) { // Threshold to reduce noise
+      
+      // Only count significant elevation changes to avoid GPS noise accumulation
+      if (diff > elevationThreshold) {
         gain += diff;
-      } else if (diff < -0.5) {
+      } else if (diff < -elevationThreshold) {
         loss += diff.abs();
       }
     }
     
+    AppLogger.debug('[ELEVATION] Calculated from ${_locationPoints.length} points: gain=${gain.toStringAsFixed(1)}m, loss=${loss.toStringAsFixed(1)}m');
     return {'gain': gain, 'loss': loss};
   }
 
@@ -1559,14 +1671,18 @@ class LocationTrackingManager implements SessionManager {
       return {'gain': gain, 'loss': loss};
     }
     
+    // Use same conservative threshold as main elevation calculation
+    const double elevationThreshold = 2.0; // 2 meters minimum change
+    
     for (int i = 1; i < _currentState.locations.length; i++) {
       final prevElevation = _currentState.locations[i - 1].altitude;
       final currElevation = _currentState.locations[i].altitude;
       final diff = currElevation - prevElevation;
       
-      if (diff > 0) {
+      // Only count significant elevation changes to avoid GPS noise accumulation
+      if (diff > elevationThreshold) {
         gain += diff;
-      } else if (diff < 0) {
+      } else if (diff < -elevationThreshold) {
         loss += diff.abs();
       }
     }
@@ -1683,5 +1799,46 @@ class LocationTrackingManager implements SessionManager {
     _gyroSub?.cancel();
     _estimationStartTime = null;
     _lastEstimatedPosition = null;
+  }
+
+  // Apply EMA smoothing, vertical accuracy gating, and vertical speed sanity checks to altitude.
+  double _filterAltitude({
+    required double rawAltitude,
+    required double? altitudeAccuracy,
+    required DateTime timestamp,
+  }) {
+    // Initialize on first sample
+    if (_filteredAltitude == null) {
+      _filteredAltitude = rawAltitude;
+      _lastAltitudeTs = timestamp;
+      return _filteredAltitude!;
+    }
+
+    final double prev = _filteredAltitude!;
+    final double dt = (_lastAltitudeTs != null)
+        ? (timestamp.difference(_lastAltitudeTs!).inMilliseconds / 1000.0).clamp(0.0, 10.0)
+        : 0.0;
+
+    // Gate by vertical accuracy if provided
+    if (altitudeAccuracy != null && altitudeAccuracy > _verticalAccuracyGateM) {
+      // Ignore poor-accuracy altitude updates; keep previous filtered value
+      return prev;
+    }
+
+    // Compute an EMA to smooth noise
+    final double ema = (_emaAlpha * rawAltitude) + ((1 - _emaAlpha) * prev);
+    final double delta = ema - prev;
+
+    // Reject absurd vertical speed spikes
+    if (dt > 0.0) {
+      final double vSpeed = (delta.abs()) / dt; // m/s
+      if (vSpeed > _maxVerticalSpeedMs) {
+        return prev;
+      }
+    }
+
+    _filteredAltitude = ema;
+    _lastAltitudeTs = timestamp;
+    return _filteredAltitude!;
   }
 }

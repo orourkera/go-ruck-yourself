@@ -778,66 +778,6 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Author row (avatar + username) from real profile data
-                    if (_authorProfile != null) ...[
-                      Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey[300]!, width: 1.5),
-                            ),
-                            child: CircleAvatar(
-                              radius: 20,
-                              backgroundColor: Colors.grey[200],
-                              child: (_authorProfile!.photoUrl != null && _authorProfile!.photoUrl!.isNotEmpty)
-                                  ? ClipOval(
-                                      child: CachedNetworkImage(
-                                        imageUrl: _authorProfile!.photoUrl!,
-                                        cacheManager: ImageCacheManager.instance,
-                                        fit: BoxFit.cover,
-                                        width: 38,
-                                        height: 38,
-                                        placeholder: (context, url) => const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        ),
-                                        errorWidget: (context, url, error) => ClipOval(
-                                          child: Image.asset(
-                                            'assets/images/profile.png',
-                                            fit: BoxFit.cover,
-                                            width: 38,
-                                            height: 38,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : ClipOval(
-                                      child: Image.asset(
-                                        'assets/images/profile.png',
-                                        fit: BoxFit.cover,
-                                        width: 38,
-                                        height: 38,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _authorProfile!.username.isNotEmpty ? _authorProfile!.username : 'Rucker',
-                              style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                    ],
                     // Stats row with Distance, Pace, Duration
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,

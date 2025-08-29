@@ -1064,7 +1064,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                       );
                     },
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
                   
                   // AI Insights Widget (behind feature flag)
                   Builder(
@@ -1081,8 +1081,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                         AppLogger.info('[HOME_SCREEN] Showing AI Insights Widget (featureFlag=$featureFlagEnabled, forceEnable=$forceEnable)');
                         return Column(
                           children: [
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 16),
                             const AIInsightsWidget(),
+                            const SizedBox(height: 16),
                           ],
                         );
                       } else {
@@ -1091,7 +1092,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                       }
                     },
                   ),
-                  const SizedBox(height: 32),
                   
                   // Create session button - full width and orange
                   SizedBox(

@@ -43,7 +43,9 @@ segment_calculations AS (
             ELSE 0
         END as segment_distance_m,
         CASE 
-            WHEN prev_altitude IS NOT NULL AND altitude > prev_altitude THEN
+            WHEN prev_altitude IS NOT NULL 
+                 AND altitude > prev_altitude 
+                 AND (altitude - prev_altitude) > 2.0 THEN
                 altitude - prev_altitude
             ELSE 0
         END as elevation_gain_segment,

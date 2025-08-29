@@ -91,6 +91,8 @@ class SessionCompletionDetectionService {
       if (currentState is ActiveSessionRunning) {
         _sessionStartTime = currentState.originalSessionStartTimeUtc;
         _totalDistanceAtLastCheck = currentState.distanceKm;
+        // Capture session ID for database notifications and payload routing
+        _currentSessionId = currentState.sessionId;
         AppLogger.info('[SESSION_COMPLETION] Session started at: $_sessionStartTime');
       }
       
@@ -446,12 +448,21 @@ class SessionCompletionDetectionService {
           return;
       }
       
+      // Build a JSON payload so the tap handler can route correctly
+      final payloadData = {
+        'type': 'session_completion_prompt',
+        'notification_id': notificationId,
+        'message': body,
+        if (_currentSessionId != null) 'session_id': _currentSessionId,
+        'prompt_type': promptType,
+      };
+      
       // Show local notification (works on phone and watch)
       await firebaseMessaging.showNotification(
         id: notificationId,
         title: title,
         body: body,
-        payload: 'session_completion_prompt',
+        payload: payloadData,
       );
       
       // Also create database notification for consistency

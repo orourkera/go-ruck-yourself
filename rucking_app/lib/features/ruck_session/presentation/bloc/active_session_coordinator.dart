@@ -707,6 +707,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     // Use the shorter of actual duration or estimated active time to prevent inflation
     final activeSeconds = duration.inSeconds < estimatedActiveSeconds ? duration.inSeconds : estimatedActiveSeconds;
     
+    // Calorie model note:
+    // - MET path inside MetCalculator already accounts for ruck load via the MET value,
+    //   so the MET calculation uses BODY WEIGHT ONLY to avoid double counting load.
+    // - Mechanical path (Pandolf-style) handles load explicitly via mass/coefficients.
+    // - Fusion blends HR with mechanical and applies safety caps.
     final calories = MetCalculator.calculateRuckingCalories(
       userWeightKg: userWeightKg,
       ruckWeightKg: ruckWeightKg,

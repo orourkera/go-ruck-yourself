@@ -202,15 +202,9 @@ class SessionValidationService {
   
   /// Get platform-specific elevation change threshold
   double _getPlatformElevationThreshold() {
-    if (Platform.isIOS) {
-      // iOS uses barometric + GPS - more conservative but accurate
-      // Lower threshold to catch smaller but legitimate changes
-      return 0.5; // 0.5 meters = ~1.6 feet
-    } else {
-      // Android GPS elevation can be noisier
-      // Slightly higher threshold to filter noise
-      return 1.0; // 1 meter = ~3.3 feet  
-    }
+    // Use consistent 2-meter threshold across platforms to filter GPS noise
+    // This prevents accumulation of small GPS fluctuations into large fake elevation gains
+    return 2.0; // 2 meters = ~6.6 feet - conservative threshold for real elevation changes
   }
   
   /// Process elevation difference with platform-specific logic
@@ -241,14 +235,8 @@ class SessionValidationService {
       return rawDifference * 0.7; // Reduce impact of potentially inaccurate reading
     }
     
-    // For good accuracy, trust iOS altitude more
-    // But enhance small changes that iOS might under-report
-    if (rawDifference.abs() < 2.0 && rawDifference.abs() > 0.3) {
-      // Enhance small but significant changes (iOS tends to under-report)
-      AppLogger.debug('iOS elevation: Enhancing small change from ${rawDifference}m to ${rawDifference * 1.3}m');
-      return rawDifference * 1.3;
-    }
-    
+    // Remove elevation enhancement multipliers to prevent artificial inflation
+    // Trust the raw GPS/barometric data without artificial amplification
     return rawDifference;
   }
   
