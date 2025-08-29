@@ -7,6 +7,7 @@ import 'package:rucking_app/core/services/weather_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/models/weather.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -70,7 +71,16 @@ class AIInsightsService {
         final lastCompletedAtStr = recency['last_completed_at'] as String?;
         if (lastCompletedAtStr != null) {
           final lastCompletedAt = DateTime.tryParse(lastCompletedAtStr);
-          final loc = await getIt<LocationService>().getCurrentLocation();
+          
+          // Try to get location for weather context, but don't fail if unavailable
+          LocationPoint? loc;
+          try {
+            loc = await getIt<LocationService>().getCurrentLocation();
+          } catch (e) {
+            AppLogger.warning('[AI_INSIGHTS] Could not get location for weather context: $e');
+            // Continue without weather context - don't crash homepage
+          }
+          
           if (loc != null && lastCompletedAt != null) {
             // Mirror AI Cheerleader path: use LocationContextService to fetch current weather for the same coords
             final lcs = getIt<LocationContextService>();

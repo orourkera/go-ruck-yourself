@@ -49,7 +49,36 @@ logging.getLogger('httpx').setLevel(logging.WARNING)    # Reduce httpx client lo
 logging.getLogger('httpcore').setLevel(logging.WARNING) # Reduce httpcore logging
 logging.getLogger('urllib3').setLevel(logging.WARNING)  # Reduce urllib3 logging
 
-logger = logging.getLogger(__name__)
+# Initialize Sentry for error tracking (production only)
+if os.environ.get("SENTRY_DSN") and os.environ.get("FLASK_ENV") != "development":
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    
+    # Configure Sentry with Flask integration
+    sentry_logging = LoggingIntegration(
+        level=logging.ERROR,        # Capture ERROR and above
+        event_level=logging.ERROR   # Send ERROR and above as events
+    )
+    
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN"),
+        integrations=[
+            FlaskIntegration(transaction_style='endpoint'),
+            sentry_logging,
+        ],
+        traces_sample_rate=0.1,  # 10% performance monitoring
+        release=os.environ.get("HEROKU_SLUG_COMMIT", "unknown"),
+        environment=os.environ.get("FLASK_ENV", "production"),
+        # Add user context for better error tracking
+        before_send=lambda event, hint: event,
+    )
+    logger = logging.getLogger(__name__)
+    logger.info("Sentry initialized for error tracking")
+else:
+    logger = logging.getLogger(__name__)
+    logger.info("Sentry not initialized (development mode or missing DSN)")
+
 logger.info("Starting RuckTracker API server...")
 
 # Initialize Supabase
