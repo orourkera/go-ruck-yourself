@@ -587,11 +587,22 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                             Positioned(
                               right: 8,
                               bottom: 8,
-                              child: Image.asset(
-                                'assets/images/first ruck.png',
-                                width: 72,
-                                height: 72,
-                                filterQuality: FilterQuality.high,
+                              child: Builder(
+                                builder: (context) {
+                                  const double badgeSize = 72; // logical pixels
+                                  final double dpr = MediaQuery.of(context).devicePixelRatio;
+                                  final int decodeW = (badgeSize * dpr).round();
+                                  final int decodeH = (badgeSize * dpr).round();
+                                  return Image.asset(
+                                    'assets/images/first ruck.png',
+                                    width: badgeSize,
+                                    height: badgeSize,
+                                    // Decode to device pixel dimensions for crisper rendering
+                                    cacheWidth: decodeW,
+                                    cacheHeight: decodeH,
+                                    filterQuality: FilterQuality.high,
+                                  );
+                                },
                               ),
                             ),
                         ],
