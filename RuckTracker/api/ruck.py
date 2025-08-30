@@ -1665,21 +1665,31 @@ class RuckSessionLocationResource(Resource):
         """Upload location points to an active ruck session (POST /api/rucks/<ruck_id>/location)"""
         try:
             if not hasattr(g, 'user') or g.user is None:
+                logger.warning(f"Location upload to session {ruck_id}: User not authenticated")
                 return {'message': 'User not authenticated'}, 401
             
             data = request.get_json()
+            if data is None:
+                logger.error(f"Location upload to session {ruck_id}: No JSON data received or malformed JSON")
+                return {'message': 'No JSON data received or malformed JSON'}, 400
+            
+            logger.debug(f"Location upload to session {ruck_id}: Raw data = {data}")
             
             # Support both single point and batch of points (like heart rate)
             if 'points' in data:
                 # Batch mode - array of location points
                 if not isinstance(data['points'], list):
-                    return {'message': 'Missing or invalid points'}, 400
+                    logger.error(f"Location upload to session {ruck_id}: 'points' field is not a list, got {type(data['points'])}")
+                    return {'message': f"'points' field must be a list, got {type(data['points']).__name__}"}, 400
                 location_points = data['points']
+                logger.debug(f"Location upload to session {ruck_id}: Processing {len(location_points)} points in batch mode")
             else:
                 # Legacy mode - single point (backwards compatibility)
                 if 'latitude' not in data or 'longitude' not in data:
-                    return {'message': 'Missing location data'}, 400
+                    logger.error(f"Location upload to session {ruck_id}: Missing lat/lng in single point mode. Data keys: {list(data.keys())}")
+                    return {'message': f"Missing latitude/longitude in single point mode. Provided keys: {list(data.keys())}"}, 400
                 location_points = [data]  # Convert to array format
+                logger.debug(f"Location upload to session {ruck_id}: Processing single point in legacy mode")
             
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
@@ -1738,30 +1748,81 @@ class RuckSessionLocationResource(Resource):
             
             # Insert location points (like heart rate samples)
             location_rows = []
-            for point in location_points:
-                if 'latitude' not in point or 'longitude' not in point:
-                    continue  # Skip invalid points
-                location_rows.append({
-                    'session_id': ruck_id,
-                    'latitude': float(point['latitude']),
-                    'longitude': float(point['longitude']),
-                    'altitude': point.get('elevation') or point.get('elevation_meters'),
-                    'timestamp': point.get('timestamp', datetime.now(tz.tzutc()).isoformat())
-                })
+            invalid_points = []
+            
+            for i, point in enumerate(location_points):
+                try:
+                    # Validate required fields
+                    if 'latitude' not in point or 'longitude' not in point:
+                        invalid_points.append(f"Point {i}: missing latitude/longitude, keys: {list(point.keys())}")
+                        continue
+                    
+                    # Validate data types and ranges
+                    try:
+                        lat = float(point['latitude'])
+                        lng = float(point['longitude'])
+                    except (ValueError, TypeError) as e:
+                        invalid_points.append(f"Point {i}: invalid lat/lng format - lat={point.get('latitude')}, lng={point.get('longitude')}, error={e}")
+                        continue
+                    
+                    # Validate coordinate ranges
+                    if not (-90 <= lat <= 90):
+                        invalid_points.append(f"Point {i}: latitude {lat} out of range [-90, 90]")
+                        continue
+                    if not (-180 <= lng <= 180):
+                        invalid_points.append(f"Point {i}: longitude {lng} out of range [-180, 180]")
+                        continue
+                    
+                    # Validate timestamp if provided
+                    timestamp = point.get('timestamp', datetime.now(tz.tzutc()).isoformat())
+                    if timestamp and timestamp != datetime.now(tz.tzutc()).isoformat():
+                        try:
+                            from dateutil import parser
+                            parsed_time = parser.parse(timestamp)
+                        except Exception as e:
+                            invalid_points.append(f"Point {i}: invalid timestamp format '{timestamp}', error={e}")
+                            continue
+                    
+                    location_rows.append({
+                        'session_id': ruck_id,
+                        'latitude': lat,
+                        'longitude': lng,
+                        'altitude': point.get('elevation') or point.get('elevation_meters'),
+                        'timestamp': timestamp
+                    })
+                    
+                except Exception as e:
+                    invalid_points.append(f"Point {i}: processing error - {e}")
+                    continue
+            
+            if invalid_points:
+                logger.warning(f"Location upload to session {ruck_id}: {len(invalid_points)} invalid points: {'; '.join(invalid_points)}")
             
             if not location_rows:
-                return {'message': 'No valid location points'}, 400
+                error_msg = f"No valid location points from {len(location_points)} submitted. Errors: {'; '.join(invalid_points)}"
+                logger.error(f"Location upload to session {ruck_id}: {error_msg}")
+                return {'message': error_msg}, 400
                 
-            insert_resp = supabase.table('location_point').insert(location_rows).execute()
-            if not insert_resp.data:
-                return {'message': 'Failed to insert location points'}, 500
+            try:
+                logger.debug(f"Location upload to session {ruck_id}: Inserting {len(location_rows)} valid location points")
+                insert_resp = supabase.table('location_point').insert(location_rows).execute()
+                if not insert_resp.data:
+                    logger.error(f"Location upload to session {ruck_id}: Database insert returned no data")
+                    return {'message': 'Database insert failed - no data returned'}, 500
+                    
+                inserted_count = len(insert_resp.data)
+                logger.info(f"Location upload to session {ruck_id}: Successfully inserted {inserted_count} points")
                 
-            # Note: No need to invalidate session cache for location points
-            # Session data (distance, duration, etc.) is calculated separately
-            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
+                # Note: No need to invalidate session cache for location points
+                # Session data (distance, duration, etc.) is calculated separately
+                return {'status': 'ok', 'inserted': inserted_count}, 201
+                
+            except Exception as db_error:
+                logger.error(f"Location upload to session {ruck_id}: Database insert failed - {db_error}")
+                return {'message': f'Database insert failed: {str(db_error)}'}, 500
             
         except Exception as e:
-            logger.error(f"Error adding location points for ruck session {ruck_id}: {e}")
+            logger.error(f"Location upload to session {ruck_id}: Unexpected error - {e}")
             return {'message': f'Error uploading location points: {str(e)}'}, 500
 
 class RuckSessionEditResource(Resource):

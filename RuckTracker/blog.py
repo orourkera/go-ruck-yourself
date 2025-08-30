@@ -7,8 +7,19 @@ blog_bp = Blueprint('blog', __name__)
 # Blog posts registry
 BLOG_POSTS = [
     {
+        "slug": "best-rucking-backpack-guide",
+        "title": "The Ultimate Rucking Backpack Guide: GoRuck vs Frontline vs Budget Alternatives (2025)",
+        "description": "Comprehensive guide to the best rucking backpacks in 2025. Compare GoRuck, Frontline Athletic, Mystery Ranch, and budget options with real user reviews and pricing.",
+        "date": "2025-01-30",
+        "author": "RuckTracker Team",
+        "tags": ["gear", "backpack", "goruck", "review"],
+        "read_time": 12,
+        "template": "blog/posts/best-rucking-backpack-guide.html",
+        "image": "images/blog/gear.jpg",
+    },
+    {
         "slug": "what-is-rucking",
-        "title": "What Is Rucking? The Complete Beginner’s Guide",
+        "title": "What Is Rucking? The Complete Beginner's Guide",
         "description": "Rucking explained: benefits, gear, how to start, and tips to avoid injury.",
         "date": "2025-08-22",
         "author": "rory@getrucky.com",

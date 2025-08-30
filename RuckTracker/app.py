@@ -61,6 +61,42 @@ if os.environ.get("SENTRY_DSN") and os.environ.get("FLASK_ENV") != "development"
         event_level=logging.ERROR   # Send ERROR and above as events
     )
     
+    def before_send_filter(event, hint):
+        """Filter out bot 404 errors and other noise from Sentry"""
+        
+        # Check if this is a 404 error
+        if 'request' in event and 'response' in event:
+            status_code = event.get('response', {}).get('status_code')
+            if status_code == 404:
+                # Check user agent for common bots
+                user_agent = event.get('request', {}).get('headers', {}).get('User-Agent', '').lower()
+                bot_patterns = [
+                    'bot', 'crawler', 'spider', 'scraper', 'facebookexternalhit',
+                    'twitterbot', 'linkedinbot', 'whatsapp', 'telegram', 'discord',
+                    'googlebot', 'bingbot', 'yandexbot', 'baiduspider', 'slurp',
+                    'duckduckbot', 'applebot', 'facebot', 'ia_archiver', 'wayback',
+                    'curl', 'wget', 'python-requests', 'go-http-client', 'php',
+                    'postman', 'insomnia', 'axios', 'okhttp', 'apache-httpclient'
+                ]
+                
+                if any(pattern in user_agent for pattern in bot_patterns):
+                    return None  # Drop the event
+        
+        # Also filter out common bot request patterns in the URL
+        if 'request' in event:
+            url = event.get('request', {}).get('url', '').lower()
+            bot_url_patterns = [
+                'robots.txt', 'sitemap.xml', 'favicon.ico', '.well-known',
+                'wp-admin', 'wp-login', 'admin', 'phpmyadmin', 'xmlrpc.php',
+                '.php', '.asp', '.jsp', '.do', '/cgi-bin/', '/.env',
+                '/.git/', '/config/', '/backup/', '/tmp/', '/var/'
+            ]
+            
+            if any(pattern in url for pattern in bot_url_patterns):
+                return None  # Drop the event
+        
+        return event
+
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN"),
         integrations=[
@@ -70,8 +106,7 @@ if os.environ.get("SENTRY_DSN") and os.environ.get("FLASK_ENV") != "development"
         traces_sample_rate=0.1,  # 10% performance monitoring
         release=os.environ.get("HEROKU_SLUG_COMMIT", "unknown"),
         environment=os.environ.get("FLASK_ENV", "production"),
-        # Add user context for better error tracking
-        before_send=lambda event, hint: event,
+        before_send=before_send_filter,
     )
     logger = logging.getLogger(__name__)
     logger.info("Sentry initialized for error tracking")
@@ -93,6 +128,43 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 # Create Flask app
 app = Flask(__name__)
+
+# Bot blocking middleware - block bots before they hit routes
+@app.before_request
+def block_bots():
+    """Block known bots and malicious requests to reduce server load"""
+    user_agent = request.headers.get('User-Agent', '').lower()
+    request_path = request.path.lower()
+    
+    # Bot user agent patterns
+    bot_patterns = [
+        'bot', 'crawler', 'spider', 'scraper', 'facebookexternalhit',
+        'twitterbot', 'linkedinbot', 'whatsapp', 'telegram', 'discord',
+        'googlebot', 'bingbot', 'yandexbot', 'baiduspider', 'slurp',
+        'duckduckbot', 'applebot', 'facebot', 'ia_archiver', 'wayback',
+        'curl', 'wget', 'python-requests', 'go-http-client', 'php',
+        'postman', 'insomnia', 'axios', 'okhttp', 'apache-httpclient'
+    ]
+    
+    # Malicious/bot URL patterns
+    bot_url_patterns = [
+        'wp-admin', 'wp-login', 'admin', 'phpmyadmin', 'xmlrpc.php',
+        '.php', '.asp', '.jsp', '.do', '/cgi-bin/', '/.env',
+        '/.git/', '/config/', '/backup/', '/tmp/', '/var/',
+        '/wp-content/', '/wp-includes/', '/wordpress/', '/drupal/'
+    ]
+    
+    # Allow legitimate requests to robots.txt, sitemap.xml, favicon.ico
+    if request_path in ['/robots.txt', '/sitemap.xml', '/favicon.ico']:
+        return
+    
+    # Block if user agent matches bot patterns
+    if any(pattern in user_agent for pattern in bot_patterns):
+        return '', 403  # Forbidden
+    
+    # Block if URL matches malicious patterns
+    if any(pattern in request_path for pattern in bot_url_patterns):
+        return '', 404  # Not Found
  
 # Cache static files aggressively to improve load performance
 from datetime import timedelta as _timedelta  # alias to avoid name clash
