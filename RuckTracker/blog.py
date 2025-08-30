@@ -7,10 +7,21 @@ blog_bp = Blueprint('blog', __name__)
 # Blog posts registry
 BLOG_POSTS = [
     {
+        "slug": "rucking-weight-alternatives",
+        "title": "Rucking Weight Alternatives: Real-World Ways to Hit 10–50 lbs (Without Buying Plates)",
+        "description": "Practical, subtly playful alternatives to ruck plates: water jugs, laptop bags, litter, and more—with simple combos to dial 10–50 lbs.",
+        "date": "2025-08-27",
+        "author": "rory@getrucky.com",
+        "tags": ["rucking", "gear", "weights", "beginner"],
+        "read_time": 6,
+        "template": "blog/posts/rucking-weight-alternatives.html",
+        "image": "images/blog/more.jpg",
+    },
+    {
         "slug": "best-rucking-backpack-guide",
         "title": "The Ultimate Rucking Backpack Guide: GoRuck vs Frontline vs Budget Alternatives (2025)",
         "description": "Comprehensive guide to the best rucking backpacks in 2025. Compare GoRuck, Frontline Athletic, Mystery Ranch, and budget options with real user reviews and pricing.",
-        "date": "2025-01-30",
+        "date": "2025-08-30",
         "author": "RuckTracker Team",
         "tags": ["gear", "backpack", "goruck", "review"],
         "read_time": 12,
