@@ -3,6 +3,7 @@ import Flutter
 import WatchConnectivity
 import UserNotifications
 import FirebaseCore
+import CoreMotion
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate, FlutterRuckingApi {
@@ -13,6 +14,7 @@ import FirebaseCore
     private let userPrefsChannelName = "com.getrucky.gfy/user_preferences"
     private let eventChannelName = "com.getrucky.gfy/heartRateStream"
     private let stepEventChannelName = "com.getrucky.gfy/stepStream"
+    private let barometerEventChannelName = "com.getrucky.gfy/barometerStream"
     private let queuedMessagesKey = "WCQueuedMessages"
     
     override func application(
@@ -156,6 +158,10 @@ import FirebaseCore
         // Setup Flutter Event Channel for streaming step count data to Dart
         let stepEventChannel = FlutterEventChannel(name: stepEventChannelName, binaryMessenger: controller.binaryMessenger)
         stepEventChannel.setStreamHandler(StepCountStreamHandler())
+        
+        // Setup Flutter Event Channel for streaming barometric pressure data to Dart
+        let barometerEventChannel = FlutterEventChannel(name: barometerEventChannelName, binaryMessenger: controller.binaryMessenger)
+        barometerEventChannel.setStreamHandler(BarometerStreamHandler())
         
         // Register for push notifications and get APNS token
         if #available(iOS 10.0, *) {
@@ -866,5 +872,79 @@ extension AppDelegate {
     func endSessionOnWatch() throws {
         print("[WATCH] endSessionOnWatch called")
         sendMessageToWatch(["command": "endSession"])
+    }
+}
+
+// Stream handler for barometric pressure data to Flutter
+class BarometerStreamHandler: NSObject, FlutterStreamHandler {
+    private static var eventSink: FlutterEventSink?
+    private static var isListening: Bool = false
+    private static var altimeter: CMAltimeter?
+    private static var operationQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "BarometerQueue"
+        return queue
+    }()
+    
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        print("🟢 [BAROMETER] BarometerStreamHandler.onListen called - setting up pressure streaming")
+        BarometerStreamHandler.eventSink = events
+        BarometerStreamHandler.isListening = true
+        
+        guard CMAltimeter.isRelativeAltitudeAvailable() else {
+            print("❌ [BAROMETER] Barometric altimeter not available on this device")
+            events(FlutterError(code: "UNAVAILABLE", message: "Barometric altimeter not available", details: nil))
+            return nil
+        }
+        
+        BarometerStreamHandler.altimeter = CMAltimeter()
+        BarometerStreamHandler.altimeter?.startRelativeAltitudeUpdates(to: BarometerStreamHandler.operationQueue) { altitudeData, error in
+            guard BarometerStreamHandler.isListening else { return }
+            
+            if let error = error {
+                print("❌ [BAROMETER] Error reading altimeter: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    if let sink = BarometerStreamHandler.eventSink {
+                        sink(FlutterError(code: "SENSOR_ERROR", message: error.localizedDescription, details: nil))
+                    }
+                }
+                return
+            }
+            
+            guard let data = altitudeData else { return }
+            
+            // Convert pressure from kPa to Pa (Pascals) for standard barometric formula
+            let pressurePa = data.pressure.doubleValue * 1000.0
+            let relativeAltitudeM = data.relativeAltitude.doubleValue
+            
+            let barometerData: [String: Double] = [
+                "pressure": pressurePa,
+                "relativeAltitude": relativeAltitudeM,
+                "timestamp": Date().timeIntervalSince1970 * 1000 // milliseconds
+            ]
+            
+            DispatchQueue.main.async {
+                if BarometerStreamHandler.isListening, let sink = BarometerStreamHandler.eventSink {
+                    sink(barometerData)
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        print("🔴 [BAROMETER] BarometerStreamHandler.onCancel called - stopping pressure streaming")
+        BarometerStreamHandler.isListening = false
+        BarometerStreamHandler.altimeter?.stopRelativeAltitudeUpdates()
+        BarometerStreamHandler.altimeter = nil
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            if !BarometerStreamHandler.isListening {
+                BarometerStreamHandler.eventSink = nil
+            }
+        }
+        
+        return nil
     }
 }

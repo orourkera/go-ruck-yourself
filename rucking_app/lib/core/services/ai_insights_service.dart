@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -184,6 +185,11 @@ class AIInsightsService {
     final integrations = Map<String, dynamic>.from(facts['integrations'] ?? const {});
     final streak = Map<String, dynamic>.from(facts['streak'] ?? const {});
 
+    // Extract rich behavioral patterns from full user insights
+    final triggers = _safeList(userInsights['triggers']);
+    final achievements = _safeList(userInsights['achievements']);
+    final activity = Map<String, dynamic>.from(userInsights['activity'] ?? const {});
+
     final context = <String, dynamic>{
       'username': username,
       'timeOfDay': timeOfDay,
@@ -207,6 +213,14 @@ class AIInsightsService {
       'isStravaConnected': _coerceBool(integrations['strava_connected']) ??
           _coerceBool(facts['strava_connected']) ?? false,
       'streakDays': (streak['days'] as num?)?.toInt(),
+      
+      // Rich behavioral patterns - with error handling
+      'behavioralTriggers': _safeExtractPatterns(() => _extractBehavioralTriggers(triggers)),
+      'achievementPatterns': _safeExtractPatterns(() => _extractAchievementPatterns(achievements)),
+      'timingPatterns': _safeExtractPatterns(() => _extractTimingPatterns(activity)),
+      'weatherPatterns': _safeExtractPatterns(() => _extractWeatherPatterns(activity)),
+      'progressionTrends': _safeExtractPatterns(() => _extractProgressionTrends(activity, allTime)),
+      'personalityMarkers': _safeExtractPatterns(() => _extractPersonalityMarkers(achievements, triggers, recency)),
     };
     
     // Add recent activity fields from facts.recency if available
@@ -218,7 +232,6 @@ class AIInsightsService {
     // Simple milestone helpers
     final totalSessions = (allTime['sessions'] as num?)?.toInt() ?? 0;
     context['sessionsTo100'] = (100 - totalSessions).clamp(0, 100);
-
 
     return context;
   }
@@ -242,10 +255,18 @@ class AIInsightsService {
           '- First-time primer: Append ONE factual sentence on what rucking is and why it helps (e.g., "Rucking = brisk walking with a backpack; burns ~2–3× walking calories and builds leg/core strength with low impact.")'
         : '';
 
+    // Extract rich behavioral patterns for more creative insights
+    final behavioralTriggers = context['behavioralTriggers'] as Map<String, dynamic>? ?? {};
+    final achievementPatterns = context['achievementPatterns'] as Map<String, dynamic>? ?? {};
+    final timingPatterns = context['timingPatterns'] as Map<String, dynamic>? ?? {};
+    final weatherPatterns = context['weatherPatterns'] as Map<String, dynamic>? ?? {};
+    final progressionTrends = context['progressionTrends'] as Map<String, dynamic>? ?? {};
+    final personalityMarkers = context['personalityMarkers'] as Map<String, dynamic>? ?? {};
+
     return '''
 Generate a personalized, motivational homepage insight for a rucking app user.
 
-Context:
+Basic Context:
 - Username: ${context['username']}
 - Current time: ${context['timeOfDay']} on ${context['dayOfWeek']}
 - Recent sessions: ${context['sessionCount']}
@@ -255,38 +276,60 @@ Context:
 - Has recent activity: ${context['hasRecentActivity']}
 ${context['daysSinceLastRuck'] != null ? '- Days since last ruck: ${context['daysSinceLastRuck']}' : ''}
 ${context['lastRuckDistance'] != null ? '- Last ruck distance: ${context['lastRuckDistance']} $distanceUnit' : ''}
- - Profile: ${context['hasProfilePhoto'] == true ? 'has photo' : 'no photo'}; Strava: ${context['isStravaConnected'] == true ? 'connected' : 'not connected'}
- ${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''}
- - Sessions to 100: ${context['sessionsTo100']}
+- Profile: ${context['hasProfilePhoto'] == true ? 'has photo' : 'no photo'}; Strava: ${context['isStravaConnected'] == true ? 'connected' : 'not connected'}
+${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''}
+- Sessions to 100: ${context['sessionsTo100']}
 
- Special Guidelines:
- $toneGuidance
- $firstSessionGuidance
- - Personality: Fun, witty, encouraging. One short playful line allowed, avoid cringe.
- - Weather: If provided, make it qualitative: compare to last ruck (warmer/cooler, windier/calmer), note likely rain window later today if relevant, or suggest a best 1–2 hour start window.
- - User facts: Use at least one personal stat (streak, total sessions, milestone progress, best/longest if present) to ground the insight.
- - Account nudges: At most ONE gentle nudge if applicable: if no profile photo, suggest adding one; if Strava not connected, suggest connecting. Keep it brief and optional; do not scold.
- - Use the user's preferred units ($distanceUnit).
- - Be concise and concrete. One distinct idea per field.
- - Do not mention BPM, medical advice, or anything not present in context.
+Rich Behavioral Patterns (USE THESE FOR CREATIVE INSIGHTS):
+- Personality Type: ${personalityMarkers['personalityType']} (motivation: ${personalityMarkers['motivationStyle']})
+- Behavioral Focus: ${achievementPatterns['focusAreas']?.join(', ') ?? 'balanced'}
+- Timing Preferences: ${timingPatterns['preferredTimeSlots']?.join(', ') ?? 'flexible'}${timingPatterns['isEarlyMorningRucker'] == true ? ' (early bird!)' : ''}
+- Weather Tolerance: ${weatherPatterns['weatherTolerance']}${weatherPatterns['coldWeatherWarrior'] == true ? ' (cold warrior)' : ''}
+- Progression Style: ${progressionTrends['improvementTrend']} trend, ${achievementPatterns['progressionStyle']} achiever
+- Challenge Elements: ${behavioralTriggers['hasPersonalChallenge'] == true ? 'self-challenger' : 'steady builder'}
+- Motivation Themes: ${behavioralTriggers['motivationThemes']?.join(', ') ?? 'general fitness'}
+
+CRITICAL: Combine behavioral insights WITH concrete stats. Use both the rich behavioral patterns AND the basic numbers to create insights that are both personal and grounded in data. For example: "Your 5:30am habit + 2 sessions this month shows real commitment" rather than just "you're consistent."
+
+Special Guidelines:
+$toneGuidance
+$firstSessionGuidance
+- Data-driven insights: ALWAYS include at least one concrete stat (sessions, distance, streak, achievements, etc.) combined with behavioral context
+- Pattern + Numbers: Merge behavioral patterns with actual numbers ("Your distance-focused 15.2 miles total shows...")
+- Personality-driven tone: Match tone to their personality type (${personalityMarkers['personalityType']}) and motivation style (${personalityMarkers['motivationStyle']})
+- Concrete recommendations: Include specific distance/time targets based on their history and patterns
+- Weather: If provided, make it qualitative: compare to last ruck (warmer/cooler, windier/calmer), note likely rain window later today if relevant, or suggest a best 1–2 hour start window.
+- Balance insights: Use BOTH behavioral patterns AND hard numbers - never ignore the basic stats
+- Account nudges: At most ONE gentle nudge if applicable: if no profile photo, suggest adding one; if Strava not connected and they seem social/competitive, suggest connecting. Keep it brief and optional; do not scold.
+- Use the user's preferred units ($distanceUnit).
+- Be concise and concrete. One distinct idea per field.
+- Do not mention BPM, medical advice, or anything not present in context.
 
 Generate a JSON response with:
 {
-  "greeting": "Time-appropriate greeting with name",
-  "insight": "Qualitative, personal takeaway using recent trend and/or milestone",
-  "recommendation": "Specific action for today that accounts for weather timing; include one gentle account nudge only if applicable",
-  "motivation": "Encouraging line with personality/humor",
-  "emoji": "Single relevant emoji"
+  "greeting": "Time-appropriate greeting with name that reflects their personality/timing patterns",
+  "insight": "Behavioral insight that INCLUDES concrete stats (sessions, distance, achievements, streak) combined with personality patterns",
+  "recommendation": "Specific action with target distance/time based on their history, patterns, and behavioral style",
+  "motivation": "Encouraging line that combines their achievements/progress with their motivation style",
+  "emoji": "Single relevant emoji that matches their personality/focus area"
 }
 
 Respond with ONLY the JSON object. Do not include any other text or formatting.
-Keep it concise, personal, and motivating. Use their preferred units.
+Keep it concise, personal, and behaviorally-informed. Use their preferred units.
 ''';
   }
 
 
   String _buildUserContextInput(Map<String, dynamic> context) {
     final distanceUnit = context['preferMetric'] ? 'km' : 'miles';
+    
+    // Extract behavioral patterns
+    final behavioralTriggers = context['behavioralTriggers'] as Map<String, dynamic>? ?? {};
+    final achievementPatterns = context['achievementPatterns'] as Map<String, dynamic>? ?? {};
+    final timingPatterns = context['timingPatterns'] as Map<String, dynamic>? ?? {};
+    final weatherPatterns = context['weatherPatterns'] as Map<String, dynamic>? ?? {};
+    final progressionTrends = context['progressionTrends'] as Map<String, dynamic>? ?? {};
+    final personalityMarkers = context['personalityMarkers'] as Map<String, dynamic>? ?? {};
 
     return '''
 User Context:
@@ -301,7 +344,16 @@ ${context['daysSinceLastRuck'] != null ? '- Days since last ruck: ${context['day
 ${context['lastRuckDistance'] != null ? '- Last ruck distance: ${context['lastRuckDistance']} $distanceUnit' : ''}
 - Profile: ${context['hasProfilePhoto'] == true ? 'has photo' : 'no photo'}; Strava: ${context['isStravaConnected'] == true ? 'connected' : 'not connected'}
 ${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''}
-- Sessions to 100: ${context['sessionsTo100']}''';
+- Sessions to 100: ${context['sessionsTo100']}
+
+Behavioral Profile:
+- Personality: ${personalityMarkers['personalityType']} type, ${personalityMarkers['motivationStyle']} motivation
+- Achievement Focus: ${achievementPatterns['focusAreas']?.join(', ') ?? 'balanced approach'}
+- Timing Style: ${timingPatterns['preferredTimeSlots']?.join(' or ') ?? 'flexible timing'}${timingPatterns['isEarlyMorningRucker'] == true ? ' (5:30am early bird)' : ''}
+- Weather Profile: ${weatherPatterns['weatherTolerance']} tolerance${weatherPatterns['coldWeatherWarrior'] == true ? ', cold weather warrior' : ''}${weatherPatterns['rainTolerance'] == true ? ', rain-ready' : ''}
+- Progress Pattern: ${progressionTrends['improvementTrend']} improvement, ${achievementPatterns['progressionStyle']} achievement pace
+- Challenge Mindset: ${behavioralTriggers['hasPersonalChallenge'] == true ? 'self-challenger who pushes limits' : 'steady consistent builder'}
+- Motivation Drivers: ${behavioralTriggers['motivationThemes']?.join(', ') ?? 'fitness and wellness'}''';
   }
 
 
@@ -318,6 +370,450 @@ ${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''
     if (s == 'true' || s == '1' || s == 'yes') return true;
     if (s == 'false' || s == '0' || s == 'no') return false;
     return null;
+  }
+
+  /// Extract behavioral triggers and motivation patterns
+  Map<String, dynamic> _extractBehavioralTriggers(List<dynamic> triggers) {
+    final patterns = <String, dynamic>{
+      'hasGoalMilestone': false,
+      'hasCompetitiveElement': false,
+      'hasPersonalChallenge': false,
+      'motivationThemes': <String>[],
+    };
+
+    for (final trigger in triggers) {
+      if (trigger is Map<String, dynamic>) {
+        final description = (trigger['description'] ?? '').toString().toLowerCase();
+        final triggerType = (trigger['trigger_type'] ?? '').toString().toLowerCase();
+        
+        // Detect goal-oriented behavior
+        if (description.contains('milestone') || description.contains('goal') || 
+            description.contains('target') || triggerType.contains('milestone')) {
+          patterns['hasGoalMilestone'] = true;
+        }
+        
+        // Detect competitive elements
+        if (description.contains('beat') || description.contains('faster') ||
+            description.contains('compete') || description.contains('challenge others')) {
+          patterns['hasCompetitiveElement'] = true;
+        }
+        
+        // Detect personal challenge mindset  
+        if (description.contains('push') || description.contains('test') ||
+            description.contains('prove') || description.contains('overcome')) {
+          patterns['hasPersonalChallenge'] = true;
+        }
+        
+        // Extract motivation themes
+        final themes = patterns['motivationThemes'] as List<String>;
+        if (description.contains('consistency') && !themes.contains('consistency')) themes.add('consistency');
+        if (description.contains('strength') && !themes.contains('strength')) themes.add('strength');
+        if (description.contains('endurance') && !themes.contains('endurance')) themes.add('endurance');
+        if (description.contains('mental') && !themes.contains('mental')) themes.add('mental');
+      }
+    }
+    
+    return patterns;
+  }
+
+  /// Extract achievement clustering and progression patterns
+  Map<String, dynamic> _extractAchievementPatterns(List<dynamic> achievements) {
+    final patterns = <String, dynamic>{
+      'achievementClusters': <String>[],
+      'recentAchievementTypes': <String>[],
+      'progressionStyle': 'steady', // steady, burst, sporadic
+      'focusAreas': <String>[],
+    };
+
+    if (achievements.isEmpty) return patterns;
+
+    final clusters = patterns['achievementClusters'] as List<String>;
+    final recentTypes = patterns['recentAchievementTypes'] as List<String>;
+    final focusAreas = patterns['focusAreas'] as List<String>;
+    
+    final now = DateTime.now();
+    var recentAchievements = 0;
+    var distanceAchievements = 0;
+    var frequencyAchievements = 0;
+    var challengeAchievements = 0;
+
+    for (final achievement in achievements) {
+      if (achievement is Map<String, dynamic>) {
+        final name = (achievement['name'] ?? '').toString().toLowerCase();
+        final dateStr = achievement['date_achieved'] ?? achievement['created_at'];
+        
+        // Check if recent (last 30 days)
+        if (dateStr != null) {
+          final achievedDate = DateTime.tryParse(dateStr.toString());
+          if (achievedDate != null && now.difference(achievedDate).inDays <= 30) {
+            recentAchievements++;
+          }
+        }
+        
+        // Categorize achievements
+        if (name.contains('distance') || name.contains('mile') || name.contains('km')) {
+          distanceAchievements++;
+          if (!focusAreas.contains('distance')) focusAreas.add('distance');
+        }
+        if (name.contains('streak') || name.contains('consistent') || name.contains('daily')) {
+          frequencyAchievements++;
+          if (!focusAreas.contains('consistency')) focusAreas.add('consistency');
+        }
+        if (name.contains('challenge') || name.contains('tough') || name.contains('endurance')) {
+          challengeAchievements++;
+          if (!focusAreas.contains('endurance')) focusAreas.add('endurance');
+        }
+      }
+    }
+    
+    // Determine progression style
+    if (recentAchievements >= 3) {
+      patterns['progressionStyle'] = 'burst';
+    } else if (recentAchievements >= 1) {
+      patterns['progressionStyle'] = 'steady';
+    } else {
+      patterns['progressionStyle'] = 'sporadic';
+    }
+    
+    // Build clusters
+    if (distanceAchievements > frequencyAchievements && distanceAchievements > challengeAchievements) {
+      clusters.add('distance-focused');
+    }
+    if (frequencyAchievements > distanceAchievements && frequencyAchievements > challengeAchievements) {
+      clusters.add('consistency-focused');
+    }
+    if (challengeAchievements > 0) {
+      clusters.add('challenge-seeker');
+    }
+    
+    return patterns;
+  }
+
+  /// Extract timing preferences and patterns
+  Map<String, dynamic> _extractTimingPatterns(Map<String, dynamic> activity) {
+    final patterns = <String, dynamic>{
+      'preferredTimeSlots': <String>[],
+      'isEarlyMorningRucker': false,
+      'weekdayPreference': 'mixed', // weekend, weekday, mixed
+      'consistentTiming': false,
+    };
+
+    final sessions = _safeList(activity['sessions']);
+    final timeSlots = <String, int>{};
+    var weekdayCount = 0;
+    var weekendCount = 0;
+    
+    for (final session in sessions) {
+      if (session is Map<String, dynamic>) {
+        final startTime = session['start_time'];
+        if (startTime != null) {
+          final dateTime = DateTime.tryParse(startTime.toString());
+          if (dateTime != null) {
+            final hour = dateTime.hour;
+            final dayOfWeek = dateTime.weekday;
+            
+            // Categorize time slots
+            String timeSlot;
+            if (hour >= 5 && hour < 8) {
+              timeSlot = 'early-morning';
+              patterns['isEarlyMorningRucker'] = true;
+            } else if (hour >= 8 && hour < 12) {
+              timeSlot = 'morning';
+            } else if (hour >= 12 && hour < 17) {
+              timeSlot = 'afternoon';
+            } else if (hour >= 17 && hour < 20) {
+              timeSlot = 'evening';
+            } else {
+              timeSlot = 'night';
+            }
+            
+            timeSlots[timeSlot] = (timeSlots[timeSlot] ?? 0) + 1;
+            
+            // Track weekday vs weekend
+            if (dayOfWeek <= 5) {
+              weekdayCount++;
+            } else {
+              weekendCount++;
+            }
+          }
+        }
+      }
+    }
+    
+    // Determine preferred time slots
+    final sortedSlots = timeSlots.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    final preferredSlots = patterns['preferredTimeSlots'] as List<String>;
+    for (final entry in sortedSlots.take(2)) {
+      if (entry.value >= 2) { // At least 2 sessions in this time slot
+        preferredSlots.add(entry.key);
+      }
+    }
+    
+    // Determine weekday preference
+    if (weekendCount > weekdayCount * 1.5) {
+      patterns['weekdayPreference'] = 'weekend';
+    } else if (weekdayCount > weekendCount * 1.5) {
+      patterns['weekdayPreference'] = 'weekday';
+    } else {
+      patterns['weekdayPreference'] = 'mixed';
+    }
+    
+    // Check timing consistency
+    patterns['consistentTiming'] = preferredSlots.isNotEmpty && timeSlots.values.any((count) => count >= 3);
+    
+    return patterns;
+  }
+
+  /// Extract weather tolerance and preferences
+  Map<String, dynamic> _extractWeatherPatterns(Map<String, dynamic> activity) {
+    final patterns = <String, dynamic>{
+      'weatherTolerance': 'moderate', // high, moderate, low
+      'coldWeatherWarrior': false,
+      'rainTolerance': false,
+      'temperatureRange': <String, num>{},
+    };
+
+    final sessions = _safeList(activity['sessions']);
+    var coldSessions = 0; // Below 40F/4C
+    var hotSessions = 0; // Above 80F/27C  
+    var rainSessions = 0;
+    var totalWithWeather = 0;
+    final temps = <double>[];
+    
+    for (final session in sessions) {
+      if (session is Map<String, dynamic>) {
+        final weather = session['weather'];
+        if (weather is Map<String, dynamic>) {
+          totalWithWeather++;
+          
+          final tempC = (weather['temperature_c'] as num?)?.toDouble();
+          if (tempC != null) {
+            temps.add(tempC);
+            
+            if (tempC <= 4) coldSessions++; // 40F or below
+            if (tempC >= 27) hotSessions++; // 80F or above
+          }
+          
+          final conditions = (weather['conditions'] ?? '').toString().toLowerCase();
+          if (conditions.contains('rain') || conditions.contains('drizzle') || conditions.contains('shower')) {
+            rainSessions++;
+          }
+        }
+      }
+    }
+    
+    if (totalWithWeather > 0) {
+      // Weather tolerance assessment
+      final coldTolerance = coldSessions / totalWithWeather;
+      final rainTolerance = rainSessions / totalWithWeather;
+      
+      patterns['coldWeatherWarrior'] = coldTolerance >= 0.3; // 30% or more in cold
+      patterns['rainTolerance'] = rainTolerance >= 0.2; // 20% or more in rain
+      
+      if (coldTolerance >= 0.3 || rainTolerance >= 0.2) {
+        patterns['weatherTolerance'] = 'high';
+      } else if (coldTolerance >= 0.1 || rainTolerance >= 0.1) {
+        patterns['weatherTolerance'] = 'moderate';
+      } else {
+        patterns['weatherTolerance'] = 'low';
+      }
+      
+      // Temperature range
+      if (temps.isNotEmpty) {
+        temps.sort();
+        patterns['temperatureRange'] = {
+          'min': temps.first,
+          'max': temps.last,
+          'median': temps[temps.length ~/ 2],
+        };
+      }
+    }
+    
+    return patterns;
+  }
+
+  /// Extract progression trends and improvement patterns  
+  Map<String, dynamic> _extractProgressionTrends(Map<String, dynamic> activity, Map<String, dynamic> allTime) {
+    final patterns = <String, dynamic>{
+      'improvementTrend': 'stable', // improving, stable, declining
+      'distanceProgression': 'consistent', // increasing, consistent, varied
+      'hasLongBreaks': false,
+      'seasonalPattern': null,
+    };
+
+    final sessions = _safeList(activity['sessions']);
+    if (sessions.length < 3) return patterns;
+    
+    // Sort sessions by date
+    final sortedSessions = sessions.where((s) => s is Map<String, dynamic> && s['start_time'] != null).toList();
+    sortedSessions.sort((a, b) {
+      final aTime = DateTime.tryParse(a['start_time'].toString());
+      final bTime = DateTime.tryParse(b['start_time'].toString());
+      if (aTime == null || bTime == null) return 0;
+      return aTime.compareTo(bTime);
+    });
+    
+    if (sortedSessions.length < 3) return patterns;
+    
+    // Analyze distance progression
+    final distances = <double>[];
+    final dates = <DateTime>[];
+    DateTime? lastDate;
+    var hasLongGap = false;
+    
+    for (final session in sortedSessions) {
+      final distanceKm = (session['distance_km'] as num?)?.toDouble();
+      final dateTime = DateTime.tryParse(session['start_time'].toString());
+      
+      if (distanceKm != null && dateTime != null) {
+        distances.add(distanceKm);
+        dates.add(dateTime);
+        
+        // Check for long breaks (>14 days)
+        if (lastDate != null && dateTime.difference(lastDate).inDays > 14) {
+          hasLongGap = true;
+        }
+        lastDate = dateTime;
+      }
+    }
+    
+    patterns['hasLongBreaks'] = hasLongGap;
+    
+    if (distances.length >= 3) {
+      // Analyze distance trends (compare first third to last third)
+      final firstThird = distances.take(distances.length ~/ 3).toList();
+      final lastThird = distances.skip(distances.length * 2 ~/ 3).toList();
+      
+      final avgFirst = firstThird.reduce((a, b) => a + b) / firstThird.length;
+      final avgLast = lastThird.reduce((a, b) => a + b) / lastThird.length;
+      
+      if (avgLast > avgFirst * 1.1) {
+        patterns['distanceProgression'] = 'increasing';
+        patterns['improvementTrend'] = 'improving';
+      } else if (avgLast < avgFirst * 0.9) {
+        patterns['distanceProgression'] = 'decreasing';  
+        patterns['improvementTrend'] = 'declining';
+      } else {
+        // Check for consistency vs variation
+        final stdDev = _calculateStdDev(distances);
+        final avgDistance = distances.reduce((a, b) => a + b) / distances.length;
+        final coefficientOfVariation = stdDev / avgDistance;
+        
+        if (coefficientOfVariation < 0.3) {
+          patterns['distanceProgression'] = 'consistent';
+        } else {
+          patterns['distanceProgression'] = 'varied';
+        }
+      }
+    }
+    
+    return patterns;
+  }
+
+  /// Extract personality markers from behavior
+  Map<String, dynamic> _extractPersonalityMarkers(List<dynamic> achievements, List<dynamic> triggers, Map<String, dynamic> recency) {
+    final markers = <String, dynamic>{
+      'personalityType': 'balanced', // consistent, challenger, explorer, social
+      'motivationStyle': 'intrinsic', // intrinsic, extrinsic, mixed
+      'riskTolerance': 'moderate', // high, moderate, low  
+      'goalOrientation': 'process', // outcome, process, mixed
+    };
+
+    // Analyze achievement types for personality indicators
+    var challengeCount = 0;
+    var consistencyCount = 0;
+    var explorationCount = 0;
+    
+    for (final achievement in achievements) {
+      if (achievement is Map<String, dynamic>) {
+        final name = (achievement['name'] ?? '').toString().toLowerCase();
+        
+        if (name.contains('challenge') || name.contains('tough') || name.contains('endurance')) {
+          challengeCount++;
+        }
+        if (name.contains('streak') || name.contains('consistent') || name.contains('regular')) {
+          consistencyCount++;
+        }
+        if (name.contains('explore') || name.contains('distance') || name.contains('new')) {
+          explorationCount++;
+        }
+      }
+    }
+    
+    // Determine personality type
+    final maxCount = [challengeCount, consistencyCount, explorationCount].reduce((a, b) => a > b ? a : b);
+    if (maxCount > 0) {
+      if (challengeCount == maxCount) {
+        markers['personalityType'] = 'challenger';
+        markers['riskTolerance'] = 'high';
+      } else if (consistencyCount == maxCount) {
+        markers['personalityType'] = 'consistent';
+        markers['goalOrientation'] = 'process';
+      } else if (explorationCount == maxCount) {
+        markers['personalityType'] = 'explorer';
+        markers['goalOrientation'] = 'mixed';
+      }
+    }
+    
+    // Analyze triggers for motivation style
+    var intrinsicCount = 0;
+    var extrinsicCount = 0;
+    
+    for (final trigger in triggers) {
+      if (trigger is Map<String, dynamic>) {
+        final description = (trigger['description'] ?? '').toString().toLowerCase();
+        
+        if (description.contains('personal') || description.contains('self') || 
+            description.contains('feel') || description.contains('health')) {
+          intrinsicCount++;
+        }
+        if (description.contains('beat') || description.contains('compare') ||
+            description.contains('show') || description.contains('prove to others')) {
+          extrinsicCount++;
+        }
+      }
+    }
+    
+    if (intrinsicCount > extrinsicCount) {
+      markers['motivationStyle'] = 'intrinsic';
+    } else if (extrinsicCount > intrinsicCount) {
+      markers['motivationStyle'] = 'extrinsic';
+    } else {
+      markers['motivationStyle'] = 'mixed';
+    }
+    
+    return markers;
+  }
+
+  double _calculateStdDev(List<double> values) {
+    if (values.isEmpty) return 0.0;
+    final mean = values.reduce((a, b) => a + b) / values.length;
+    final sumOfSquaredDiffs = values.map((x) => (x - mean) * (x - mean)).reduce((a, b) => a + b);
+    return math.sqrt(sumOfSquaredDiffs / values.length);
+  }
+
+  /// Safely extract a list from dynamic data, handling various data types
+  List<dynamic> _safeList(dynamic value) {
+    if (value == null) return const [];
+    if (value is List) return value;
+    if (value is Map<String, dynamic>) {
+      // If it's a map, try to extract values or convert to list
+      final values = value.values.toList();
+      return values.where((v) => v != null).toList();
+    }
+    return const [];
+  }
+
+  /// Safely extract behavioral patterns with error handling
+  Map<String, dynamic> _safeExtractPatterns(Map<String, dynamic> Function() extractor) {
+    try {
+      return extractor();
+    } catch (e) {
+      AppLogger.warning('[AI_INSIGHTS] Pattern extraction error: $e');
+      return <String, dynamic>{};
+    }
   }
 
   String _buildWeatherDeltaSnippet(CurrentWeather current, CurrentWeather last, bool preferMetric) {

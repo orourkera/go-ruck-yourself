@@ -981,6 +981,12 @@ class RuckSessionCompleteResource(Resource):
                 logger.error(f"dateutil not available for GPS validation on session {ruck_id}")
                 date_parser = None
             
+            # CRITICAL: Add small delay to ensure pending location uploads have been processed
+            # This prevents the GPS safety check from running before all location points are uploaded
+            import time
+            time.sleep(0.5)  # 500ms delay to allow pending uploads to complete
+            logger.info(f"[CANONICAL] Waiting for pending location uploads to complete for session {ruck_id}")
+            
             try:
                 # Fetch GPS location points for this session
                 location_resp = supabase.table('location_point') \
@@ -991,6 +997,8 @@ class RuckSessionCompleteResource(Resource):
             except Exception as fetch_err:
                 logger.error(f"Error fetching GPS points for canonical metrics on session {ruck_id}: {fetch_err}")
                 location_resp = None
+                # Continue with client-provided metrics rather than failing the completion
+                logger.warning(f"[CANONICAL] GPS fetch failed for session {ruck_id}, using client-provided metrics")
 
             if location_resp and location_resp.data and len(location_resp.data) >= 2:
                 points = location_resp.data
@@ -1075,15 +1083,21 @@ class RuckSessionCompleteResource(Resource):
                     client_distance_km = data.get('distance_km', 0.0)
                     server_distance_km = round(total_distance_km, 3)
                     
+                    # Enhanced logging for debugging distance discrepancies
+                    logger.info(f"[DISTANCE_SAFETY] Distance comparison for session {ruck_id}:")
+                    logger.info(f"[DISTANCE_SAFETY]   - Client reported: {client_distance_km}km")
+                    logger.info(f"[DISTANCE_SAFETY]   - Server calculated: {server_distance_km}km")
+                    logger.info(f"[DISTANCE_SAFETY]   - GPS points processed: {len(points)}")
+                    
                     if server_distance_km >= client_distance_km or client_distance_km == 0:
                         # Backend calculation is greater or equal, or no client data - use server calculation
                         update_data['distance_km'] = server_distance_km
-                        logger.info(f"[DISTANCE_SAFETY] Using server distance: {server_distance_km}km (client: {client_distance_km}km)")
+                        logger.info(f"[DISTANCE_SAFETY] ✓ Using server distance: {server_distance_km}km (overriding client: {client_distance_km}km)")
                     else:
                         # Backend calculation is less than client - keep client value for safety
                         # This preserves accurate frontend tracking when backend has GPS gaps
                         update_data['distance_km'] = client_distance_km
-                        logger.warning(f"[DISTANCE_SAFETY] Keeping client distance: {client_distance_km}km (server would be: {server_distance_km}km) - backend calculation appears incomplete")
+                        logger.warning(f"[DISTANCE_SAFETY] ⚠️ Keeping client distance: {client_distance_km}km (server calculation {server_distance_km}km appears incomplete)")
                     
                     # Always use server-calculated elevation as it's more reliable with larger datasets
                     update_data['elevation_gain_m'] = round(elevation_gain_m, 1)

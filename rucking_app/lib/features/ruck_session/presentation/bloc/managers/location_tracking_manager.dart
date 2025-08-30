@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
@@ -11,6 +12,7 @@ import '../../../../../core/services/api_client.dart';
 import '../../../../../core/services/auth_service.dart';
 import '../../../../../core/services/location_service.dart';
 import '../../../../../core/services/watch_service.dart';
+import '../../../../../core/services/barometer_service.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../../../core/models/location_point.dart';
 import '../../../../../core/models/terrain_segment.dart';
@@ -36,6 +38,7 @@ class LocationTrackingManager implements SessionManager {
   final ApiClient _apiClient;
   final WatchService _watchService;
   final AuthService _authService;
+  final BarometerService _barometerService = BarometerService();
   final LocationValidationService _validationService = LocationValidationService();
   final SessionValidationService _sessionValidationService = SessionValidationService();
   
@@ -141,12 +144,21 @@ class LocationTrackingManager implements SessionManager {
   double _estimatedDistance = 0.0;
   double _estimatedDirection = 0.0; // in degrees
 
-  // Elevation smoothing and gating (no barometer dependency)
+  // Elevation smoothing and gating with barometric fusion
   double? _filteredAltitude; // EMA-smoothed altitude for gain/loss computation
   DateTime? _lastAltitudeTs;
   static const double _emaAlpha = 0.3; // Smoothing factor for altitude EMA
   static const double _maxVerticalSpeedMs = 5.0; // Reject spikes faster than 5 m/s
   static const double _verticalAccuracyGateM = 15.0; // Ignore altitude updates with worse accuracy
+  
+  // Barometric altitude fusion state
+  StreamSubscription<BarometricReading>? _barometerSubscription;
+  double? _lastBarometricAltitude;
+  DateTime? _lastBarometricTimestamp;
+  bool _isBarometerCalibrated = false;
+  int _gpsCalibrationCount = 0;
+  static const int _gpsCalibrationSamples = 3; // Calibrate after 3 good GPS readings
+  static const double _fusionWeight = 0.7; // Weight for GPS vs barometric (0.7 = 70% GPS, 30% barometric)
 
   LocationTrackingManager({
     required LocationService locationService,
@@ -234,6 +246,12 @@ class LocationTrackingManager implements SessionManager {
     _filteredAltitude = null;
     _lastAltitudeTs = null;
     
+    // Reset barometric fusion state
+    _lastBarometricAltitude = null;
+    _lastBarometricTimestamp = null;
+    _isBarometerCalibrated = false;
+    _gpsCalibrationCount = 0;
+    
     // Reset distance stall detection
     _lastDistanceIncreaseTime = DateTime.now();
     _lastDistanceValueForStall = 0.0;
@@ -269,6 +287,9 @@ class LocationTrackingManager implements SessionManager {
   
     if (hasLocationAccess) {
       await _startLocationTracking();
+      
+      // Start barometric pressure streaming asynchronously to avoid blocking countdown
+      _startBarometricStreamingAsync();
     } else {
       AppLogger.warning('[LOCATION_MANAGER] No location permission, session continues in offline mode');
     }
@@ -276,6 +297,11 @@ class LocationTrackingManager implements SessionManager {
 
   Future<void> _onSessionStopped(SessionStopRequested event) async {
     await _stopLocationTracking();
+    
+    // Stop barometric streaming
+    await _barometerSubscription?.cancel();
+    _barometerSubscription = null;
+    await _barometerService.stopStreaming();
     
     // CRITICAL FIX: Clean up state with explicit memory cleanup
     _activeSessionId = null;
@@ -799,10 +825,10 @@ class LocationTrackingManager implements SessionManager {
           AppLogger.warning('[LOCATION_MANAGER] TRIMMING: Index too low, reset to unprocessed state');
         }
       } else {
-        // No points remaining - reset to initial state
+        // No points remaining - reset index but PRESERVE accumulated distance
         _lastProcessedLocationIndex = -1;
-        _lastKnownTotalDistance = 0.0;
-        AppLogger.info('[LOCATION_MANAGER] TRIMMING: No points remaining, reset distance tracking state');
+        // DO NOT reset _lastKnownTotalDistance - this must persist across trimming operations
+        AppLogger.info('[LOCATION_MANAGER] TRIMMING: No points remaining, reset index but preserved distance: ${_lastKnownTotalDistance.toStringAsFixed(3)}km');
       }
       
       AppLogger.info('[LOCATION_MANAGER] TRIMMING: Index adjustment: $oldProcessedIndex -> $_lastProcessedLocationIndex (removed $pointsToRemove points)');
@@ -1675,17 +1701,58 @@ class LocationTrackingManager implements SessionManager {
     double gain = 0.0;
     double loss = 0.0;
     
-    // Use more conservative threshold to filter GPS noise
-    const double elevationThreshold = 2.0; // 2 meters minimum change
+    // Threshold and gating to reduce noise accumulation
+    const double elevationThreshold = 2.0; // 2 meters minimum net change before counting
+    const double minHorizontalMeters = 1.5; // ignore vertical changes when essentially stationary
+    const double maxStepMeters = 25.0; // clamp per-step vertical change to avoid rare spikes
+    
+    // Hysteresis accumulator: build up changes until they exceed threshold, then commit
+    double pending = 0.0; // signed accumulator (positive for up, negative for down)
+    int dir = 0; // 1 = up, -1 = down, 0 = neutral
     
     for (int i = 1; i < _locationPoints.length; i++) {
-      final diff = _locationPoints[i].elevation - _locationPoints[i - 1].elevation;
+      final prev = _locationPoints[i - 1];
+      final curr = _locationPoints[i];
       
-      // Only count significant elevation changes to avoid GPS noise accumulation
-      if (diff > elevationThreshold) {
-        gain += diff;
-      } else if (diff < -elevationThreshold) {
-        loss += diff.abs();
+      // Ignore vertical noise if there's no meaningful horizontal movement
+      final double hMeters = _haversineDistance(
+        prev.latitude,
+        prev.longitude,
+        curr.latitude,
+        curr.longitude,
+      );
+      if (hMeters < minHorizontalMeters) {
+        continue;
+      }
+      
+      // Clamp unrealistic single-step vertical changes (additional guard besides vertical speed gate)
+      double step = (curr.elevation - prev.elevation);
+      if (step > maxStepMeters) step = maxStepMeters;
+      if (step < -maxStepMeters) step = -maxStepMeters;
+      if (step == 0.0) {
+        continue;
+      }
+      
+      // Maintain direction-aware hysteresis accumulator
+      final int stepDir = step > 0 ? 1 : -1;
+      if (dir == 0 || dir == stepDir) {
+        pending += step; // continue accumulating in same direction
+        dir = stepDir;
+      } else {
+        // Direction changed; reset accumulator to the current step
+        pending = step;
+        dir = stepDir;
+      }
+      
+      // If accumulated change exceeds threshold, commit the full amount (common approach on Garmin/Strava-like devices)
+      if (dir > 0 && pending >= elevationThreshold) {
+        gain += pending;
+        pending = 0.0;
+        dir = 0;
+      } else if (dir < 0 && -pending >= elevationThreshold) {
+        loss += (-pending);
+        pending = 0.0;
+        dir = 0;
       }
     }
     
@@ -1828,6 +1895,13 @@ class LocationTrackingManager implements SessionManager {
   @override
   Future<void> dispose() async {
     await _stopLocationTracking();
+    
+    // Clean up barometer resources
+    await _barometerSubscription?.cancel();
+    _barometerSubscription = null;
+    await _barometerService.stopStreaming();
+    _barometerService.dispose();
+    
     await _stateController.close();
   }
   
@@ -1983,15 +2057,33 @@ class LocationTrackingManager implements SessionManager {
     _lastEstimatedPosition = null;
   }
 
-  // Apply EMA smoothing, vertical accuracy gating, and vertical speed sanity checks to altitude.
+  // Apply EMA smoothing, vertical accuracy gating, vertical speed sanity checks, and barometric fusion to altitude.
   double _filterAltitude({
     required double rawAltitude,
     required double? altitudeAccuracy,
     required DateTime timestamp,
   }) {
+    // Calibrate barometer with GPS if not yet calibrated
+    if (!_isBarometerCalibrated && _lastBarometricAltitude != null) {
+      // Use estimated pressure from barometric service for calibration
+      final estimatedPressure = 101325.0; // Fallback pressure if not available
+      _calibrateBarometer(
+        gpsAltitude: rawAltitude,
+        gpsAccuracy: altitudeAccuracy,
+        pressurePa: estimatedPressure,
+      );
+    }
+    
+    // Fuse GPS and barometric altitude for improved accuracy
+    final double fusedAltitude = _fuseAltitude(
+      gpsAltitude: rawAltitude,
+      gpsAccuracy: altitudeAccuracy,
+      timestamp: timestamp,
+    );
+    
     // Initialize on first sample
     if (_filteredAltitude == null) {
-      _filteredAltitude = rawAltitude;
+      _filteredAltitude = fusedAltitude;
       _lastAltitudeTs = timestamp;
       return _filteredAltitude!;
     }
@@ -2001,14 +2093,21 @@ class LocationTrackingManager implements SessionManager {
         ? (timestamp.difference(_lastAltitudeTs!).inMilliseconds / 1000.0).clamp(0.0, 10.0)
         : 0.0;
 
-    // Gate by vertical accuracy if provided
-    if (altitudeAccuracy != null && altitudeAccuracy > _verticalAccuracyGateM) {
-      // Ignore poor-accuracy altitude updates; keep previous filtered value
+    // Gate by vertical accuracy if provided (only apply to GPS, barometric helps when GPS is poor)
+    if (altitudeAccuracy != null && altitudeAccuracy > _verticalAccuracyGateM && _lastBarometricAltitude == null) {
+      // Ignore poor-accuracy altitude updates only if no barometric data available
       return prev;
     }
 
-    // Compute an EMA to smooth noise
-    final double ema = (_emaAlpha * rawAltitude) + ((1 - _emaAlpha) * prev);
+    // Deadband: ignore tiny oscillations before applying EMA
+    const double deadbandM = 0.3; // small deadband to suppress micro-noise
+    if ((fusedAltitude - prev).abs() < deadbandM) {
+      _lastAltitudeTs = timestamp; // keep time updated for dt gating elsewhere
+      return prev;
+    }
+
+    // Compute an EMA to smooth noise on the fused altitude
+    final double ema = (_emaAlpha * fusedAltitude) + ((1 - _emaAlpha) * prev);
     final double delta = ema - prev;
 
     // Reject absurd vertical speed spikes
@@ -2022,5 +2121,111 @@ class LocationTrackingManager implements SessionManager {
     _filteredAltitude = ema;
     _lastAltitudeTs = timestamp;
     return _filteredAltitude!;
+  }
+
+  /// Handle barometric pressure readings for altitude fusion
+  void _onBarometricReading(BarometricReading reading) {
+    _lastBarometricTimestamp = reading.timestamp;
+    
+    // On iOS, use relative altitude directly from CMAltimeter
+    if (reading.relativeAltitudeM != null) {
+      _lastBarometricAltitude = reading.relativeAltitudeM;
+      AppLogger.debug('[BAROMETER] iOS relative altitude: ${reading.relativeAltitudeM!.toStringAsFixed(1)}m');
+    } else {
+      // Android: Convert pressure to altitude using barometric formula
+      _lastBarometricAltitude = _barometerService.pressureToAltitude(reading.pressurePa);
+      AppLogger.debug('[BAROMETER] Android pressure altitude: ${_lastBarometricAltitude!.toStringAsFixed(1)}m from ${reading.pressurePa.toStringAsFixed(0)}Pa');
+    }
+  }
+
+  /// Fuse GPS and barometric altitude for improved accuracy
+  double _fuseAltitude({
+    required double gpsAltitude,
+    required double? gpsAccuracy,
+    required DateTime timestamp,
+  }) {
+    // If no barometric data or not calibrated, use GPS only
+    if (_lastBarometricAltitude == null || !_isBarometerCalibrated) {
+      return gpsAltitude;
+    }
+    
+    // Check if barometric data is recent (within 10 seconds)
+    if (_lastBarometricTimestamp != null && 
+        timestamp.difference(_lastBarometricTimestamp!).inSeconds.abs() > 10) {
+      AppLogger.debug('[ALTITUDE_FUSION] Barometric data too old, using GPS only');
+      return gpsAltitude;
+    }
+    
+    // Weight fusion based on GPS accuracy
+    double fusionWeight = _fusionWeight;
+    if (gpsAccuracy != null && gpsAccuracy > 10.0) {
+      // Poor GPS accuracy - rely more on barometer
+      fusionWeight = 0.3; // 30% GPS, 70% barometric
+    } else if (gpsAccuracy != null && gpsAccuracy < 5.0) {
+      // Good GPS accuracy - rely more on GPS
+      fusionWeight = 0.8; // 80% GPS, 20% barometric
+    }
+    
+    final fusedAltitude = (fusionWeight * gpsAltitude) + ((1 - fusionWeight) * _lastBarometricAltitude!);
+    
+    AppLogger.debug('[ALTITUDE_FUSION] GPS: ${gpsAltitude.toStringAsFixed(1)}m (acc: ${gpsAccuracy?.toStringAsFixed(1)}), '
+        'Baro: ${_lastBarometricAltitude!.toStringAsFixed(1)}m, '
+        'Fused: ${fusedAltitude.toStringAsFixed(1)}m (weight: ${fusionWeight.toStringAsFixed(2)})');
+    
+    return fusedAltitude;
+  }
+
+  /// Start barometric streaming asynchronously to avoid blocking UI
+  void _startBarometricStreamingAsync() {
+    // Delay barometer initialization to avoid blocking countdown screen
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      try {
+        AppLogger.debug('[LOCATION_MANAGER] Starting barometric streaming (delayed)...');
+        
+        // Start streaming with timeout to prevent hanging
+        await _barometerService.startStreaming().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            AppLogger.warning('[LOCATION_MANAGER] Barometer initialization timed out, continuing without fusion');
+            throw TimeoutException('Barometer initialization timeout', const Duration(seconds: 3));
+          },
+        );
+        
+        _barometerSubscription = _barometerService.readings.listen(
+          _onBarometricReading,
+          onError: (error) {
+            AppLogger.warning('[LOCATION_MANAGER] Barometric streaming error: $error');
+          },
+        );
+        AppLogger.info('[LOCATION_MANAGER] Barometric altitude fusion enabled');
+      } catch (e) {
+        AppLogger.warning('[LOCATION_MANAGER] Failed to start barometric streaming: $e');
+        // Continue without barometric fusion - GPS altitude only
+      }
+    });
+  }
+
+  /// Calibrate barometer with GPS readings
+  void _calibrateBarometer({
+    required double gpsAltitude,
+    required double? gpsAccuracy,
+    required double pressurePa,
+  }) {
+    // Only calibrate with accurate GPS readings
+    if (gpsAccuracy == null || gpsAccuracy > 8.0) {
+      return;
+    }
+    
+    _gpsCalibrationCount++;
+    AppLogger.debug('[BAROMETER] Calibration sample ${_gpsCalibrationCount}/${_gpsCalibrationSamples}: GPS ${gpsAltitude.toStringAsFixed(1)}m');
+    
+    if (_gpsCalibrationCount >= _gpsCalibrationSamples) {
+      _barometerService.calibrateWithGPS(
+        gpsAltitudeM: gpsAltitude,
+        pressurePa: pressurePa,
+      );
+      _isBarometerCalibrated = true;
+      AppLogger.info('[BAROMETER] Calibration completed after ${_gpsCalibrationSamples} GPS samples');
+    }
   }
 }

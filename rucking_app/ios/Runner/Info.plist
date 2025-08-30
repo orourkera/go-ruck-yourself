@@ -35,6 +35,8 @@
 	<string>Ruck reads your health data to track your heart rate during ruck sessions, which helps calculate calorie burn more accurately.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Ruck saves your ruck sessions as workouts in Apple Health, including distance, time, calories burned, and elevation data to help you track your fitness progress.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Ruck uses motion and fitness data to improve altitude tracking accuracy during ruck sessions by combining GPS with barometric pressure readings for better elevation measurements.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Ruck uses your location to track your routes, calculate distance, pace and elevation during ruck sessions. Background location is used when tracking an active session.</string>
 	<key>NSLocationAlwaysUsageDescription</key>

@@ -10,6 +10,10 @@ import android.os.Bundle
 import android.Manifest
 import android.os.Build
 import android.util.Log
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,6 +26,7 @@ class MainActivity : FlutterActivity() {
     private val HEART_RATE_CHANNEL = "com.ruck.app/heartRateStream"
     private val WATCH_SESSION_CHANNEL = "com.ruck.app/watch_session"
     private val GPX_IMPORT_CHANNEL = "com.ruck.app/gpx_import"
+    private val BAROMETER_CHANNEL = "com.ruck.app/barometerStream"
     
     companion object {
         private const val TAG = "MainActivity"
@@ -49,6 +54,7 @@ class MainActivity : FlutterActivity() {
     
     // Track stream state to prevent cancellation errors
     private var heartRateEventSink: EventChannel.EventSink? = null
+    private var barometerEventSink: EventChannel.EventSink? = null
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -114,6 +120,21 @@ class MainActivity : FlutterActivity() {
                     if (heartRateEventSink != null) {
                         heartRateEventSink = null
                     }
+                }
+            }
+        )
+        
+        // Barometer event channel for pressure sensor streaming
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, BAROMETER_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    barometerEventSink = events
+                    startBarometerStreaming()
+                }
+                
+                override fun onCancel(arguments: Any?) {
+                    stopBarometerStreaming()
+                    barometerEventSink = null
                 }
             }
         )
@@ -317,6 +338,69 @@ class MainActivity : FlutterActivity() {
                     STORAGE_PERMISSION_REQUEST_CODE
                 )
             }
+        }
+    }
+    
+    // Barometer sensor handling
+    private var sensorManager: SensorManager? = null
+    private var pressureSensor: Sensor? = null
+    private val barometerListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            event?.let { sensorEvent ->
+                if (sensorEvent.sensor.type == Sensor.TYPE_PRESSURE) {
+                    val pressureMb = sensorEvent.values[0] // millibar (hPa)
+                    val pressurePa = pressureMb * 100.0 // Convert to Pascals
+                    
+                    val barometerData = mapOf(
+                        "pressure" to pressurePa,
+                        "timestamp" to System.currentTimeMillis().toDouble()
+                    )
+                    
+                    barometerEventSink?.success(barometerData)
+                }
+            }
+        }
+        
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+            Log.d(TAG, "Barometer sensor accuracy changed: $accuracy")
+        }
+    }
+    
+    private fun startBarometerStreaming() {
+        try {
+            sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+            pressureSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PRESSURE)
+            
+            if (pressureSensor == null) {
+                Log.w(TAG, "Pressure sensor not available on this device")
+                barometerEventSink?.error("UNAVAILABLE", "Pressure sensor not available", null)
+                return
+            }
+            
+            val success = sensorManager?.registerListener(
+                barometerListener,
+                pressureSensor,
+                SensorManager.SENSOR_DELAY_NORMAL // ~5Hz update rate
+            ) ?: false
+            
+            if (success) {
+                Log.d(TAG, "Barometer streaming started successfully")
+            } else {
+                Log.e(TAG, "Failed to register barometer sensor listener")
+                barometerEventSink?.error("SENSOR_ERROR", "Failed to start barometer streaming", null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting barometer streaming: ${e.message}")
+            barometerEventSink?.error("SENSOR_ERROR", e.message, null)
+        }
+    }
+    
+    private fun stopBarometerStreaming() {
+        try {
+            sensorManager?.unregisterListener(barometerListener)
+            Log.d(TAG, "Barometer streaming stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping barometer streaming: ${e.message}")
         }
     }
 }

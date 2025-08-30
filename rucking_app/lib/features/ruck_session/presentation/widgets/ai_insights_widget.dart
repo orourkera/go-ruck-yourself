@@ -81,8 +81,37 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
   void didUpdateWidget(AIInsightsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Regenerate insights if session data changed significantly
-    if ((widget.recentSessions?.length ?? 0) != (oldWidget.recentSessions?.length ?? 0)) {
-      _generateInsights();
+    final oldSessionCount = oldWidget.recentSessions?.length ?? 0;
+    final newSessionCount = widget.recentSessions?.length ?? 0;
+    final oldAchievementCount = oldWidget.achievements?.length ?? 0;
+    final newAchievementCount = widget.achievements?.length ?? 0;
+    
+    // Force refresh on any data change since behavioral patterns are now much richer
+    if (newSessionCount != oldSessionCount || newAchievementCount != oldAchievementCount) {
+      AppLogger.info('[AI_INSIGHTS_WIDGET] Data change detected - forcing insight refresh (sessions: $oldSessionCount->$newSessionCount, achievements: $oldAchievementCount->$newAchievementCount)');
+      _generateInsights(force: true); // Force refresh to bypass cache
+    }
+  }
+
+  /// Manually clear the insight cache - useful when profile or integration changes occur
+  Future<void> clearInsightCache() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is! Authenticated) return;
+      
+      final prefs = await SharedPreferences.getInstance();
+      final user = authState.user;
+      final key = 'ai_home_cache_${user.userId}_${DateTime.now().yyyymmdd}';
+      await prefs.remove(key);
+      
+      AppLogger.info('[AI_INSIGHTS_WIDGET] Cleared insight cache for ${user.username}');
+      
+      // Regenerate insights
+      if (mounted) {
+        _generateInsights(force: true);
+      }
+    } catch (e) {
+      AppLogger.error('[AI_INSIGHTS_WIDGET] Failed to clear insight cache: $e');
     }
   }
 

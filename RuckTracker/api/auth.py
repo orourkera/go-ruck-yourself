@@ -333,11 +333,44 @@ class RefreshTokenResource(Resource):
                     # Convert user model to a JSON-serializable dictionary
                     user_data = auth_response.user.model_dump(mode='json') if auth_response.user else None
                     
-                    return {
+                    # Build response and set Secure, HttpOnly refresh token cookie
+                    response_body = {
                         'token': auth_response.session.access_token,
                         'refresh_token': auth_response.session.refresh_token,
                         'user': user_data
-                    }, 200
+                    }
+                    resp = make_response((response_body, 200))
+                    try:
+                        # Cookie configuration
+                        is_dev = os.environ.get('FLASK_ENV') == 'development'
+                        secure_cookie = not is_dev  # secure in non-dev
+                        # SameSite=None requires Secure; use Lax for local/dev
+                        samesite_policy = 'None' if secure_cookie else 'Lax'
+                        # Domain configuration (optional)
+                        cookie_domain = os.environ.get('COOKIE_DOMAIN')
+                        # Avoid setting domain for localhost-like hosts
+                        if cookie_domain and ('localhost' in cookie_domain or '127.0.0.1' in cookie_domain):
+                            cookie_domain = None
+                        # Expiry configuration
+                        try:
+                            days = int(os.environ.get('REFRESH_TOKEN_COOKIE_DAYS', '30'))
+                        except Exception:
+                            days = 30
+                        expires_at = datetime.utcnow() + timedelta(days=days)
+
+                        resp.set_cookie(
+                            'refresh_token',
+                            auth_response.session.refresh_token,
+                            expires=expires_at,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesite_policy,
+                            path='/',
+                            domain=cookie_domain
+                        )
+                    except Exception as cookie_err:
+                        logger.warning(f"[AUTH_REFRESH] Failed to set refresh_token cookie: {cookie_err}")
+                    return resp
                 else:
                     logger.error("[AUTH_REFRESH] Invalid auth response or no session in refresh token response")
                     return {'message': 'Invalid refresh token'}, 401

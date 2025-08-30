@@ -223,6 +223,22 @@ def add_cache_headers(response):
         pass
     return response
 
+# Standardize 401 responses with WWW-Authenticate header for API paths
+@app.after_request
+def add_www_authenticate_header(response):
+    try:
+        if response.status_code == 401:
+            path = request.path or ''
+            # Apply only to API routes
+            if path.startswith('/api'):
+                # Do not overwrite if already set
+                if not response.headers.get('WWW-Authenticate'):
+                    # Indicate Bearer usage and a generic error to aid clients
+                    response.headers['WWW-Authenticate'] = 'Bearer realm="RuckTracker API", error="invalid_token"'
+    except Exception:
+        pass
+    return response
+
 # Initialize Migrate (db comes from RuckTracker.extensions)
 migrate = Migrate(directory='RuckTracker/migrations')
 

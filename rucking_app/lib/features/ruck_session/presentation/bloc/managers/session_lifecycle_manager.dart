@@ -124,7 +124,15 @@ class SessionLifecycleManager implements SessionManager {
 
   Future<void> _onSessionStartRequested(manager_events.SessionStartRequested event) async {
     try {
-      AppLogger.info('Starting new ruck session with weight: ${event.ruckWeightKg}kg');
+      AppLogger.info('[LIFECYCLE] Starting ruck session with weight: ${event.ruckWeightKg ?? 0.0}kg');
+      
+      // CRITICAL: Clear any existing session recovery cache to prevent data mixing
+      try {
+        await _storageService.remove('active_session_data');
+        AppLogger.info('[LIFECYCLE] Cleared session recovery cache before starting new session');
+      } catch (e) {
+        AppLogger.warning('[LIFECYCLE] Failed to clear session recovery cache: $e');
+      }
       
       // Optimistically mark session as active before backend confirmation
       _updateState(_currentState.copyWith(
