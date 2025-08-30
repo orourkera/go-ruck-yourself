@@ -312,9 +312,33 @@ def get_ruck_buddies():
     if hasattr(response, 'error') and response.error:
         return jsonify({'error': response.error}), 500
     
-    # Process the response to add computed social data
+    # Precompute earliest completed session per user among users present in this page
     processed_sessions = []
     current_user_id = g.user.id
+
+    user_ids_in_page = list({s.get('user_id') for s in (response.data or []) if s.get('user_id')})
+    earliest_completed_map = {}
+    try:
+        if user_ids_in_page:
+            # Fetch earliest completed session per user (private or public) to flag first ruck
+            rs = (
+                supabase.table('ruck_session')
+                .select('id,user_id,completed_at,status')
+                .in_('user_id', user_ids_in_page)
+                .eq('status', 'completed')
+                .order('user_id')
+                .order('completed_at')
+                .limit(10000)
+                .execute()
+            )
+            for row in (rs.data or []):
+                uid = row.get('user_id')
+                if uid and uid not in earliest_completed_map:
+                    earliest_completed_map[uid] = row.get('id')
+    except Exception as e:
+        logger.error(f"[RUCK_BUDDIES] Failed to compute earliest completed sessions: {e}")
+
+    # Process the response to add computed social data
     
     for session in response.data:
         # Count likes and check if current user liked it
@@ -338,6 +362,12 @@ def get_ruck_buddies():
         session['is_liked_by_current_user'] = is_liked_by_current_user
         session['comment_count'] = comment_count
         session['location_points'] = sampled_location_points
+
+        # First ruck flag: true if this session is the earliest completed for that user
+        try:
+            session['first_ruck'] = session.get('id') == earliest_completed_map.get(session.get('user_id'))
+        except Exception:
+            session['first_ruck'] = False
         
         # Remove the raw likes/comments arrays to keep response clean
         session.pop('likes', None)

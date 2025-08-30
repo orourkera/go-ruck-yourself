@@ -21,6 +21,7 @@ class RuckBuddy extends Equatable {
   final int likeCount;
   final int commentCount;
   final bool isLikedByCurrentUser;
+  final bool firstRuck;
 
   const RuckBuddy({
     required this.id,
@@ -41,6 +42,7 @@ class RuckBuddy extends Equatable {
     this.likeCount = 0,
     this.commentCount = 0,
     this.isLikedByCurrentUser = false,
+    this.firstRuck = false,
   });
 
   RuckBuddy copyWith({
@@ -62,6 +64,7 @@ class RuckBuddy extends Equatable {
     int? likeCount,
     int? commentCount,
     bool? isLikedByCurrentUser,
+    bool? firstRuck,
   }) {
     return RuckBuddy(
       id: id ?? this.id,
@@ -82,6 +85,7 @@ class RuckBuddy extends Equatable {
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
       isLikedByCurrentUser: isLikedByCurrentUser ?? this.isLikedByCurrentUser,
+      firstRuck: firstRuck ?? this.firstRuck,
     );
   }
 
@@ -91,6 +95,6 @@ class RuckBuddy extends Equatable {
     distanceKm, caloriesBurned, elevationGainM, 
     elevationLossM, startedAt, completedAt, createdAt, 
     avgHeartRate, user, locationPoints, photos,
-    likeCount, commentCount, isLikedByCurrentUser
+    likeCount, commentCount, isLikedByCurrentUser, firstRuck
   ];
 }

@@ -556,30 +556,45 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                       
                       print('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedPhotoData.length} photos)');
                       
-                      return MediaCarousel(
-                        mediaItems: mediaItems,
-                        height: 200, // Updated to 200px tall
-                        initialPage: processedPhotoData.isNotEmpty ? 1 : 0, // Start at first photo if photos exist
-                        onPhotoTap: (index) {
-                          // Only handle photo taps, skip map items
-                          final photoUrls = mediaItems
-                              .where((item) => item.type == MediaType.photo)
-                              .map((item) => item.photoUrl!)
-                              .toList();
-                          
-                          if (photoUrls.isNotEmpty) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PhotoViewer(
-                                  photoUrls: photoUrls,
-                                  initialIndex: index,
-                                ),
+                      return Stack(
+                        children: [
+                          MediaCarousel(
+                            mediaItems: mediaItems,
+                            height: 200, // Updated to 200px tall
+                            initialPage: processedPhotoData.isNotEmpty ? 1 : 0, // Start at first photo if photos exist
+                            onPhotoTap: (index) {
+                              // Only handle photo taps, skip map items
+                              final photoUrls = mediaItems
+                                  .where((item) => item.type == MediaType.photo)
+                                  .map((item) => item.photoUrl!)
+                                  .toList();
+                              
+                              if (photoUrls.isNotEmpty) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => PhotoViewer(
+                                      photoUrls: photoUrls,
+                                      initialIndex: index,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            ruckBuddyId: widget.ruckBuddy.id, // Add ruckBuddyId parameter
+                          ),
+                          if (widget.ruckBuddy.firstRuck)
+                            Positioned(
+                              right: 8,
+                              bottom: 8,
+                              child: Image.asset(
+                                'assets/images/first ruck.png',
+                                width: 72,
+                                height: 72,
+                                filterQuality: FilterQuality.high,
                               ),
-                            );
-                          }
-                        },
-                        ruckBuddyId: widget.ruckBuddy.id, // Add ruckBuddyId parameter
+                            ),
+                        ],
                       );
                     }),
                     

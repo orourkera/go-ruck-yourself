@@ -15,7 +15,7 @@ BLOG_POSTS = [
         "tags": ["rucking", "gear", "weights", "beginner"],
         "read_time": 6,
         "template": "blog/posts/rucking-weight-alternatives.html",
-        "image": "images/blog/more.jpg",
+        "image": "images/blog/nathan-dumlao-bxQLEK0tVao-unsplash.jpg",
     },
     {
         "slug": "best-rucking-backpack-guide",

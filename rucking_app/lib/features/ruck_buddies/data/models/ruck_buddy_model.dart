@@ -23,6 +23,7 @@ class RuckBuddyModel extends RuckBuddy {
     int likeCount = 0,
     int commentCount = 0,
     bool isLikedByCurrentUser = false,
+    bool firstRuck = false,
   }) : super(
     id: id,
     userId: userId,
@@ -42,6 +43,7 @@ class RuckBuddyModel extends RuckBuddy {
     likeCount: likeCount,
     commentCount: commentCount,
     isLikedByCurrentUser: isLikedByCurrentUser,
+    firstRuck: firstRuck,
   );
 
   factory RuckBuddyModel.fromJson(Map<String, dynamic> json) {
@@ -174,6 +176,7 @@ class RuckBuddyModel extends RuckBuddy {
         likeCount: _parseToInt(json['like_count']),
         commentCount: _parseToInt(json['comment_count']),
         isLikedByCurrentUser: json['is_liked_by_current_user'] == true,
+        firstRuck: (json['first_ruck'] == true) || (json['firstRuck'] == true),
       );
     } catch (e) {
       print('Error creating RuckBuddyModel: $e');
