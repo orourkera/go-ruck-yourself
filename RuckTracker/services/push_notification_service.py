@@ -186,8 +186,8 @@ class PushNotificationService:
             bool: True if all successful, False otherwise
         """
         if not device_tokens:
-            logger.warning("❌ send_notification: No device tokens provided")
-            return False
+            logger.info("📱 No device tokens provided - user likely has notifications disabled")
+            return True  # Return True to indicate graceful handling, not a failure
         
         logger.info(f"🚀 PUSH NOTIFICATION START - Sending to {len(device_tokens)} devices")
         logger.info(f"📋 Title: '{title}'")
@@ -337,6 +337,10 @@ class PushNotificationService:
         comment_id: str
     ) -> bool:
         """Send ruck comment notification"""
+        if not device_tokens:
+            logger.info(f"📱 No device tokens for ruck comment notification (ruck_id: {ruck_id}) - user notifications disabled")
+            return True  # Graceful handling, not a failure
+            
         title = "New Comment"
         body = f"{commenter_name} commented on your ruck!"
         
@@ -562,8 +566,8 @@ class PushNotificationService:
     ) -> bool:
         """Send achievement earned notification for one or multiple achievements"""
         if not device_tokens:
-            logger.warning("No device tokens provided for achievement notification")
-            return False
+            logger.info(f"📱 No device tokens for achievement notification (session_id: {session_id}) - user notifications disabled")
+            return True  # Graceful handling, not a failure
         
         if len(achievement_names) == 1:
             title = "🏆 Achievement Unlocked!"
@@ -594,8 +598,8 @@ class PushNotificationService:
     ) -> bool:
         """Send ruck started notification to followers"""
         if not device_tokens:
-            logger.warning("No device tokens provided for ruck started notification")
-            return False
+            logger.info(f"📱 No device tokens for ruck started notification (ruck_id: {ruck_id}) - followers have notifications disabled")
+            return True  # Graceful handling, not a failure
         
         title = "🎒 Ruck Started!"
         body = f"{rucker_name} started rucking"
@@ -616,8 +620,8 @@ class PushNotificationService:
     def send_club_join_request_notification(self, device_tokens: List[str], requester_name: str, club_name: str, club_id: str):
         """Send notification when someone requests to join a club"""
         if not device_tokens:
-            logger.warning("No device tokens provided for club join request notification")
-            return False
+            logger.info(f"📱 No device tokens for club join request notification (club_id: {club_id}) - admin notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = "New Club Join Request"
         body = f"{requester_name} wants to join {club_name}"
@@ -640,8 +644,8 @@ class PushNotificationService:
     def send_club_membership_approved_notification(self, device_tokens: List[str], club_name: str, club_id: str):
         """Send notification when club membership is approved"""
         if not device_tokens:
-            logger.warning("No device tokens provided for club membership approved notification")
-            return False
+            logger.info(f"📱 No device tokens for club membership approved notification (club_id: {club_id}) - user notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = "Welcome to the Club!"
         body = f"Your request to join {club_name} has been approved"
@@ -663,8 +667,8 @@ class PushNotificationService:
     def send_club_membership_rejected_notification(self, device_tokens: List[str], club_name: str):
         """Send notification when club membership is rejected"""
         if not device_tokens:
-            logger.warning("No device tokens provided for club membership rejected notification")
-            return False
+            logger.info(f"📱 No device tokens for club membership rejected notification - user notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = "Club Membership Update"
         body = f"Your request to join {club_name} was not approved"
@@ -685,8 +689,8 @@ class PushNotificationService:
     def send_club_deleted_notification(self, device_tokens: List[str], club_name: str):
         """Send notification when a club is deleted"""
         if not device_tokens:
-            logger.warning("No device tokens provided for club deleted notification")
-            return False
+            logger.info(f"📱 No device tokens for club deleted notification - member notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = "Club Disbanded"
         body = f"{club_name} has been disbanded by the admin"
@@ -707,8 +711,8 @@ class PushNotificationService:
     def send_club_event_notification(self, device_tokens: List[str], event_title: str, club_name: str, event_id: str, club_id: str):
         """Send notification when a new club event is created"""
         if not device_tokens:
-            logger.warning("No device tokens provided for club event notification")
-            return False
+            logger.info(f"📱 No device tokens for club event notification (event_id: {event_id}) - member notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = f"New {club_name} Event"
         body = f"{event_title} - Check it out!"
@@ -732,8 +736,8 @@ class PushNotificationService:
     def send_event_reminder_notification(self, device_tokens: List[str], event_title: str, event_id: str, reminder_time: str):
         """Send reminder notification for upcoming events"""
         if not device_tokens:
-            logger.warning("No device tokens provided for event reminder notification")
-            return False
+            logger.info(f"📱 No device tokens for event reminder notification (event_id: {event_id}) - user notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = "Event Reminder"
         body = f"{event_title} starts {reminder_time}!"
@@ -756,8 +760,8 @@ class PushNotificationService:
     def send_event_comment_notification(self, device_tokens: List[str], event_title: str, commenter_name: str, comment_preview: str, event_id: str):
         """Send notification when someone comments on an event"""
         if not device_tokens:
-            logger.warning("No device tokens provided for event comment notification")
-            return False
+            logger.info(f"📱 No device tokens for event comment notification (event_id: {event_id}) - user notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = f"New comment on {event_title}"
         body = f"{commenter_name}: {comment_preview}"
@@ -781,8 +785,8 @@ class PushNotificationService:
     def send_event_cancelled_notification(self, device_tokens: List[str], event_title: str, event_id: str):
         """Send notification when an event is cancelled"""
         if not device_tokens:
-            logger.warning("No device tokens provided for event cancelled notification")
-            return False
+            logger.info(f"📱 No device tokens for event cancelled notification (event_id: {event_id}) - user notifications disabled")
+            return True  # Graceful handling, not a failure
             
         title = "Event Cancelled"
         body = f"{event_title} has been cancelled"
@@ -804,8 +808,8 @@ class PushNotificationService:
     def notify_stuck_session(self, user_id, session_id):
         tokens = self.get_user_device_tokens(user_id)
         if not tokens:
-            logger.warning(f'No device tokens for user {user_id} - cannot send stuck session notification')
-            return False
+            logger.info(f'📱 No device tokens for user {user_id} - stuck session notification disabled')
+            return True  # Graceful handling, not a failure
         
         notification_data = {
             'type': 'stuck_session',
@@ -871,20 +875,20 @@ def get_user_device_tokens(user_ids: List[str]) -> List[str]:
             logger.info(f"   📈 Token success rate: {(active_tokens/len(user_ids))*100:.1f}%")
             
             if active_tokens == 0:
-                logger.error(f"❌ CRITICAL: No valid FCM tokens found for users {user_ids}")
-                logger.error(f"❌ All records returned: {response.data}")
+                logger.info(f"📱 No valid FCM tokens found for users {user_ids} - notifications likely disabled")
+                logger.debug(f"📋 All records returned: {response.data}")
             
             return tokens
         else:
-            logger.error(f"❌ CRITICAL: No device token records found in database for users: {user_ids}")
+            logger.info(f"📱 No device token records found for users: {user_ids}")
             
             # Let's check if these users exist at all
             user_check = admin_client.table('user').select('id, username').in_('id', user_ids).execute()
             if user_check.data:
-                logger.info(f"✅ Users exist in user table: {[(u['id'], u.get('username')) for u in user_check.data]}")
-                logger.error(f"❌ But they have no device tokens registered!")
+                logger.info(f"✅ Users exist but have no device tokens registered (notifications disabled)")
+                logger.debug(f"📋 Users: {[(u['id'], u.get('username')) for u in user_check.data]}")
             else:
-                logger.error(f"❌ Users don't exist in user table: {user_ids}")
+                logger.warning(f"⚠️ Users don't exist in user table: {user_ids}")
             
             return []
             

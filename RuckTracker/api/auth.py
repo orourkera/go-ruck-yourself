@@ -296,7 +296,24 @@ class RefreshTokenResource(Resource):
             if not data and request.form:
                 data = request.form.to_dict()
             refresh_token = (data.get('refresh_token') or data.get('refreshToken') or '').strip()
-            
+
+            # Additional fallbacks: query params then cookies
+            if not refresh_token:
+                args = request.args or {}
+                refresh_token = (args.get('refresh_token') or args.get('refreshToken') or '').strip()
+
+            if not refresh_token and request.cookies:
+                # Common cookie names that might be set by clients
+                cookie_candidates = [
+                    'refresh_token', 'refreshToken',
+                    'sb-refresh-token', 'sb-refreshToken',
+                    'supabase-refresh-token'
+                ]
+                for name in cookie_candidates:
+                    if name in request.cookies and request.cookies.get(name):
+                        refresh_token = request.cookies.get(name).strip()
+                        break
+
             if not refresh_token:
                 logger.warning("[AUTH_REFRESH] Missing refresh token in request body (accepted keys: refresh_token, refreshToken)")
                 return {'message': 'Refresh token is required'}, 400
@@ -332,7 +349,8 @@ class RefreshTokenResource(Resource):
                     logger.warning(f"[AUTH_REFRESH] Rate limit hit for refresh token from {client_ip}: {error_message}")
                     return {'message': 'Too many requests. Please wait before retrying.'}, 429
                 elif 'already used' in error_message.lower() or 'invalid refresh token' in error_message.lower():
-                    logger.warning(f"[AUTH_REFRESH] Invalid/expired refresh token from {client_ip}: {error_message}")
+                    # Expected when the client presents an old/rotated/expired token
+                    logger.info(f"[AUTH_REFRESH] Invalid/expired refresh token from {client_ip}: {error_message}")
                     return {'message': 'Refresh token expired. Please sign in again.'}, 401
                 else:
                     logger.error(f"[AUTH_REFRESH] Supabase auth error during refresh from {client_ip}: {error_message}")

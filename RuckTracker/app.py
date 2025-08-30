@@ -536,9 +536,19 @@ def load_user():
     g.user_id = None
     g.access_token = None
     
+    # Endpoints that should not attempt JWT validation (e.g., refresh uses expired access token in header)
+    exempt_auth_paths = {
+        '/api/auth/refresh',
+    }
+    request_path = request.path
+
     auth_header = request.headers.get('Authorization')
     is_development = os.environ.get('FLASK_ENV') == 'development' or app.debug
     
+    # Skip validation for exempt paths
+    if request_path in exempt_auth_paths:
+        return
+
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split("Bearer ")[1].strip()
         try:
@@ -550,7 +560,12 @@ def load_user():
                 g.access_token = token
                 return
         except Exception as token_error:
-            logger.error(f"Token validation exception: {str(token_error)}")
+            # Downgrade noise from expired tokens on auth endpoints
+            log_msg = f"Token validation exception on {request_path}: {str(token_error)}"
+            if any(segment in request_path for segment in ['/api/auth', '/auth/']):
+                logger.info(log_msg)
+            else:
+                logger.error(log_msg)
 
         # Fallback to mock user flow happens below for dev environments
         
