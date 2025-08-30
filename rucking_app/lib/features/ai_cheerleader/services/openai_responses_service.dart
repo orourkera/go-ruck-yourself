@@ -32,10 +32,6 @@ class OpenAIResponsesService {
       'model': model,
       'input': input,
       'stream': true,
-      // New Responses API requires an object for text.format
-      'text': {
-        'format': {'type': 'json_object'}
-      },
     };
     final isO3 = model.toLowerCase().startsWith('o3');
     // Reasoning models (o3*) do not accept temperature; omit it
@@ -78,6 +74,27 @@ class OpenAIResponsesService {
             if (delta.isNotEmpty) {
               full.write(delta);
               if (onDelta != null) onDelta(delta);
+            }
+          } else if (type.contains('response.delta') || type.contains('response.output_item.added')) {
+            // Some responses stream text via item/content instead of output_text.delta
+            String acc = '';
+            void collect(dynamic node) {
+              if (node is Map<String, dynamic>) {
+                node.forEach((k, v) {
+                  if (k == 'text' && v is String) {
+                    acc += v;
+                  } else {
+                    collect(v);
+                  }
+                });
+              } else if (node is List) {
+                for (final e in node) collect(e);
+              }
+            }
+            collect(map);
+            if (acc.isNotEmpty) {
+              full.write(acc);
+              if (onDelta != null) onDelta(acc);
             }
           } else if (type.contains('response.completed')) {
             // Completed signal; onComplete below after forEach finishes

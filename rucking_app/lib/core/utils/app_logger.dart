@@ -197,6 +197,9 @@ class AppLogger {
     const tags = <String>[
       '[AI_DEBUG]',
       '[AI_CHEERLEADER_DEBUG]',
+      '[AI_INSIGHTS]',
+      '[AI_INSIGHTS_WIDGET]',
+      '[OPENAI_SSE]',
       '[HR_CHART]',
       '[HR_DEBUG]',
       '[PACE DEBUG]',

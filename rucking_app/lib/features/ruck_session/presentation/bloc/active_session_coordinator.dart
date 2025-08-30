@@ -905,10 +905,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
     AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}, pausedAt=${_lifecycleManager.currentState.pausedAt}');
     
-    // Steps computation: Start asynchronously, don't block completion
-    if (_currentSteps == null) {
-      _computeStepsAsync();
-    }
+    // Steps computation: Ensure we capture final step count before completion
+    await _captureFinalStepsSync();
 
     // Stop the timer by pausing first
     AppLogger.info('[COORDINATOR] Pausing session first');
@@ -1173,6 +1171,51 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     } catch (e) {
       AppLogger.error('[COORDINATOR] Error during crash recovery check: $e');
       // Continue gracefully - not critical for app startup
+    }
+  }
+
+  /// Capture final steps synchronously before completion
+  Future<void> _captureFinalStepsSync() async {
+    try {
+      final startTime = _lifecycleManager.currentState.startTime;
+      if (startTime != null && _currentSteps == null) {
+        AppLogger.info('[COORDINATOR] Capturing final step count before completion...');
+        final computedSteps = await _healthService.getStepsBetween(startTime, DateTime.now());
+        _currentSteps = computedSteps;
+        AppLogger.info('[COORDINATOR] Final step count captured: $_currentSteps');
+        
+        // Fallback to estimation if no steps from health kit
+        if (computedSteps == 0) {
+          final double distance = (_currentAggregatedState is ActiveSessionRunning)
+              ? (_currentAggregatedState as ActiveSessionRunning).distanceKm
+              : _locationManager.currentState.totalDistance;
+              
+          double? heightCm;
+          final authState = GetIt.instance<AuthBloc>().state;
+          if (authState is Authenticated && authState.user.heightCm != null) {
+            heightCm = authState.user.heightCm;
+          }
+          _currentSteps = _healthService.estimateStepsFromDistance(distance, userHeightCm: heightCm);
+          AppLogger.info('[COORDINATOR] Estimated final steps: $_currentSteps');
+        }
+      } else {
+        AppLogger.info('[COORDINATOR] Steps already captured: $_currentSteps or no startTime available');
+      }
+    } catch (e) {
+      AppLogger.warning('[COORDINATOR] Failed to capture final steps: $e');
+      
+      // Fallback to distance estimation
+      final double distance = (_currentAggregatedState is ActiveSessionRunning)
+          ? (_currentAggregatedState as ActiveSessionRunning).distanceKm
+          : _locationManager.currentState.totalDistance;
+          
+      double? heightCm;
+      final authState = GetIt.instance<AuthBloc>().state;
+      if (authState is Authenticated && authState.user.heightCm != null) {
+        heightCm = authState.user.heightCm;
+      }
+      _currentSteps = _healthService.estimateStepsFromDistance(distance, userHeightCm: heightCm);
+      AppLogger.warning('[COORDINATOR] Using estimated steps as fallback: $_currentSteps');
     }
   }
 

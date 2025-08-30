@@ -200,11 +200,20 @@ class WatchService {
             AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ INVALID heart rate from WatchConnectivity: $hr (type: ${hr.runtimeType})');
           }
         } else if (command == 'watchStepUpdate') {
-          // DISABLED: Steps now handled exclusively via EventChannel to prevent duplicate processing
-          // The iOS native code sends steps via StepCountStreamHandler EventChannel  
-          // This prevents race conditions and ensures single data flow path
+          // TEMPORARY FIX: Re-enable direct watch step messages as fallback since EventChannel isn't working
           final steps = data['steps'];
-          AppLogger.debug('[WATCH_SERVICE] watchStepUpdate received ($steps steps) but ignored - using EventChannel exclusively');
+          AppLogger.info('[WATCH_SERVICE] [STEPS_FALLBACK] 📥 Direct watchStepUpdate received: $steps steps');
+          
+          if (steps != null && steps is num) {
+            final stepCount = steps.toInt();
+            if (stepCount >= 0 && stepCount <= 999999) {
+              if (!_stepsController.isClosed) {
+                _stepsController.add(stepCount);
+                _currentSteps = stepCount;
+                AppLogger.info('[WATCH_SERVICE] [STEPS_FALLBACK] ✅ Step count updated via direct message: $stepCount steps');
+              }
+            }
+          }
         } else if (command == 'stepsDebug') {
           AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🧪 Steps debug snapshot from watch: $data');
         } else if (command == 'heartRateDebug') {
@@ -450,9 +459,12 @@ class WatchService {
         'timestamp': DateTime.now().toIso8601String(),
         'source': 'phone',
         'startHeartRateMonitoring': true, // Explicitly request heart rate monitoring
+        'startStepsMonitoring': true, // Explicitly request step monitoring
         'forcePermissionCheck': true, // Force permission validation
         'debugHeartRate': true, // Request debug heart rate info from watch
+        'debugSteps': true, // Request debug step info from watch
         'requestInitialHeartRate': true, // Request initial heart rate reading
+        'requestInitialSteps': true, // Request initial step reading
       };
       
       AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Sending detailed workout data after launch');
@@ -1302,10 +1314,12 @@ class WatchService {
     _nativeStepsSubscription = null;
 
     try {
-      AppLogger.info('[WATCH_SERVICE] [STEPS] Setting up native steps EventChannel listener (PRIMARY data path)...');
+      AppLogger.info('[WATCH_SERVICE] [STEPS] 🚀 Setting up native steps EventChannel listener (PRIMARY data path)...');
+      AppLogger.info('[WATCH_SERVICE] [STEPS] 🔍 EventChannel: ${_stepEventChannel.toString()}');
       _nativeStepsSubscription = _stepEventChannel
           .receiveBroadcastStream()
           .listen((dynamic event) {
+        AppLogger.info('[WATCH_SERVICE] [STEPS] 📥 RAW EventChannel event received: $event (type: ${event.runtimeType})');
         try {
           int? steps;
           
@@ -1383,14 +1397,14 @@ class WatchService {
         } catch (e) {
           AppLogger.debug('[WATCH_SERVICE] [STEPS] Failed to restart steps listener: $e');
         }
-        // Also nudge the watch to push steps via WCSession and request a debug snapshot
+        // Steps monitoring is now handled automatically in workout session startup
+        // No need for premature startStepsMonitoring command - it fails before builder is ready
         () async {
           try {
-            await _sendMessageToWatch({'command': 'startStepsMonitoring'});
             await _sendMessageToWatch({'command': 'stepsDebugRequest'});
-            AppLogger.debug('[WATCH_SERVICE] [STEPS_DEBUG] Sent startStepsMonitoring and stepsDebugRequest');
+            AppLogger.debug('[WATCH_SERVICE] [STEPS_DEBUG] Sent stepsDebugRequest (steps monitoring handled by workout session)');
           } catch (e) {
-            AppLogger.debug('[WATCH_SERVICE] [STEPS_DEBUG] Failed to send steps nudge/debug request: $e');
+            AppLogger.debug('[WATCH_SERVICE] [STEPS_DEBUG] Failed to send steps debug request: $e');
           }
         }();
       }
@@ -1400,8 +1414,10 @@ class WatchService {
   /// Public method to explicitly request steps streaming from the watch app.
   Future<void> ensureStepsStreaming() async {
     try {
-      await _sendMessageToWatch({'command': 'startStepsMonitoring'});
-      AppLogger.debug('[WATCH_SERVICE] ensureStepsStreaming: startStepsMonitoring sent');
+      // Steps monitoring is now handled automatically in workout session startup
+      // The HKAnchoredObjectQuery in WorkoutManager handles real-time step updates
+      await _sendMessageToWatch({'command': 'stepsDebugRequest'});
+      AppLogger.debug('[WATCH_SERVICE] ensureStepsStreaming: requesting debug info (monitoring handled by workout)');
     } catch (e) {
       AppLogger.debug('[WATCH_SERVICE] ensureStepsStreaming failed: $e');
     }

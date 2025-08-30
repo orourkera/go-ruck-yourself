@@ -161,14 +161,16 @@ class AIInsightsService {
       );
       final prompt = _buildInsightPrompt(context, weatherAddon: '');
       final sb = StringBuffer();
+      bool gotDelta = false;
       AppLogger.info('[AI_INSIGHTS] Streaming homepage insight (o3-mini)…');
       await _responsesService!.stream(
-        model: 'o3-mini',
+        model: 'gpt-4o-mini',
         input: prompt,
         // o3 does not accept temperature in Responses API; omitted inside service
-        maxOutputTokens: 220,
+        maxOutputTokens: 300,
         onDelta: (d) {
           sb.write(d);
+          gotDelta = true;
           onDelta(d);
         },
         onComplete: (full) {
@@ -181,6 +183,20 @@ class AIInsightsService {
           if (onError != null) onError(e);
         },
       );
+      // If we never received a delta, provide a non-streaming fallback for better UX
+      if (!gotDelta) {
+        AppLogger.warning('[AI_INSIGHTS] Stream produced no deltas; falling back to non-streaming');
+        final aiResponse = await _openAIService.generateMessage(
+          context: {'prompt': prompt},
+          personality: 'motivational',
+          modelOverride: 'o3-mini',
+          temperatureOverride: null,
+          maxTokensOverride: null,
+          timeoutOverride: const Duration(seconds: 10),
+        );
+        final insight = _parseAIResponse(aiResponse ?? '', context);
+        onFinal(insight);
+      }
     } catch (e) {
       if (onError != null) onError(e);
     }

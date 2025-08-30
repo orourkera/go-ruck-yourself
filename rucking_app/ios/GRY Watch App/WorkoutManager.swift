@@ -16,6 +16,11 @@ public class WorkoutManager: NSObject {
     private var stepCountHandler: ((Int) -> Void)?
     private var stepUpdateTimer: Timer?
     
+    // Real-time step tracking with HKAnchoredObjectQuery
+    private var stepAnchoredQuery: HKAnchoredObjectQuery?
+    private var workoutStartDate: Date?
+    private var cumulativeSteps: Int = 0
+    
     // Delegate to notify about significant workout events
     weak var delegate: WorkoutManagerDelegate?
     
@@ -194,13 +199,16 @@ public class WorkoutManager: NSObject {
             
             print("[WORKOUT_MANAGER] Starting workout activity...")
             
+            // Store workout start date for step tracking
+            self.workoutStartDate = Date()
+            
             // Start the workout session first
-            session.startActivity(with: Date())
+            session.startActivity(with: self.workoutStartDate!)
             
             print("[WORKOUT_MANAGER] Starting data collection...")
             
             // Then start data collection
-            builder.beginCollection(withStart: Date()) { (success, error) in
+            builder.beginCollection(withStart: self.workoutStartDate!) { (success, error) in
                 if success {
                     print("[WORKOUT_MANAGER] ✅ Data collection started successfully")
                     
@@ -223,20 +231,17 @@ public class WorkoutManager: NSObject {
                         self.requestHeartRateUpdate()
                     }
                     
-                    // Also request step count update
+                    // Start real-time step tracking with HKAnchoredObjectQuery
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        print("[WORKOUT_MANAGER] Requesting initial step count update...")
+                        print("[WORKOUT_MANAGER] Starting real-time step tracking...")
                         
                         self.sendTelemetryToDart([
-                            "event": "watch_step_count_request_initiated",
+                            "event": "watch_step_tracking_initiated",
                             "timestamp": Date().timeIntervalSince1970
                         ])
                         
-                        self.requestStepCountUpdate()
+                        self.startRealTimeStepTracking()
                     }
-                    
-                    // Start periodic step updates every 30 seconds
-                    self.startPeriodicStepUpdates()
                 } else {
                     print("[WORKOUT_MANAGER] ❌ Data collection failed to start")
                     if let error = error {
@@ -468,6 +473,9 @@ public class WorkoutManager: NSObject {
     
     // End the current workout session
     func endWorkout(completion: @escaping (Error?) -> Void) {
+        // Stop real-time step tracking
+        stopRealTimeStepTracking()
+        
         guard let session = workoutSession, let builder = workoutBuilder else {
             completion(nil) // No active session to end
             return
@@ -535,7 +543,15 @@ public class WorkoutManager: NSObject {
     private func startPeriodicStepUpdates() {
         print("[WORKOUT_MANAGER] Starting periodic step updates every 30 seconds")
         stepUpdateTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            print("[WORKOUT_MANAGER] Periodic step update triggered")
+            print("[WORKOUT_MANAGER] Periodic step update triggered - checking step detection")
+            
+            // Send telemetry to track if periodic updates are running
+            self?.sendTelemetryToDart([
+                "event": "watch_periodic_step_check",
+                "cumulative_steps": self?.cumulativeSteps ?? 0,
+                "timestamp": Date().timeIntervalSince1970
+            ])
+            
             self?.requestStepCountUpdate()
         }
     }
@@ -588,6 +604,110 @@ public class WorkoutManager: NSObject {
         }
         
         healthStore.execute(query)
+    }
+    
+    // MARK: - Real-time Step Tracking with HKAnchoredObjectQuery
+    
+    private func startRealTimeStepTracking() {
+        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let startDate = workoutStartDate else {
+            print("[WORKOUT_MANAGER] ERROR: Cannot start step tracking - missing step type or start date")
+            return
+        }
+        
+        print("[WORKOUT_MANAGER] Starting HKAnchoredObjectQuery for real-time steps from \(startDate)")
+        
+        // Create predicates as per Apple documentation
+        let datePredicate = HKQuery.predicateForSamples(
+            withStart: startDate,
+            end: nil,
+            options: .strictStartDate
+        )
+        
+        // CRITICAL: Filter to only local watch data to avoid phone step duplication
+        let devicePredicate = HKQuery.predicateForObjects(from: [HKDevice.local()])
+        let queryPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [datePredicate, devicePredicate])
+        
+        let updateHandler: ((HKAnchoredObjectQuery, [HKSample]?, [HKDeletedObject]?, HKQueryAnchor?, Error?) -> Void) = { query, samples, deletedObjects, queryAnchor, error in
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("[WORKOUT_MANAGER] Step query error: \(error.localizedDescription)")
+                    
+                    self.sendTelemetryToDart([
+                        "event": "watch_step_query_error",
+                        "error": error.localizedDescription,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
+                    return
+                }
+                
+                guard let stepSamples = samples as? [HKQuantitySample] else {
+                    print("[WORKOUT_MANAGER] No step samples received")
+                    return
+                }
+                
+                print("[WORKOUT_MANAGER] Received \(stepSamples.count) step samples")
+                
+                // Calculate cumulative steps from all samples
+                let newSteps = stepSamples.reduce(0) { total, sample in
+                    return total + Int(sample.quantity.doubleValue(for: HKUnit.count()))
+                }
+                
+                if newSteps > 0 {
+                    self.cumulativeSteps += newSteps
+                    print("[WORKOUT_MANAGER] ✅ Real-time steps update: +\(newSteps) steps, total: \(self.cumulativeSteps)")
+                    
+                    self.sendTelemetryToDart([
+                        "event": "watch_step_data_received",
+                        "new_steps": newSteps,
+                        "cumulative_steps": self.cumulativeSteps,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
+                    
+                    // Call the step handler with cumulative steps
+                    if let handler = self.stepCountHandler {
+                        handler(self.cumulativeSteps)
+                    } else {
+                        print("[WORKOUT_MANAGER] WARNING: Step count handler is nil")
+                    }
+                }
+            }
+        }
+        
+        // Create and start the anchored query
+        stepAnchoredQuery = HKAnchoredObjectQuery(
+            type: stepType,
+            predicate: queryPredicate,
+            anchor: nil,
+            limit: HKObjectQueryNoLimit,
+            resultsHandler: updateHandler
+        )
+        
+        stepAnchoredQuery!.updateHandler = updateHandler
+        healthStore.execute(stepAnchoredQuery!)
+        
+        print("[WORKOUT_MANAGER] Real-time step tracking started with HKAnchoredObjectQuery")
+        
+        sendTelemetryToDart([
+            "event": "watch_step_tracking_started",
+            "start_date": startDate.timeIntervalSince1970,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+    }
+    
+    private func stopRealTimeStepTracking() {
+        if let query = stepAnchoredQuery {
+            print("[WORKOUT_MANAGER] Stopping real-time step tracking")
+            healthStore.stop(query)
+            stepAnchoredQuery = nil
+            cumulativeSteps = 0
+            
+            sendTelemetryToDart([
+                "event": "watch_step_tracking_stopped",
+                "timestamp": Date().timeIntervalSince1970
+            ])
+        }
     }
 }
 

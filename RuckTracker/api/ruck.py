@@ -1274,60 +1274,52 @@ class RuckSessionCompleteResource(Resource):
                 logger.info(f"Found {len(session_location_points)} location points for elevation calculation")
                 
                 try:
-                    # First, delete existing splits for this session
-                    delete_resp = supabase.table('session_splits') \
-                        .delete() \
-                        .eq('session_id', ruck_id) \
-                        .execute()
-                    
-                    # Insert new splits
                     if splits_data and len(splits_data) > 0:
-                        splits_to_insert = []
+                        # Deduplicate splits data first
+                        unique_map = {}
                         for split in splits_data:
-                            # Use elevation gain data from frontend instead of recalculating
-                            # The frontend now properly calculates elevation gains for splits
-                            split_elevation_gain = split.get('elevation_gain_m', 0.0)
+                            sn = split.get('split_number')
+                            if sn is None or sn <= 0:
+                                logger.warning(f"Skipping split with invalid split_number: {sn}")
+                                continue
                             
-                            logger.debug(f"Split {split.get('split_number')}: using frontend elevation gain: {split_elevation_gain:.1f}m")
+                            # Use elevation gain data from frontend instead of recalculating
+                            split_elevation_gain = split.get('elevation_gain_m', 0.0)
+                            logger.debug(f"Split {sn}: using frontend elevation gain: {split_elevation_gain:.1f}m")
                             
                             # Handle the split data format from the Flutter app
                             split_record = {
                                 'session_id': int(ruck_id),
-                                'split_number': split.get('split_number'),
-                                'split_distance_km': split.get('split_distance', 1.0),  # Always 1.0 (1km or 1mi)
-                                'split_duration_seconds': split.get('split_duration_seconds'),
+                                'split_number': sn,
+                                'split_distance_km': split.get('split_distance', 1.0),
+                                'split_duration_seconds': split.get('split_duration_seconds', 0),
                                 'total_distance_km': split.get('total_distance', 0),
                                 'total_duration_seconds': split.get('total_duration_seconds', 0),
                                 'calories_burned': split.get('calories_burned', 0.0),
-                                'elevation_gain_m': split_elevation_gain,  # Use calculated elevation gain
+                                'elevation_gain_m': split_elevation_gain,
                                 'split_timestamp': split.get('timestamp') if split.get('timestamp') else datetime.now(tz.tzutc()).isoformat()
                             }
-                            splits_to_insert.append(split_record)
-                        
-                        if splits_to_insert:
-                            # Deduplicate by (session_id, split_number) to avoid unique constraint violations
-                            unique_map = {}
-                            for rec in splits_to_insert:
-                                sn = rec.get('split_number')
-                                if sn is None:
-                                    # Skip invalid split numbers
-                                    continue
-                                unique_map[(rec['session_id'], sn)] = rec
+                            # Keep latest split data for each split_number
+                            unique_map[sn] = split_record
 
+                        if unique_map:
                             deduped_splits = list(sorted(unique_map.values(), key=lambda r: r['split_number']))
-
-                            insert_resp = supabase.table('session_splits') \
-                                .insert(deduped_splits) \
+                            logger.info(f"Processing {len(deduped_splits)} deduplicated splits for session {ruck_id}")
+                            
+                            # Use UPSERT approach to handle existing splits atomically
+                            upsert_resp = supabase.table('session_splits') \
+                                .upsert(deduped_splits, on_conflict='session_id,split_number') \
                                 .execute()
                             
-                            if insert_resp.data:
-                                logger.info(f"Successfully inserted {len(insert_resp.data)} splits for session {ruck_id}")
+                            if upsert_resp.data:
+                                logger.info(f"Successfully upserted {len(upsert_resp.data)} splits for session {ruck_id}")
                             else:
-                                logger.warning(f"Failed to insert splits for session {ruck_id}: {insert_resp.error}")
-                except Exception as splits_error:
-                    logger.error(f"Error handling splits for session {ruck_id}: {splits_error}")
-                    # Don't fail the session completion if splits insertion fails
-        
+                                logger.error(f"Failed to upsert splits for session {ruck_id}: {upsert_resp}")
+                                
+                except Exception as e:
+                    logger.error(f"Error handling splits for session {ruck_id}: {e}")
+                    # Don't fail the entire completion on splits error
+
             # Check if this session is associated with an event and update progress
             if completed_session.get('event_id'):
                 try:

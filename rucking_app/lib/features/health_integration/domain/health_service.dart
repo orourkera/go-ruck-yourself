@@ -671,13 +671,20 @@ class HealthService {
       AppLogger.info('[STEPS LIVE] WatchService found - checking session status');
       AppLogger.info('[STEPS LIVE] Watch session active: ${watchService.isSessionActive}');
       
-      // Only use watch stream if session is actually active
+      // Only use watch stream if session is actually active AND producing data
       if (watchService.isSessionActive) {
         final watchStream = watchService.stepsStream;
-        AppLogger.info('[STEPS LIVE] ✅ Using Apple Watch steps stream (session active)');
+        AppLogger.info('[STEPS LIVE] ✅ Attempting Apple Watch steps stream (session active)');
         
-        // Add debugging to the watch stream
-        return watchStream.map((steps) {
+        // Add timeout fallback since watch step monitoring appears broken
+        return watchStream.timeout(
+          const Duration(seconds: 15),
+          onTimeout: (sink) {
+            AppLogger.warning('[STEPS LIVE] ⚠️  Watch steps timeout - watch step monitoring broken, falling back to HealthKit');
+            // Force HealthKit polling when watch doesn't send steps
+            _startHealthKitPollingWithSink(start, sink);
+          },
+        ).map((steps) {
           AppLogger.info('[STEPS LIVE] 📊 Watch stream emitted: $steps steps');
           return steps;
         });
@@ -689,11 +696,17 @@ class HealthService {
     }
     
     // Fallback to HealthKit polling if watch service not available
-    try {
-      _stepsController?.close();
-    } catch (_) {}
+    // Clean up existing resources properly
+    stopLiveSteps();
+    
     _stepsController = StreamController<int>.broadcast();
-    _stepsTimer?.cancel();
+    
+    // Add proper cleanup when stream is cancelled
+    _stepsController!.onCancel = () {
+      AppLogger.info('[STEPS LIVE] Stream cancelled, stopping timer');
+      _stepsTimer?.cancel();
+      _stepsTimer = null;
+    };
 
     // Store session start time for calculating session-only steps
     final sessionStart = start;
@@ -755,6 +768,45 @@ class HealthService {
       _stepsController?.close();
     } catch (_) {}
     _stepsController = null;
+  }
+
+  /// Helper method to start HealthKit polling with an existing sink
+  void _startHealthKitPollingWithSink(DateTime sessionStart, EventSink<int> sink) {
+    AppLogger.info('[STEPS LIVE] Starting HealthKit polling fallback for watch session');
+    
+    // Poll every 5 seconds for step updates
+    _stepsTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      try {
+        final now = DateTime.now();
+        final sessionDuration = now.difference(sessionStart);
+        
+        // Cancel early for very new sessions
+        if (sessionDuration.inSeconds < 10) {
+          AppLogger.info('[STEPS LIVE] [HEALTHKIT_FALLBACK] Session too new (${sessionDuration.inSeconds}s), waiting for HealthKit data...');
+          sink.add(0);
+          return;
+        }
+        
+        // Try a narrower window first (last 10 minutes)
+        final fallbackStart = now.subtract(const Duration(minutes: 10));
+        final actualStart = sessionStart.isAfter(fallbackStart) ? sessionStart : fallbackStart;
+        
+        final total = await getStepsBetween(actualStart, now);
+        AppLogger.info('[STEPS LIVE] [HEALTHKIT_FALLBACK] HealthKit steps: $total (window: ${fallbackStart.difference(now).inMinutes.abs()}min)');
+        
+        // Try to add data - if sink is closed, this will throw
+        try {
+          sink.add(total);
+        } catch (e) {
+          AppLogger.info('[STEPS LIVE] [HEALTHKIT_FALLBACK] Sink closed, stopping timer: $e');
+          timer.cancel();
+        }
+      } catch (e) {
+        AppLogger.warning('[STEPS LIVE] [HEALTHKIT_FALLBACK] Error during step polling: $e');
+        // Stop timer if sink is closed or other critical error
+        timer.cancel();
+      }
+    });
   }
   
   /// Update heart rate from Watch (called from native code)
