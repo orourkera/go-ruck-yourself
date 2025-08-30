@@ -10,8 +10,14 @@ import 'package:latlong2/latlong.dart';
 ///   • `[lat,lng]` arrays
 ///   • Numeric or String values for each coordinate
 List<LatLng> parseRoutePoints(dynamic rawRoute) {
-  if (rawRoute == null) return const [];
+  print('[ROUTE_PARSER] Starting parseRoutePoints with rawRoute type: ${rawRoute.runtimeType}');
+  if (rawRoute == null) {
+    print('[ROUTE_PARSER] rawRoute is null, returning empty list');
+    return const [];
+  }
+  
   final points = <LatLng>[];
+  print('[ROUTE_PARSER] rawRoute is List: ${rawRoute is List}, length: ${rawRoute is List ? rawRoute.length : 'N/A'}');
 
   double? _parse(dynamic v) {
     if (v == null) return null;

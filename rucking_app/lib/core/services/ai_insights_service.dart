@@ -4,12 +4,8 @@ import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_se
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
-import 'package:rucking_app/core/services/weather_service.dart';
-import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/models/weather.dart';
-import 'package:rucking_app/core/models/location_point.dart';
-import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
@@ -27,112 +23,6 @@ class AIInsightsService {
        _apiClient = apiClient,
        _responsesService = responsesService ?? getIt<OpenAIResponsesService>();
 
-  /// Generate personalized homepage insights based on user data from the API
-  Future<AIInsight> generateHomepageInsights({
-    required bool preferMetric,
-    required String timeOfDay,
-    required String dayOfWeek,
-    required String username,
-  }) async {
-    try {
-      AppLogger.info('[AI_INSIGHTS] Generating homepage insights for user');
-      
-      // Base context so we always have something meaningful for fallbacks
-      Map<String, dynamic> context = {
-        'username': username,
-        'timeOfDay': timeOfDay,
-        'dayOfWeek': dayOfWeek,
-        'preferMetric': preferMetric,
-        'sessionCount': 0,
-        'totalDistance': 0.0,
-        'averageDistance': 0.0,
-        'achievementCount': 0,
-        'hasRecentActivity': false,
-        'allTimeSessions': 0,
-      };
-
-      // Fetch user insights snapshot (facts + triggers) from the new endpoint
-      var insights = await _fetchUserInsights();
-      // Retry once if empty (token ramp-up/network blip)
-      if (insights.isEmpty) {
-        AppLogger.info('[AI_INSIGHTS] user_insights empty on first attempt – retrying shortly');
-        await Future.delayed(const Duration(milliseconds: 600));
-        insights = await _fetchUserInsights();
-      }
-      
-      context = _buildInsightContext(
-        userInsights: insights,
-        preferMetric: preferMetric,
-        timeOfDay: timeOfDay,
-        dayOfWeek: dayOfWeek,
-        username: username,
-      );
-
-      // Optional: enrich with weather today vs last ruck day
-      String weatherAddon = '';
-      try {
-        final recency = Map<String, dynamic>.from(insights['facts']?['recency'] ?? const {});
-        final lastCompletedAtStr = recency['last_completed_at'] as String?;
-        if (lastCompletedAtStr != null) {
-          final lastCompletedAt = DateTime.tryParse(lastCompletedAtStr);
-          
-          // Try to get location for weather context, but don't fail if unavailable
-          LocationPoint? loc;
-          try {
-            loc = await getIt<LocationService>().getCurrentLocation();
-          } catch (e) {
-            AppLogger.warning('[AI_INSIGHTS] Could not get location for weather context: $e');
-            // Continue without weather context - don't crash homepage
-          }
-          
-          if (loc != null && lastCompletedAt != null) {
-            // Mirror AI Cheerleader path: use LocationContextService to fetch current weather for the same coords
-            final lcs = getIt<LocationContextService>();
-            final ctx = await lcs.getLocationContext(loc.latitude, loc.longitude);
-            final CurrentWeather? today = ctx?.weather?.currentWeather;
-            final WeatherService ws = WeatherService();
-            final Weather? lastWxWrap = await ws.getWeatherForecast(
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-              date: lastCompletedAt,
-              datasets: const ['currentWeather','dailyForecast'],
-            );
-            final CurrentWeather? last = lastWxWrap?.currentWeather;
-            if (today != null && last != null) {
-              weatherAddon = _buildWeatherDeltaSnippet(today, last, preferMetric);
-            }
-          }
-        }
-      } catch (e) {
-        AppLogger.warning('[AI_INSIGHTS] Weather enrichment skipped: $e');
-      }
-
-      if (weatherAddon.isNotEmpty) {
-        AppLogger.info('[AI_INSIGHTS] Weather addon for prompt: $weatherAddon');
-      } else {
-        AppLogger.info('[AI_INSIGHTS] Weather addon empty (no location/last ruck/weather data)');
-      }
-      final prompt = _buildInsightPrompt(context, weatherAddon: weatherAddon);
-      final aiResponse = await _openAIService.generateMessage(
-        context: {'prompt': prompt},
-        personality: 'motivational',
-        modelOverride: 'o3-mini', // Prefer richer reasoning for homepage insights
-        temperatureOverride: 1.2,
-        timeoutOverride: const Duration(seconds: 8),
-      );
-      AppLogger.info('[AI_INSIGHTS] Raw AI response: ${aiResponse != null ? aiResponse.substring(0, aiResponse.length > 200 ? 200 : aiResponse.length) : 'null'}');
-      
-      return _parseAIResponse(aiResponse ?? '', context);
-      
-    } catch (e) {
-      AppLogger.error('[AI_INSIGHTS] Failed to generate insights: $e');
-      return _getFallbackInsightFromContext({
-        'timeOfDay': timeOfDay,
-        'username': username,
-        'preferMetric': preferMetric,
-      });
-    }
-  }
 
   /// Stream homepage insights using the Responses API (o3 streaming).
   /// onDelta receives incremental text; onFinal receives the parsed AIInsight.
@@ -159,15 +49,18 @@ class AIInsightsService {
         dayOfWeek: dayOfWeek,
         username: username,
       );
-      final prompt = _buildInsightPrompt(context, weatherAddon: '');
+      final instructions = _buildInsightInstructions(context);
+      final userInput = _buildUserContextInput(context);
       final sb = StringBuffer();
       bool gotDelta = false;
-      AppLogger.info('[AI_INSIGHTS] Streaming homepage insight (o3-mini)…');
+      AppLogger.info('[AI_INSIGHTS] Streaming homepage insight (GPT-5 reasoning model)…');
       await _responsesService!.stream(
-        model: 'gpt-4o-mini',
-        input: prompt,
-        // o3 does not accept temperature in Responses API; omitted inside service
+        model: _getReasoningModel(),
+        instructions: instructions,
+        input: userInput,
+        store: false, // Don't store insights for privacy
         maxOutputTokens: 300,
+        // Remove structured output for now - just get plain text JSON
         onDelta: (d) {
           sb.write(d);
           gotDelta = true;
@@ -186,8 +79,9 @@ class AIInsightsService {
       // If we never received a delta, provide a non-streaming fallback for better UX
       if (!gotDelta) {
         AppLogger.warning('[AI_INSIGHTS] Stream produced no deltas; falling back to non-streaming');
+        final combinedPrompt = instructions + '\n\n' + userInput;
         final aiResponse = await _openAIService.generateMessage(
-          context: {'prompt': prompt},
+          context: {'prompt': combinedPrompt},
           personality: 'motivational',
           modelOverride: 'o3-mini',
           temperatureOverride: null,
@@ -213,11 +107,14 @@ class AIInsightsService {
       final now = DateTime.now();
       final timeOfDay = _getTimeOfDay(now);
       final dayOfWeek = DateFormat('EEEE').format(now);
-      final insight = await generateHomepageInsights(
-        preferMetric: preferMetric,
-        timeOfDay: timeOfDay,
-        dayOfWeek: dayOfWeek,
-        username: username,
+      // Create a temporary insight for caching (prewarm functionality)
+      final insight = AIInsight(
+        greeting: _getDefaultGreeting(timeOfDay, username),
+        insight: 'Building your rucking habit...',
+        recommendation: 'Start with a short ruck today.',
+        motivation: 'Every step builds strength.',
+        emoji: '🎒',
+        generatedAt: DateTime.now(),
       );
       await _saveHomeCache(userId, insight);
       AppLogger.info('[AI_INSIGHTS] Prewarmed homepage insight cache for $userId');
@@ -326,7 +223,7 @@ class AIInsightsService {
     return context;
   }
 
-  String _buildInsightPrompt(Map<String, dynamic> context, {String weatherAddon = ''}) {
+  String _buildInsightInstructions(Map<String, dynamic> context) {
     final distanceUnit = context['preferMetric'] ? 'km' : 'miles';
     final gender = (context['gender'] as String?) ?? '';
     final isFirstSession = ((context['allTimeSessions'] as int? ?? 0) == 0);
@@ -358,7 +255,6 @@ Context:
 - Has recent activity: ${context['hasRecentActivity']}
 ${context['daysSinceLastRuck'] != null ? '- Days since last ruck: ${context['daysSinceLastRuck']}' : ''}
 ${context['lastRuckDistance'] != null ? '- Last ruck distance: ${context['lastRuckDistance']} $distanceUnit' : ''}
-${weatherAddon.isNotEmpty ? '- Weather: ' + weatherAddon : ''}
  - Profile: ${context['hasProfilePhoto'] == true ? 'has photo' : 'no photo'}; Strava: ${context['isStravaConnected'] == true ? 'connected' : 'not connected'}
  ${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''}
  - Sessions to 100: ${context['sessionsTo100']}
@@ -386,6 +282,33 @@ Generate a JSON response with:
 Respond with ONLY the JSON object. Do not include any other text or formatting.
 Keep it concise, personal, and motivating. Use their preferred units.
 ''';
+  }
+
+
+  String _buildUserContextInput(Map<String, dynamic> context) {
+    final distanceUnit = context['preferMetric'] ? 'km' : 'miles';
+
+    return '''
+User Context:
+- Username: ${context['username']}
+- Current time: ${context['timeOfDay']} on ${context['dayOfWeek']}
+- Recent sessions: ${context['sessionCount']}
+- Total distance: ${context['totalDistance']} $distanceUnit
+- Average distance: ${context['averageDistance']} $distanceUnit
+- Total achievements: ${context['achievementCount']}
+- Has recent activity: ${context['hasRecentActivity']}
+${context['daysSinceLastRuck'] != null ? '- Days since last ruck: ${context['daysSinceLastRuck']}' : ''}
+${context['lastRuckDistance'] != null ? '- Last ruck distance: ${context['lastRuckDistance']} $distanceUnit' : ''}
+- Profile: ${context['hasProfilePhoto'] == true ? 'has photo' : 'no photo'}; Strava: ${context['isStravaConnected'] == true ? 'connected' : 'not connected'}
+${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''}
+- Sessions to 100: ${context['sessionsTo100']}''';
+  }
+
+
+  /// Get the best available reasoning model for insights generation
+  String _getReasoningModel() {
+    // Use GPT-4.1 for better reasoning capabilities than GPT-4o
+    return 'gpt-4.1-2025-04-14';
   }
 
   bool? _coerceBool(dynamic v) {

@@ -147,6 +147,29 @@ class RuckSessionResource(Resource):
             if session.get('user_id') != g.user.id and not session.get('is_public'):
                 return {'message': 'Forbidden'}, 403
 
+            # Fetch location points to match recent sessions RPC behavior
+            try:
+                lp_resp = (
+                    supabase.table('location_point')
+                    .select('latitude,longitude,altitude,timestamp')
+                    .eq('session_id', ruck_id)
+                    .order('timestamp', desc=False)
+                    .execute()
+                )
+                location_points = lp_resp.data or []
+                
+                # Add location data in multiple formats for compatibility
+                session['location_points'] = location_points
+                session['locationPoints'] = location_points  # camelCase variant
+                session['route'] = location_points  # alias for route field
+                
+                logger.info(f"[API_DEBUG] Session {ruck_id} returning {len(location_points)} location points")
+            except Exception as lp_err:
+                logger.warning(f"Failed to fetch location points for session {ruck_id}: {lp_err}")
+                session['location_points'] = []
+                session['locationPoints'] = []
+                session['route'] = []
+
             return session, 200
         except Exception as e:
             logger.error(f"Error fetching session {ruck_id}: {e}")
@@ -1687,8 +1710,31 @@ class RuckSessionLocationResource(Resource):
                     logger.error(f"Failed to auto-start session {ruck_id}: {e}")
                     return {'message': f"Failed to start session: {str(e)}"}, 500
             elif current_status != 'in_progress':
-                logger.warning(f"Session {ruck_id} status is '{current_status}', not 'in_progress'")
-                return {'message': f"Session not in progress (status: {current_status})"}, 400
+                logger.warning(f"Session {ruck_id} status is '{current_status}', not 'in_progress'. User {g.user.id} attempted location upload.")
+                
+                # Allow location uploads to recently completed sessions (within 5 minutes)
+                if current_status == 'completed':
+                    # Check if session was completed recently
+                    session_details = supabase.table('ruck_session') \
+                        .select('completed_at') \
+                        .eq('id', ruck_id) \
+                        .execute()
+                    
+                    if session_details.data and session_details.data[0].get('completed_at'):
+                        from dateutil import parser
+                        completed_at = parser.parse(session_details.data[0]['completed_at'])
+                        time_since_completion = datetime.now(tz.tzutc()) - completed_at
+                        
+                        if time_since_completion.total_seconds() <= 300:  # 5 minutes
+                            logger.info(f"Allowing location upload to recently completed session {ruck_id} (completed {time_since_completion.total_seconds():.0f}s ago)")
+                        else:
+                            logger.warning(f"Session {ruck_id} completed {time_since_completion.total_seconds():.0f}s ago, rejecting location upload")
+                            return {'message': f"Session completed {time_since_completion.total_seconds():.0f}s ago, too late for location uploads"}, 400
+                    else:
+                        logger.warning(f"Session {ruck_id} is completed but no completed_at timestamp found")
+                        return {'message': f"Session not in progress (status: {current_status})"}, 400
+                else:
+                    return {'message': f"Session not in progress (status: {current_status})"}, 400
             
             # Insert location points (like heart rate samples)
             location_rows = []

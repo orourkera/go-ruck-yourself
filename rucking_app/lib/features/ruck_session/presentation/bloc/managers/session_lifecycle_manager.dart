@@ -322,21 +322,69 @@ class SessionLifecycleManager implements SessionManager {
           
           // Check for 404/405 errors indicating session doesn't exist in backend
           if (e.toString().contains('404') || e.toString().contains('405')) {
-            AppLogger.error('[LIFECYCLE] Session $_activeSessionId does not exist in backend (404/405). Cleaning up local state.');
+            AppLogger.error('[LIFECYCLE] Session $_activeSessionId does not exist in backend (404/405). Attempting recovery...');
             
-            // Clear all local session data
-            await _storageService.remove('active_session_data');
-            await _storageService.remove('pending_completion_$_activeSessionId');
+            // Try to recreate the session before giving up
+            if (attempt == 1) {
+              try {
+                AppLogger.info('[LIFECYCLE] Attempting to recreate lost session $_activeSessionId');
+                
+                // Create new session with current data
+                final recreateResponse = await _apiClient.post('/rucks', {
+                  'ruck_weight_kg': completionData['ruck_weight_kg'] ?? 0.0,
+                  'user_weight_kg': completionData['user_weight_kg'] ?? 70.0,
+                  'is_manual': false,
+                  'distance_km': completionData['distance_km'] ?? 0.0,
+                  'duration_seconds': completionData['duration_seconds'] ?? 0,
+                  'elevation_gain_m': completionData['elevation_gain_m'] ?? 0.0,
+                  'start_time': completionData['start_time'] ?? DateTime.now().toUtc().toIso8601String(),
+                });
+                
+                final newSessionId = recreateResponse['id'].toString();
+                AppLogger.info('[LIFECYCLE] Recreated session as: $newSessionId');
+                
+                // Update session ID and try completion again
+                _activeSessionId = newSessionId;
+                completionData['session_id'] = newSessionId;
+                
+                // Try completing the recreated session
+                final completeResponse = await _apiClient.post('/rucks/$newSessionId/complete', completionData);
+                AppLogger.info('[LIFECYCLE] Successfully completed recreated session: $newSessionId');
+                completionSuccessful = true;
+                break; // Exit retry loop
+                
+              } catch (recreateError) {
+                AppLogger.error('[LIFECYCLE] Failed to recreate session: $recreateError');
+                // Continue with normal error handling
+              }
+            }
             
-            // Reset state to initial to trigger navigation to homepage
-            _updateState(const SessionLifecycleState(
-              isActive: false,
-              sessionId: null,
-              startTime: null,
-            ));
-            _activeSessionId = null;
-            
-            return; // Exit early - don't retry
+            // If recreation failed or we've already tried, clean up
+            if (!completionSuccessful) {
+              AppLogger.error('[LIFECYCLE] Session recreation failed. Cleaning up local state.');
+              
+              // Store error context for debugging
+              await _storageService.setObject('lost_session_context', {
+                'original_session_id': _activeSessionId,
+                'error': e.toString(),
+                'timestamp': DateTime.now().toIso8601String(),
+                'completion_data': completionData,
+              });
+              
+              // Clear all local session data
+              await _storageService.remove('active_session_data');
+              await _storageService.remove('pending_completion_$_activeSessionId');
+              
+              // Reset state to initial to trigger navigation to homepage
+              _updateState(const SessionLifecycleState(
+                isActive: false,
+                sessionId: null,
+                startTime: null,
+              ));
+              _activeSessionId = null;
+              
+              return; // Exit early - don't retry
+            }
           }
           
           await Future.delayed(Duration(seconds: attempt * 2)); // Backoff

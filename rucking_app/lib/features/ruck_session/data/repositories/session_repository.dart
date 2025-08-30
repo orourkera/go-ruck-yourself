@@ -362,6 +362,12 @@ class SessionRepository {
         }
       } else {
         AppLogger.info('DEBUGGING: No heart_rate_samples field in session response');
+        
+        // Try to fetch heart rate samples separately if we have aggregate data but no samples
+        if (session.avgHeartRate != null && session.avgHeartRate! > 0) {
+          AppLogger.info('DEBUGGING: Attempting to fetch heart rate samples separately for session $sessionId');
+          heartRateSamples = await fetchHeartRateSamples(sessionId);
+        }
       }
       // Compute HR statistics if missing and samples are available
       RuckSession resultSession = session.copyWith(heartRateSamples: heartRateSamples);

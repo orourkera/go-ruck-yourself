@@ -1,0 +1,1 @@
+// Remove lines 30-138 (the old generateHomepageInsights method)

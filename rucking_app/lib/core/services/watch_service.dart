@@ -324,6 +324,52 @@ class WatchService {
               case 'sessionEnded':
                 await _handleSessionEndedFromWatch(data);
                 break;
+              case 'watchHeartRateUpdate':
+                final hr = data['heartRate'];
+                AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🎯 RECEIVED watchHeartRateUpdate command (queued) - raw data: $data');
+                if (hr is num) {
+                  final heartRateValue = hr.toDouble();
+                  AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🎯 PROCESSING valid heart rate: $heartRateValue BPM');
+                  handleWatchHeartRateUpdate(heartRateValue);
+                } else {
+                  AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ INVALID heart rate from WatchConnectivity (queued): $hr (type: ${hr.runtimeType})');
+                }
+                break;
+              case 'watchStepUpdate':
+                final steps = data['steps'];
+                AppLogger.info('[WATCH_SERVICE] [STEPS_FALLBACK] 📥 Direct watchStepUpdate received (queued): $steps steps');
+                if (steps is num && steps >= 0) {
+                  final stepsValue = steps.toInt();
+                  AppLogger.info('[WATCH_SERVICE] [STEPS_FALLBACK] ✅ Processing valid steps: $stepsValue');
+                  if (_stepsController != null && !_stepsController!.isClosed) {
+                    _stepsController!.add(stepsValue);
+                    AppLogger.info('[WATCH_SERVICE] [STEPS_FALLBACK] 📤 Added steps to stream: $stepsValue');
+                  }
+                }
+                break;
+              case 'stepsDebug':
+                AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🧪 Steps debug snapshot from watch (queued): $data');
+                final steps = data['steps'];
+                if (steps is num && steps >= 0) {
+                  final stepsValue = steps.toInt();
+                  AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] ✅ Processing debug steps: $stepsValue');
+                  if (_stepsController != null && !_stepsController!.isClosed) {
+                    _stepsController!.add(stepsValue);
+                    AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 📤 Added debug steps to stream: $stepsValue');
+                  }
+                }
+                break;
+              case 'heartRateDebug':
+                AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 📊 Heart rate debug from watch (queued): $data');
+                break;
+              case 'healthKitStatus':
+                final stepsAuth = data['stepsAuth'] ?? -1;
+                final heartRateAuth = data['heartRateAuth'] ?? -1;
+                AppLogger.info('[WATCH_SERVICE] 📊 HealthKit status from Watch (queued) - Steps: $stepsAuth, HeartRate: $heartRateAuth');
+                break;
+              case 'watchTelemetry':
+                await _processTelemetryFromWatch(data);
+                break;
               default:
                 // Ignore unknown commands; may be metrics/context updates already handled elsewhere
                 break;

@@ -2053,9 +2053,11 @@ class _SessionRouteMap extends StatelessWidget {
     print('[ROUTE_DEBUG] Session ${session.id} - Starting _getRoutePoints()');
     print('[ROUTE_DEBUG] Session ${session.id} - locationPoints type: ${session.locationPoints.runtimeType}');
     print('[ROUTE_DEBUG] Session ${session.id} - locationPoints length: ${session.locationPoints?.length ?? 0}');
+    print('[ROUTE_DEBUG] Session ${session.id} - locationPoints raw data: ${session.locationPoints}');
     
     if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
       print('[ROUTE_DEBUG] Session ${session.id} - First point: ${session.locationPoints!.first}');
+      print('[ROUTE_DEBUG] Session ${session.id} - First point type: ${session.locationPoints!.first.runtimeType}');
       print('[ROUTE_DEBUG] Session ${session.id} - Last point: ${session.locationPoints!.last}');
     }
 
@@ -2065,6 +2067,17 @@ class _SessionRouteMap extends StatelessWidget {
     if (result.isNotEmpty) {
       print('[ROUTE_DEBUG] Session ${session.id} - First parsed point: ${result.first}');
       print('[ROUTE_DEBUG] Session ${session.id} - Last parsed point: ${result.last}');
+    } else {
+      print('[ROUTE_DEBUG] Session ${session.id} - No points parsed! Raw data analysis:');
+      if (session.locationPoints != null) {
+        for (int i = 0; i < session.locationPoints!.length && i < 3; i++) {
+          final point = session.locationPoints![i];
+          print('[ROUTE_DEBUG] Point $i: $point (type: ${point.runtimeType})');
+          if (point is Map) {
+            print('[ROUTE_DEBUG] Point $i keys: ${point.keys.toList()}');
+          }
+        }
+      }
     }
     
     return result;
