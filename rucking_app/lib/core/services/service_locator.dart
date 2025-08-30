@@ -31,6 +31,7 @@ import 'package:rucking_app/features/clubs/presentation/bloc/clubs_bloc.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
 import 'package:rucking_app/core/services/ai_insights_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
@@ -177,10 +178,21 @@ Future<void> setupServiceLocator() async {
   // Register OpenAIService with logger dependency
   GetIt.I.registerSingleton<OpenAIService>(OpenAIService(logger: GetIt.I<SimpleAILogger>()));
   
+  // Initialize OpenAI with API key
+  if (openaiApiKey.isNotEmpty) {
+    OpenAI.apiKey = openaiApiKey;
+  }
+
+  // Register Responses API SSE client for o3 streaming (must be before AIInsightsService)
+  getIt.registerSingleton<OpenAIResponsesService>(
+    OpenAIResponsesService(apiKey: openaiApiKey),
+  );
+  
   // Register AI Insights Service for homepage personalization
   GetIt.I.registerSingleton<AIInsightsService>(AIInsightsService(
     openAIService: GetIt.I<OpenAIService>(),
     apiClient: GetIt.I<ApiClient>(),
+    responsesService: GetIt.I<OpenAIResponsesService>(),
   ));
   
   GetIt.I.registerSingleton<ElevenLabsService>(ElevenLabsService(elevenLabsApiKey));
@@ -188,10 +200,7 @@ Future<void> setupServiceLocator() async {
   GetIt.I.registerSingleton<AIAudioService>(AIAudioService());
   GetIt.I.registerSingleton<AICheerleaderService>(AICheerleaderService());
   
-  // Initialize OpenAI with API key
-  if (openaiApiKey.isNotEmpty) {
-    OpenAI.apiKey = openaiApiKey;
-  }
+  
 
   // Register SplitTrackingService which depends on WatchService
   getIt.registerSingleton<SplitTrackingService>(

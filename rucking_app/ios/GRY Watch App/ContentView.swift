@@ -135,6 +135,7 @@ struct ContentView: View {
         .edgesIgnoringSafeArea(.bottom)
         .onAppear {
             requestHealthKitPermissionsIfNeeded()
+            setupNavigationListener()
         }
     }
     
@@ -314,6 +315,24 @@ struct ContentView: View {
                 }
             }
             .padding(6)
+        }
+    }
+    
+    private func setupNavigationListener() {
+        // Listen for navigation requests from SessionManager
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("NavigateToActiveSession"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            print("[CONTENTVIEW] Received NavigateToActiveSession notification")
+            
+            // Trigger haptic feedback
+            WKInterfaceDevice.current().play(.notification)
+            
+            // The UI will automatically switch to CompactWorkoutView when
+            // sessionManager.isSessionActive becomes true
+            print("[CONTENTVIEW] Session is now active: \(sessionManager.isSessionActive)")
         }
     }
 }

@@ -219,6 +219,12 @@ class RuckSessionResource(Resource):
         except Exception as e:
             logger.error(f"Error deleting session {ruck_id}: {e}")
             return {'message': f'Error deleting session: {str(e)}'}, 500
+    
+    def patch(self, ruck_id):
+        """PATCH method for session - redirects to details endpoint for compatibility"""
+        logger.info(f"PATCH /rucks/{ruck_id} received - redirecting to details endpoint")
+        detail_resource = RuckSessionDetailResource()
+        return detail_resource.patch(ruck_id)
 
 class RuckSessionDetailResource(Resource):
     """Return enriched ruck session details (GET /api/rucks/<id>/details)

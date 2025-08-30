@@ -519,6 +519,13 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                         self.isSessionActive = true
                         self.isPaused = false
                         self.sessionStartedFromPhone = true // Mark as phone-initiated
+                        
+                        // IMPORTANT: Trigger haptic feedback to alert user
+                        WKInterfaceDevice.current().play(.start)
+                        
+                        // Navigate to active session view programmatically
+                        self.navigateToActiveSession()
+                        
                         self.startSession()
                     }
                 }
@@ -999,6 +1006,20 @@ extension SessionManager {
                 exit(0)
             }
         }
+    }
+    
+    private func navigateToActiveSession() {
+        // Navigate to the active session view when session starts from phone
+        print("[WATCH] Attempting to navigate to active session view")
+        
+        // Post notification to trigger navigation in ContentView
+        NotificationCenter.default.post(
+            name: NSNotification.Name("NavigateToActiveSession"),
+            object: nil
+        )
+        
+        // Also trigger app activation to ensure watch app comes to foreground
+        print("[WATCH] Session started from phone - watch app should activate")
     }
 }
 

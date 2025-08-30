@@ -2,6 +2,7 @@
 import Foundation
 import HealthKit
 import WatchKit
+import WatchConnectivity
 
 public protocol WorkoutManagerDelegate: AnyObject {
     func workoutDidEnd()
@@ -20,6 +21,36 @@ public class WorkoutManager: NSObject {
     
     var isHealthKitAvailable: Bool {
         return HKHealthStore.isHealthDataAvailable()
+    }
+    
+    // Bridge method to send telemetry to Dart side for Sentry
+    private func sendTelemetryToDart(_ data: [String: Any]) {
+        // Send telemetry via WatchConnectivity to iPhone app, which forwards to Sentry
+        var telemetryData = data
+        telemetryData["command"] = "watchTelemetry"
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: telemetryData)
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print("[WATCH_TELEMETRY] \(jsonString)")
+            }
+        } catch {
+            print("[WATCH_TELEMETRY_ERROR] Failed to serialize: \(error)")
+        }
+        
+        // Send via WatchConnectivity session to iPhone
+        if #available(watchOS 2.0, *) {
+            let session = WCSession.default
+            if session.isReachable {
+                session.sendMessage(telemetryData, replyHandler: nil) { error in
+                    print("[WATCH_TELEMETRY_ERROR] Failed to send: \(error.localizedDescription)")
+                }
+            } else {
+                print("[WATCH_TELEMETRY_DEBUG] WatchConnectivity not reachable, queuing telemetry")
+                // Queue for later or use application context
+                try? session.updateApplicationContext(telemetryData)
+            }
+        }
     }
     
     // Types to read and share via HealthKit
@@ -41,22 +72,67 @@ public class WorkoutManager: NSObject {
     // Request authorization to access HealthKit data
     func requestAuthorization(completion: @escaping (Bool, Error?) -> Void) {
         print("[WORKOUT_MANAGER] Requesting HealthKit authorization...")
+        print("[WORKOUT_MANAGER] HealthKit available: \(HKHealthStore.isHealthDataAvailable())")
         print("[WORKOUT_MANAGER] Types to read: \(typesToRead)")
         print("[WORKOUT_MANAGER] Types to share: \(typesToShare)")
         
+        // Send detailed telemetry to Sentry
+        sendTelemetryToDart([
+            "event": "watch_auth_request_started",
+            "healthkit_available": HKHealthStore.isHealthDataAvailable(),
+            "types_to_read_count": typesToRead.count,
+            "types_to_share_count": typesToShare.count,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+        
         healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) { (success, error) in
             print("[WORKOUT_MANAGER] Authorization result - Success: \(success)")
-            if let error = error {
-                print("[WORKOUT_MANAGER] Authorization error: \(error.localizedDescription)")
-            }
             
-            // Check individual permissions
+            // Collect detailed authorization status
+            var authStatuses: [String: Int] = [:]
             for type in self.typesToRead {
                 let status = self.healthStore.authorizationStatus(for: type)
-                print("[WORKOUT_MANAGER] Permission for \(type): \(status.rawValue)")
+                let typeName = type.identifier.replacingOccurrences(of: "HKQuantityTypeIdentifier", with: "")
+                authStatuses[typeName] = status.rawValue
+                print("[WORKOUT_MANAGER] Permission for \(typeName): \(status.rawValue) (\(self.statusDescription(status)))")
+            }
+            
+            if let error = error {
+                print("[WORKOUT_MANAGER] Authorization error: \(error.localizedDescription)")
+                
+                // Send detailed error to Sentry
+                self.sendTelemetryToDart([
+                    "event": "watch_auth_failed",
+                    "error_message": error.localizedDescription,
+                    "error_code": (error as NSError).code,
+                    "error_domain": (error as NSError).domain,
+                    "auth_statuses": authStatuses,
+                    "timestamp": Date().timeIntervalSince1970
+                ])
+            } else {
+                print("[WORKOUT_MANAGER] HealthKit authorization completed")
+                
+                // Send detailed success status to Sentry
+                self.sendTelemetryToDart([
+                    "event": "watch_auth_completed",
+                    "overall_success": success,
+                    "auth_statuses": authStatuses,
+                    "heart_rate_authorized": authStatuses["HeartRate"] == HKAuthorizationStatus.sharingAuthorized.rawValue,
+                    "step_count_authorized": authStatuses["StepCount"] == HKAuthorizationStatus.sharingAuthorized.rawValue,
+                    "timestamp": Date().timeIntervalSince1970
+                ])
             }
             
             completion(success, error)
+        }
+    }
+    
+    private func statusDescription(_ status: HKAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "notDetermined"
+        case .sharingDenied: return "sharingDenied" 
+        case .sharingAuthorized: return "sharingAuthorized"
+        @unknown default: return "unknown"
         }
     }
     
@@ -64,9 +140,25 @@ public class WorkoutManager: NSObject {
     func startWorkout(completion: @escaping (Error?) -> Void) {
         print("[WORKOUT_MANAGER] Starting workout session...")
         
+        // Send workout start telemetry
+        sendTelemetryToDart([
+            "event": "watch_workout_start_requested",
+            "healthkit_available": HKHealthStore.isHealthDataAvailable(),
+            "has_existing_session": workoutSession != nil,
+            "has_existing_builder": workoutBuilder != nil,
+            "timestamp": Date().timeIntervalSince1970
+        ])
+        
         // Check HealthKit availability first
         guard HKHealthStore.isHealthDataAvailable() else {
             print("[WORKOUT_MANAGER] ERROR: HealthKit not available on this device")
+            
+            sendTelemetryToDart([
+                "event": "watch_workout_start_failed",
+                "error": "HealthKit not available on device",
+                "timestamp": Date().timeIntervalSince1970
+            ])
+            
             completion(NSError(domain: "WorkoutManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "HealthKit not available"]))
             return
         }
@@ -112,15 +204,34 @@ public class WorkoutManager: NSObject {
                 if success {
                     print("[WORKOUT_MANAGER] ✅ Data collection started successfully")
                     
+                    // Send success telemetry
+                    self.sendTelemetryToDart([
+                        "event": "watch_workout_collection_started",
+                        "success": true,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
+                    
                     // Force heart rate data collection to start immediately
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         print("[WORKOUT_MANAGER] Requesting initial heart rate update...")
+                        
+                        self.sendTelemetryToDart([
+                            "event": "watch_heart_rate_request_initiated",
+                            "timestamp": Date().timeIntervalSince1970
+                        ])
+                        
                         self.requestHeartRateUpdate()
                     }
                     
                     // Also request step count update
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                         print("[WORKOUT_MANAGER] Requesting initial step count update...")
+                        
+                        self.sendTelemetryToDart([
+                            "event": "watch_step_count_request_initiated",
+                            "timestamp": Date().timeIntervalSince1970
+                        ])
+                        
                         self.requestStepCountUpdate()
                     }
                     
@@ -130,12 +241,31 @@ public class WorkoutManager: NSObject {
                     print("[WORKOUT_MANAGER] ❌ Data collection failed to start")
                     if let error = error {
                         print("[WORKOUT_MANAGER] Data collection error: \(error.localizedDescription)")
+                        
+                        // Send collection failure telemetry
+                        self.sendTelemetryToDart([
+                            "event": "watch_workout_collection_failed",
+                            "error": error.localizedDescription,
+                            "error_code": (error as NSError).code,
+                            "error_domain": (error as NSError).domain,
+                            "timestamp": Date().timeIntervalSince1970
+                        ])
                     }
                 }
                 completion(error)
             }
         } catch {
             print("[WORKOUT_MANAGER] ❌ Failed to create workout session: \(error.localizedDescription)")
+            
+            // Send session creation failure telemetry
+            sendTelemetryToDart([
+                "event": "watch_workout_session_creation_failed",
+                "error": error.localizedDescription,
+                "error_code": (error as NSError).code,
+                "error_domain": (error as NSError).domain,
+                "timestamp": Date().timeIntervalSince1970
+            ])
+            
             completion(error)
         }
     }
@@ -146,13 +276,29 @@ public class WorkoutManager: NSObject {
         
         guard let builder = workoutBuilder else { 
             print("[WORKOUT_MANAGER] ERROR: workoutBuilder is nil")
+            
+            sendTelemetryToDart([
+                "event": "watch_heart_rate_request_failed",
+                "error": "workoutBuilder is nil",
+                "timestamp": Date().timeIntervalSince1970
+            ])
             return 
         }
         
         print("[WORKOUT_MANAGER] Checking for heart rate data...")
         
-        // Check if we have any heart rate data available
+        // Check authorization status
         if let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate) {
+            let authStatus = healthStore.authorizationStatus(for: heartRateType)
+            print("[WORKOUT_MANAGER] Heart rate auth status: \(statusDescription(authStatus))")
+            
+            sendTelemetryToDart([
+                "event": "watch_heart_rate_auth_check",
+                "auth_status": authStatus.rawValue,
+                "auth_description": statusDescription(authStatus),
+                "timestamp": Date().timeIntervalSince1970
+            ])
+            
             print("[WORKOUT_MANAGER] Got heart rate type, checking statistics...")
             
             if let statistics = builder.statistics(for: heartRateType) {
@@ -162,20 +308,49 @@ public class WorkoutManager: NSObject {
                     let heartRate = mostRecent.doubleValue(for: HKUnit(from: "count/min"))
                     print("[WORKOUT_MANAGER] Found recent heart rate: \(heartRate) BPM")
                     
+                    sendTelemetryToDart([
+                        "event": "watch_heart_rate_data_received",
+                        "heart_rate_bpm": heartRate,
+                        "has_handler": heartRateHandler != nil,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
+                    
                     if let handler = heartRateHandler {
                         print("[WORKOUT_MANAGER] Calling heart rate handler...")
                         handler(heartRate)
                     } else {
                         print("[WORKOUT_MANAGER] ERROR: Heart rate handler is nil!")
+                        
+                        sendTelemetryToDart([
+                            "event": "watch_heart_rate_handler_missing",
+                            "heart_rate_bpm": heartRate,
+                            "timestamp": Date().timeIntervalSince1970
+                        ])
                     }
                 } else {
                     print("[WORKOUT_MANAGER] No recent heart rate quantity available")
+                    
+                    sendTelemetryToDart([
+                        "event": "watch_heart_rate_no_data",
+                        "has_statistics": true,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
                 }
             } else {
                 print("[WORKOUT_MANAGER] No statistics available for heart rate")
+                
+                sendTelemetryToDart([
+                    "event": "watch_heart_rate_no_statistics",
+                    "timestamp": Date().timeIntervalSince1970
+                ])
             }
         } else {
             print("[WORKOUT_MANAGER] ERROR: Could not get heart rate type")
+            
+            sendTelemetryToDart([
+                "event": "watch_heart_rate_type_failed",
+                "timestamp": Date().timeIntervalSince1970
+            ])
         }
     }
     
@@ -185,17 +360,35 @@ public class WorkoutManager: NSObject {
         
         guard let builder = workoutBuilder else { 
             print("[WORKOUT_MANAGER] ERROR: workoutBuilder is nil for steps")
+            
+            sendTelemetryToDart([
+                "event": "watch_step_count_request_failed",
+                "error": "workoutBuilder is nil",
+                "timestamp": Date().timeIntervalSince1970
+            ])
             return 
         }
         
         // Check step count authorization first
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
             print("[WORKOUT_MANAGER] ERROR: Could not get step count type")
+            
+            sendTelemetryToDart([
+                "event": "watch_step_count_type_failed",
+                "timestamp": Date().timeIntervalSince1970
+            ])
             return
         }
         
         let authStatus = healthStore.authorizationStatus(for: stepType)
         print("[WORKOUT_MANAGER] Step count authorization status: \(authStatus.rawValue)")
+        
+        sendTelemetryToDart([
+            "event": "watch_step_count_auth_check",
+            "auth_status": authStatus.rawValue,
+            "auth_description": statusDescription(authStatus),
+            "timestamp": Date().timeIntervalSince1970
+        ])
         
         if authStatus == .notDetermined {
             print("[WORKOUT_MANAGER] WARNING: Step count authorization not determined - requesting")
@@ -229,18 +422,43 @@ public class WorkoutManager: NSObject {
                     print("[WORKOUT_MANAGER] Fallback most-recent step count: \(totalSteps!) steps (\(Date().timeIntervalSince1970))")
                 } else {
                     print("[WORKOUT_MANAGER] No step count quantity available")
+                    
+                    sendTelemetryToDart([
+                        "event": "watch_step_count_no_data",
+                        "has_statistics": true,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
                 }
 
                 if let stepCount = totalSteps {
+                    sendTelemetryToDart([
+                        "event": "watch_step_count_data_received",
+                        "step_count": stepCount,
+                        "has_handler": stepCountHandler != nil,
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
+                    
                     if let handler = stepCountHandler {
                         print("[WORKOUT_MANAGER] Calling step count handler with value: \(stepCount) (\(Date().timeIntervalSince1970))")
                         handler(stepCount)
                     } else {
                         print("[WORKOUT_MANAGER] ERROR: Step count handler is nil!")
+                        
+                        sendTelemetryToDart([
+                            "event": "watch_step_count_handler_missing",
+                            "step_count": stepCount,
+                            "timestamp": Date().timeIntervalSince1970
+                        ])
                     }
                 }
             } else {
                 print("[WORKOUT_MANAGER] No statistics available for step count - trying direct HealthKit query")
+                
+                sendTelemetryToDart([
+                    "event": "watch_step_count_no_statistics_fallback_query",
+                    "timestamp": Date().timeIntervalSince1970
+                ])
+                
                 queryRecentStepsDirectly()
             }
         } else {

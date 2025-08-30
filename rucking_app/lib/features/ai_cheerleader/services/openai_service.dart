@@ -15,7 +15,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
-  static const String _model = 'gpt-4o-mini'; // Faster, lower-latency model
+  static const String _model = 'gpt-4o-mini'; // default fallback model
   static const int _maxTokens = 120; // Allow for 2-3 sentences
   static const double _temperature = 0.7; // Slightly lower for tighter responses
   static const Duration _timeout = Duration(seconds: 6);
@@ -32,6 +32,10 @@ class OpenAIService {
     required Map<String, dynamic> context,
     required String personality,
     bool explicitContent = false,
+    String? modelOverride,
+    int? maxTokensOverride,
+    double? temperatureOverride,
+    Duration? timeoutOverride,
   }) async {
     AppLogger.error('[OPENAI_SERVICE_DEBUG] ===== GENERATE MESSAGE METHOD CALLED =====');
     AppLogger.error('[OPENAI_SERVICE_DEBUG] This proves the OpenAIService.generateMessage is being called');
@@ -82,19 +86,33 @@ class OpenAIService {
       AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 4: About to call OpenAI.instance.chat.create...');
       AppLogger.info('[OPENAI_DEBUG] About to call OpenAI.instance.chat.create...');
       
-      final completion = await OpenAI.instance.chat.create(
-        model: _model,
-        messages: [
-          OpenAIChatCompletionChoiceMessageModel(
-            content: [
-              OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt),
-            ],
-            role: OpenAIChatMessageRole.user,
-          ),
-        ],
-        maxTokens: _maxTokens,
-        temperature: _temperature,
-      ).timeout(_timeout);
+      final useO3 = (modelOverride ?? _model).toLowerCase().startsWith('o3');
+      final completion = useO3
+          ? await OpenAI.instance.chat.create(
+              model: modelOverride ?? _model,
+              messages: [
+                OpenAIChatCompletionChoiceMessageModel(
+                  content: [
+                    OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt),
+                  ],
+                  role: OpenAIChatMessageRole.user,
+                ),
+              ],
+              // Do NOT pass maxTokens or temperature for o3 models (Responses API semantics)
+            ).timeout(timeoutOverride ?? _timeout)
+          : await OpenAI.instance.chat.create(
+              model: modelOverride ?? _model,
+              messages: [
+                OpenAIChatCompletionChoiceMessageModel(
+                  content: [
+                    OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt),
+                  ],
+                  role: OpenAIChatMessageRole.user,
+                ),
+              ],
+              maxTokens: maxTokensOverride ?? _maxTokens,
+              temperature: temperatureOverride ?? _temperature,
+            ).timeout(timeoutOverride ?? _timeout);
       
       AppLogger.info('[OPENAI_DEBUG] OpenAI API call completed successfully');
       AppLogger.info('[OPENAI_DEBUG] Response choices count: ${completion.choices.length}');

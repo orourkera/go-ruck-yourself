@@ -21,6 +21,7 @@ import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
@@ -208,6 +209,49 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
     // No animation needed anymore since we removed the gray overlay
     // This method is kept for compatibility but doesn't do anything
   }
+
+  // Lightweight telemetry for significant state changes to aid debugging
+  void _sendSessionStateTelemetry(ActiveSessionState state) {
+    try {
+      if (state is ActiveSessionRunning) {
+        AppErrorHandler.handleError(
+          'active_session_running_state',
+          'running update',
+          context: {
+            'session_id': state.sessionId,
+            'distance_km': state.distanceKm.toStringAsFixed(3),
+            'pace_s_per_km': state.pace?.toStringAsFixed(1) ?? 'n/a',
+            'calories': state.calories,
+            'elevation_gain_m': state.elevationGain,
+            'elevation_loss_m': state.elevationLoss,
+            'is_paused': state.isPaused,
+            'steps': state.steps ?? 0,
+            'points': state.locationPoints.length,
+          },
+          severity: ErrorSeverity.info,
+        );
+      } else if (state is ActiveSessionCompleted) {
+        AppErrorHandler.handleError(
+          'active_session_completed_state',
+          'completed update',
+          context: {
+            'session_id': state.sessionId,
+            'distance_km': state.finalDistanceKm,
+            'duration_s': state.finalDurationSeconds,
+            'calories': state.finalCalories,
+            'elevation_gain_m': state.elevationGain,
+            'elevation_loss_m': state.elevationLoss,
+            'steps': state.steps ?? 0,
+          },
+          severity: ErrorSeverity.info,
+        );
+      } else if (state is ActiveSessionInitial) {
+        AppLogger.debug('[UI_TELEMETRY] ActiveSessionInitial');
+      }
+    } catch (_) {
+      // Never let telemetry throw from UI
+    }
+  }
   
   // Helper method to get the appropriate color based on user gender
   Color _getLadyModeColor(BuildContext context) {
@@ -346,7 +390,25 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       (curr is ActiveSessionRunning && !sessionRunning) ||
                       (prev is! ActiveSessionInitial && curr is ActiveSessionInitial), // Handle transition back to initial (404 case)
                     listener: (context, state) {
+                      // Send comprehensive telemetry for all significant state changes
+                      _sendSessionStateTelemetry(state);
+                      
                       if (state is ActiveSessionFailure) {
+                        // Critical error telemetry
+                        final authState = context.read<AuthBloc>().state;
+                        final uid = authState is Authenticated ? authState.user.userId : null;
+                        AppErrorHandler.handleError(
+                          'active_session_failure',
+                          state.errorMessage,
+                          context: {
+                            'error_message': state.errorMessage,
+                            'session_id': widget.args.sessionId,
+                            'user_id': uid,
+                            'timestamp': DateTime.now().millisecondsSinceEpoch,
+                          },
+                          severity: ErrorSeverity.error,
+                        );
+                        
                         StyledSnackBar.showError(
                           context: context,
                           message: state.errorMessage,
@@ -356,6 +418,22 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         // If we transition back to Initial after UI was initialized, 
                         // it means we need to navigate away (e.g., 404 error case)
                         AppLogger.info('Session returned to Initial state, navigating to homepage');
+                        
+                        // Send 404/session lost telemetry
+                        final authState2 = context.read<AuthBloc>().state;
+                        final uid2 = authState2 is Authenticated ? authState2.user.userId : null;
+                        AppErrorHandler.handleError(
+                          'active_session_lost_404',
+                          'Session returned to initial state unexpectedly',
+                          context: {
+                            'session_id': widget.args.sessionId,
+                            'user_id': uid2,
+                            'ui_initialized': uiInitialized,
+                            'timestamp': DateTime.now().millisecondsSinceEpoch,
+                          },
+                          severity: ErrorSeverity.warning,
+                        );
+                        
                         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
                       } else if (state is SessionSummaryGenerated) {
                         final endTime = state.session.endTime ?? DateTime.now();

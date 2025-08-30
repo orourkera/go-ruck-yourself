@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
@@ -16,12 +17,15 @@ import 'package:intl/intl.dart';
 class AIInsightsService {
   final OpenAIService _openAIService;
   final ApiClient _apiClient;
+  final OpenAIResponsesService? _responsesService;
   
   AIInsightsService({
     required OpenAIService openAIService,
     required ApiClient apiClient,
+    OpenAIResponsesService? responsesService,
   }) : _openAIService = openAIService,
-       _apiClient = apiClient;
+       _apiClient = apiClient,
+       _responsesService = responsesService ?? getIt<OpenAIResponsesService>();
 
   /// Generate personalized homepage insights based on user data from the API
   Future<AIInsight> generateHomepageInsights({
@@ -112,6 +116,9 @@ class AIInsightsService {
       final aiResponse = await _openAIService.generateMessage(
         context: {'prompt': prompt},
         personality: 'motivational',
+        modelOverride: 'o3-mini', // Prefer richer reasoning for homepage insights
+        temperatureOverride: 1.2,
+        timeoutOverride: const Duration(seconds: 8),
       );
       AppLogger.info('[AI_INSIGHTS] Raw AI response: ${aiResponse != null ? aiResponse.substring(0, aiResponse.length > 200 ? 200 : aiResponse.length) : 'null'}');
       
@@ -124,6 +131,58 @@ class AIInsightsService {
         'username': username,
         'preferMetric': preferMetric,
       });
+    }
+  }
+
+  /// Stream homepage insights using the Responses API (o3 streaming).
+  /// onDelta receives incremental text; onFinal receives the parsed AIInsight.
+  Future<void> streamHomepageInsights({
+    required bool preferMetric,
+    required String username,
+    required void Function(String delta) onDelta,
+    required void Function(AIInsight insight) onFinal,
+    void Function(Object error)? onError,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final timeOfDay = _getTimeOfDay(now);
+      final dayOfWeek = DateFormat('EEEE').format(now);
+      var insights = await _fetchUserInsights();
+      if (insights.isEmpty) {
+        await Future.delayed(const Duration(milliseconds: 400));
+        insights = await _fetchUserInsights();
+      }
+      final context = _buildInsightContext(
+        userInsights: insights,
+        preferMetric: preferMetric,
+        timeOfDay: timeOfDay,
+        dayOfWeek: dayOfWeek,
+        username: username,
+      );
+      final prompt = _buildInsightPrompt(context, weatherAddon: '');
+      final sb = StringBuffer();
+      AppLogger.info('[AI_INSIGHTS] Streaming homepage insight (o3-mini)…');
+      await _responsesService!.stream(
+        model: 'o3-mini',
+        input: prompt,
+        // o3 does not accept temperature in Responses API; omitted inside service
+        maxOutputTokens: 220,
+        onDelta: (d) {
+          sb.write(d);
+          onDelta(d);
+        },
+        onComplete: (full) {
+          AppLogger.info('[AI_INSIGHTS] Stream complete; attempting to parse JSON. Snippet: ' +
+              (full.length > 200 ? full.substring(0, 200) : full));
+          final insight = _parseAIResponse(full, context);
+          onFinal(insight);
+        },
+        onError: (e) {
+          if (onError != null) onError(e);
+        },
+      );
+    } catch (e) {
+      if (onError != null) onError(e);
     }
   }
 
@@ -208,6 +267,9 @@ class AIInsightsService {
     final recency = Map<String, dynamic>.from(facts['recency'] ?? const {});
     final demographics = Map<String, dynamic>.from(facts['demographics'] ?? const {});
     final userBlock = Map<String, dynamic>.from(facts['user'] ?? const {});
+    final profile = Map<String, dynamic>.from(facts['profile'] ?? userBlock);
+    final integrations = Map<String, dynamic>.from(facts['integrations'] ?? const {});
+    final streak = Map<String, dynamic>.from(facts['streak'] ?? const {});
 
     final context = <String, dynamic>{
       'username': username,
@@ -226,6 +288,12 @@ class AIInsightsService {
       // Personalization helpers
       'allTimeSessions': (allTime['sessions'] as int?) ?? 0,
       'gender': (demographics['gender'] ?? userBlock['gender'])?.toString().toLowerCase(),
+      // Profile/integrations
+      'hasProfilePhoto': _coerceBool(profile['has_avatar']) ??
+          ((profile['avatar_url'] ?? userBlock['avatar_url'])?.toString().isNotEmpty == true),
+      'isStravaConnected': _coerceBool(integrations['strava_connected']) ??
+          _coerceBool(facts['strava_connected']) ?? false,
+      'streakDays': (streak['days'] as num?)?.toInt(),
     };
     
     // Add recent activity fields from facts.recency if available
@@ -233,6 +301,10 @@ class AIInsightsService {
     if (lastDist != null) context['lastRuckDistance'] = lastDist;
     final dsl = recency['days_since_last'];
     if (dsl != null) context['daysSinceLastRuck'] = (dsl is num) ? dsl.round() : int.tryParse('$dsl');
+
+    // Simple milestone helpers
+    final totalSessions = (allTime['sessions'] as num?)?.toInt() ?? 0;
+    context['sessionsTo100'] = (100 - totalSessions).clamp(0, 100);
 
 
     return context;
@@ -253,7 +325,8 @@ class AIInsightsService {
     }
 
     final firstSessionGuidance = isFirstSession
-        ? '- First-time guidance: This is their first session. Thank them for joining and encourage a simple start: "Try 5 minutes, even without weight, to earn your first achievement." Keep it approachable.'
+        ? '- First-time guidance: This is their first session. Thank them for joining and encourage a simple start: "Try 5 minutes, even without weight, to earn your first achievement." Keep it approachable.\n'
+          '- First-time primer: Append ONE factual sentence on what rucking is and why it helps (e.g., "Rucking = brisk walking with a backpack; burns ~2–3× walking calories and builds leg/core strength with low impact.")'
         : '';
 
     return '''
@@ -270,27 +343,42 @@ Context:
 ${context['daysSinceLastRuck'] != null ? '- Days since last ruck: ${context['daysSinceLastRuck']}' : ''}
 ${context['lastRuckDistance'] != null ? '- Last ruck distance: ${context['lastRuckDistance']} $distanceUnit' : ''}
 ${weatherAddon.isNotEmpty ? '- Weather: ' + weatherAddon : ''}
+ - Profile: ${context['hasProfilePhoto'] == true ? 'has photo' : 'no photo'}; Strava: ${context['isStravaConnected'] == true ? 'connected' : 'not connected'}
+ ${context['streakDays'] != null ? '- Streak days: ${context['streakDays']}' : ''}
+ - Sessions to 100: ${context['sessionsTo100']}
 
  Special Guidelines:
  $toneGuidance
  $firstSessionGuidance
- - If Weather is provided above, include one short weather observation in either the insight or recommendation (e.g., warmer/cooler, windier/calmer, clearer/rainier than last ruck).
+ - Personality: Fun, witty, encouraging. One short playful line allowed, avoid cringe.
+ - Weather: If provided, make it qualitative: compare to last ruck (warmer/cooler, windier/calmer), note likely rain window later today if relevant, or suggest a best 1–2 hour start window.
+ - User facts: Use at least one personal stat (streak, total sessions, milestone progress, best/longest if present) to ground the insight.
+ - Account nudges: At most ONE gentle nudge if applicable: if no profile photo, suggest adding one; if Strava not connected, suggest connecting. Keep it brief and optional; do not scold.
  - Use the user's preferred units ($distanceUnit).
- - Be concise and concrete. One short idea per field.
+ - Be concise and concrete. One distinct idea per field.
  - Do not mention BPM, medical advice, or anything not present in context.
 
 Generate a JSON response with:
 {
   "greeting": "Time-appropriate greeting with name",
-  "insight": "Data-driven observation about their patterns/progress",
-  "recommendation": "Specific, actionable suggestion for today",
-  "motivation": "Encouraging message about their progress",
+  "insight": "Qualitative, personal takeaway using recent trend and/or milestone",
+  "recommendation": "Specific action for today that accounts for weather timing; include one gentle account nudge only if applicable",
+  "motivation": "Encouraging line with personality/humor",
   "emoji": "Single relevant emoji"
 }
 
 Respond with ONLY the JSON object. Do not include any other text or formatting.
 Keep it concise, personal, and motivating. Use their preferred units.
 ''';
+  }
+
+  bool? _coerceBool(dynamic v) {
+    if (v == null) return null;
+    if (v is bool) return v;
+    final s = v.toString().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes') return true;
+    if (s == 'false' || s == '0' || s == 'no') return false;
+    return null;
   }
 
   String _buildWeatherDeltaSnippet(CurrentWeather current, CurrentWeather last, bool preferMetric) {

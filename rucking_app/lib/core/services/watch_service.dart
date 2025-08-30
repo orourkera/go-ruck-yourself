@@ -16,6 +16,7 @@ import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sampl
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/services/auth_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'rucking_api_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -76,6 +77,7 @@ class WatchService {
   // Steps watchdog
   Timer? _stepsWatchdogTimer;
   DateTime? _lastStepsUpdateTime;
+  int? _currentSteps;
 
   // Heart rate samples list
   List<HeartRateSample> _currentSessionHeartRateSamples = [];
@@ -114,7 +116,7 @@ class WatchService {
     // Heart rate handled via WatchConnectivity direct messages (watchHeartRateUpdate command)
     // No need for separate EventChannel - removed to eliminate dual stream conflict
 
-    // Setup steps event channel
+    // Setup steps event channel - this is the primary step data path
     _setupNativeStepsListener();
     // Start steps watchdog to ensure updates continue
     _startStepsWatchdog();
@@ -198,15 +200,11 @@ class WatchService {
             AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] ❌ INVALID heart rate from WatchConnectivity: $hr (type: ${hr.runtimeType})');
           }
         } else if (command == 'watchStepUpdate') {
+          // DISABLED: Steps now handled exclusively via EventChannel to prevent duplicate processing
+          // The iOS native code sends steps via StepCountStreamHandler EventChannel  
+          // This prevents race conditions and ensures single data flow path
           final steps = data['steps'];
-          AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🚶 RECEIVED watchStepUpdate command - raw data: $data');
-          if (steps is num) {
-            final stepValue = steps.toInt();
-            AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🚶 PROCESSING valid steps: $stepValue steps');
-            _handleWatchStepUpdate(stepValue);
-          } else {
-            AppLogger.error('[WATCH_SERVICE] [STEPS_DEBUG] ❌ INVALID step count from WatchConnectivity: $steps (type: ${steps.runtimeType})');
-          }
+          AppLogger.debug('[WATCH_SERVICE] watchStepUpdate received ($steps steps) but ignored - using EventChannel exclusively');
         } else if (command == 'stepsDebug') {
           AppLogger.info('[WATCH_SERVICE] [STEPS_DEBUG] 🧪 Steps debug snapshot from watch: $data');
         } else if (command == 'heartRateDebug') {
@@ -229,6 +227,9 @@ class WatchService {
           }
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
+        } else if (command == 'watchTelemetry') {
+          // Handle telemetry from Apple Watch and forward to Sentry
+          await _processTelemetryFromWatch(data);
         }
 
         return true;
@@ -436,7 +437,11 @@ class WatchService {
     AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Current heart rate before session start: $_currentHeartRate');
 
     try {
-      // Send comprehensive session start data to watch with workout start command
+      // Use the startWorkout method to properly launch watch app with auto-launch functionality
+      AppLogger.info('[WATCH_SERVICE] Using startWorkout method to launch watch app and start session...');
+      await _watchSessionChannel.invokeMethod('startWorkout');
+      
+      // After launching, send the detailed session data
       final message = {
         'command': 'workoutStarted', // Tell watch to start HealthKit workout session
         'isMetric': isMetric,
@@ -450,9 +455,10 @@ class WatchService {
         'requestInitialHeartRate': true, // Request initial heart rate reading
       };
       
-      AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Sending workout start with HR monitoring request');
+      AppLogger.error('[WATCH_SERVICE] [HR_DEBUG] 🔥 Sending detailed workout data after launch');
       
-      AppLogger.info('[WATCH_SERVICE] Sending workout start command to watch: $message');
+      // Send detailed data after a short delay to ensure watch app is launched
+      await Future.delayed(const Duration(milliseconds: 200));
       await _sendMessageToWatch(message);
       // Start watchdog to ensure we recover if HR updates stall
       _startHeartRateWatchdog();
@@ -1291,26 +1297,25 @@ class WatchService {
   }
 
   void _setupNativeStepsListener() {
-    // Cancel any existing steps subscription
-    try {
-      _nativeStepsSubscription?.cancel();
-    } catch (e) {
-      AppLogger.debug('[WATCH_SERVICE] Steps subscription cancellation (safe to ignore): $e');
-    }
+    // Cancel any existing subscription
+    _nativeStepsSubscription?.cancel();
     _nativeStepsSubscription = null;
 
     try {
-      AppLogger.debug('[WATCH_SERVICE] [STEPS] Setting up native steps EventChannel listener...');
+      AppLogger.info('[WATCH_SERVICE] [STEPS] Setting up native steps EventChannel listener (PRIMARY data path)...');
       _nativeStepsSubscription = _stepEventChannel
           .receiveBroadcastStream()
           .listen((dynamic event) {
         try {
           int? steps;
+          
+          // The iOS StepCountStreamHandler sends plain integers
           if (event is int) {
             steps = event;
           } else if (event is num) {
             steps = event.toInt();
           } else if (event is Map) {
+            // Fallback for potential future changes
             final map = event as Map;
             final dynamic value = map['steps'] ?? map['count'] ?? map['value'];
             if (value is int) {
@@ -1319,26 +1324,48 @@ class WatchService {
               steps = value.toInt();
             }
           } else {
-            AppLogger.debug('[WATCH_SERVICE] [STEPS] Unrecognized steps event payload: $event');
+            AppLogger.warning('[WATCH_SERVICE] [STEPS] Unexpected steps event type: ${event.runtimeType}, value: $event');
           }
 
           if (steps != null) {
-            _stepsController.add(steps);
-            _lastStepsUpdateTime = DateTime.now();
-            AppLogger.info('[WATCH_SERVICE] [STEPS] Steps update received: $steps');
+            // Validate step count is reasonable
+            if (steps >= 0 && steps <= 999999) {
+              _stepsController.add(steps);
+              _lastStepsUpdateTime = DateTime.now();
+              _currentSteps = steps;  // Cache the current step count
+              AppLogger.info('[WATCH_SERVICE] [STEPS] ✅ Step update received via EventChannel: $steps');
+            } else {
+              AppLogger.warning('[WATCH_SERVICE] [STEPS] Invalid step count received: $steps');
+            }
           } else {
-            AppLogger.debug('[WATCH_SERVICE] [STEPS] Null steps parsed from event: $event');
+            AppLogger.debug('[WATCH_SERVICE] [STEPS] Could not parse steps from event: $event');
           }
-        } catch (e) {
-          AppLogger.error('[WATCH_SERVICE] [STEPS] Error processing steps event: $e');
+        } catch (e, stack) {
+          AppLogger.error('[WATCH_SERVICE] [STEPS] Error processing steps event', exception: e, stackTrace: stack);
         }
       }, onError: (error) {
-        AppLogger.error('[WATCH_SERVICE] [STEPS] Steps channel error: $error');
+        AppLogger.error('[WATCH_SERVICE] [STEPS] Steps EventChannel error', exception: error);
+        // Attempt recovery after error
+        Future.delayed(const Duration(seconds: 5), () {
+          if (_isSessionActive) {
+            AppLogger.info('[WATCH_SERVICE] [STEPS] Attempting to recover steps listener after error...');
+            _setupNativeStepsListener();
+          }
+        });
       }, onDone: () {
-        AppLogger.warning('[WATCH_SERVICE] [STEPS] Steps channel closed');
-      });
-    } catch (e) {
-      AppLogger.error('[WATCH_SERVICE] Failed to set up steps listener: $e');
+        AppLogger.warning('[WATCH_SERVICE] [STEPS] Steps EventChannel closed');
+        // Attempt to restart if session is still active
+        if (_isSessionActive) {
+          Future.delayed(const Duration(seconds: 2), () {
+            AppLogger.info('[WATCH_SERVICE] [STEPS] Restarting steps listener after channel closure...');
+            _setupNativeStepsListener();
+          });
+        }
+      }, cancelOnError: false);
+      
+      AppLogger.info('[WATCH_SERVICE] [STEPS] ✅ Steps EventChannel listener active');
+    } catch (e, stack) {
+      AppLogger.error('[WATCH_SERVICE] Failed to set up steps listener', exception: e, stackTrace: stack);
     }
   }
 
@@ -1397,6 +1424,71 @@ class WatchService {
       AppLogger.debug('[WATCH_SERVICE] ensureHeartRateStreaming: startHeartRateMonitoring sent');
     } catch (e) {
       AppLogger.debug('[WATCH_SERVICE] ensureHeartRateStreaming failed to send HR start: $e');
+    }
+  }
+
+  /// Process telemetry data from Apple Watch and forward to Sentry
+  Future<void> _processTelemetryFromWatch(Map<String, dynamic> data) async {
+    try {
+      final event = data['event'] as String?;
+      if (event == null) {
+        AppLogger.warning('[WATCH_TELEMETRY] No event type in telemetry data');
+        return;
+      }
+
+      AppLogger.info('[WATCH_TELEMETRY] Processing event: $event with data: $data');
+      
+      // Create enriched context for Sentry
+      final enrichedContext = <String, dynamic>{
+        ...data,
+        'source': 'apple_watch',
+        'session_active': _isSessionActive,
+        'session_id': _currentSessionId,
+        'platform': 'watchOS',
+      };
+
+      // Determine severity based on event type
+      ErrorSeverity severity = ErrorSeverity.info;
+      if (event.contains('failed') || event.contains('error')) {
+        severity = ErrorSeverity.error;
+      } else if (event.contains('missing') || event.contains('no_')) {
+        severity = ErrorSeverity.warning;
+      }
+
+      // Send to Sentry via AppErrorHandler
+      await AppErrorHandler.handleError(
+        'watch_$event',
+        'Apple Watch telemetry: $event',
+        context: enrichedContext,
+        severity: severity,
+      );
+
+      // Log specific events for debugging
+      switch (event) {
+        case 'watch_auth_failed':
+        case 'watch_workout_start_failed':
+        case 'watch_heart_rate_handler_missing':
+        case 'watch_step_count_handler_missing':
+          AppLogger.error('[WATCH_TELEMETRY] Critical event: $event - $data');
+          break;
+        case 'watch_heart_rate_data_received':
+        case 'watch_step_count_data_received':
+          AppLogger.info('[WATCH_TELEMETRY] Data event: $event - BPM: ${data['heart_rate_bpm']}, Steps: ${data['step_count']}');
+          break;
+        default:
+          AppLogger.debug('[WATCH_TELEMETRY] Event processed: $event');
+      }
+
+    } catch (e) {
+      AppLogger.error('[WATCH_TELEMETRY] Failed to process telemetry: $e');
+      
+      // Send telemetry processing error to Sentry
+      await AppErrorHandler.handleError(
+        'watch_telemetry_processing_failed',
+        e,
+        context: {'original_data': data},
+        severity: ErrorSeverity.error,
+      );
     }
   }
 }
