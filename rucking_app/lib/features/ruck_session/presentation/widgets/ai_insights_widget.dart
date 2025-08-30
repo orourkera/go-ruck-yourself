@@ -164,6 +164,32 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
         },
       );
 
+      // Safety net: if streaming hasn't produced a final after 7s, do a non-streaming generation
+      // to avoid showing a generic fallback forever.
+      // ignore: unawaited_futures
+      Future.delayed(const Duration(seconds: 7), () async {
+        if (!mounted) return;
+        if (_currentInsight != null) return; // stream succeeded
+        try {
+          AppLogger.info('[AI_INSIGHTS_WIDGET] Stream timeout fallback – generating non-streaming insight');
+          final fallback = await aiService.generateHomepageInsights(
+            preferMetric: user.preferMetric,
+            timeOfDay: timeOfDay,
+            dayOfWeek: dayOfWeek,
+            username: user.username,
+          );
+          if (!mounted) return;
+          setState(() {
+            _currentInsight = fallback;
+            _isStreaming = false;
+            _isLoading = false;
+          });
+          await _saveCachedInsight(user.userId, fallback);
+        } catch (e) {
+          AppLogger.error('[AI_INSIGHTS_WIDGET] Fallback generation failed: $e');
+        }
+      });
+
     } catch (e) {
       AppLogger.error('[AI_INSIGHTS] Failed to generate insights: $e');
       if (mounted) {

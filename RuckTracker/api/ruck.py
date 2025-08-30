@@ -1138,13 +1138,13 @@ class RuckSessionCompleteResource(Resource):
                         min_hr = min(bpm_values)
                         max_hr = max(bpm_values)
                         hr_update_resp = supabase.table('ruck_session').update({
-                            'avg_heart_rate': round(avg_hr, 1),
+                            'avg_heart_rate': int(round(avg_hr)),  # FIX: Convert to int to match DB schema
                             'min_heart_rate': int(round(min_hr)),
                             'max_heart_rate': int(round(max_hr))
                         }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
                         logger.info(f"[HR_AGGREGATE] HR update response: {hr_update_resp.data}")
                         # Also reflect into completed_session for response
-                        completed_session['avg_heart_rate'] = round(avg_hr, 1)
+                        completed_session['avg_heart_rate'] = int(round(avg_hr))  # FIX: Convert to int 
                         completed_session['min_heart_rate'] = int(round(min_hr))
                         completed_session['max_heart_rate'] = int(round(max_hr))
                         logger.info(f"[HR_AGGREGATE] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr} from {len(bpm_values)} samples")
@@ -1251,12 +1251,12 @@ class RuckSessionCompleteResource(Resource):
                             min_hr = min(bpm_values)
                             max_hr = max(bpm_values)
                             supabase.table('ruck_session').update({
-                                'avg_heart_rate': round(avg_hr, 1),
+                                'avg_heart_rate': int(round(avg_hr)),  # FIX: Convert to int to match DB schema
                                 'min_heart_rate': int(round(min_hr)),
                                 'max_heart_rate': int(round(max_hr))
                             }).eq('id', ruck_id).eq('user_id', g.user.id).execute()
                             # Also reflect into completed_session for response
-                            completed_session['avg_heart_rate'] = round(avg_hr, 1)
+                            completed_session['avg_heart_rate'] = int(round(avg_hr))  # FIX: Convert to int
                             completed_session['min_heart_rate'] = int(round(min_hr))
                             completed_session['max_heart_rate'] = int(round(max_hr))
                             logger.info(f"[HR_DEBUG] Updated HR stats for session {ruck_id}: avg={avg_hr:.1f}, min={min_hr}, max={max_hr}")
