@@ -129,6 +129,26 @@ class CustomJSONEncoder(json.JSONEncoder):
 # Create Flask app
 app = Flask(__name__)
 
+# robots.txt for crawlers
+@app.route('/robots.txt')
+def robots_txt():
+    content = (
+        "User-agent: *\n"
+        "Disallow: /wp-admin/\n"
+        "Disallow: /wp-login.php\n"
+        "Disallow: /xmlrpc.php\n"
+        "Disallow: /.git/\n"
+        "Disallow: /.env\n"
+        "Disallow: /config/\n"
+        "Disallow: /backup/\n"
+        "Disallow: /vendor/\n"
+        "Disallow: /tmp/\n"
+        "Disallow: /var/\n"
+        "Allow: /blog/\n"
+        "Sitemap: https://getrucky.com/sitemap.xml\n"
+    )
+    return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
 # Bot blocking middleware - block bots before they hit routes
 @app.before_request
 def block_bots():
@@ -146,6 +166,15 @@ def block_bots():
         'postman', 'insomnia', 'axios', 'okhttp', 'apache-httpclient'
     ]
     
+    # Allowlisted well-known crawlers (UA substring match)
+    allowed_crawlers = [
+        'googlebot', 'bingbot', 'applebot', 'duckduckbot', 'amazonbot'
+    ]
+    # Public paths that crawlers may index
+    crawler_allowed_paths = [
+        '/', '/blog', '/blog/', '/static/', '/favicon.ico', '/robots.txt', '/sitemap.xml'
+    ]
+    
     # Malicious/bot URL patterns
     bot_url_patterns = [
         'wp-admin', 'wp-login', 'admin', 'phpmyadmin', 'xmlrpc.php',
@@ -158,7 +187,16 @@ def block_bots():
     if request_path in ['/robots.txt', '/sitemap.xml', '/favicon.ico']:
         return
     
-    # Block if user agent matches bot patterns
+    # Allow known crawlers on public paths
+    if any(ua in user_agent for ua in allowed_crawlers):
+        if any(
+            request_path == p or request_path.startswith(p.rstrip('/'))
+            for p in crawler_allowed_paths
+        ):
+            return  # allow crawl
+        # Otherwise fall through to normal bot handling
+    
+    # Block if user agent matches generic bot patterns (and not allowed above)
     if any(pattern in user_agent for pattern in bot_patterns):
         return '', 403  # Forbidden
     

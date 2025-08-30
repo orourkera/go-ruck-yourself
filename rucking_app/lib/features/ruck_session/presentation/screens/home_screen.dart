@@ -1112,7 +1112,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                     ),
                   ),
                   // Reduce vertical gap above AI insights
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
 
                   // AI Insights Widget (behind feature flag)
                   Builder(
@@ -1130,7 +1130,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                         return Column(
                           children: const [
                             // Tight top gap before AI card
-                            SizedBox(height: 8),
+                            SizedBox(height: 4),
                             AIInsightsWidget(),
                             // Reduce space after AI card
                             SizedBox(height: 8),
