@@ -87,10 +87,7 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
   }
 
   Future<void> _generateInsights({bool force = false}) async {
-    // Skip if current insight is fresh
-    if (!force && _currentInsight != null && !_currentInsight!.isStale) {
-      return;
-    }
+    // Do not early-return on fresh insight; we still stream a refresh in the background
 
     setState(() {
       _isLoading = true;

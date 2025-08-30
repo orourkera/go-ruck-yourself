@@ -237,14 +237,19 @@ class SessionLifecycleManager implements SessionManager {
   Future<void> _onSessionStopRequested(manager_events.SessionStopRequested event) async {
     try {
       AppLogger.info('[LIFECYCLE] Stopping ruck session - sessionId: $_activeSessionId');
-      AppLogger.info('[LIFECYCLE] Current state before stop: isActive=${_currentState.isActive}, sessionId=${_currentState.sessionId}');
+      AppLogger.info('[LIFECYCLE] Current state before stop: isActive=${_currentState.isActive}, sessionId=${_currentState.sessionId}, pausedAt=${_currentState.pausedAt}');
       
       // CRITICAL: Cancel timers FIRST to prevent race condition with _onTick
       _ticker?.cancel();
       _ticker = null;
       AppLogger.info('[LIFECYCLE] Timer cancelled to prevent duration override');
       
-      _updateState(_currentState.copyWith(isSaving: true));
+      // CRITICAL FIX: Clear pausedAt to prevent showing paused state during completion
+      // This ensures the coordinator doesn't emit a paused state while transitioning to completed
+      _updateState(_currentState.copyWith(
+        isSaving: true,
+        pausedAt: null,  // Clear paused state immediately when stopping
+      ));
       
       // Stop watch session
       await _watchService.endSessionOnWatch();

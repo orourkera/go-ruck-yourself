@@ -165,9 +165,9 @@ class CheckSessionAchievementsResource(Resource):
     
     def post(self, session_id):
         try:
-            logger.error(f"🎯 ACHIEVEMENT CHECK CALLED FOR SESSION {session_id}")
-            logger.error(f"🎯 Request headers: {dict(request.headers)}")
-            logger.error(f"🎯 User context - user_id: {getattr(g, 'user_id', 'None')}, access_token: {'Present' if getattr(g, 'access_token', None) else 'None'}")
+            logger.info(f"🎯 ACHIEVEMENT CHECK CALLED FOR SESSION {session_id}")
+            logger.debug(f"🎯 Request headers: {dict(request.headers)}")
+            logger.debug(f"🎯 User context - user_id: {getattr(g, 'user_id', 'None')}, access_token: {'Present' if getattr(g, 'access_token', None) else 'None'}")
             
             # Get the user's JWT token from the request context
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
@@ -176,21 +176,21 @@ class CheckSessionAchievementsResource(Resource):
             session_response = supabase.table('ruck_session').select('*').eq('id', session_id).single().execute()
             
             if not session_response.data:
-                logger.error(f"🎯 SESSION {session_id} NOT FOUND IN DATABASE")
+                logger.warning(f"🎯 SESSION {session_id} NOT FOUND IN DATABASE")
                 return {'error': 'Session not found'}, 404
                 
             session = session_response.data
             user_id = session['user_id']
             
-            logger.error(f"🎯 FOUND SESSION {session_id} FOR USER {user_id}")
-            logger.error(f"🎯 Session key data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s, status={session.get('status')}, weight={session.get('ruck_weight_kg')}kg")
+            logger.info(f"🎯 FOUND SESSION {session_id} FOR USER {user_id}")
+            logger.info(f"🎯 Session key data: distance={session.get('distance_km')}km, duration={session.get('duration_seconds')}s, status={session.get('status')}, weight={session.get('ruck_weight_kg')}kg")
             
             # Global min requirements
             validation_result = self._validateSessionForAchievements(session)
-            logger.error(f"🎯 Session validation result: {validation_result}")
+            logger.info(f"🎯 Session validation result: {validation_result}")
             
             if not validation_result:
-                logger.error(f"🎯 SESSION FAILED VALIDATION - RETURNING NO ACHIEVEMENTS")
+                logger.info(f"🎯 SESSION FAILED VALIDATION - RETURNING NO ACHIEVEMENTS")
                 return {
                     'status': 'success', 
                     'new_achievements': [],
@@ -317,11 +317,11 @@ class CheckSessionAchievementsResource(Resource):
                         session_id=session_id
                     )
             
-            logger.error(f"🎯 ACHIEVEMENT CHECK COMPLETE - FOUND {len(new_achievements)} NEW ACHIEVEMENTS")
+            logger.info(f"🎯 ACHIEVEMENT CHECK COMPLETE - FOUND {len(new_achievements)} NEW ACHIEVEMENTS")
             if new_achievements:
-                logger.error(f"🎯 NEW ACHIEVEMENTS AWARDED: {[a['name'] for a in new_achievements]}")
+                logger.info(f"🎯 NEW ACHIEVEMENTS AWARDED: {[a['name'] for a in new_achievements]}")
             else:
-                logger.error(f"🎯 NO NEW ACHIEVEMENTS FOUND - USER ALREADY HAS {len(existing_achievement_ids)} ACHIEVEMENTS")
+                logger.info(f"🎯 NO NEW ACHIEVEMENTS FOUND - USER ALREADY HAS {len(existing_achievement_ids)} ACHIEVEMENTS")
         
             return {
                 'status': 'success',

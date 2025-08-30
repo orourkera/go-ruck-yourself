@@ -892,11 +892,18 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
   ) async {
     AppLogger.error('[COORDINATOR] ===== SESSION COMPLETION STARTED =====');
     AppLogger.info('[COORDINATOR] Session completion started');
+    
+    // Log current paused state to debug watch completion
+    if (_currentAggregatedState is ActiveSessionRunning) {
+      final runningState = _currentAggregatedState as ActiveSessionRunning;
+      AppLogger.info('[COORDINATOR] Session was ${runningState.isPaused ? "PAUSED" : "RUNNING"} when completion triggered');
+    }
+    
     // Stop steps
     try { _stepsSub?.cancel(); } catch (_) {}
     try { _healthService.stopLiveSteps(); } catch (_) {}
     AppLogger.info('[COORDINATOR] Current aggregated state: ${_currentAggregatedState.runtimeType}');
-    AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
+    AppLogger.info('[COORDINATOR] Lifecycle state before: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}, pausedAt=${_lifecycleManager.currentState.pausedAt}');
     
     // Steps computation: Start asynchronously, don't block completion
     if (_currentSteps == null) {
@@ -914,9 +921,17 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       AppLogger.info('[COORDINATOR] Lifecycle state after: isActive=${_lifecycleManager.currentState.isActive}, sessionId=${_lifecycleManager.currentState.sessionId}');
       
       // Aggregate and emit the completed state
-      AppLogger.info('[COORDINATOR] Aggregating state');
+      AppLogger.info('[COORDINATOR] Aggregating state after stop request');
       _aggregateAndEmitState();
       AppLogger.info('[COORDINATOR] New aggregated state: ${_currentAggregatedState.runtimeType}');
+      
+      // Debug: Check if we're showing paused state incorrectly
+      if (_currentAggregatedState is ActiveSessionRunning) {
+        final runningState = _currentAggregatedState as ActiveSessionRunning;
+        if (runningState.isPaused) {
+          AppLogger.warning('[COORDINATOR] WARNING: Still showing paused state after stop request!');
+        }
+      }
       
       AppLogger.info('[COORDINATOR] Checking if current state is ActiveSessionCompleted: ${_currentAggregatedState is ActiveSessionCompleted}');
       if (_currentAggregatedState is ActiveSessionCompleted) {

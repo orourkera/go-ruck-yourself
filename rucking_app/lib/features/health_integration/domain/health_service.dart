@@ -704,7 +704,7 @@ class HealthService {
       final sessionDuration = now.difference(sessionStart);
       AppLogger.debug('[STEPS LIVE] Immediate poll - session duration: ${sessionDuration.inSeconds}s');
       
-      if (sessionDuration.inMinutes < 1) {
+      if (sessionDuration.inSeconds < 10) {
         // Too early - HealthKit likely hasn't recorded any intervals yet
         AppLogger.info('[STEPS LIVE] Session too new (${sessionDuration.inSeconds}s), emitting 0 steps');
         if (_stepsController != null && !_stepsController!.isClosed) {
@@ -726,10 +726,10 @@ class HealthService {
       final sessionDuration = now.difference(sessionStart);
       AppLogger.debug('[STEPS LIVE] Polling steps - session duration: ${sessionDuration.inMinutes}min');
       
-      // Only query HealthKit after session has been running for at least 1 minute
-      // This gives HealthKit time to record step intervals
-      if (sessionDuration.inMinutes < 1) {
-        AppLogger.info('[STEPS LIVE] Session too new (${sessionDuration.inSeconds}s), emitting 0 steps');
+      // Reduce delay to 10 seconds for testing (was 1 minute)
+      // HealthKit might not have data immediately but 10s should be enough for testing
+      if (sessionDuration.inSeconds < 10) {
+        AppLogger.info('[STEPS LIVE] Session too new (${sessionDuration.inSeconds}s), waiting for HealthKit data...');
         if (_stepsController != null && !_stepsController!.isClosed) {
           _stepsController!.add(0);
         }
