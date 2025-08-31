@@ -173,7 +173,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   bool _navigatedToComplete = false;
   // Local guard to indicate we are finishing and navigating to the complete screen.
   // Used to suppress any transient paused UI during the finish transition.
-  bool _finishing = false;
   // HUD removed
 
   Future<void> _navigateToSessionCompleteWithAi(ActiveSessionCompleted initial) async {
@@ -334,7 +333,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                 // Mark finishing to suppress transient paused UI until navigation completes
                 if (mounted) {
                   setState(() {
-                    _finishing = true;
                   });
                 }
                 context.read<ActiveSessionBloc>().add(const SessionCompleted());
@@ -371,7 +369,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       // If both are ActiveSessionRunning, check for specific significant changes
                       if (previous is ActiveSessionRunning && current is ActiveSessionRunning) {
                         // While finishing, ignore isPaused toggles to avoid transient pause UI rebuilds
-                        return (!_finishing && previous.isPaused != current.isPaused) ||
+                        return (previous.isPaused != current.isPaused) ||
                             !listEquals(previous.locationPoints, current.locationPoints) || // More robust list comparison
                             previous.distanceKm != current.distanceKm ||
                             previous.pace != current.pace ||
@@ -386,7 +384,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                     },
                     listenWhen: (prev, curr) => 
                       (prev is ActiveSessionFailure != curr is ActiveSessionFailure) || 
-                      (curr is SessionSummaryGenerated) ||
                       (curr is ActiveSessionRunning && !sessionRunning) ||
                       (prev is! ActiveSessionInitial && curr is ActiveSessionInitial), // Handle transition back to initial (404 case)
                     listener: (context, state) {
@@ -435,55 +432,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                         );
                         
                         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-                      } else if (state is SessionSummaryGenerated) {
-                        final endTime = state.session.endTime ?? DateTime.now();
-                        final ruckId = state.session.id ?? '';
-                        final duration = state.session.duration ?? Duration.zero;
-                        final distance = state.session.distance ?? 0.0;
-                        final caloriesBurned = state.session.caloriesBurned ?? 0;
-                        final elevationGain = state.session.elevationGain ?? 0.0;
-                        final elevationLoss = state.session.elevationLoss ?? 0.0;
-                        final ruckWeightKg = state.session.ruckWeightKg ?? 0.0;
-                        final notes = state.session.notes;
-                        final heartRateSamples = state.session.heartRateSamples;
-                        final splits = state.session.splits;
-                        
-                        // Debug logging for splits
-                        print('[DEBUG] Splits data being passed to session complete:');
-                        print('[DEBUG] Splits type: ${splits.runtimeType}');
-                        print('[DEBUG] Splits length: ${splits?.length ?? 'null'}');
-                        if (splits != null && splits.isNotEmpty) {
-                          print('[DEBUG] First split: ${splits.first}');
-                          for (int i = 0; i < splits.length; i++) {
-                            print('[DEBUG] Split $i: ${splits[i]}');
-                          }
-                        } else {
-                          print('[DEBUG] No splits data available');
-                        }
-                        
-                        // Get terrain segments from the previous running state if available
-                        List<TerrainSegment> terrainSegments = [];
-                        if (sessionRunning && _lastActiveSessionRunning != null) {
-                          terrainSegments = _lastActiveSessionRunning!.terrainSegments;
-                        }
-
-                        Navigator.of(context).pushReplacementNamed(
-                          '/session_complete',
-                          arguments: {
-                            'completedAt': endTime,
-                            'ruckId': ruckId,
-                            'duration': duration,
-                            'distance': distance,
-                            'caloriesBurned': caloriesBurned,
-                            'elevationGain': elevationGain,
-                            'elevationLoss': elevationLoss,
-                            'ruckWeight': ruckWeightKg, // Changed back to ruckWeight
-                            'initialNotes': notes,
-                            'heartRateSamples': heartRateSamples,
-                            'splits': splits,
-                            'terrainSegments': terrainSegments,
-                          },
-                        );
                       } else if (state is ActiveSessionRunning && !sessionRunning) {
                         setState(() {
                           sessionRunning = true;
@@ -723,7 +671,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                       right: 12,
                                       child: _WeightChip(weightKg: state.ruckWeightKg),
                                     ),
-                                    if (state.isPaused && !_finishing)
+                                    if (state.isPaused)
                                       const Positioned.fill(child: IgnorePointer(
                                         ignoring: true, // Let touch events pass through
                                         child: _PauseOverlay(),
@@ -837,20 +785,16 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                                     if (prev.runtimeType != curr.runtimeType) return true;
                                     if (prev is ActiveSessionRunning && curr is ActiveSessionRunning) {
                                       // While finishing, ignore isPaused changes to prevent pause icon flip
-                                      return !_finishing && (prev.isPaused != curr.isPaused);
+                                      return prev.isPaused != curr.isPaused;
                                     }
                                     return false;
                                   },
                                   builder: (context, state) {
                                     bool isPaused = state is ActiveSessionRunning ? state.isPaused : false;
-                                    if (_finishing) {
-                                      isPaused = false; // suppress paused visual state while finishing
-                                    }
                                     return SessionControls(
                                       isPaused: isPaused,
                                       onTogglePause: () {
                                         if (state is! ActiveSessionRunning) return; // Ignore if not running
-                                        if (_finishing) return; // Ignore toggles while finishing
                                         if (isPaused) {
                                           context.read<ActiveSessionBloc>().add(const SessionResumed(source: SessionActionSource.ui));
                                         } else {
@@ -969,20 +913,6 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                               CircularProgressIndicator(),
                               SizedBox(height: 16),
                               Text('Loading session summary...')
-                            ],
-                          ),
-                        );
-                      }
-                      
-                      if (state is SessionSummaryGenerated) {
-                        // Show loading while navigating to session complete screen
-                        return const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(),
-                              SizedBox(height: 16),
-                              Text('Completing session...'),
                             ],
                           ),
                         );

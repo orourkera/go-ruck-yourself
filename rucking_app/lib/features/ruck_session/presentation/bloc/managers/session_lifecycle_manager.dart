@@ -171,6 +171,9 @@ class SessionLifecycleManager implements SessionManager {
       _activeSessionId = finalSessionId;
       _sessionStartTime = DateTime.now();
       
+      // CRITICAL: Set session ID in watch service BEFORE starting watch session
+      _watchService.setCurrentSessionId(finalSessionId);
+      
       // Get user metric preference
       final preferMetric = await _getUserMetricPreference();
 
@@ -194,9 +197,6 @@ class SessionLifecycleManager implements SessionManager {
         AppLogger.error('[LIFECYCLE] Session ID: $finalSessionId, SessionStartTime: $_sessionStartTime');
         rethrow;
       }
-
-      // Set session ID in watch service for proper sync
-      _watchService.setCurrentSessionId(finalSessionId);
       
       AppLogger.info('[LIFECYCLE] Starting watch session with weight: ${event.ruckWeightKg ?? 0.0}kg');
       await _watchService.startSessionOnWatch(event.ruckWeightKg ?? 0.0, isMetric: preferMetric);

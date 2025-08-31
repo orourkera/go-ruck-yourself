@@ -2285,9 +2285,7 @@ class RuckSessionRouteChunkResource(Resource):
                     'latitude': lat,
                     'longitude': lng,
                     # TODO: Remove elevation_meters fallback once Flutter app is updated
-                    'altitude': point.get('altitude') or point.get('elevation_meters'),
-                    'speed': point.get('speed'),
-                    'heading': point.get('heading')
+                    'altitude': point.get('altitude') or point.get('elevation_meters')
                 })
             
             if not location_rows:

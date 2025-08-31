@@ -188,6 +188,13 @@ class HeartRateService {
           return;
         }
         
+        // CRITICAL: Stop HealthKit subscription when watch readings are active
+        if (_healthHeartRateSubscription != null) {
+          _healthHeartRateSubscription!.cancel();
+          _healthHeartRateSubscription = null;
+          AppLogger.error('HeartRateService: [HR_DEBUG] 🛑 DISABLED HealthKit subscription - using watch readings only');
+        }
+        
         final sample = HeartRateSample(
           timestamp: DateTime.now(),
           bpm: heartRate.toInt(),
