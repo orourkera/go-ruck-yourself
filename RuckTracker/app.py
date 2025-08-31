@@ -425,6 +425,10 @@ app.register_blueprint(cache_monitor_bp)
 from RuckTracker.api.users import users_bp
 app.register_blueprint(users_bp, url_prefix='/api/users')
 
+# Import and register coaching plans blueprint
+from RuckTracker.api.coaching_plans import coaching_plans_bp
+app.register_blueprint(coaching_plans_bp, url_prefix='/api')
+
 # Register blog blueprint (public web routes)
 app.register_blueprint(blog_bp)
 

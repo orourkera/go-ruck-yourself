@@ -12,6 +12,7 @@ import 'package:rucking_app/features/achievements/presentation/bloc/achievement_
 import 'package:rucking_app/features/achievements/data/models/achievement_model.dart';
 import 'package:rucking_app/features/achievements/presentation/widgets/achievement_progress_card.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/coaching/presentation/screens/plan_creation_screen.dart';
 
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
 class AchievementsHubScreen extends StatefulWidget {
@@ -238,16 +239,24 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Create Custom Goal'),
+              icon: const Icon(Icons.psychology),
+              label: const Text('Start AI Coaching Plan'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 textStyle: AppTextStyles.titleSmall,
               ),
-              onPressed: () {
-                Navigator.of(context).pushNamed('/goals');
+              onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const PlanCreationScreen(),
+                  ),
+                );
+                if (result == true && mounted) {
+                  // Refresh achievements data after plan creation
+                  _loadAchievementData();
+                }
               },
             ),
           ),

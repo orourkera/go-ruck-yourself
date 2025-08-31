@@ -63,41 +63,46 @@ class TermsOfServiceScreen extends StatelessWidget {
             ),
              _buildSection(
               '5. Location & Health Data',
-              'The App uses GPS data (with your permission) and personal metrics (such as height, weight, and age) to calculate calories burned and track ruck sessions. If you enable Health integration, the App will also access your heart rate data to provide real-time feedback, more accurate calorie estimation, and post-session analytics (average, max, min heart rate).\n\nHeart rate data is stored locally on your device and is never sold or used for advertising. It is not shared with third parties unless you enable cloud sync or backup. All health data access is subject to your explicit consent and can be revoked at any time in your device settings.\n\nThe App is not a medical tool and does not provide medical advice. Always consult a qualified healthcare provider before starting any new fitness routine.',
-              context,
-            ),
-             _buildSection(
-              '6. Intellectual Property',
-              'All content, branding, and functionality in the App is the property of Get Rucky, Inc or its licensors. You may not copy, reproduce, or distribute any part of the App without prior written permission.',
-              context,
-            ),
-             _buildSection(
-              '7. Termination',
-              'We reserve the right to suspend or terminate your account at any time if you violate these Terms or engage in abusive or unlawful behavior.\n\nYou may delete your account at any time through the App or by contacting us at rory@getrucky.com.',
-              context,
-            ),
-             _buildSection(
-              '8. Disclaimers',
-              'The App is provided "as is" without warranties of any kind.\nWe do not guarantee the accuracy of fitness calculations or uninterrupted access to the App.\nUse of the App is at your own risk.',
-              context,
-            ),
-             _buildSection(
-              '9. Limitation of Liability',
-              'To the fullest extent permitted by law, Get Rucky, Inc is not liable for:\n\nAny injuries or health issues resulting from your rucking activity\nLoss or corruption of data\nIndirect, incidental, or consequential damages',
+              'The App uses GPS data (with your permission) and personal metrics (such as height, weight, and age) to calculate calories burned and track ruck sessions. If you enable Health integration, the App will also access your heart rate data to provide real-time feedback, more accurate calorie estimation, and post-session analytics (average, max, min heart rate).\n\nHeart rate data is stored locally on your device and is never sold or used for advertising. It is not shared with third parties unless you enable cloud sync or backup. All health data access is subject to your explicit consent and can be revoked at any time in your device settings.\n\nThe App and any related blog content are for informational and recreational use only. The App is not a medical device and does not provide medical, clinical, or professional advice. Do not use the App or blog content to diagnose, treat, or prevent any condition. Always consult a qualified healthcare provider before beginning or changing any fitness program. You understand and agree that you use the App at your own risk and you assume all risks of injury that may arise from rucking or fitness activities.',
               context,
             ),
             _buildSection(
-              '10. Modifications to Terms',
+              '6. AI Cheerleader & Encouragement Features',
+              'Some features (e.g., AI Cheerleader) may provide motivational prompts, insights, or perceived coaching. These features rely on third-party AI services and internet connectivity and may be unavailable at times. AI-generated content is for motivational purposes only and does not constitute medical, fitness, or professional advice. Do not rely on AI-generated content for diagnosis, treatment, safety, or emergency decisions. Any prompts, encouragement, insights, or perceived coaching are not a substitute for professional judgment or consultation with a qualified healthcare provider.',
+              context,
+            ),
+            _buildSection(
+              '7. Intellectual Property',
+              'All content, branding, and functionality in the App is the property of Get Rucky, Inc or its licensors. You may not copy, reproduce, or distribute any part of the App without prior written permission.',
+              context,
+            ),
+            _buildSection(
+              '8. Termination',
+              'We reserve the right to suspend or terminate your account at any time if you violate these Terms or engage in abusive or unlawful behavior.\n\nYou may delete your account at any time through the App or by contacting us at rory@getrucky.com.',
+              context,
+            ),
+            _buildSection(
+              '9. Disclaimers',
+              'The App and related blog content are provided "as is" without warranties of any kind. We do not guarantee the accuracy of fitness calculations, insights, or uninterrupted access to the App. The App is for informational and recreational use only and is not a medical device. Use of the App is at your own risk.',
+              context,
+            ),
+            _buildSection(
+              '10. Limitation of Liability',
+              'To the fullest extent permitted by law, Get Rucky, Inc is not liable for:\n\nAny injuries or health issues resulting from your rucking activity\nLoss or corruption of data\nIndirect, incidental, or consequential damages\n\nThis limitation applies to all features, including any prompts, encouragement, insights, or perceived coaching (e.g., AI Cheerleader).',
+              context,
+            ),
+            _buildSection(
+              '11. Modifications to Terms',
               'We may update these Terms occasionally. We\'ll notify you of any material changes, and your continued use of the App after such changes constitutes your acceptance of the updated Terms.',
               context,
             ),
             _buildSection(
-              '11. Governing Law',
+              '12. Governing Law',
               'These Terms are governed by and interpreted under the laws of the State of Colorado, without regard to conflict of law principles.',
               context,
             ),
             _buildSection(
-              '12. Contact Us',
+              '13. Contact Us',
               'If you have any questions about these Terms, contact us at:\nEmail: rory@getrucky.com',
               context,
             ),
