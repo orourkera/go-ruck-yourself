@@ -47,6 +47,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   bool _isGeneratingPreview = false;
   CoachingPlanType? _selectedPlanType;
   CoachingPersonality? _selectedPersonality;
+  CoachingPersonality? _hoveredPersonality;
   PlanPersonalization? _personalization;
   String _generatedSummary = '';
   
@@ -322,7 +323,7 @@ User Details:
 - Training Days: ${_personalization!.trainingDaysPerWeek} days per week
 - Preferred Days: ${_personalization!.preferredDays?.join(', ')}
 - Challenges: ${_personalization!.challenges?.join(', ')}
-- Minimum Session: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}
+- Minimum Session: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}${_getStreakTargetDescription()}
 
 Generate a comprehensive plan brief that includes:
 
@@ -336,7 +337,7 @@ Generate a comprehensive plan brief that includes:
 
 5. WHAT TO EXPECT: Timeline of what they'll feel each phase of the ${_selectedPlanType!.duration} plan.
 
-6. MINIMUM DAYS: How their ${_personalization!.minimumSessionMinutes}-minute minimum sessions${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''} fit into the plan for busy days.
+6. MINIMUM DAYS: How their ${_personalization!.minimumSessionMinutes}-minute minimum sessions${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''} fit into the plan for busy days.${_getStreakTargetInstruction()}
 
 Write in plain text with clear headings - no asterisks, no markdown formatting. Be specific about actual training sessions they'll do. Address their personal challenges directly. Keep it around 400-500 words, detailed and actionable.
 ''';
@@ -469,7 +470,9 @@ Keep it under 200 words, motivational, and specific to their answers.
         personalization: _personalization!,
       );
       
-      AppLogger.info('Successfully created coaching plan: ${planData['coaching_plan']['id']}');
+      // The planData is now the response data directly from success_response
+      final coachingPlan = planData['coaching_plan'];
+      AppLogger.info('Successfully created coaching plan: ${coachingPlan['id']}');
       
       if (mounted) {
         setState(() {
@@ -804,6 +807,7 @@ Keep it under 200 words, motivational, and specific to their answers.
   Widget _buildPersonalizationStep() {
     return PersonalizationQuestions(
       onPersonalizationComplete: _onPersonalizationComplete,
+      planType: _selectedPlanType,
     );
   }
 
@@ -986,203 +990,219 @@ Keep it under 200 words, motivational, and specific to their answers.
       return const SizedBox.shrink();
     }
     
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Ready to Start?',
-            style: AppTextStyles.headlineMedium.copyWith(
-              fontWeight: FontWeight.bold,
+          // AI Coach avatar with personality
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [_selectedPersonality!.color, _selectedPersonality!.color.withOpacity(0.7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _selectedPersonality!.color.withOpacity(0.3),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(
+              _selectedPersonality!.icon,
+              size: 40,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Here\'s your personalized plan summary:',
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: Colors.grey[600],
-            ),
-          ),
+          
           const SizedBox(height: 24),
           
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Plan Type Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              _selectedPlanType!.emoji,
-                              style: const TextStyle(fontSize: 32),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _selectedPlanType!.name,
-                                    style: AppTextStyles.titleLarge.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    _selectedPlanType!.duration,
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: _selectedPersonality!.color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _selectedPersonality!.icon,
-                                color: _selectedPersonality!.color,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${_selectedPersonality!.name} Coaching Style',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: _selectedPersonality!.color,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Personalization Summary Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.person,
-                              color: AppColors.primary,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Your Personalization',
-                              style: AppTextStyles.titleMedium.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        if (_personalization!.why != null)
-                          _buildPersonalizationItem(
-                            'Your Why',
-                            _personalization!.why!,
-                          ),
-                        
-                        if (_personalization!.successDefinition != null)
-                          _buildPersonalizationItem(
-                            'Success Definition',
-                            _personalization!.successDefinition!,
-                          ),
-                        
-                        if (_personalization!.trainingDaysPerWeek != null)
-                          _buildPersonalizationItem(
-                            'Training Days',
-                            '${_personalization!.trainingDaysPerWeek} days per week',
-                          ),
-                        
-                        if (_personalization!.preferredDays != null && _personalization!.preferredDays!.isNotEmpty)
-                          _buildPersonalizationItem(
-                            'Preferred Days',
-                            _personalization!.preferredDays!.join(', '),
-                          ),
-                        
-                        if (_personalization!.challenges != null && _personalization!.challenges!.isNotEmpty)
-                          _buildPersonalizationItem(
-                            'Key Challenges',
-                            _personalization!.challenges!.join(', '),
-                          ),
-                        
-                        if (_personalization!.minimumSessionMinutes != null)
-                          _buildPersonalizationItem(
-                            'Minimum Session',
-                            '${_personalization!.minimumSessionMinutes} minutes${_personalization!.unloadedOk == true ? " (unloaded OK)" : ""}',
-                          ),
-                      ],
-                    ),
-                  ),
+          // Conversational greeting based on personality
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  _selectedPersonality!.color.withOpacity(0.1),
+                  _selectedPersonality!.color.withOpacity(0.05),
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _selectedPersonality!.color.withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getPersonalizedGreeting(),
+                  style: AppTextStyles.headlineMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: _selectedPersonality!.color,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _getPersonalizedEncouragement(),
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    height: 1.5,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 32),
           
+          // Plan overview in conversational style
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Plan header
+                Row(
+                  children: [
+                    Text(
+                      _selectedPlanType!.emoji,
+                      style: const TextStyle(fontSize: 32),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedPlanType!.name,
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: _selectedPersonality!.color,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _selectedPersonality!.color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _selectedPlanType!.duration,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: _selectedPersonality!.color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Conversational plan details
+                Text(
+                  _getPersonalizedPlanSummary(),
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    height: 1.6,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Key details in a more conversational format
+                _buildConversationalDetails(),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // Motivational call to action
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  _selectedPersonality!.color.withOpacity(0.15),
+                  _selectedPersonality!.color.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _selectedPersonality!.color.withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.rocket_launch,
+                  size: 48,
+                  color: _selectedPersonality!.color,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _getPersonalizedCallToAction(),
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: _selectedPersonality!.color,
+                    height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // Action button with personality-based text
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _onCommitToPlan,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: _selectedPersonality!.color,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                elevation: 4,
+                shadowColor: _selectedPersonality!.color.withOpacity(0.3),
               ),
               child: Text(
-                'Yes, coach me through this plan!',
-                style: AppTextStyles.titleMedium,
+                _getPersonalizedButtonText(),
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -1384,5 +1404,239 @@ Keep it under 200 words, motivational, and specific to their answers.
         ],
       ),
     );
+  }
+
+  String _getStreakTargetDescription() {
+    if (_personalization!.streakTargetDays != null) {
+      return '\n- Streak Target: ${_personalization!.streakTargetDays} days in a row';
+    } else if (_personalization!.streakTargetRucks != null && _personalization!.streakTimeframeDays != null) {
+      return '\n- Streak Target: ${_personalization!.streakTargetRucks} rucks in ${_personalization!.streakTimeframeDays} days';
+    }
+    return '';
+  }
+
+  String _getStreakTargetInstruction() {
+    if (_personalization!.streakTargetDays != null) {
+      return '\n\n7. STREAK TARGET: How to build toward their ${_personalization!.streakTargetDays}-day consecutive streak goal with strategies for streak protection and recovery.';
+    } else if (_personalization!.streakTargetRucks != null && _personalization!.streakTimeframeDays != null) {
+      return '\n\n7. STREAK TARGET: How to achieve ${_personalization!.streakTargetRucks} rucks in ${_personalization!.streakTimeframeDays} days with flexible scheduling and recovery strategies.';
+    }
+    return '';
+  }
+
+  String _getPersonalizedGreeting() {
+    final personality = _selectedPersonality!;
+    final planName = _selectedPlanType!.name.toLowerCase();
+    
+    switch (personality.id) {
+      case 'Supportive Friend':
+        return 'I\'m so excited for you! 🌟\nYou\'ve created something amazing here.';
+      case 'Drill Sergeant':
+        return 'Outstanding work, recruit!\nYou\'ve built a mission-ready plan.';
+      case 'Southern Redneck':
+        return 'Well butter my biscuit!\nYou just cooked up a fine plan there.';
+      case 'Yoga Instructor':
+        return 'Beautiful energy, beautiful plan.\nYou\'ve found your path to balance.';
+      case 'British Butler':
+        return 'I must say, quite impressive!\nYour plan is rather well-crafted indeed.';
+      case 'Sports Commentator':
+        return 'What a spectacular game plan!\nThis could be championship material!';
+      case 'Cowboy/Cowgirl':
+        return 'Well partner, you\'ve got yourself\na trail map worth ridin\'!';
+      case 'Nature Lover':
+        return 'Like a perfect sunrise,\nyour plan has natural beauty.';
+      case 'Session Analyst':
+        return 'Excellent optimization detected!\nYour plan shows strategic planning.';
+      default:
+        return 'This looks fantastic!\nYou\'ve created something special.';
+    }
+  }
+
+  String _getPersonalizedEncouragement() {
+    final personality = _selectedPersonality!;
+    final why = _personalization!.why?.isNotEmpty == true ? _personalization!.why!.first : 'your goals';
+    
+    switch (personality.id) {
+      case 'Supportive Friend':
+        return 'I can see how much $why means to you, and honestly? You\'ve got this. This plan is going to help you feel stronger and more confident every single day.';
+      case 'Drill Sergeant':
+        return 'Listen up! You want $why? This plan will deliver results. No excuses, no shortcuts - just disciplined execution toward your objective.';
+      case 'Southern Redneck':
+        return 'Honey, when you\'re chasin\' $why, you need a plan tougher than a two-dollar steak. This here plan\'s gonna get you there faster than greased lightning!';
+      case 'Yoga Instructor':
+        return 'Your intention around $why is beautiful. This plan will help you flow toward that goal with mindful progress and inner strength.';
+      case 'British Butler':
+        return 'Your pursuit of $why is quite admirable, if I may say so. This plan shall serve you well on your journey to excellence.';
+      case 'Sports Commentator':
+        return 'Ladies and gentlemen, this athlete is going for $why! With this training plan, we could see some incredible performances ahead!';
+      case 'Cowboy/Cowgirl':
+        return 'Partner, when you\'re ridin\' toward $why, you need a steady horse and a clear trail. This plan\'s got both - now let\'s ride!';
+      case 'Nature Lover':
+        return 'Your connection to $why flows like a river toward the sea. This plan will guide you naturally toward that beautiful destination.';
+      case 'Session Analyst':
+        return 'Data shows strong correlation between structured planning and achieving $why. Your plan metrics indicate high probability of success.';
+      default:
+        return 'Your commitment to $why shows through in every choice you made. This plan will help you get there step by step.';
+    }
+  }
+
+  String _getPersonalizedPlanSummary() {
+    final personality = _selectedPersonality!;
+    final planName = _selectedPlanType!.name;
+    final days = _personalization!.trainingDaysPerWeek ?? 3;
+    final minutes = _personalization!.minimumSessionMinutes ?? 30;
+    
+    switch (personality.id) {
+      case 'Supportive Friend':
+        return 'Here\'s what we\'re going to do together: $days days a week of $planName training, starting with just $minutes minutes. It\'s going to be so manageable, and I\'ll be cheering you on every step!';
+      case 'Drill Sergeant':
+        return 'Your mission: Execute $planName protocol $days days per week, minimum $minutes minutes per session. This is your commitment to excellence - no compromises!';
+      case 'Southern Redneck':
+        return 'Alright sugar, here\'s the deal: $days days a week we\'re gonna do this $planName business for at least $minutes minutes. Ain\'t gonna kill ya, and it\'s gonna make ya stronger than a garlic milkshake!';
+      case 'Yoga Instructor':
+        return 'We\'ll flow through $planName practice $days days each week, honoring at least $minutes minutes of mindful movement. Each session is a meditation in motion.';
+      case 'British Butler':
+        return 'Your regimen shall consist of $planName training $days days per week, with sessions of no less than $minutes minutes. Quite reasonable, I\'d say.';
+      case 'Sports Commentator':
+        return 'Here\'s the game plan: $planName training $days days a week, $minutes minutes minimum! This training schedule is built for champions!';
+      case 'Cowboy/Cowgirl':
+        return 'Here\'s how we\'re gonna ride this trail: $planName training $days days a week, spendin\' at least $minutes minutes in the saddle each time. Steady as she goes!';
+      case 'Nature Lover':
+        return 'We\'ll embrace $planName practice $days days each week, spending at least $minutes minutes connecting with your strength and the earth beneath your feet.';
+      case 'Session Analyst':
+        return 'Protocol: $planName training frequency of $days sessions weekly, minimum $minutes-minute duration per session. Optimal parameters for measurable progress.';
+      default:
+        return 'You\'ll be doing $planName training $days days per week, with each session lasting at least $minutes minutes. It\'s perfectly tailored to fit your life.';
+    }
+  }
+
+  Widget _buildConversationalDetails() {
+    final challenges = _personalization!.challenges?.join(' and ') ?? 'your busy schedule';
+    final preferredDays = _personalization!.preferredDays?.join(', ') ?? 'flexible days';
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _selectedPersonality!.color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    color: _selectedPersonality!.color,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Your Schedule',
+                    style: AppTextStyles.titleSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: _selectedPersonality!.color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'We\'ll focus on $preferredDays, working around $challenges. Everything\'s designed to fit your real life.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        if (_personalization!.unloadedOk == true) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.directions_walk,
+                  color: Colors.green[600],
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Great news! Since you\'re okay with unloaded sessions, we have extra flexibility for those busy days.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _getPersonalizedCallToAction() {
+    final personality = _selectedPersonality!;
+    
+    switch (personality.id) {
+      case 'Supportive Friend':
+        return 'Ready to start this amazing journey together? I believe in you completely!';
+      case 'Drill Sergeant':
+        return 'Time to execute, soldier! Are you ready to earn your victory?';
+      case 'Southern Redneck':
+        return 'Time to quit yakkin\' and start walkin\'! You ready to get after it?';
+      case 'Yoga Instructor':
+        return 'Are you ready to step into this beautiful practice of strength and mindfulness?';
+      case 'British Butler':
+        return 'Shall we commence this rather excellent adventure in fitness?';
+      case 'Sports Commentator':
+        return 'The crowd is on their feet! Are you ready to take the field?';
+      case 'Cowboy/Cowgirl':
+        return 'Time to saddle up, partner! Ready to ride this trail to success?';
+      case 'Nature Lover':
+        return 'The path is calling you forward. Are you ready to walk with purpose?';
+      case 'Session Analyst':
+        return 'All systems optimized and ready for deployment. Shall we initiate the program?';
+      default:
+        return 'Everything\'s set up perfectly for you. Ready to begin?';
+    }
+  }
+
+  String _getPersonalizedButtonText() {
+    final personality = _selectedPersonality!;
+    
+    switch (personality.id) {
+      case 'Supportive Friend':
+        return 'Yes, let\'s do this together! 💪';
+      case 'Drill Sergeant':
+        return 'Sir, yes sir! Deploy the plan!';
+      case 'Southern Redneck':
+        return 'Heck yeah, let\'s get started!';
+      case 'Yoga Instructor':
+        return 'I\'m ready to begin this journey';
+      case 'British Butler':
+        return 'Indeed, let\'s proceed forthwith';
+      case 'Sports Commentator':
+        return 'Game time! Let\'s go!';
+      case 'Cowboy/Cowgirl':
+        return 'Saddle up - let\'s ride!';
+      case 'Nature Lover':
+        return 'I\'m ready to walk this path';
+      case 'Session Analyst':
+        return 'Initialize training protocol';
+      default:
+        return 'Yes, coach me through this plan!';
+    }
   }
 }

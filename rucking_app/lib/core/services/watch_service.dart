@@ -137,7 +137,7 @@ class WatchService {
 
   /// Handle method calls from the watch session channel
   Future<dynamic> _handleWatchSessionMethod(MethodCall call) async {
-    // Silent method call processing
+    AppLogger.debug('[WATCH] Handling method call: ${call.method}');
 
     switch (call.method) {
       case 'onWatchSessionUpdated':
@@ -156,7 +156,7 @@ class WatchService {
           }
         });
         
-        AppLogger.info('[WATCH] Session updated with data: $data');
+        AppLogger.info('[WATCH] Session updated with command: ${data['command']}');
         _sessionEventController.add(data);
         
         // Get the command type from the message
@@ -715,7 +715,7 @@ class WatchService {
       AppLogger.debug('[WATCH] User isMetric preference: $isMetric');
       AppLogger.debug('[WATCH] Split calories: $formattedCalories, elevation: $formattedElevation');
 
-      await _sendMessageToWatch({
+      final splitMessage = {
         'command': 'splitNotification',
         'splitDistance': formattedSplitDistance,
         'splitTime': _formatDuration(splitDuration),
@@ -725,9 +725,22 @@ class WatchService {
         'splitElevation': formattedElevation,
         'isMetric': isMetric,
         'shouldVibrate': true, // Add flag to trigger vibration on watch
-      });
+        'timestamp': DateTime.now().toIso8601String(),
+      };
 
-      // Split notification sent
+      // Send via standard message channel
+      await _sendMessageToWatch(splitMessage);
+      
+      // ALSO queue as transferUserInfo to ensure delivery when watch app opens
+      // This ensures the user sees their split even if the watch app was closed
+      try {
+        await _watchSessionChannel.invokeMethod('transferSplitNotification', splitMessage);
+        AppLogger.info('[WATCH] Split notification queued for background delivery');
+      } catch (e) {
+        AppLogger.debug('[WATCH] Could not queue split for background delivery: $e');
+      }
+
+      AppLogger.info('[WATCH] Split notification sent successfully');
       return true;
     } catch (e) {
       AppLogger.error('[WATCH] Failed to send split notification: $e');

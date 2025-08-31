@@ -791,12 +791,21 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            // Forward to SessionManagerDelegate
-            self.delegate?.didReceiveMessage(userInfo)
             
-            // Update metrics when present
-            if let metrics = userInfo["metrics"] as? [String: Any] {
-                self.updateMetricsFromData(metrics)
+            // Check if this is a queued split notification
+            if let command = userInfo["command"] as? String, command == "splitNotification" {
+                print("[WATCH] 🎯 Processing queued split notification from background delivery")
+                self.processSplitNotification(userInfo)
+                // Vibrate to alert user of the split they achieved
+                WKInterfaceDevice.current().play(.notification)
+            } else {
+                // Forward to SessionManagerDelegate
+                self.delegate?.didReceiveMessage(userInfo)
+                
+                // Update metrics when present
+                if let metrics = userInfo["metrics"] as? [String: Any] {
+                    self.updateMetricsFromData(metrics)
+                }
             }
         }
     }

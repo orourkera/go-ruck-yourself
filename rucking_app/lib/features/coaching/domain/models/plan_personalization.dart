@@ -6,6 +6,9 @@ class PlanPersonalization {
   final List<String>? challenges;
   final int? minimumSessionMinutes;
   final bool? unloadedOk;
+  final int? streakTargetDays;
+  final int? streakTargetRucks;
+  final int? streakTimeframeDays;
 
   const PlanPersonalization({
     this.why,
@@ -15,6 +18,9 @@ class PlanPersonalization {
     this.challenges,
     this.minimumSessionMinutes,
     this.unloadedOk,
+    this.streakTargetDays,
+    this.streakTargetRucks,
+    this.streakTimeframeDays,
   });
 
   PlanPersonalization copyWith({
@@ -25,6 +31,9 @@ class PlanPersonalization {
     List<String>? challenges,
     int? minimumSessionMinutes,
     bool? unloadedOk,
+    int? streakTargetDays,
+    int? streakTargetRucks,
+    int? streakTimeframeDays,
   }) {
     return PlanPersonalization(
       why: why ?? this.why,
@@ -34,6 +43,9 @@ class PlanPersonalization {
       challenges: challenges ?? this.challenges,
       minimumSessionMinutes: minimumSessionMinutes ?? this.minimumSessionMinutes,
       unloadedOk: unloadedOk ?? this.unloadedOk,
+      streakTargetDays: streakTargetDays ?? this.streakTargetDays,
+      streakTargetRucks: streakTargetRucks ?? this.streakTargetRucks,
+      streakTimeframeDays: streakTimeframeDays ?? this.streakTimeframeDays,
     );
   }
 
@@ -46,6 +58,9 @@ class PlanPersonalization {
       'challenges': challenges,
       'minimumSessionMinutes': minimumSessionMinutes,
       'unloadedOk': unloadedOk,
+      'streakTargetDays': streakTargetDays,
+      'streakTargetRucks': streakTargetRucks,
+      'streakTimeframeDays': streakTimeframeDays,
     };
   }
 
@@ -58,6 +73,9 @@ class PlanPersonalization {
       challenges: (json['challenges'] as List<dynamic>?)?.cast<String>(),
       minimumSessionMinutes: json['minimumSessionMinutes'] as int?,
       unloadedOk: json['unloadedOk'] as bool?,
+      streakTargetDays: json['streakTargetDays'] as int?,
+      streakTargetRucks: json['streakTargetRucks'] as int?,
+      streakTimeframeDays: json['streakTimeframeDays'] as int?,
     );
   }
 

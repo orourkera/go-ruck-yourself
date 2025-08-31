@@ -65,12 +65,17 @@ class LocationPoint extends Equatable {
   /// Convert LocationPoint to JSON
   Map<String, dynamic> toJson() {
     return {
-      'latitude': latitude,
-      'longitude': longitude,
-      'elevation_meters': elevation,
+      'lat': latitude,  // Backend expects 'lat' for route-chunk endpoint
+      'lng': longitude,  // Backend expects 'lng' for route-chunk endpoint
+      'latitude': latitude,  // Keep for compatibility with other endpoints
+      'longitude': longitude,  // Keep for compatibility with other endpoints
+      'altitude': elevation,  // Backend expects 'altitude', not 'elevation_meters'
+      'elevation_meters': elevation,  // Keep for compatibility
       'timestamp': timestamp.toIso8601String(),
-      'accuracy_meters': accuracy,
+      'accuracy': accuracy,  // Backend expects 'accuracy', not 'accuracy_meters'
+      'accuracy_meters': accuracy,  // Keep for compatibility
       if (speed != null) 'speed': speed,
+      if (speed != null) 'heading': 0.0,  // Add heading field expected by backend
       'is_estimated': isEstimated,
       'unique_id': uniqueId,
     };

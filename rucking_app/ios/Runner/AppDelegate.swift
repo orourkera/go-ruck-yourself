@@ -105,6 +105,19 @@ import CoreMotion
                 } else {
                     result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
                 }
+            case "transferSplitNotification":
+                // Queue split notification for background delivery when watch app opens
+                if let splitData = call.arguments as? [String: Any] {
+                    print("[WATCH] Queueing split notification for background delivery")
+                    // Use transferUserInfo to ensure delivery even if watch app is closed
+                    if let session = self.session {
+                        session.transferUserInfo(splitData)
+                        print("[WATCH] Split notification queued via transferUserInfo")
+                    }
+                    result(true)
+                } else {
+                    result(FlutterError(code: "-1", message: "Invalid split notification data", details: nil))
+                }
             case "getQueuedWatchMessages":
                 // Return and clear any queued WCSession userInfo messages collected while Flutter wasn't ready
                 let queued = self.dequeueAllQueuedMessages()

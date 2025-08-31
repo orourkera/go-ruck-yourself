@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
+import 'package:rucking_app/features/coaching/domain/models/coaching_plan_type.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 class PersonalizationQuestions extends StatefulWidget {
   final void Function(PlanPersonalization) onPersonalizationComplete;
+  final CoachingPlanType? planType;
 
   const PersonalizationQuestions({
     super.key,
     required this.onPersonalizationComplete,
+    this.planType,
   });
 
   @override
@@ -21,14 +24,24 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   
   PlanPersonalization _personalization = const PlanPersonalization();
 
-  final List<String> _questions = [
-    "What's your why for this goal?",
-    "In 8–12 weeks, what would make you say this was a win?",
-    "How many days/week can you realistically train?",
-    "Which days usually work best?",
-    "What's your biggest challenge to hitting this goal?",
-    "On tough days, what's your minimum viable session?",
-  ];
+  List<String> get _questions {
+    final baseQuestions = [
+      "What's your why for this goal?",
+      "In 8–12 weeks, what would make you say this was a win?",
+      "How many days/week can you realistically train?",
+      "Which days usually work best?",
+      "What's your biggest challenge to hitting this goal?",
+    ];
+    
+    // Add streak question for Daily Discipline plan
+    if (widget.planType?.id == 'daily-discipline') {
+      baseQuestions.add("How many days in a row are you aiming for?");
+    }
+    
+    baseQuestions.add("On tough days, what's your minimum viable session?");
+    
+    return baseQuestions;
+  }
 
   @override
   void dispose() {
@@ -67,7 +80,30 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     }
   }
 
+  List<Widget> _buildQuestionPages() {
+    final pages = [
+      _buildWhyQuestion(),
+      _buildSuccessQuestion(),
+      _buildTrainingDaysQuestion(),
+      _buildPreferredDaysQuestion(),
+      _buildChallengesQuestion(),
+    ];
+    
+    // Add streak question for Daily Discipline plan
+    if (widget.planType?.id == 'daily-discipline') {
+      pages.add(_buildStreakQuestion());
+    }
+    
+    pages.add(_buildMinimumSessionQuestion());
+    
+    return pages;
+  }
+
   bool _canProceed() {
+    final isDailyDiscipline = widget.planType?.id == 'daily-discipline';
+    final streakQuestionIndex = isDailyDiscipline ? 5 : -1;
+    final minSessionIndex = isDailyDiscipline ? 6 : 5;
+    
     switch (_currentQuestionIndex) {
       case 0:
         return _personalization.why != null && _personalization.why!.isNotEmpty;
@@ -80,7 +116,16 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       case 4:
         return _personalization.challenges != null && _personalization.challenges!.isNotEmpty;
       case 5:
-        // Always allow proceed on last question - we'll use defaults if needed
+        if (isDailyDiscipline) {
+          // This is the streak question - require either daily streak or flexible frequency
+          return (_personalization.streakTargetDays != null) ||
+                 (_personalization.streakTargetRucks != null && _personalization.streakTimeframeDays != null);
+        } else {
+          // This is the minimum session question - always allow proceed
+          return true;
+        }
+      case 6:
+        // This is the minimum session question for daily discipline - always allow proceed
         return true;
       default:
         return false;
@@ -125,14 +170,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             child: PageView(
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildWhyQuestion(),
-                _buildSuccessQuestion(),
-                _buildTrainingDaysQuestion(),
-                _buildPreferredDaysQuestion(),
-                _buildChallengesQuestion(),
-                _buildMinimumSessionQuestion(),
-              ],
+              children: _buildQuestionPages(),
             ),
           ),
           
@@ -487,9 +525,201 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     );
   }
 
-  Widget _buildMinimumSessionQuestion() {
+  Widget _buildStreakQuestion() {
     return _buildQuestionCard(
-      question: _questions[5],
+      question: "How many days in a row are you aiming for?",
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Choose your discipline goal:',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Daily streak option
+          Text(
+            'Daily streak (every day):',
+            style: AppTextStyles.titleSmall.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
+            children: [7, 14, 21, 30].map((days) {
+              final isSelected = _personalization.streakTargetDays == days && 
+                                 _personalization.streakTargetRucks == null;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _personalization = _personalization.copyWith(
+                      streakTargetDays: days,
+                      streakTargetRucks: null,
+                      streakTimeframeDays: null,
+                    );
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                      width: 2,
+                    ),
+                  ),
+                  child: Text(
+                    days == 7 ? '1 week' : 
+                    days == 14 ? '2 weeks' : 
+                    days == 21 ? '3 weeks' : 
+                    '1 month',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: isSelected ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Flexible frequency option
+          Text(
+            'Or flexible frequency:',
+            style: AppTextStyles.titleSmall.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              {'rucks': 15, 'days': 30, 'label': '15 rucks in 30 days'},
+              {'rucks': 20, 'days': 30, 'label': '20 rucks in 30 days'},
+              {'rucks': 10, 'days': 21, 'label': '10 rucks in 3 weeks'},
+              {'rucks': 12, 'days': 21, 'label': '12 rucks in 3 weeks'},
+            ].map((option) {
+              final isSelected = _personalization.streakTargetRucks == option['rucks'] &&
+                                 _personalization.streakTimeframeDays == option['days'];
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _personalization = _personalization.copyWith(
+                      streakTargetDays: null,
+                      streakTargetRucks: option['rucks'] as int,
+                      streakTimeframeDays: option['days'] as int,
+                    );
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                      width: 2,
+                    ),
+                  ),
+                  child: Text(
+                    option['label'] as String,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: isSelected ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Custom inputs
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  autofocus: false,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'X rucks',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final rucks = int.tryParse(value);
+                    if (rucks != null && rucks > 0) {
+                      setState(() {
+                        _personalization = _personalization.copyWith(
+                          streakTargetDays: null,
+                          streakTargetRucks: rucks,
+                          streakTimeframeDays: _personalization.streakTimeframeDays ?? 30,
+                        );
+                      });
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('in'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  autofocus: false,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'Y days',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final days = int.tryParse(value);
+                    if (days != null && days > 0) {
+                      setState(() {
+                        _personalization = _personalization.copyWith(
+                          streakTargetDays: null,
+                          streakTargetRucks: _personalization.streakTargetRucks ?? 15,
+                          streakTimeframeDays: days,
+                        );
+                      });
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMinimumSessionQuestion() {
+    final questionIndex = widget.planType?.id == 'daily-discipline' ? 6 : 5;
+    return _buildQuestionCard(
+      question: _questions[questionIndex],
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

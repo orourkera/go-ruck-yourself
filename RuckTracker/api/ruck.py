@@ -2262,15 +2262,24 @@ class RuckSessionRouteChunkResource(Resource):
             # Insert location points
             location_rows = []
             for point in data['route_points']:
-                if 'timestamp' not in point or 'lat' not in point or 'lng' not in point:
+                # Support both field name formats for backward compatibility
+                # Accept lat/lng (new) or latitude/longitude (old Flutter format)
+                lat = point.get('lat') or point.get('latitude')
+                lng = point.get('lng') or point.get('longitude')
+                
+                if 'timestamp' not in point or lat is None or lng is None:
                     continue
+                    
+                # Also handle accuracy field name variations
+                accuracy = point.get('accuracy') or point.get('accuracy_meters')
+                
                 location_rows.append({
                     'session_id': ruck_id,
                     'timestamp': point['timestamp'],
-                    'latitude': point['lat'],
-                    'longitude': point['lng'],
-                    'altitude': point.get('altitude'),
-                    'accuracy': point.get('accuracy'),
+                    'latitude': lat,
+                    'longitude': lng,
+                    'altitude': point.get('altitude') or point.get('elevation_meters'),
+                    'accuracy': accuracy,
                     'speed': point.get('speed'),
                     'heading': point.get('heading')
                 })
