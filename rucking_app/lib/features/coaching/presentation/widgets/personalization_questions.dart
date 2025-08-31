@@ -46,8 +46,12 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         curve: Curves.easeInOut,
       );
     } else {
-      // All questions completed
-      widget.onPersonalizationComplete(_personalization);
+      // All questions completed - set defaults for missing values
+      final completedPersonalization = _personalization.copyWith(
+        minimumSessionMinutes: _personalization.minimumSessionMinutes ?? 15,
+        unloadedOk: _personalization.unloadedOk ?? false,
+      );
+      widget.onPersonalizationComplete(completedPersonalization);
     }
   }
 
@@ -76,7 +80,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       case 4:
         return _personalization.challenges != null && _personalization.challenges!.isNotEmpty;
       case 5:
-        return _personalization.minimumSessionMinutes != null && _personalization.unloadedOk != null;
+        // Always allow proceed on last question - we'll use defaults if needed
+        return true;
       default:
         return false;
     }
@@ -84,21 +89,26 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Personalize Your Plan (${_currentQuestionIndex + 1}/6)'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: _currentQuestionIndex > 0
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _previousQuestion,
-              )
-            : null,
-      ),
-      body: Column(
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        appBar: AppBar(
+          title: Text('Personalize Your Plan (${_currentQuestionIndex + 1}/6)'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: _currentQuestionIndex > 0
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _previousQuestion,
+                )
+              : null,
+        ),
+        body: Column(
         children: [
           // Progress indicator
           Container(
@@ -150,24 +160,28 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           ),
         ],
       ),
+    ),
     );
   }
 
   Widget _buildQuestionCard({required String question, required Widget content}) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            question,
-            style: AppTextStyles.headlineSmall.copyWith(
-              fontWeight: FontWeight.bold,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              question,
+              style: AppTextStyles.headlineMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          content,
-        ],
+            const SizedBox(height: 24),
+            content,
+            const SizedBox(height: 100), // Add extra space at bottom for keyboard
+          ],
+        ),
       ),
     );
   }
@@ -202,6 +216,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           
           // Custom text input
           TextField(
+            autofocus: false,
             decoration: InputDecoration(
               hintText: 'Or describe your own reason...',
               border: OutlineInputBorder(
@@ -249,6 +264,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           const SizedBox(height: 16),
           
           TextField(
+            autofocus: false,
             decoration: InputDecoration(
               hintText: 'What would success look like?',
               border: OutlineInputBorder(
@@ -288,7 +304,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [2, 3, 4, 5].map((days) {
+            children: [2, 3, 4, 5, 6, 7].map((days) {
               final isSelected = _personalization.trainingDaysPerWeek == days;
               return GestureDetector(
                 onTap: () {
@@ -421,6 +437,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           
           const SizedBox(height: 16),
           TextField(
+            autofocus: false,
             decoration: InputDecoration(
               hintText: 'Other challenges?',
               border: OutlineInputBorder(

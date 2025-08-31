@@ -23,6 +23,7 @@ enum PlanCreationStep {
   personalitySelection,
   commitment,
   creating,
+  generatingSummary,
   complete,
 }
 
@@ -41,9 +42,13 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   PlanCreationStep _currentStep = PlanCreationStep.greeting;
   String _streamingText = '';
   bool _isStreaming = false;
+  bool _showGoalPills = false;
+  String _planPreviewSummary = '';
+  bool _isGeneratingPreview = false;
   CoachingPlanType? _selectedPlanType;
   CoachingPersonality? _selectedPersonality;
   PlanPersonalization? _personalization;
+  String _generatedSummary = '';
   
   late OpenAIResponsesService _openAiService;
   late CoachingService _coachingService;
@@ -154,7 +159,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
 
     try {
       await _openAiService.stream(
-        model: 'o3-mini',
+        model: 'gpt-4.1',
         instructions: 'You are a friendly, enthusiastic AI fitness coach for a rucking app. Your job is to greet users warmly and get them excited about creating a training plan.',
         input: 'Greet the user named "$username" and ask them what kind of goal they want to set. Keep it brief, friendly, and motivating. End with asking what kind of goal they want to set.',
         temperature: 0.7,
@@ -171,15 +176,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
             setState(() {
               _isStreaming = false;
               _streamingText = fullText;
-            });
-            
-            // After greeting is complete, show goal selection buttons
-            Future.delayed(const Duration(milliseconds: 1000), () {
-              if (mounted) {
-                setState(() {
-                  _currentStep = PlanCreationStep.goalSelection;
-                });
-              }
+              _showGoalPills = true; // Show goal pills in same screen
             });
           }
         },
@@ -189,7 +186,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
             setState(() {
               _isStreaming = false;
               _streamingText = "Hi $username! I'm your AI coach, and I'm excited to help you create the perfect rucking plan. What kind of goal do you want to set?";
-              _currentStep = PlanCreationStep.goalSelection;
+              _showGoalPills = true;
             });
           }
         },
@@ -201,17 +198,99 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
         setState(() {
           _isStreaming = false;
           _streamingText = "Hi $username! I'm your AI coach, and I'm excited to help you create the perfect rucking plan. What kind of goal do you want to set?";
-          _currentStep = PlanCreationStep.goalSelection;
+          _showGoalPills = true;
         });
       }
     }
   }
 
-  void _onPlanTypeSelected(CoachingPlanType planType) {
-    setState(() {
-      _selectedPlanType = planType;
-      _currentStep = PlanCreationStep.personalization;
-    });
+  void _onPlanTypeSelected(CoachingPlanType planType) async {
+    // Show goal summary and confirmation dialog
+    final confirmed = await _showGoalConfirmationDialog(planType);
+    if (confirmed == true) {
+      setState(() {
+        _selectedPlanType = planType;
+        _currentStep = PlanCreationStep.personalization;
+      });
+    }
+  }
+
+  Future<bool?> _showGoalConfirmationDialog(CoachingPlanType planType) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Text(planType.emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                planType.name,
+                style: AppTextStyles.headlineMedium.copyWith(
+                  color: planType.color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: planType.color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: planType.color.withOpacity(0.3)),
+              ),
+              child: Text(
+                planType.duration,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: planType.color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              planType.description,
+              style: AppTextStyles.bodyMedium.copyWith(height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Is this the goal you want to work towards?',
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+                color: planType.color,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Not quite',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: planType.color,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Yes, let\'s do it!'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onPersonalizationComplete(PlanPersonalization personalization) {
@@ -219,6 +298,81 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       _personalization = personalization;
       _currentStep = PlanCreationStep.planPreview;
     });
+    
+    // Generate AI plan preview summary
+    _generatePlanPreviewSummary();
+  }
+
+  Future<void> _generatePlanPreviewSummary() async {
+    if (_selectedPlanType == null || _personalization == null) return;
+    
+    final authState = context.read<AuthBloc>().state;
+    final username = authState is Authenticated ? authState.user.username : 'Rucker';
+    
+    final prompt = '''
+Create a detailed personalized training plan brief for ${username}'s ${_selectedPlanType!.name} goal in a motivational coaching tone.
+
+Goal: ${_selectedPlanType!.name}
+Goal Description: ${_selectedPlanType!.description}
+Duration: ${_selectedPlanType!.duration}
+
+User Details:
+- Why: ${_personalization!.why}
+- Success Definition: ${_personalization!.successDefinition}
+- Training Days: ${_personalization!.trainingDaysPerWeek} days per week
+- Preferred Days: ${_personalization!.preferredDays?.join(', ')}
+- Challenges: ${_personalization!.challenges?.join(', ')}
+- Minimum Session: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}
+
+Generate a comprehensive plan brief that includes:
+
+1. **Mission Statement** - Their why and success definition
+2. **Weekly Structure** - Specific training schedule using their preferred days and training frequency
+3. **Session Details** - What each training day will include (duration, intensity, type)
+4. **Progression Rules** - How the plan will evolve over ${_selectedPlanType!.duration}
+5. **Safety Gates** - How to handle their specific challenges
+6. **Timeline Expectations** - What they'll experience each phase
+
+Make it detailed enough to show the actual plan structure, not just motivation. Use a confident coaching voice that addresses their specific challenges and schedule. Include specific session types appropriate for ${_selectedPlanType!.name}.
+
+Keep it around 300-400 words, structured and actionable.
+''';
+
+    setState(() {
+      _planPreviewSummary = '';
+      _isGeneratingPreview = true;
+    });
+
+    try {
+      await _openAiService.stream(
+        model: 'gpt-4.1',
+        instructions: 'You are an enthusiastic AI fitness coach creating a personalized plan summary for ${username}. Address them by name throughout. Be motivational, specific, and exciting.',
+        input: prompt,
+        temperature: 0.7,
+        maxOutputTokens: 500,
+        onDelta: (delta) {
+          if (mounted) {
+            setState(() {
+              _planPreviewSummary += delta;
+            });
+          }
+        },
+        onComplete: (fullText) {
+          if (mounted) {
+            setState(() {
+              _isGeneratingPreview = false;
+              _planPreviewSummary = fullText;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to generate plan preview summary: $e');
+      setState(() {
+        _planPreviewSummary = 'I\'m so excited about your ${_selectedPlanType!.name} journey! This ${_selectedPlanType!.duration} plan is perfectly tailored to your goals and schedule. With ${_personalization!.trainingDaysPerWeek} training days per week, you\'re going to see incredible progress toward ${_personalization!.successDefinition}. Let\'s make this happen!';
+        _isGeneratingPreview = false;
+      });
+    }
   }
 
   void _onPersonalitySelected(CoachingPersonality personality) {
@@ -226,6 +380,72 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       _selectedPersonality = personality;
       _currentStep = PlanCreationStep.commitment;
     });
+  }
+
+  Future<void> _generatePlanSummary(Map<String, dynamic> planData) async {
+    try {
+      final prompt = """
+You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan.
+
+Plan Type: ${_selectedPlanType!.name}
+Duration: ${_selectedPlanType!.duration}
+Description: ${_selectedPlanType!.description}
+
+User's Personalization:
+- Why: ${_personalization!.why}
+- Success Definition: ${_personalization!.successDefinition}
+- Training Days/Week: ${_personalization!.trainingDaysPerWeek}
+- Preferred Days: ${_personalization!.preferredDays?.join(', ')}
+- Challenges: ${_personalization!.challenges?.join(', ')}
+- Minimum Session: ${_personalization!.minimumSessionMinutes} minutes
+- Unloaded OK: ${_personalization!.unloadedOk}
+
+Coaching Style: ${_selectedPersonality!.name}
+
+Generate a personalized, motivating 2-3 paragraph summary that:
+1. Acknowledges their 'why' and success goals
+2. Explains how this plan addresses their specific challenges
+3. Gives them confidence about achieving their goals
+4. Matches the ${_selectedPersonality!.name} coaching style
+
+Keep it under 200 words, motivational, and specific to their answers.
+""";
+
+      setState(() {
+        _generatedSummary = '';
+        _isStreaming = true;
+      });
+
+      await _openAiService.stream(
+        model: 'gpt-4.1',
+        instructions: 'You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan.',
+        input: prompt,
+        temperature: 0.7,
+        maxOutputTokens: 250,
+        onDelta: (delta) {
+          if (mounted) {
+            setState(() {
+              _generatedSummary += delta;
+              _isStreaming = true;
+            });
+          }
+        },
+        onComplete: (fullText) {
+          if (mounted) {
+            setState(() {
+              _isStreaming = false;
+              _generatedSummary = fullText;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to generate plan summary: $e');
+      setState(() {
+        _generatedSummary = 'Your personalized ${_selectedPlanType!.name} plan is ready! Let\'s crush those goals together.';
+        _isStreaming = false;
+      });
+    }
   }
 
   void _onCommitToPlan() async {
@@ -250,15 +470,24 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       
       if (mounted) {
         setState(() {
-          _currentStep = PlanCreationStep.complete;
+          _currentStep = PlanCreationStep.generatingSummary;
         });
         
-        // Navigate back with success after a brief delay
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.of(context).pop(true);
-          }
-        });
+        // Generate AI summary of the plan
+        await _generatePlanSummary(planData);
+        
+        if (mounted) {
+          setState(() {
+            _currentStep = PlanCreationStep.complete;
+          });
+          
+          // Navigate back with success after a brief delay
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              Navigator.of(context).pop(true);
+            }
+          });
+        }
       }
     } catch (e) {
       AppLogger.error('Failed to create coaching plan: $e');
@@ -320,6 +549,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       backgroundColor: AppColors.backgroundLight,
       appBar: _currentStep != PlanCreationStep.greeting && 
               _currentStep != PlanCreationStep.creating &&
+              _currentStep != PlanCreationStep.generatingSummary &&
               _currentStep != PlanCreationStep.complete
           ? AppBar(
               title: const Text('AI Coaching Plan'),
@@ -354,6 +584,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
         return _buildCommitmentStep();
       case PlanCreationStep.creating:
         return _buildCreatingStep();
+      case PlanCreationStep.generatingSummary:
+        return _buildGeneratingSummaryStep();
       case PlanCreationStep.complete:
         return _buildCompleteStep();
     }
@@ -362,10 +594,9 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   Widget _buildGreetingStep() {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // AI Coach avatar
             Container(
@@ -444,6 +675,60 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
                 ],
               ),
             ),
+            
+            // Goal selection pills (shown after streaming completes)
+            if (_showGoalPills) ...[
+              const SizedBox(height: 32),
+              AnimatedOpacity(
+                opacity: _showGoalPills ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 600),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
+                  children: _planTypes.map((planType) {
+                    return GestureDetector(
+                      onTap: () => _onPlanTypeSelected(planType),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: planType.color.withOpacity(0.3),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: planType.color.withOpacity(0.1),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              planType.emoji,
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              planType.name,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: planType.color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -523,79 +808,123 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     if (_selectedPlanType == null || _personalization == null) return const SizedBox.shrink();
     
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Your Personalized Plan',
-            style: AppTextStyles.headlineMedium.copyWith(
-              fontWeight: FontWeight.bold,
+          // AI Coach avatar
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.3),
+                  blurRadius: 15,
+                  spreadRadius: 3,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.psychology,
+              size: 50,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           
+          // Goal title with emoji
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _selectedPlanType!.emoji,
+                style: const TextStyle(fontSize: 32),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  _selectedPlanType!.name,
+                  style: AppTextStyles.headlineMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: _selectedPlanType!.color,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          
+          // AI-generated personalized summary
           Expanded(
             child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  PlanPreviewCard(planType: _selectedPlanType!),
-                  const SizedBox(height: 16),
-                  
-                  // Personalization summary
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      spreadRadius: 2,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.person,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Your Personalization',
-                                style: AppTextStyles.titleMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          _buildPersonalizationSummaryItem('Why', _personalization!.why ?? ''),
-                          _buildPersonalizationSummaryItem('Success Looks Like', _personalization!.successDefinition ?? ''),
-                          _buildPersonalizationSummaryItem('Training Days', '${_personalization!.trainingDaysPerWeek ?? 0} days per week'),
-                          _buildPersonalizationSummaryItem('Preferred Days', _personalization!.preferredDays?.join(', ') ?? ''),
-                          _buildPersonalizationSummaryItem('Challenges to Overcome', _personalization!.challenges?.join(', ') ?? ''),
-                          _buildPersonalizationSummaryItem('Minimum Session', '${_personalization!.minimumSessionMinutes ?? 0} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}'),
-                        ],
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      _planPreviewSummary + (_isGeneratingPreview ? '▌' : ''),
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        height: 1.6,
                       ),
                     ),
-                  ),
-                ],
+                    if (_isGeneratingPreview) ...[
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'AI Coach is creating your plan...',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: !_isGeneratingPreview ? () {
                 setState(() {
                   _currentStep = PlanCreationStep.personalitySelection;
                 });
-              },
+              } : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -605,7 +934,9 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
                 ),
               ),
               child: Text(
-                'Perfect! Let\'s choose coaching style',
+                _isGeneratingPreview 
+                  ? 'Creating your plan...'
+                  : 'Perfect! Let\'s choose coaching style',
                 style: AppTextStyles.titleMedium,
               ),
             ),
@@ -615,32 +946,6 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     );
   }
 
-  Widget _buildPersonalizationSummaryItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: AppTextStyles.bodySmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTextStyles.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildPersonalitySelectionStep() {
     return Padding(
@@ -917,40 +1222,161 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     );
   }
 
-  Widget _buildCompleteStep() {
+  Widget _buildGeneratingSummaryStep() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 120,
-            height: 120,
+            width: 80,
+            height: 80,
+            child: CircularProgressIndicator(
+              strokeWidth: 4,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Generating your personalized plan summary...',
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Our AI coach is crafting your motivational summary',
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompleteStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        children: [
+          // Success icon
+          Container(
+            width: 100,
+            height: 100,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.green.withOpacity(0.1),
             ),
             child: Icon(
               Icons.check_circle,
-              size: 60,
+              size: 50,
               color: Colors.green,
             ),
           ),
           const SizedBox(height: 24),
+          
+          // Title
           Text(
-            'Your plan is ready!',
+            'Your Plan is Ready!',
             style: AppTextStyles.headlineMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: Colors.green,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          
+          // AI-generated summary
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Your AI Coach Says:',
+                          style: AppTextStyles.titleMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _generatedSummary.isNotEmpty 
+                        ? _generatedSummary 
+                        : 'Your personalized ${_selectedPlanType?.name ?? "training"} plan is ready! Let\'s crush those goals together.',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Bottom message
           Text(
-            'Check your homepage for personalized insights and your next session recommendation.',
-            style: AppTextStyles.bodyLarge.copyWith(
+            'Check your homepage for personalized insights and session recommendations.',
+            style: AppTextStyles.bodyMedium.copyWith(
               color: Colors.grey[600],
             ),
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalizationItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.bodyMedium,
+            ),
           ),
         ],
       ),

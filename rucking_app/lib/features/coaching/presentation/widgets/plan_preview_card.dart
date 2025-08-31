@@ -54,7 +54,7 @@ class PlanPreviewCard extends StatelessWidget {
                     children: [
                       Text(
                         planType.name,
-                        style: AppTextStyles.headlineSmall.copyWith(
+                        style: AppTextStyles.headlineMedium.copyWith(
                           fontWeight: FontWeight.bold,
                           color: planType.color,
                         ),

@@ -27,6 +27,14 @@ public class WorkoutManager: NSObject {
     var isHealthKitAvailable: Bool {
         return HKHealthStore.isHealthDataAvailable()
     }
+
+    deinit {
+        // Defensive cleanup to ensure no queries or timers survive deallocation
+        print("[WORKOUT_MANAGER] deinit - cleaning up queries and timers")
+        stopRealTimeStepTracking()
+        stepUpdateTimer?.invalidate()
+        stepUpdateTimer = nil
+    }
     
     // Bridge method to send telemetry to Dart side for Sentry
     private func sendTelemetryToDart(_ data: [String: Any]) {
@@ -727,6 +735,10 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
             print("[WORKOUT_MANAGER] Workout state: Paused")
         case .ended:
             print("[WORKOUT_MANAGER] Workout state: Ended")
+            // Defensive cleanup in case end was triggered externally
+            stopRealTimeStepTracking()
+            stepUpdateTimer?.invalidate()
+            stepUpdateTimer = nil
             delegate?.workoutDidEnd()
         @unknown default:
             print("[WORKOUT_MANAGER] Workout state: Unknown (\(toState.rawValue))")

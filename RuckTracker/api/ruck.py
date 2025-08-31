@@ -2220,33 +2220,38 @@ class HeartRateSampleUploadResource(Resource):
 
 class RuckSessionRouteChunkResource(Resource):
     def post(self, ruck_id):
-        """Upload route data chunk for completed session (POST /api/rucks/<ruck_id>/route-chunk)"""
+        """Upload route data chunk for a session (POST /api/rucks/<ruck_id>/route-chunk)
+
+        Accepted session statuses: 'in_progress', 'paused', 'completed'.
+        """
         try:
             if not hasattr(g, 'user') or g.user is None:
                 return {'message': 'User not authenticated'}, 401
-            
+        
             data = request.get_json()
             if not data or 'route_points' not in data or not isinstance(data['route_points'], list):
                 return {'message': 'Missing or invalid route_points'}, 400
-            
+        
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            
-            # Check if session exists, belongs to user, and is completed
+        
+            # Check if session exists and belongs to user
             session_resp = supabase.table('ruck_session') \
                 .select('id,status') \
                 .eq('id', ruck_id) \
                 .eq('user_id', g.user.id) \
                 .execute()
-            
+        
             if not session_resp.data:
                 logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
                 return {'message': 'Session not found or access denied'}, 404
-            
+        
             session_data = session_resp.data[0]
-            if session_data['status'] != 'completed':
-                logger.warning(f"Session {ruck_id} status is '{session_data['status']}', not 'completed'")
-                return {'message': f"Session not completed (status: {session_data['status']}). Route chunks can only be uploaded to completed sessions."}, 400
-            
+            current_status = session_data['status']
+            allowed_statuses = ('in_progress', 'paused', 'completed')
+            if current_status not in allowed_statuses:
+                logger.warning(f"[ROUTE_CHUNK] Session {ruck_id} has invalid status '{current_status}' for route upload")
+                return {'message': f"Invalid session status for route upload: {current_status}"}, 400
+        
             # Insert location points
             location_rows = []
             for point in data['route_points']:

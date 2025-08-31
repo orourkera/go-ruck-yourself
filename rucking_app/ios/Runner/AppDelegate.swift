@@ -415,6 +415,23 @@ import CoreMotion
             case "debug_watchEndTapped":
                 // Optional: log-only debug signal from watch to confirm tap
                 print("[DEBUG] Received debug_watchEndTapped from Watch")
+                
+            case "debug_watchResumeTapped":
+                // Debug signal from watch resume button
+                print("[WATCH] Watch resume button was tapped (debug signal)")
+                
+            case "debug_watchPauseTapped":
+                // Debug signal from watch pause button
+                print("[WATCH] Watch pause button was tapped (debug signal)")
+                
+            case "watchErrorToSentry":
+                // Handle watch app errors and forward to Sentry
+                self.handleWatchErrorForSentry(message)
+                
+            case "watchMessageToSentry":
+                // Handle watch app messages and forward to Sentry
+                self.handleWatchMessageForSentry(message)
+                
             case "watchHeartRateUpdate":
                 if let heartRate = message["heartRate"] as? Double {
                     // Heart rate update received from WatchConnectivity
@@ -531,6 +548,110 @@ import CoreMotion
     override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for remote notifications: \(error)")
         return super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
+    }
+    
+    // MARK: - Watch Error Handling for Sentry
+    
+    private func handleWatchErrorForSentry(_ message: [String: Any]) {
+        guard let operation = message["operation"] as? String,
+              let errorMessage = message["error_message"] as? String,
+              let severity = message["severity"] as? String else {
+            print("[WATCH_SENTRY] Invalid error message format from watch")
+            return
+        }
+        
+        print("[WATCH_SENTRY] Forwarding watch error to Flutter/Sentry: \(operation) - \(errorMessage)")
+        
+        // Create error context for Sentry
+        var context: [String: Any] = [
+            "source": "watch_app",
+            "operation": operation,
+            "severity": severity
+        ]
+        
+        if let errorDomain = message["error_domain"] as? String {
+            context["error_domain"] = errorDomain
+        }
+        
+        if let errorCode = message["error_code"] as? Int {
+            context["error_code"] = errorCode
+        }
+        
+        if let watchContext = message["context"] as? [String: Any] {
+            context["watch_context"] = watchContext
+        }
+        
+        if let timestamp = message["timestamp"] as? Double {
+            context["watch_timestamp"] = timestamp
+        }
+        
+        // Forward to Flutter for Sentry reporting
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  let controller = self.window?.rootViewController as? FlutterViewController else {
+                print("[WATCH_SENTRY] No FlutterViewController available")
+                return
+            }
+            
+            let channel = FlutterMethodChannel(
+                name: "com.getrucky.gfy/watch_errors",
+                binaryMessenger: controller.binaryMessenger
+            )
+            
+            channel.invokeMethod("reportWatchError", arguments: [
+                "operation": operation,
+                "error": errorMessage,
+                "context": context,
+                "severity": severity
+            ])
+        }
+    }
+    
+    private func handleWatchMessageForSentry(_ message: [String: Any]) {
+        guard let operation = message["operation"] as? String,
+              let messageText = message["message"] as? String,
+              let severity = message["severity"] as? String else {
+            print("[WATCH_SENTRY] Invalid message format from watch")
+            return
+        }
+        
+        print("[WATCH_SENTRY] Forwarding watch message to Flutter/Sentry: \(operation) - \(messageText)")
+        
+        // Create message context for Sentry
+        var context: [String: Any] = [
+            "source": "watch_app",
+            "operation": operation,
+            "severity": severity
+        ]
+        
+        if let watchContext = message["context"] as? [String: Any] {
+            context["watch_context"] = watchContext
+        }
+        
+        if let timestamp = message["timestamp"] as? Double {
+            context["watch_timestamp"] = timestamp
+        }
+        
+        // Forward to Flutter for Sentry reporting
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  let controller = self.window?.rootViewController as? FlutterViewController else {
+                print("[WATCH_SENTRY] No FlutterViewController available")
+                return
+            }
+            
+            let channel = FlutterMethodChannel(
+                name: "com.getrucky.gfy/watch_errors",
+                binaryMessenger: controller.binaryMessenger
+            )
+            
+            channel.invokeMethod("reportWatchMessage", arguments: [
+                "operation": operation,
+                "message": messageText,
+                "context": context,
+                "severity": severity
+            ])
+        }
     }
 }
 

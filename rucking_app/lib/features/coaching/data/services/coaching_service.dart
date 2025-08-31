@@ -16,17 +16,25 @@ class CoachingService {
     try {
       final response = await _apiClient.post(
         '/api/coaching-plans',
-        data: {
+        {
           'base_plan_id': basePlanId,
           'coaching_personality': coachingPersonality,
           'personalization': personalization.toJson(),
         },
       );
 
-      if (response.data['success'] == true) {
-        return response.data['data'];
+      // Handle both direct response and wrapped response formats
+      if (response.data is Map<String, dynamic>) {
+        if (response.data.containsKey('success') && response.data['success'] == true) {
+          return response.data['data'];
+        } else if (response.data.containsKey('success') && response.data['success'] == false) {
+          throw Exception(response.data['message'] ?? 'Failed to create coaching plan');
+        } else {
+          // Direct response format
+          return response.data;
+        }
       } else {
-        throw Exception(response.data['message'] ?? 'Failed to create coaching plan');
+        return response.data;
       }
     } catch (e) {
       throw Exception('Failed to create coaching plan: $e');
@@ -40,14 +48,28 @@ class CoachingService {
       
       final response = await _apiClient.get(
         '/api/coaching-plans',
-        queryParameters: queryParams,
+        queryParams: queryParams,
       );
 
-      if (response.data['success'] == true) {
-        final List<dynamic> plans = response.data['data']['coaching_plans'];
-        return plans.cast<Map<String, dynamic>>();
+      // Handle both direct response and wrapped response formats
+      if (response.data is Map<String, dynamic>) {
+        if (response.data.containsKey('success') && response.data['success'] == true) {
+          final List<dynamic> plans = response.data['data']['coaching_plans'];
+          return plans.cast<Map<String, dynamic>>();
+        } else if (response.data.containsKey('success') && response.data['success'] == false) {
+          throw Exception(response.data['message'] ?? 'Failed to fetch coaching plans');
+        } else {
+          // Direct response format - assume it's a list
+          if (response.data is List) {
+            return (response.data as List).cast<Map<String, dynamic>>();
+          } else {
+            throw Exception('Unexpected response format');
+          }
+        }
+      } else if (response.data is List) {
+        return (response.data as List).cast<Map<String, dynamic>>();
       } else {
-        throw Exception(response.data['message'] ?? 'Failed to fetch coaching plans');
+        throw Exception('Unexpected response format');
       }
     } catch (e) {
       throw Exception('Failed to fetch coaching plans: $e');
@@ -59,10 +81,18 @@ class CoachingService {
     try {
       final response = await _apiClient.get('/api/coaching-plans/$planId');
 
-      if (response.data['success'] == true) {
-        return response.data['data']['coaching_plan'];
+      // Handle both direct response and wrapped response formats
+      if (response.data is Map<String, dynamic>) {
+        if (response.data.containsKey('success') && response.data['success'] == true) {
+          return response.data['data']['coaching_plan'];
+        } else if (response.data.containsKey('success') && response.data['success'] == false) {
+          throw Exception(response.data['message'] ?? 'Failed to fetch coaching plan');
+        } else {
+          // Direct response format
+          return response.data;
+        }
       } else {
-        throw Exception(response.data['message'] ?? 'Failed to fetch coaching plan');
+        return response.data;
       }
     } catch (e) {
       throw Exception('Failed to fetch coaching plan: $e');
@@ -77,13 +107,21 @@ class CoachingService {
     try {
       final response = await _apiClient.patch(
         '/api/coaching-plans/$planId',
-        data: {'status': status},
+        {'status': status},
       );
 
-      if (response.data['success'] == true) {
-        return response.data['data']['coaching_plan'];
+      // Handle both direct response and wrapped response formats
+      if (response.data is Map<String, dynamic>) {
+        if (response.data.containsKey('success') && response.data['success'] == true) {
+          return response.data['data']['coaching_plan'];
+        } else if (response.data.containsKey('success') && response.data['success'] == false) {
+          throw Exception(response.data['message'] ?? 'Failed to update coaching plan');
+        } else {
+          // Direct response format
+          return response.data;
+        }
       } else {
-        throw Exception(response.data['message'] ?? 'Failed to update coaching plan');
+        return response.data;
       }
     } catch (e) {
       throw Exception('Failed to update coaching plan: $e');

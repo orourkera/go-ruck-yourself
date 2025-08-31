@@ -13,7 +13,8 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
     @IBOutlet weak var elevationLabel: WKInterfaceLabel!
     @IBOutlet weak var statusLabel: WKInterfaceLabel!
     
-    private var workoutManager: WorkoutManager?
+    // UI-only controller: SessionManager exclusively owns WorkoutManager lifecycle
+    // private var workoutManager: WorkoutManager?
     
     override func awake(withContext context: Any?) {
         super.awake(withContext: context)
@@ -73,9 +74,8 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
             }
         }
         
-        // Initialize WorkoutManager for HealthKit (SwiftUI ContentView handles permissions now)
-        workoutManager = WorkoutManager()
-        print("[INTERFACE_CONTROLLER] Initialized - permissions handled by SwiftUI ContentView")
+        // Do NOT initialize a separate WorkoutManager here. SessionManager owns lifecycle.
+        print("[INTERFACE_CONTROLLER] Initialized - delegating HK/workout to SessionManager")
     }
     
     override func willActivate() {
@@ -89,40 +89,15 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
         super.didDeactivate()
     }
     
-    // Setup HealthKit authorization and heart rate handling
+    // Setup HealthKit authorization - delegated to SessionManager
     private func setupHealthKit() {
-        guard let manager = workoutManager else { 
-            print("[INTERFACE_CONTROLLER] ERROR: workoutManager is nil")
-            return 
-        }
+        // HealthKit setup is now handled by SessionManager.shared
+        // This method is kept for compatibility but delegates to SessionManager
+        print("[INTERFACE_CONTROLLER] HealthKit setup delegated to SessionManager")
         
-        print("[INTERFACE_CONTROLLER] HealthKit available: \(manager.isHealthKitAvailable)")
-        if manager.isHealthKitAvailable {
-            print("[INTERFACE_CONTROLLER] Requesting HealthKit authorization...")
-            manager.requestAuthorization { [weak self] (success, error) in
-                guard let self = self else { return }
-                if success {
-                    // Set handler for heart rate updates
-                    manager.setHeartRateHandler { heartRate in
-                        DispatchQueue.main.async {
-                            self.heartRateLabel.setText(String(format: "HR: %.0f bpm", heartRate))
-                            self.sendHeartRate(heartRate)
-                        }
-                    }
-                } else {
-                    print("[INTERFACE_CONTROLLER] ❌ HealthKit authorization denied or failed")
-                    if let error = error {
-                        print("[INTERFACE_CONTROLLER] Authorization error: \(error.localizedDescription)")
-                        self.statusLabel.setText("HealthKit Error: \(error.localizedDescription)")
-                    } else {
-                        self.statusLabel.setText("HealthKit authorization denied")
-                    }
-                }
-            }
-        } else {
-            print("[INTERFACE_CONTROLLER] ❌ HealthKit not available on this device")
-            statusLabel.setText("HealthKit Not Available")
-        }
+        // SessionManager handles all HealthKit permissions and workout management
+        // No direct WorkoutManager access needed in InterfaceController
+        statusLabel.setText("HealthKit via SessionManager")
     }
     
     // Update UI with received metrics
@@ -204,14 +179,7 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
                 if let ruckWeight = data["ruckWeight"] as? Double {
                     print("🔔 [WATCH UI] Starting session with ruck weight: \(ruckWeight)")
                 }
-                // Start heart rate monitoring
-                self.workoutManager?.startWorkout { error in
-                    if let error = error {
-                        self.statusLabel.setText("Session Error: \(error.localizedDescription)")
-                    } else {
-                        print("🔔 [WATCH UI] Heart rate monitoring started")
-                    }
-                }
+                // Do not start a separate workout here. SessionManager handles start.
                 
             case "workoutStarted":
                 self.statusLabel.setText("Workout Active")
@@ -219,23 +187,11 @@ class InterfaceController: WKInterfaceController, SessionManagerDelegate {
                 if let ruckWeight = data["ruckWeight"] as? Double {
                     print("🔔 [WATCH UI] Ruck weight: \(ruckWeight)")
                 }
-                self.workoutManager?.startWorkout { error in
-                    if let error = error {
-                        self.statusLabel.setText("Workout Error: \(error.localizedDescription)")
-                    }
-                }
+                // Do not start a separate workout here. SessionManager handles start.
                 
             case "workoutStopped":
                 self.statusLabel.setText("Workout Ended")
-                // Let SessionManager handle the termination logic
-                // It will end the workout and terminate the app properly
-                SessionManager.shared.delegate?.didReceiveMessage(["command": "workoutStopped"])
-                // Also end the local workout manager
-                self.workoutManager?.endWorkout { error in
-                    if let error = error {
-                        print("[WATCH UI] Workout End Error: \(error.localizedDescription)")
-                    }
-                }
+                // Let SessionManager handle termination logic exclusively.
                 
             case "updateMetrics":
                 print("🔔 [WATCH UI] processCommand: Handling 'updateMetrics'")

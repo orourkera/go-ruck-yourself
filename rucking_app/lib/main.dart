@@ -32,6 +32,7 @@ import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/core/services/session_recovery_service.dart';
 import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
+import 'package:rucking_app/core/services/watch_error_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -129,8 +130,65 @@ Future<void> _runApp() async {
       
       // Enhanced Configuration for 9.3.0
       options.beforeSend = (event, hint) {
-        // Filter out sensitive data if needed
-        return event;
+        // Drop events related to common bot/WordPress URLs to reduce noise.
+        // This mirrors our server filters and extends them for client events.
+        const patterns = <String>[
+          'wp-admin', 'wp-login', 'xmlrpc.php',
+          '/wp-content/', '/wp-includes/', '/wordpress/', '/drupal/',
+          'phpmyadmin', '/cgi-bin/',
+          '.php', '.asp', '.jsp', '.do',
+          '/.env', '/.git/', '/config/', '/backup/', '/tmp/', '/var/'
+        ];
+
+        bool containsBlocked(String value) {
+          final v = value.toLowerCase();
+          for (final p in patterns) {
+            if (v.contains(p)) return true;
+          }
+          return false;
+        }
+
+        try {
+          // Check event.request URL if present
+          final reqUrl = event.request?.url ?? '';
+          if (reqUrl.isNotEmpty && containsBlocked(reqUrl)) {
+            return null;
+          }
+
+          // Check exception stack frames (file names/abs paths)
+          final exceptions = event.exceptions;
+          if (exceptions != null) {
+            for (final ex in exceptions) {
+              final frames = ex.stackTrace?.frames;
+              if (frames == null) continue;
+              for (final f in frames) {
+                final fileStr = ([f.fileName ?? '', f.absPath ?? '']
+                      ..removeWhere((e) => e.isEmpty))
+                    .join(' ');
+                if (fileStr.isNotEmpty && containsBlocked(fileStr)) {
+                  return null;
+                }
+              }
+            }
+          }
+
+          // Check HTTP breadcrumbs for blocked URLs
+          final breadcrumbs = event.breadcrumbs;
+          if (breadcrumbs != null) {
+            for (final b in breadcrumbs) {
+              final data = b.data;
+              if (data == null) continue;
+              final url = (data['url'] ?? data['request_uri'] ?? '').toString();
+              if (url.isNotEmpty && containsBlocked(url)) {
+                return null;
+              }
+            }
+          }
+        } catch (_) {
+          // Never let filtering throw
+        }
+
+        return event; // keep
       };
     },
     appRunner: () => _initializeApp(),
@@ -299,6 +357,9 @@ Future<void> _initializeApp() async {
     AppLogger.error('Failed to initialize some services (network issue): $e');
     // Continue anyway - essential services should still work
   }
+  
+  // Initialize watch error service for Sentry reporting
+  await WatchErrorService.initialize();
   
   // 🔥 CRASH RECOVERY: Check for crashed sessions after services are initialized
   try {

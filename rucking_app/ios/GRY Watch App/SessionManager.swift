@@ -152,17 +152,36 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
         session = WCSession.default
         // Initialize WorkoutManager after super.init()
         super.init()
-        print("[WATCH BOOT] SessionManager init")
+        print("[WATCH BOOT] 🚀 SessionManager init - WatchConnectivity state: \(session.activationState.rawValue)")
+        print("[WATCH BOOT] 🚀 WCSession.isSupported: \(WCSession.isSupported())")
+        // Note: isPaired and isWatchAppInstalled are iOS-only properties
+        
         workoutManager = WorkoutManager()
         session.delegate = self
+        
         if session.activationState != .activated {
+            print("[WATCH BOOT] 🔄 Activating WCSession...")
             session.activate()
+        } else {
+            print("[WATCH BOOT] ✅ WCSession already activated")
         }
+        
         // Ensure we receive callbacks when the workout ends
         workoutManager.delegate = self
         
         // HealthKit permissions will be requested by InterfaceController on first launch
-        print("[WATCH BOOT] SessionManager initialized - permissions will be requested by InterfaceController")
+        print("[WATCH BOOT] ✅ SessionManager initialized - permissions will be requested by InterfaceController")
+        
+        // Send telemetry that watch app has started
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.sendMessage([
+                "command": "watchTelemetry",
+                "event": "watch_app_launched",
+                "timestamp": Date().timeIntervalSince1970,
+                "activation_state": self.session.activationState.rawValue,
+                "is_reachable": self.session.isReachable
+            ])
+        }
     }
     
     private func requestHealthKitPermissions() {
@@ -453,19 +472,40 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     // MARK: - WCSessionDelegate
     
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        print("[WATCH WC] 🔄 WCSession activation completed with state: \(activationState.rawValue)")
+        print("[WATCH WC] 🔄 isReachable: \(session.isReachable)")
+        
         if activationState == .activated {
+            print("[WATCH WC] ✅ WCSession successfully activated")
             delegate?.sessionDidActivate()
+            
+            // Send activation telemetry
+            sendMessage([
+                "command": "watchTelemetry",
+                "event": "watch_wc_activated",
+                "timestamp": Date().timeIntervalSince1970,
+                "is_reachable": session.isReachable
+            ])
         } else {
+            print("[WATCH WC] ❌ WCSession activation failed with state: \(activationState.rawValue)")
             delegate?.sessionDidDeactivate()
         }
+        
         if let error = error {
-            print("Session activation failed: \(error.localizedDescription)")
+            print("[WATCH WC] ❌ Session activation error: \(error.localizedDescription)")
+            sendMessage([
+                "command": "watchTelemetry",
+                "event": "watch_wc_activation_error",
+                "timestamp": Date().timeIntervalSince1970,
+                "error": error.localizedDescription
+            ])
         }
     }
     
     public func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
         delegate?.didReceiveMessage(message)
-        print("[WATCH] WC didReceiveMessage payload: \(message)")
+        print("[WATCH WC] 📨 didReceiveMessage payload: \(message)")
+        print("[WATCH WC] 📨 Session state - isReachable: \(session.isReachable), activationState: \(session.activationState.rawValue)")
         
         // Heart rate update received silently
         
@@ -504,6 +544,8 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     
                     // CRITICAL: Always reinitialize WorkoutManager for fresh HR streaming
                     print("[WATCH] Reinitializing WorkoutManager for fresh HR streaming")
+                    // Defensive: stop and cleanup any existing workout manager first
+                    self.workoutManager.stopWorkout()
                     self.workoutManager = WorkoutManager()
                     self.workoutManager.delegate = self
                     
@@ -526,58 +568,38 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                         // Navigate to active session view programmatically
                         self.navigateToActiveSession()
                         
+                        // Start the HealthKit workout now
                         self.startSession()
                     }
                 }
                 
-            case "startHeartRateMonitoring":
-                // Explicit request from phone to ensure HR streaming starts
-                print("[WATCH] Received startHeartRateMonitoring command from phone")
-                if !isSessionActive {
-                    // Start session with existing permissions
-                    print("[WATCH] HR monitoring requested while inactive – starting session")
-                    DispatchQueue.main.async {
-                        self.isSessionActive = true
-                        self.isPaused = false
-                        self.sessionStartedFromPhone = true
-                        self.startSession()
-                    }
-                } else {
-                    // Nudge immediate HR update
-                    self.workoutManager.nudgeHeartRateUpdate()
-                }
-
             case "startStepsMonitoring":
-                // Explicit request from phone to ensure steps streaming
+                // Explicit request from phone to ensure steps streaming – guard if inactive
                 print("[WATCH] Received startStepsMonitoring command from phone")
+                guard self.isSessionActive else {
+                    print("[WATCH] Ignoring startStepsMonitoring – session is not active")
+                    self.sendMessage([
+                        "command": "watchTelemetry",
+                        "event": "ignored_start_steps_monitoring_inactive",
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
+                    break
+                }
                 self.workoutManager.nudgeStepCountUpdate()
 
-            case "stepsDebugRequest":
-                // Send a steps snapshot back to the phone for debugging
-                let snapshot: [String: Any] = [
-                    "command": "stepsDebug",
-                    "steps": self.steps,
-                    "isSessionActive": self.isSessionActive,
-                    "isPaused": self.isPaused,
-                    "timestamp": Date().timeIntervalSince1970
-                ]
-                print("[WATCH] Sending stepsDebug snapshot: \(snapshot)")
-                self.sendMessage(snapshot)
-                
             case "stopSession", "workoutStopped", "endSession", "sessionEnded", "sessionComplete":
-                // Always perform cleanup on stop commands, regardless of current flags
+                // Perform full cleanup on stop-related commands
                 DispatchQueue.main.async {
                     self.isSessionActive = false
                     self.isPaused = false
-                    self.sessionStartedFromPhone = false // Reset flag on session stop
+                    self.sessionStartedFromPhone = false
+                    
                     // Stop steps watchdog
                     self.stepsWatchdogTimer?.invalidate()
                     self.stepsWatchdogTimer = nil
                     
-                    // Clear the timer status to prevent lock screen persistence
+                    // Clear status and metrics
                     self.status = "--"
-                    
-                    // Reset all session data
                     self.heartRate = 0
                     self.calories = 0
                     self.distanceValue = 0.0
@@ -586,25 +608,27 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                     self.elevationGain = 0.0
                     self.elevationLoss = 0.0
                     
-                    // Stop the workout manager and clear handlers
+                    // Stop HK workout and clear handlers
                     self.workoutManager.stopWorkout()
                     self.workoutManager.setHeartRateHandler { _ in }
                     self.workoutManager.setStepCountHandler { _ in }
                     
-                    // Force UI refresh to clear any background state
+                    // Haptic to indicate stop
                     WKInterfaceDevice.current().play(.stop)
                     
-                    print("[WATCH] Session terminated, exiting app to return to watch home screen")
+                    // Telemetry: confirm stop cleanup completed
+                    self.sendMessage([
+                        "command": "watchTelemetry",
+                        "event": "watch_stop_cleanup_complete",
+                        "timestamp": Date().timeIntervalSince1970
+                    ])
                     
-                    // Terminate the app to remove from lock screen
-                    // Delay slightly to ensure cleanup completes
+                    // Terminate to remove from lock screen
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        // Exit the app completely
-                        // This will remove it from the lock screen and prevent battery drain
                         exit(0)
                     }
                 }
-                
+
             case "pauseSession":
                 // Pause command from phone
                 DispatchQueue.main.async {
@@ -730,6 +754,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     
     // Handle application context
     public func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
+        print("[WATCH WC] 🔄 didReceiveApplicationContext payload: \(applicationContext)")
+        print("[WATCH WC] 🔄 Session state - isReachable: \(session.isReachable), activationState: \(session.activationState.rawValue)")
+        
         // Update UI on the main thread (prevents the SwiftUI threading error)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -759,6 +786,9 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
     #endif
     
     public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String : Any]) {
+        print("[WATCH WC] 📦 didReceiveUserInfo payload: \(userInfo)")
+        print("[WATCH WC] 📦 Session state - isReachable: \(session.isReachable), activationState: \(session.activationState.rawValue)")
+        
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             // Forward to SessionManagerDelegate
@@ -1029,6 +1059,13 @@ extension SessionManager {
         stepsWatchdogTimer?.invalidate()
         stepsWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            // Defensive: if session is not active, watchdog should not run
+            if self.isSessionActive == false {
+                print("[WATCH] [STEPS_DEBUG] Watchdog fired while session inactive – invalidating")
+                self.stepsWatchdogTimer?.invalidate()
+                self.stepsWatchdogTimer = nil
+                return
+            }
             let now = Date()
             if let last = self.lastStepsUpdateAt {
                 let delta = now.timeIntervalSince(last)
