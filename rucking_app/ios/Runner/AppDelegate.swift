@@ -141,6 +141,11 @@ import CoreMotion
                 // Return and clear any queued WCSession userInfo messages collected while Flutter wasn't ready
                 let queued = self.dequeueAllQueuedMessages()
                 result(queued)
+            case "startPedometerSession":
+                // Start a new pedometer session for real-time step tracking
+                print("[PEDOMETER] Starting new pedometer session")
+                PedometerStreamHandler.startNewSession()
+                result(true)
             default:
                 print("[WATCH] Method not implemented: \(call.method)")
                 result(FlutterMethodNotImplemented)
@@ -194,6 +199,11 @@ import CoreMotion
         // Setup Flutter Event Channel for streaming barometric pressure data to Dart
         let barometerEventChannel = FlutterEventChannel(name: barometerEventChannelName, binaryMessenger: controller.binaryMessenger)
         barometerEventChannel.setStreamHandler(BarometerStreamHandler())
+        
+        // Setup Flutter Event Channel for real-time pedometer data (CMPedometer)
+        let pedometerEventChannel = FlutterEventChannel(name: "com.getrucky.gfy/pedometerStream", binaryMessenger: controller.binaryMessenger)
+        pedometerEventChannel.setStreamHandler(PedometerStreamHandler())
+        print("[PEDOMETER] Event channel registered")
         
         // Register for push notifications and get APNS token
         if #available(iOS 10.0, *) {
