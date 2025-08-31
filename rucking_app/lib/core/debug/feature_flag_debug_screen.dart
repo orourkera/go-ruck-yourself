@@ -92,17 +92,10 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Emergency Disabled: ${FeatureFlags.emergencyDisableAllFlags ? "🚨 YES" : "✅ NO"}',
+              'Simplified Auth: ${FeatureFlags.useSimplifiedAuth ? "✅ ENABLED" : "❌ DISABLED"}',
               style: AppTextStyles.bodyMedium?.copyWith(
-                color: FeatureFlags.emergencyDisableAllFlags ? Colors.red : Colors.green,
+                color: FeatureFlags.useSimplifiedAuth ? Colors.green : Colors.orange,
                 fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Rollout: ${FeatureFlags.authRolloutPercentage}% of users',
-              style: AppTextStyles.bodyMedium?.copyWith(
-                color: FeatureFlags.authRolloutPercentage > 0 ? Colors.orange : Colors.grey,
               ),
             ),
             if (remoteConfigInfo['lastFetchTime'] != null) ...[
@@ -165,17 +158,17 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
             const SizedBox(height: 12),
             _buildFlagRow(
               'CUSTOM_PROFILE_MANAGEMENT',
-              FeatureFlags.KEEP_CUSTOM_PROFILE_MANAGEMENT,
+              FeatureFlags.keepCustomProfileManagement,
               'Extended user profiles (weight, height, preferences)',
             ),
             _buildFlagRow(
               'AVATAR_UPLOAD_PROCESSING',
-              FeatureFlags.KEEP_AVATAR_UPLOAD_PROCESSING,
+              FeatureFlags.keepAvatarUploadProcessing,
               'Image processing and avatar uploads',
             ),
             _buildFlagRow(
               'MAILJET_INTEGRATION',
-              FeatureFlags.KEEP_MAILJET_INTEGRATION,
+              FeatureFlags.keepMailjetIntegration,
               'Email marketing automation',
             ),
           ],

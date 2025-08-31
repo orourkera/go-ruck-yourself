@@ -2279,9 +2279,6 @@ class RuckSessionRouteChunkResource(Resource):
                 if 'timestamp' not in point or lat is None or lng is None:
                     continue
                     
-                # Also handle accuracy field name variations
-                accuracy = point.get('accuracy') or point.get('accuracy_meters')
-                
                 location_rows.append({
                     'session_id': ruck_id,
                     'timestamp': point['timestamp'],
@@ -2289,7 +2286,6 @@ class RuckSessionRouteChunkResource(Resource):
                     'longitude': lng,
                     # TODO: Remove elevation_meters fallback once Flutter app is updated
                     'altitude': point.get('altitude') or point.get('elevation_meters'),
-                    'accuracy': accuracy,
                     'speed': point.get('speed'),
                     'heading': point.get('heading')
                 })
