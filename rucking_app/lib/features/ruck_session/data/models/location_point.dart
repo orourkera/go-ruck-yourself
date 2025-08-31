@@ -58,7 +58,8 @@ class LocationPoint extends Equatable {
       'accuracy_meters': accuracy,  // Keep for compatibility
       if (speed != null) 'speed': speed,
       if (speed != null) 'heading': 0.0,  // Add heading field expected by backend
-      'unique_id': uniqueId,
+      // Generate a unique ID based on timestamp and coordinates
+      'unique_id': '${timestamp.millisecondsSinceEpoch}_${latitude.toStringAsFixed(6)}_${longitude.toStringAsFixed(6)}',
     };
   }
 } 

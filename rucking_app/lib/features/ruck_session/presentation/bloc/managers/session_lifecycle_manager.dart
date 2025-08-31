@@ -57,6 +57,9 @@ class SessionLifecycleManager implements SessionManager {
   // Sophisticated timer coordination
   late TimerCoordinator _timerCoordinator;
   
+  // Deduplication flag to prevent multiple completion calls
+  bool _isCompletionInProgress = false;
+  
   SessionLifecycleManager({
     required SessionRepository sessionRepository,
     required AuthService authService,
@@ -90,6 +93,10 @@ class SessionLifecycleManager implements SessionManager {
 
   @override
   SessionLifecycleState get currentState => _currentState;
+  
+  /// Read-only access to the current active session ID
+  /// Used by `ActiveSessionCoordinator` to propagate the generated ID to managers
+  String? get activeSessionId => _activeSessionId;
   
   /// Set recovery completion callback
   void setRecoveryCallback(Function(Map<String, dynamic>) callback) {
@@ -247,6 +254,13 @@ class SessionLifecycleManager implements SessionManager {
       AppLogger.info('[LIFECYCLE] Stopping ruck session - sessionId: $_activeSessionId');
       AppLogger.info('[LIFECYCLE] Current state before stop: isActive=${_currentState.isActive}, sessionId=${_currentState.sessionId}, pausedAt=${_currentState.pausedAt}');
       
+      // Prevent duplicate completion calls
+      if (_isCompletionInProgress) {
+        AppLogger.warning('[LIFECYCLE] Session completion already in progress, ignoring duplicate request');
+        return;
+      }
+      _isCompletionInProgress = true;
+      
       // CRITICAL: Cancel timers FIRST to prevent race condition with _onTick
       _ticker?.cancel();
       _ticker = null;
@@ -316,6 +330,13 @@ class SessionLifecycleManager implements SessionManager {
       // CRITICAL: Call completion API with comprehensive data and retry logic
       bool completionSuccessful = false;
       String? completionError;
+      
+      // Check again if another completion call happened while we were gathering data
+      if (!_isCompletionInProgress) {
+        AppLogger.warning('[LIFECYCLE] Completion was cancelled or already completed by another call');
+        return;
+      }
+      
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
           AppLogger.info('[LIFECYCLE] Sending completion data (attempt $attempt): ${completionData.keys.join(", ")}');
@@ -430,11 +451,13 @@ class SessionLifecycleManager implements SessionManager {
     await clearCrashRecoveryData();
       
     } catch (e) {
-      AppLogger.error('[LIFECYCLE] Error stopping session: $e');
+      AppLogger.error('[LIFECYCLE] Failed to stop session completely: $e');
+      _isCompletionInProgress = false;  // Reset flag on error
       _updateState(_currentState.copyWith(
         isSaving: false,
-        errorMessage: 'Failed to stop session',
+        error: 'Failed to stop session: ${e.toString()}',
       ));
+      rethrow;
     }
   }
 
@@ -474,334 +497,6 @@ class SessionLifecycleManager implements SessionManager {
     AppLogger.info('[LIFECYCLE] ===== SESSION PAUSED SUCCESSFULLY =====');
   }
 
-  Future<void> _onSessionResumed(manager_events.SessionResumed event) async {
-    if (!_currentState.isActive) {
-      AppLogger.warning('[LIFECYCLE] Resume requested but session not active - ignoring');
-      return;
-    }
-    
-    if (_currentState.pausedAt == null) {
-      AppLogger.warning('[LIFECYCLE] Resume requested but session not paused - ignoring');
-      return;
-    }
-    
-    AppLogger.info('[LIFECYCLE] ===== RESUMING SESSION =====');
-    AppLogger.info('[LIFECYCLE] Resuming session from paused state');
-    AppLogger.info('[LIFECYCLE] Current state before resume: isActive=${_currentState.isActive}, pausedAt=${_currentState.pausedAt}');
-    
-    // Calculate pause duration
-    final pausedDuration = _currentState.pausedAt != null
-        ? DateTime.now().difference(_currentState.pausedAt!)
-        : Duration.zero;
-    
-    AppLogger.info('[LIFECYCLE] Pause duration was: ${pausedDuration.inSeconds} seconds');
-    
-    // Resume timers
-    _startTimer();
-    AppLogger.info('[LIFECYCLE] Timer restarted for resume');
-    
-    // CRITICAL: Resume TimerCoordinator to restart duration increment
-    try {
-      final timerCoordinator = GetIt.instance<TimerCoordinator>();
-      timerCoordinator.resumeTimerSystem();
-      AppLogger.info('[LIFECYCLE] TimerCoordinator resumed successfully');
-    } catch (e) {
-      AppLogger.error('[LIFECYCLE] Failed to resume TimerCoordinator: $e');
-    }
-    
-    // Update watch
-    await _watchService.resumeSessionOnWatch();
-    AppLogger.info('[LIFECYCLE] Watch resume command sent');
-    
-    _updateState(_currentState.copyWith(
-      isActive: true,
-      pausedAt: null, // Clear paused state
-      totalPausedDuration: _currentState.totalPausedDuration + pausedDuration,
-    ));
-    
-    AppLogger.info('[LIFECYCLE] State updated - pausedAt: ${_currentState.pausedAt}');
-    AppLogger.info('[LIFECYCLE] ===== SESSION RESUMED SUCCESSFULLY =====');
-  }
-
-  Future<void> _onTimerStarted(manager_events.TimerStarted event) async {
-    _startTimer();
-  }
-
-  Future<void> _onTimerStopped(manager_events.TimerStopped event) async {
-    _ticker?.cancel();
-    _ticker = null;
-  }
-
-  Future<void> _onTick(manager_events.Tick event) async {
-    if (_currentState.isActive && _sessionStartTime != null && _currentState.pausedAt == null) {
-      // Only update duration when NOT paused (pausedAt is null)
-      final newDuration = DateTime.now().difference(_sessionStartTime!);
-      _updateState(_currentState.copyWith(duration: newDuration));
-    }
-    // When paused (pausedAt is not null), duration should remain frozen - no updates
-  }
-
-
-  Future<bool> _getUserMetricPreference() async {
-    bool preferMetric = false; // Default to imperial
-    
-    final authState = GetIt.I<AuthBloc>().state;
-    AppLogger.info('[SESSION_LIFECYCLE] AuthBloc state type: ${authState.runtimeType}');
-    
-    if (authState is Authenticated) {
-      preferMetric = authState.user.preferMetric;
-      AppLogger.info('[SESSION_LIFECYCLE] User preferMetric: ${authState.user.preferMetric}');
-    } else {
-      AppLogger.warning('[SESSION_LIFECYCLE] User not authenticated, checking storage for preference');
-      
-      // Fallback: Try to get user preference from storage
-      try {
-        final storedUserData = await _storageService.getObject(AppConfig.userProfileKey);
-        if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
-          preferMetric = storedUserData['preferMetric'] as bool;
-          AppLogger.info('[SESSION_LIFECYCLE] Found stored user preference: $preferMetric');
-        } else {
-          AppLogger.warning('[SESSION_LIFECYCLE] No stored user preference found, defaulting to imperial (false)');
-        }
-      } catch (e) {
-        AppLogger.error('[SESSION_LIFECYCLE] Error reading stored user preference: $e');
-        AppLogger.warning('[SESSION_LIFECYCLE] Defaulting to imperial (false)');
-      }
-    }
-    
-    AppLogger.info('[SESSION_LIFECYCLE] Final preferMetric value: $preferMetric');
-    return preferMetric;
-  }
-
-  void _startTimer() {
-    _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      handleEvent(const manager_events.Tick());
-    });
-  }
-
-  void _updateState(SessionLifecycleState newState) {
-    _currentState = newState;
-    _stateController.add(newState);
-  }
-
-  @override
-  /// Check for and recover active session on app startup
-  Future<void> checkForCrashedSession() async {
-    try {
-      print('[RECOVERY_DEBUG] Starting session recovery check');
-      print('[RECOVERY_DEBUG] Storage service type: ${_storageService.runtimeType}');
-      
-      // Check if storage service is working at all
-      try {
-        await _storageService.setObject('recovery_test', {'test': 'value'});
-        final testRead = await _storageService.getObject('recovery_test');
-        print('[RECOVERY_DEBUG] Storage test - wrote and read: $testRead');
-        await _storageService.remove('recovery_test');
-      } catch (e) {
-        print('[RECOVERY_DEBUG] Storage service not working: $e');
-      }
-      
-      Map<String, dynamic>? sessionData;
-      for (int attempt = 1; attempt <= 3; attempt++) {
-        try {
-          print('[RECOVERY_DEBUG] Attempting storage read $attempt for key: active_session_data');
-          sessionData = await _storageService.getObject('active_session_data');
-          print('[RECOVERY_DEBUG] Raw data on attempt $attempt: $sessionData');
-          print('[RECOVERY_DEBUG] Data type: ${sessionData?.runtimeType}, keys: ${sessionData?.keys}');
-          break;
-        } catch (e) {
-          print('[RECOVERY_DEBUG] Storage read failed on attempt $attempt: $e');
-          print('[RECOVERY_DEBUG] Error type: ${e.runtimeType}');
-          await Future.delayed(Duration(seconds: attempt));
-        }
-      }
-      
-      // Try alternative keys in case there's a mismatch
-      if (sessionData == null) {
-        print('[RECOVERY_DEBUG] Trying alternative storage keys...');
-        try {
-          final altData1 = await _storageService.getObject('session_data');
-          print('[RECOVERY_DEBUG] Alternative key session_data: $altData1');
-          final altData2 = await _storageService.getObject('active_session');
-          print('[RECOVERY_DEBUG] Alternative key active_session: $altData2');
-        } catch (e) {
-          print('[RECOVERY_DEBUG] Alternative key check failed: $e');
-        }
-      }
-      
-      if (sessionData == null) {
-        print('[RECOVERY_DEBUG] No data found after 3 attempts and alternative keys');
-        return;
-      }
-
-      final sessionId = sessionData['session_id']?.toString();
-      final startTimeStr = sessionData['session_start_time'] as String?;
-      // If we have session data, assume it was active when stored
-      final isActive = sessionData['session_id'] != null;
-
-      if (!isActive || sessionId == null || startTimeStr == null) {
-        AppLogger.info('[RECOVERY] Session data incomplete or inactive');
-        await _storageService.remove('active_session_data');
-        return;
-      }
-
-      final startTime = DateTime.parse(startTimeStr);
-      final crashDuration = DateTime.now().difference(startTime);
-
-      // If session was started more than 6 hours ago, probably abandon it
-      if (crashDuration.inHours > 6) {
-        AppLogger.info('[RECOVERY] Session too old (${crashDuration.inHours}h), abandoning');
-        await _storageService.remove('active_session_data');
-        return;
-      }
-
-      // CRITICAL: Validate session exists in backend before recovery
-      try {
-        AppLogger.info('[RECOVERY] Validating session $sessionId exists in backend...');
-        final resp = await _apiClient.get('/rucks/$sessionId');
-        // ApiClient throws on non-2xx. If we reach here, just sanity-check shape.
-        if (resp == null) {
-          throw Exception('Session validation failed: null response');
-        }
-        if (resp is Map && resp.isEmpty) {
-          throw Exception('Session validation failed: empty payload');
-        }
-        AppLogger.info('[RECOVERY] ✅ Session $sessionId validated in backend');
-      } catch (e) {
-        AppLogger.error('[RECOVERY] ❌ Session $sessionId does not exist in backend: $e');
-        AppLogger.error('[RECOVERY] Clearing orphaned session data and aborting recovery');
-        await _storageService.remove('active_session_data');
-        return;
-      }
-
-      // Check if we're already running a LIVE active session with different ID - don't override
-      // Only skip if we have an active session AND it's different from the recovered session
-      if (_currentState.isActive && _currentState.sessionId != null && _currentState.sessionId != sessionId && _ticker != null && _ticker!.isActive) {
-        AppLogger.info('[RECOVERY] Already running LIVE session ${_currentState.sessionId}, found recovery for different session ${sessionId} - skipping recovery');
-        await _storageService.remove('active_session_data'); // Clean up stale recovery data
-        return;
-      }
-      
-      AppLogger.warning('🔥 CRASH RECOVERY: Found active session from ${crashDuration.inMinutes} minutes ago');
-
-      // Restore session state
-      _activeSessionId = sessionId;
-      _sessionStartTime = startTime;
-
-      final ruckWeight = (sessionData['ruck_weight_kg'] as num?)?.toDouble() ?? 0.0;
-      final userWeight = 70.0; // Default weight if not stored
-      final lastDuration = Duration(seconds: (sessionData['elapsed_seconds'] as num?)?.toInt() ?? 0);
-
-      final totalDistance = (sessionData['distance_km'] as num?)?.toDouble() ?? 0.0;
-      final elevationGain = (sessionData['elevation_gain'] as num?)?.toDouble() ?? 0.0;
-      final elevationLoss = (sessionData['elevation_loss'] as num?)?.toDouble() ?? 0.0;
-      final caloriesBurned = (sessionData['calories'] as num?)?.toDouble() ?? 0.0;
-      
-      // Calculate gap distance from last saved location to current location
-      double gapDistance = 0.0;
-      LocationPoint? lastSavedLocation;
-      try {
-        final lastLocationData = sessionData['last_location'] as Map<String, dynamic>?;
-        if (lastLocationData != null) {
-          lastSavedLocation = LocationPoint.fromJson(lastLocationData);
-          AppLogger.info('[LIFECYCLE] Last saved location: ${lastSavedLocation.latitude}, ${lastSavedLocation.longitude}');
-          
-          // Get current location to calculate gap distance
-          gapDistance = await _calculateGapDistance(lastSavedLocation);
-          AppLogger.info('[LIFECYCLE] Calculated gap distance: ${gapDistance}km');
-        }
-      } catch (e) {
-        AppLogger.warning('[LIFECYCLE] Could not calculate gap distance: $e');
-      }
-      
-      final recoveredDistance = totalDistance + gapDistance;
-      AppLogger.info('[LIFECYCLE] Recovery data - Distance: ${totalDistance}km + gap: ${gapDistance}km = ${recoveredDistance}km, Elevation: ${elevationGain}m gain/${elevationLoss}m loss, Calories: $caloriesBurned');
-
-      _updateState(SessionLifecycleState(
-        isActive: true,
-        sessionId: sessionId,
-        startTime: startTime,
-        duration: lastDuration,
-        ruckWeightKg: ruckWeight,
-        userWeightKg: userWeight,
-        errorMessage: '🔄 Session recovered from unexpected app closure',
-        isLoading: false,
-        isSaving: false,
-        currentSession: null,
-        totalPausedDuration: Duration.zero,
-        pausedAt: null,
-        isRecovered: true,
-      ));
-
-      // Send recovery data to coordinator so it can initialize managers
-    // Send recovery data to coordinator - but mark it as recovery data
-    _notifyRecoveryCompleted({
-      'is_crash_recovery': true, // Mark as actual crash recovery
-      'session_id': sessionId,
-      'start_time': startTimeStr,
-      'ruck_weight_kg': ruckWeight,
-      'user_weight_kg': userWeight,
-      'distance_km': recoveredDistance, // Restore accumulated distance
-      'elevation_gain': elevationGain,
-      'elevation_loss': elevationLoss,
-      'calories': caloriesBurned, // Restore accumulated calories
-      'last_location': lastSavedLocation?.toJson(),
-      'gap_distance_km': gapDistance,
-      'recovery_duration_minutes': crashDuration.inMinutes,
-    });
-
-      // Restart timers and services
-      _startTimer();
-      _startSessionPersistenceTimer();
-      _startSophisticatedTimerSystem();
-      _startConnectivityMonitoring();
-
-      // Check for pending completions
-      final pendingKeys = await _storageService.getAllKeys().then((keys) => keys.where((k) => k.startsWith('pending_completion_')).toList());
-      for (final key in pendingKeys) {
-        final data = await _storageService.getObject(key);
-        if (data != null) {
-          final sessionId = key.split('_').last;
-          try {
-            await _apiClient.post('/rucks/$sessionId/complete', data);
-            await _storageService.remove(key);
-            AppLogger.info('[RECOVERY] Successfully completed pending session $sessionId');
-          } catch (e) {
-            AppLogger.warning('[RECOVERY] Failed to complete pending session $sessionId: $e');
-            // Leave for next try
-          }
-        }
-      }
-
-      AppLogger.info('✅ Session recovery complete: $sessionId');
-    } catch (e) {
-      AppLogger.error('[RECOVERY] Failed to recover crashed session: $e');
-      await _storageService.remove('active_session_data');
-    }
-  }
-
-/// Clear the crash recovery data when session completes normally
-Future<void> clearCrashRecoveryData() async {
-  try {
-    await _storageService.remove('active_session_data');
-    AppLogger.debug('[RECOVERY] Cleared crash recovery data');
-  } catch (e) {
-    AppLogger.error('[RECOVERY] Failed to clear recovery data: $e');
-  }
-}
-
-  Future<void> dispose() async {
-    _ticker?.cancel();
-    _sessionPersistenceTimer?.cancel();
-    _connectivitySubscription?.cancel();
-    _timerCoordinator.dispose();
-    await _stateController.close();
-  }
-
-  // Getters for other managers to access session info
-  String? get activeSessionId => _activeSessionId;
-  DateTime? get sessionStartTime => _sessionStartTime;
   Future<void> _onSessionReset(manager_events.SessionReset event) async {
     try {
       AppLogger.info('[LIFECYCLE] Session reset requested');
@@ -813,18 +508,15 @@ Future<void> clearCrashRecoveryData() async {
       // Clear session identifiers and state
       _activeSessionId = null;
       _sessionStartTime = null;
+      _isCompletionInProgress = false;  // Reset completion flag
       
-      // Reset to initial state
+      // Clear pausedAt to ensure clean state
       _updateState(const SessionLifecycleState(
         isActive: false,
         sessionId: null,
         startTime: null,
-        duration: Duration.zero,
-        totalPausedDuration: Duration.zero,
         pausedAt: null,
-        ruckWeightKg: 0.0,
-        userWeightKg: 0.0,
-        errorMessage: null,
+        duration: Duration.zero,
         isSaving: false,
         isLoading: false,
         currentSession: null,

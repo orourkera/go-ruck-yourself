@@ -149,12 +149,42 @@ def robots_txt():
     )
     return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
 
+# Apple App Site Association served at root as well (Apple fetches both locations)
+@app.route('/apple-app-site-association', methods=['GET', 'HEAD'])
+def aasa_root():
+    try:
+        base_dir = os.path.dirname(__file__)
+        aasa_path = os.path.join(base_dir, '.well-known', 'apple-app-site-association')
+        with open(aasa_path, 'rb') as f:
+            data = f.read()
+        # Serve with correct content type and allow caching
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'public, max-age=86400',  # 24 hours
+        }
+        status = 200
+        if request.method == 'HEAD':
+            # Return headers only for HEAD
+            return '', status, headers
+        return data, status, headers
+    except FileNotFoundError:
+        return jsonify({'error': 'apple-app-site-association not found'}), 404
+
 # Bot blocking middleware - block bots before they hit routes
 @app.before_request
 def block_bots():
     """Block known bots and malicious requests to reduce server load"""
     user_agent = request.headers.get('User-Agent', '').lower()
     request_path = request.path.lower()
+    
+    # Allow Apple's AASA validation explicitly
+    aasa_allowed_paths = {
+        '/.well-known/apple-app-site-association',
+        '/apple-app-site-association',
+    }
+    if request_path in aasa_allowed_paths or 'aasa-bot' in user_agent:
+        # Let AASA validator pass through regardless of generic bot rules
+        return
     
     # Bot user agent patterns
     bot_patterns = [

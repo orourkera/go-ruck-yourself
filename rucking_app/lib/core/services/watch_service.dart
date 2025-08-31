@@ -272,13 +272,17 @@ class WatchService {
     if (hasActiveSession) {
       AppLogger.info('[WATCH] Active session found - sending session data to watch');
       
+      // Get user's metric preference from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final bool isMetric = prefs.getBool('prefer_metric') ?? true; // Default to metric
+      
       // Prepare comprehensive session data for the watch
       final sessionData = {
         'command': 'activeSessionResponse',
         'hasActiveSession': true,
         'sessionId': (currentState as ActiveSessionRunning).sessionId,
         'isPaused': currentState.isPaused,
-        'isMetric': currentState.isMetric,
+        'isMetric': isMetric,
         'ruckWeight': _ruckWeight,
         'metrics': {
           'distance': _currentDistance,
@@ -306,14 +310,14 @@ class WatchService {
       // Trigger a full metrics update
       if (activeBloc != null && currentState is ActiveSessionRunning) {
         await updateSessionOnWatch(
-          distance: currentState.distance,
-          duration: currentState.duration,
-          pace: currentState.pace,
+          distance: currentState.distanceKm,
+          duration: Duration(seconds: currentState.elapsedSeconds),
+          pace: currentState.pace ?? 0.0,
           isPaused: currentState.isPaused,
           calories: currentState.calories,
           elevationGain: currentState.elevationGain,
           elevationLoss: currentState.elevationLoss,
-          isMetric: currentState.isMetric,
+          isMetric: isMetric, // Use the preference we just loaded
           steps: _currentSteps,
         );
       }
