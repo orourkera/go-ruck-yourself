@@ -1,0 +1,126 @@
+<figure style="margin:0 0 1rem 0;">
+  <img src="{{ url_for('static', filename='images/blog/gear.jpg') }}"
+       alt="Packing a ruck with weight high and close to the spine"
+       style="width:33%; height:auto; border-radius:8px; margin: 1rem 0;">
+</figure>
+<p><strong>Rucksack weight distribution matters.</strong> A well-packed ruck feels lighter, breathes better, and saves your shoulders and lower back. This step-by-step guide shows exactly how to pack so weight rides <em>high and close</em> to your spine and stays stable on flats, hills, and turns.</p>
+
+<div style="background:#f6f9f6; border:1px solid #e4efe4; border-radius:8px; padding:.75rem 1rem; margin:1rem 0;">
+  <strong>Quick Takeaways</strong>
+  <ul style="margin:.5rem 0 0 1rem;">
+    <li>Heaviest items high and close to the back panel; light/bulky items as fillers.</li>
+    <li>Stability beats density: no slosh, no swing, no bounce.</li>
+    <li>Protect hotspots: soft interface at the lumbar, shoulder webbing flat, no hard corners.</li>
+  </ul>
+</div>
+
+<h2>Step-by-Step: How to Pack a Ruck</h2>
+<ol>
+  <li><strong>Back panel first:</strong> Place a thin foam pad or folded towel against the back panel to smooth out seams and improve airflow.</li>
+  <li><strong>Heaviest weight high/close:</strong> Ruck plate or dense items go in the high inner sleeve or strapped tight near the top. Avoid low slouching weight.</li>
+  <li><strong>Stabilize with fillers:</strong> Use clothing, a hoodie, or a small towel to block lateral movement—no gaps around the weight.</li>
+  <li><strong>Soft buffer at lumbar:</strong> Prevent hard edges on the lower back with a rolled tee or towel.</li>
+  <li><strong>Even external straps:</strong> Cinch top and bottom evenly so the load sits snug without deforming the pack.</li>
+</ol>
+
+<h2>Field Example: The Grocery-Pack Fix</h2>
+<p>Jordan used two 10 lb rice bags and a water bladder in a commuter pack. The rice slid to the bottom and the bladder sloshed, causing forward lean and hot spots. We stacked the rice <em>high</em>, wedged them with a hoodie, and compressed the top straps. Slosh gone; posture improved; pace steady on 4% hills.</p>
+
+<h2>Checklist Before You Go</h2>
+<ul>
+  <li>Pick up the pack: does weight feel high and near the shoulders?</li>
+  <li>Shake left/right: any swing? Add fillers.</li>
+  <li>Lean forward/back: any slouch? Re-cinch top straps and compress the load.</li>
+  <li>Strap check: shoulder straps equal length; no twisted webbing; sternum strap mid‑chest.</li>
+</ul>
+
+<h2 id="rucking-calorie-calculator">Rucking Calorie Calculator</h2>
+<p>
+  Estimate effort by weight, pace, and grade with our free tool:
+  <a href="/rucking-calorie-calculator"><strong>Open the Rucking Calorie Calculator</strong></a>.
+</p>
+
+<h2>References</h2>
+<ol>
+  <li>Looney, D.P. et al. (2022). Modeling the Metabolic Costs of Heavy Military Backpacking (LCDA). <em>Med Sci Sports Exerc</em>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8919998/" target="_blank" rel="noopener">Open access</a>.</li>
+  <li>Knapik, J.J. et al. (2004). Load carriage biomechanics and risk factors. <em>J Strength Cond Res</em>.</li>
+  <li>Dean, C. (2016). Backpack load distribution and posture. <em>Appl Ergon</em>.</li>
+</ol>
+
+<div id="faq" style="margin-top:1.25rem; font-weight:700;">Packing a Ruck: FAQ</div>
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Where should the heaviest weight go in a ruck?</h3>
+<div class="faq-answer" data-open="false">High and close to your back. Dense weight near the top reduces torque on the lower back and makes hills feel easier.</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">How do I stop items from sliding or sloshing?</h3>
+<div class="faq-answer" data-open="false">Block gaps with soft fillers (hoodie, towel), then compress top and bottom straps evenly so the core load cannot move.</div>
+
+<style>
+  .faq-collapsible #faq + h3.faq-question,
+  .faq-collapsible #faq ~ h3.faq-question { cursor: pointer; position: relative; }
+  .faq-collapsible #faq + h3.faq-question::after,
+  .faq-collapsible #faq ~ h3.faq-question::after {
+    content: '\25BC'; font-size: 0.8em; color: #728C69; margin-left: 8px; transition: transform 0.15s ease-in-out;
+  }
+  .faq-collapsible #faq + h3.faq-question[aria-expanded="true"]::after,
+  .faq-collapsible #faq ~ h3.faq-question[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .faq-collapsible .faq-answer { display: none; margin-top: .25rem; }
+  .faq-collapsible .faq-answer[data-open="true"] { display: block; }
+  .faq-collapsible .faq-question:focus { outline: 2px dashed #cfd7cf; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-collapsible #faq + h3.faq-question::after,
+    .faq-collapsible #faq ~ h3.faq-question::after { transition: none; }
+  }
+</style>
+
+<script>
+  (function(){
+    var faqRoot = document.getElementById('faq');
+    if (!faqRoot) return;
+    document.documentElement.classList.add('faq-collapsible');
+    function toggle(q){
+      var ans = q.nextElementSibling; if (!ans || !ans.classList.contains('faq-answer')) return;
+      var expanded = q.getAttribute('aria-expanded') === 'true';
+      q.setAttribute('aria-expanded', String(!expanded));
+      ans.setAttribute('data-open', String(!expanded));
+    }
+    var node = faqRoot.nextElementSibling; var qs = [];
+    while (node) {
+      if (node.matches && node.matches('h3.faq-question')) qs.push(node);
+      if (node.tagName === 'H2') break;
+      node = node.nextElementSibling;
+    }
+    qs.forEach(function(q){
+      q.setAttribute('role','button'); q.setAttribute('aria-expanded','false');
+      var ans = q.nextElementSibling; if (ans && ans.classList) ans.setAttribute('data-open','false');
+      q.addEventListener('click', function(){ toggle(q); });
+      q.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle(q);} });
+    });
+  })();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Where should the heaviest weight go in a ruck?",
+      "acceptedAnswer": {"@type": "Answer", "text": "High and close to your back. Dense weight near the top reduces torque on the lower back and makes hills feel easier."}
+    },
+    {
+      "@type": "Question",
+      "name": "How do I stop items from sliding or sloshing?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Block gaps with soft fillers (hoodie, towel), then compress top and bottom straps evenly so the core load cannot move."}
+    }
+  ]
+}
+</script>
+
+<h2>Related Guides</h2>
+<ul>
+  <li><a href="/blog/weighted-vest-form-and-fitting">Weighted Vest and Ruck Fitting</a> - Stop the bounce</li>
+  <li><a href="/blog/rucking-weight-how-much">How Much Weight Should You Ruck With?</a> - Start smart</li>
+  <li><a href="/blog/rucking-gear-and-weighted-vest-gear">Gear Guide: Rucks and Vests</a> - Comfort and durability</li>
+  <li><a href="/rucking-calorie-calculator">Rucking Calorie Calculator</a> - Estimate effort</li>
+</ul>

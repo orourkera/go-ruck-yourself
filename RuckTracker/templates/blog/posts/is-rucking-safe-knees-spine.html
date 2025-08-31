@@ -1,0 +1,115 @@
+<figure style="margin:0 0 1rem 0;">
+  <img src="{{ url_for('static', filename='images/blog/girl.jpg') }}"
+       alt="Rucking posture and joint safety"
+       style="width:33%; height:auto; border-radius:8px; margin: 1rem 0;">
+</figure>
+<p><strong>Is rucking safe?</strong> With smart progressions and good technique, most healthy people can ruck safely. Here’s what the science says about knee and spine loads—and what you can do to reduce risk.</p>
+
+<div style="background:#f6f9f6; border:1px solid #e4efe4; border-radius:8px; padding:.75rem 1rem; margin:1rem 0;">
+  <strong>Quick Takeaways</strong>
+  <ul style="margin:.5rem 0 0 1rem;">
+    <li>Start light and build time first; increase load in small steps.</li>
+    <li>Keep weight high/close and eliminate bounce to lower joint stress.</li>
+    <li>Short steps, upright torso, and relaxed hands improve comfort and economy.</li>
+  </ul>
+</div>
+
+<h2>Joint Loads 101</h2>
+<p>External load increases ground reaction forces and the work your posture muscles must do. But dose and distribution matter: a dense weight <em>high and close</em> typically feels easier than the same weight low and far from the spine.</p>
+
+<h2>Technique That Protects</h2>
+<ul>
+  <li><strong>Stride:</strong> Shorter steps reduce braking forces. Avoid over‑striding and hard heel strikes.</li>
+  <li><strong>Posture:</strong> Neutral torso, slight forward lean from the ankles, not the hips.</li>
+  <li><strong>Fit:</strong> Snug shoulder straps, sternum strap mid‑chest, optional hip belt on longer sessions.</li>
+</ul>
+
+<h2>Progression That Works</h2>
+<ul>
+  <li>Weeks 1–2: 2–3 x 20–30 min easy, 0–10% BW.</li>
+  <li>Weeks 3–4: 3 x 30–40 min easy; add a short hill or gentle intervals.</li>
+  <li>Weeks 5+: Add weight in 2–5 lb steps only if feet/skin/joints feel great.</li>
+</ul>
+
+<h2 id="rucking-calorie-calculator">Rucking Calorie Calculator</h2>
+<p>
+  Estimate effort by weight, pace, and grade with our free tool:
+  <a href="/rucking-calorie-calculator"><strong>Open the Rucking Calorie Calculator</strong></a>.
+</p>
+
+<h2>References</h2>
+<ol>
+  <li>Knapik, J.J. et al. (2004). Load carriage injury mechanisms and prevention. <em>J Strength Cond Res</em>.</li>
+  <li>Looney, D.P. et al. (2022). Modeling the Metabolic Costs of Heavy Military Backpacking (LCDA). <em>Med Sci Sports Exerc</em>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8919998/" target="_blank" rel="noopener">Open access</a>.</li>
+  <li>Weyand, P.G. et al. (2021). Real‑world walking economy on mixed‑terrain. <em>J Appl Physiol</em>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8560389/" target="_blank" rel="noopener">Open access</a>.</li>
+</ol>
+
+<div id="faq" style="margin-top:1.25rem; font-weight:700;">Rucking Safety: FAQ</div>
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Is rucking bad for your knees?</h3>
+<div class="faq-answer" data-open="false">Not inherently. Start light, use shorter steps, and build gradually. If pain persists beyond mild soreness, rest and assess technique and load.</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Is rucking bad for your back?</h3>
+<div class="faq-answer" data-open="false">Poor load placement and bounce are common culprits. Keep weight high/close, stabilize the load, and maintain neutral posture.</div>
+
+<style>
+  .faq-collapsible #faq + h3.faq-question,
+  .faq-collapsible #faq ~ h3.faq-question { cursor: pointer; position: relative; }
+  .faq-collapsible #faq + h3.faq-question::after,
+  .faq-collapsible #faq ~ h3.faq-question::after {
+    content: '\25BC'; font-size: 0.8em; color: #728C69; margin-left: 8px; transition: transform 0.15s ease-in-out;
+  }
+  .faq-collapsible #faq + h3.faq-question[aria-expanded="true"]::after,
+  .faq-collapsible #faq ~ h3.faq-question[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .faq-collapsible .faq-answer { display: none; margin-top: .25rem; }
+  .faq-collapsible .faq-answer[data-open="true"] { display: block; }
+  .faq-collapsible .faq-question:focus { outline: 2px dashed #cfd7cf; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-collapsible #faq + h3.faq-question::after,
+    .faq-collapsible #faq ~ h3.faq-question::after { transition: none; }
+  }
+</style>
+
+<script>
+  (function(){
+    var faqRoot = document.getElementById('faq');
+    if (!faqRoot) return;
+    document.documentElement.classList.add('faq-collapsible');
+    function toggle(q){
+      var ans = q.nextElementSibling; if (!ans || !ans.classList.contains('faq-answer')) return;
+      var expanded = q.getAttribute('aria-expanded') === 'true';
+      q.setAttribute('aria-expanded', String(!expanded));
+      ans.setAttribute('data-open', String(!expanded));
+    }
+    var node = faqRoot.nextElementSibling; var qs = [];
+    while (node) {
+      if (node.matches && node.matches('h3.faq-question')) qs.push(node);
+      if (node.tagName === 'H2') break;
+      node = node.nextElementSibling;
+    }
+    qs.forEach(function(q){
+      q.setAttribute('role','button'); q.setAttribute('aria-expanded','false');
+      var ans = q.nextElementSibling; if (ans && ans.classList) ans.setAttribute('data-open','false');
+      q.addEventListener('click', function(){ toggle(q); });
+      q.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle(q);} });
+    });
+  })();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is rucking bad for your knees?", "acceptedAnswer": {"@type": "Answer", "text": "Not inherently. Start light, use shorter steps, and build gradually. If pain persists beyond mild soreness, rest and assess technique and load."}},
+    {"@type": "Question", "name": "Is rucking bad for your back?", "acceptedAnswer": {"@type": "Answer", "text": "Poor load placement and bounce are common culprits. Keep weight high/close, stabilize the load, and maintain neutral posture."}}
+  ]
+}
+</script>
+
+<h2>Related Guides</h2>
+<ul>
+  <li><a href="/blog/rucking-and-knee-back-safety">Knee and Back Safety</a> - Risk reducers</li>
+  <li><a href="/blog/rucking-weight-how-much">How Much Weight Should You Ruck With?</a> - Start smart</li>
+  <li><a href="/blog/weighted-vest-form-and-fitting">Weighted Vest and Ruck Fitting</a> - Stop the bounce</li>
+  <li><a href="/rucking-calorie-calculator">Rucking Calorie Calculator</a> - Estimate effort</li>
+</ul>

@@ -80,6 +80,88 @@
   <li><strong>Popular commentary:</strong> Gary Brecka on weighted vests and walking—motivational perspective, not peer‑reviewed research. <a href="https://www.youtube.com/watch?v=0BXG38Fdog4" target="_blank" rel="noopener">Watch on YouTube</a>.</li>
 </ul>
 
+<hr style="margin:2rem 0; border:none; border-top:1px solid #eee;" />
+<h2 id="rucking-calorie-calculator">Rucking Calorie Calculator</h2>
+<p>
+  Want to see how different loads change calorie burn? Use our free <strong>rucking calorie calculator</strong> (aka <em>ruck calorie calculator</em> or <em>calories burned rucking calculator</em>):
+  <a href="/rucking-calorie-calculator"><strong>Open the Rucking Calorie Calculator</strong></a>. Adjust body weight, pack weight, pace, grade, and terrain.
+</p>
+
+<div id="faq" style="margin-top:1.25rem; font-weight:700;">Ruck Weight: FAQ</div>
+<h3 class="faq-question" tabindex="0" aria-expanded="false">How much weight should beginners ruck with?</h3>
+<div class="faq-answer" data-open="false">
+  Start light—often ~5–10% of body weight—and focus on 30–45 minutes at a steady, conversational pace. Add weight slowly after several easy sessions with good form.
+</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">When should I increase my ruck weight?</h3>
+<div class="faq-answer" data-open="false">
+  If sessions feel comfortable and recovery is good for 1–3 weeks, increase just one variable: weight (+2–5 lb), time, or hills. Avoid raising multiple variables at once.
+</div>
+
+<style>
+  /* Progressive enhancement: only hide/toggle when JS adds .faq-collapsible */
+  .faq-collapsible #faq + h3.faq-question,
+  .faq-collapsible #faq ~ h3.faq-question { cursor: pointer; position: relative; }
+  .faq-collapsible #faq + h3.faq-question::after,
+  .faq-collapsible #faq ~ h3.faq-question::after {
+    content: '\25BC'; font-size: 0.8em; color: #728C69; margin-left: 8px; transition: transform 0.15s ease-in-out;
+  }
+  .faq-collapsible #faq + h3.faq-question[aria-expanded="true"]::after,
+  .faq-collapsible #faq ~ h3.faq-question[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .faq-collapsible .faq-answer { display: none; margin-top: .25rem; }
+  .faq-collapsible .faq-answer[data-open="true"] { display: block; }
+  .faq-collapsible .faq-question:focus { outline: 2px dashed #cfd7cf; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-collapsible #faq + h3.faq-question::after,
+    .faq-collapsible #faq ~ h3.faq-question::after { transition: none; }
+  }
+</style>
+
+<script>
+  (function(){
+    var faqRoot = document.getElementById('faq');
+    if (!faqRoot) return;
+    document.documentElement.classList.add('faq-collapsible');
+    function toggle(q){
+      var ans = q.nextElementSibling; if (!ans || !ans.classList.contains('faq-answer')) return;
+      var expanded = q.getAttribute('aria-expanded') === 'true';
+      q.setAttribute('aria-expanded', String(!expanded));
+      ans.setAttribute('data-open', String(!expanded));
+    }
+    var node = faqRoot.nextElementSibling; var qs = [];
+    while (node) {
+      if (node.matches && node.matches('h3.faq-question')) qs.push(node);
+      if (node.tagName === 'H2') break;
+      node = node.nextElementSibling;
+    }
+    qs.forEach(function(q){
+      q.setAttribute('role','button'); q.setAttribute('aria-expanded','false');
+      var ans = q.nextElementSibling; if (ans && ans.classList) ans.setAttribute('data-open','false');
+      q.addEventListener('click', function(){ toggle(q); });
+      q.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle(q);} });
+    });
+  })();
+  </script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How much weight should beginners ruck with?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Start light—often ~5–10% of body weight—and focus on 30–45 minutes at a steady, conversational pace. Add weight slowly after several easy sessions with good form."}
+    },
+    {
+      "@type": "Question",
+      "name": "When should I increase my ruck weight?",
+      "acceptedAnswer": {"@type": "Answer", "text": "If sessions feel comfortable and recovery is good for 1–3 weeks, increase just one variable: weight (+2–5 lb), time, or hills. Avoid raising multiple variables at once."}
+    }
+  ]
+}
+  </script>
+
 <h2>Related Guides</h2>
 <ul>
   <li><a href="/blog/what-is-rucking">What Is Rucking?</a></li>

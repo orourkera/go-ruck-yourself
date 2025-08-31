@@ -56,6 +56,88 @@
   <li><strong>Popular commentary:</strong> Gary Brecka on weighted vests and walking—motivational perspective, not peer‑reviewed research. <a href="https://www.youtube.com/watch?v=0BXG38Fdog4" target="_blank" rel="noopener">Watch on YouTube</a>.</li>
 </ul>
 
+<hr style="margin:2rem 0; border:none; border-top:1px solid #eee;" />
+<h2 id="rucking-calorie-calculator">Rucking Calorie Calculator</h2>
+<p>
+  Compare your own burn rates with our free <strong>rucking calorie calculator</strong> (aka <em>ruck calorie calculator</em> or <em>calories burned rucking calculator</em>):
+  <a href="/rucking-calorie-calculator"><strong>Open the Rucking Calorie Calculator</strong></a>. Adjust body weight, external load, pace, grade, and terrain.
+</p>
+
+<div id="faq" style="margin-top:1.25rem; font-weight:700;">Rucking vs Running: FAQ</div>
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Which burns more calories: rucking or running?</h3>
+<div class="faq-answer" data-open="false">
+  Running generally burns more per minute at the same effort, but rucking with load can approach easy run costs while staying lower‑impact. Many people can ruck longer; total session calories often track total time on feet. Use the <a href="/rucking-calorie-calculator">calculator</a> to compare.
+</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Is rucking easier on the joints than running?</h3>
+<div class="faq-answer" data-open="false">
+  Typically, yes. Running produces higher peak impact forces; loaded walking raises forces vs. walking but remains joint‑friendlier for many at sustainable paces. Progress gradually and keep form tall with short steps.
+</div>
+
+<style>
+  /* Progressive enhancement: only hide/toggle when JS adds .faq-collapsible */
+  .faq-collapsible #faq + h3.faq-question,
+  .faq-collapsible #faq ~ h3.faq-question { cursor: pointer; position: relative; }
+  .faq-collapsible #faq + h3.faq-question::after,
+  .faq-collapsible #faq ~ h3.faq-question::after {
+    content: '\25BC'; font-size: 0.8em; color: #728C69; margin-left: 8px; transition: transform 0.15s ease-in-out;
+  }
+  .faq-collapsible #faq + h3.faq-question[aria-expanded="true"]::after,
+  .faq-collapsible #faq ~ h3.faq-question[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .faq-collapsible .faq-answer { display: none; margin-top: .25rem; }
+  .faq-collapsible .faq-answer[data-open="true"] { display: block; }
+  .faq-collapsible .faq-question:focus { outline: 2px dashed #cfd7cf; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-collapsible #faq + h3.faq-question::after,
+    .faq-collapsible #faq ~ h3.faq-question::after { transition: none; }
+  }
+</style>
+
+<script>
+  (function(){
+    var faqRoot = document.getElementById('faq');
+    if (!faqRoot) return;
+    document.documentElement.classList.add('faq-collapsible');
+    function toggle(q){
+      var ans = q.nextElementSibling; if (!ans || !ans.classList.contains('faq-answer')) return;
+      var expanded = q.getAttribute('aria-expanded') === 'true';
+      q.setAttribute('aria-expanded', String(!expanded));
+      ans.setAttribute('data-open', String(!expanded));
+    }
+    var node = faqRoot.nextElementSibling; var qs = [];
+    while (node) {
+      if (node.matches && node.matches('h3.faq-question')) qs.push(node);
+      if (node.tagName === 'H2') break;
+      node = node.nextElementSibling;
+    }
+    qs.forEach(function(q){
+      q.setAttribute('role','button'); q.setAttribute('aria-expanded','false');
+      var ans = q.nextElementSibling; if (ans && ans.classList) ans.setAttribute('data-open','false');
+      q.addEventListener('click', function(){ toggle(q); });
+      q.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle(q);} });
+    });
+  })();
+  </script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which burns more calories: rucking or running?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Running generally burns more per minute at the same effort, but rucking with load can approach easy run costs while staying lower‑impact. Many people can ruck longer; total session calories often track total time on feet. Use the calculator to compare."}
+    },
+    {
+      "@type": "Question",
+      "name": "Is rucking easier on the joints than running?",
+      "acceptedAnswer": {"@type": "Answer", "text": "Typically, yes. Running produces higher peak impact forces; loaded walking raises forces vs. walking but remains joint‑friendlier for many at sustainable paces. Progress gradually and keep form tall with short steps."}
+    }
+  ]
+}
+  </script>
+
 <h2>Related Guides</h2>
 <ul>
   <li><a href="/blog/what-is-rucking">What Is Rucking? Complete Beginner's Guide</a> - Start here for basics</li>
