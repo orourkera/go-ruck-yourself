@@ -1665,7 +1665,11 @@ class RuckSessionCompleteResource(Resource):
 
                 if int(prior_count) == 0:
                     # Only send first ruck notifications for public rucks from users who allow sharing
-                    if not completed_session.get('is_public', False):
+                    # and that meet minimum duration requirements (5+ minutes)
+                    duration_seconds = completed_session.get('duration_seconds', 0)
+                    if duration_seconds < 300:
+                        logger.info(f"[FIRST_RUCK] Skipping notification - ruck too short ({duration_seconds}s < 300s)")
+                    elif not completed_session.get('is_public', False):
                         logger.info("[FIRST_RUCK] Skipping notification - ruck is not public")
                     else:
                         # Check if the completing user allows ruck sharing
