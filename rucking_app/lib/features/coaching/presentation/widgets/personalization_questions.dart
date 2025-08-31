@@ -191,19 +191,28 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       question: _questions[0],
       content: Column(
         children: [
-          // Suggested chips
+          // Suggested chips (multi-select)
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: PlanPersonalization.whySuggestions.map((suggestion) {
-              final isSelected = _personalization.why == suggestion;
+              final isSelected = _personalization.why?.contains(suggestion) ?? false;
               return FilterChip(
                 label: Text(suggestion),
                 selected: isSelected,
                 onSelected: (selected) {
                   setState(() {
+                    final currentWhy = _personalization.why ?? [];
+                    List<String> newWhy;
+                    
+                    if (selected) {
+                      newWhy = [...currentWhy, suggestion];
+                    } else {
+                      newWhy = currentWhy.where((w) => w != suggestion).toList();
+                    }
+                    
                     _personalization = _personalization.copyWith(
-                      why: selected ? suggestion : null,
+                      why: newWhy,
                     );
                   });
                 },
@@ -217,6 +226,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           // Custom text input
           TextField(
             autofocus: false,
+            textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: 'Or describe your own reason...',
               border: OutlineInputBorder(
@@ -229,16 +239,25 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
             onChanged: (value) {
               setState(() {
-                _personalization = _personalization.copyWith(
-                  why: value.isNotEmpty ? value : null,
-                );
+                if (value.isNotEmpty) {
+                  // Clear chip selections and set custom text
+                  _personalization = _personalization.copyWith(
+                    why: [value],
+                  );
+                } else {
+                  _personalization = _personalization.copyWith(
+                    why: [],
+                  );
+                }
               });
             },
             onTap: () {
               // Clear chip selection when typing custom text
-              if (PlanPersonalization.whySuggestions.contains(_personalization.why)) {
+              final currentWhy = _personalization.why ?? [];
+              final hasChipSelections = currentWhy.any((w) => PlanPersonalization.whySuggestions.contains(w));
+              if (hasChipSelections) {
                 setState(() {
-                  _personalization = _personalization.copyWith(why: '');
+                  _personalization = _personalization.copyWith(why: []);
                 });
               }
             },
@@ -265,6 +284,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           
           TextField(
             autofocus: false,
+            textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: 'What would success look like?',
               border: OutlineInputBorder(
@@ -302,8 +322,10 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           ),
           const SizedBox(height: 24),
           
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
             children: [2, 3, 4, 5, 6, 7].map((days) {
               final isSelected = _personalization.trainingDaysPerWeek == days;
               return GestureDetector(
@@ -315,8 +337,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   });
                 },
                 child: Container(
-                  width: 60,
-                  height: 60,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -438,6 +460,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           const SizedBox(height: 16),
           TextField(
             autofocus: false,
+            textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: 'Other challenges?',
               border: OutlineInputBorder(

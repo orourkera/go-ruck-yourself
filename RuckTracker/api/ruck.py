@@ -1756,31 +1756,35 @@ class RuckSessionLocationResource(Resource):
         """Upload location points to an active ruck session (POST /api/rucks/<ruck_id>/location)"""
         try:
             if not hasattr(g, 'user') or g.user is None:
-                logger.warning(f"Location upload to session {ruck_id}: User not authenticated")
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                logger.warning(f"[LOC_UPLOAD][AUTH_FAIL] session={ruck_id} ip={client_ip} reason=unauthenticated")
                 return {'message': 'User not authenticated'}, 401
             
             data = request.get_json()
             if data is None:
-                logger.error(f"Location upload to session {ruck_id}: No JSON data received or malformed JSON")
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                logger.error(f"[LOC_UPLOAD][BAD_JSON] session={ruck_id} user={getattr(g.user,'id',None)} ip={client_ip} reason=no_or_malformed_json")
                 return {'message': 'No JSON data received or malformed JSON'}, 400
             
-            logger.debug(f"Location upload to session {ruck_id}: Raw data = {data}")
+            logger.debug(f"[LOC_UPLOAD][RAW] session={ruck_id} user={g.user.id} data_keys={list(data.keys())}")
             
             # Support both single point and batch of points (like heart rate)
             if 'points' in data:
                 # Batch mode - array of location points
                 if not isinstance(data['points'], list):
-                    logger.error(f"Location upload to session {ruck_id}: 'points' field is not a list, got {type(data['points'])}")
+                    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                    logger.error(f"[LOC_UPLOAD][BAD_POINTS_TYPE] session={ruck_id} user={g.user.id} ip={client_ip} type={type(data['points'])}")
                     return {'message': f"'points' field must be a list, got {type(data['points']).__name__}"}, 400
                 location_points = data['points']
-                logger.debug(f"Location upload to session {ruck_id}: Processing {len(location_points)} points in batch mode")
+                logger.debug(f"[LOC_UPLOAD][BATCH] session={ruck_id} user={g.user.id} count={len(location_points)}")
             else:
                 # Legacy mode - single point (backwards compatibility)
                 if 'latitude' not in data or 'longitude' not in data:
-                    logger.error(f"Location upload to session {ruck_id}: Missing lat/lng in single point mode. Data keys: {list(data.keys())}")
+                    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                    logger.error(f"[LOC_UPLOAD][MISSING_LATLNG] session={ruck_id} user={g.user.id} ip={client_ip} keys={list(data.keys())}")
                     return {'message': f"Missing latitude/longitude in single point mode. Provided keys: {list(data.keys())}"}, 400
                 location_points = [data]  # Convert to array format
-                logger.debug(f"Location upload to session {ruck_id}: Processing single point in legacy mode")
+                logger.debug(f"[LOC_UPLOAD][LEGACY_SINGLE] session={ruck_id} user={g.user.id}")
             
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
@@ -1792,7 +1796,8 @@ class RuckSessionLocationResource(Resource):
                 .execute()
             
             if not session_resp.data:
-                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                logger.warning(f"[LOC_UPLOAD][SESSION_NOT_FOUND] session={ruck_id} user={g.user.id} ip={client_ip}")
                 return {'message': 'Session not found or access denied'}, 404
             
             session_data = session_resp.data[0]
@@ -1800,7 +1805,7 @@ class RuckSessionLocationResource(Resource):
             
             # Auto-start session if it's in 'created' status and receiving first location/HR data
             if current_status == 'created':
-                logger.info(f"Auto-starting session {ruck_id} on first data upload")
+                logger.info(f"[LOC_UPLOAD][AUTO_START] session={ruck_id} user={g.user.id} prev_status=created")
                 try:
                     supabase.table('ruck_session').update({
                         'status': 'in_progress',
@@ -1808,10 +1813,11 @@ class RuckSessionLocationResource(Resource):
                     }).eq('id', ruck_id).execute()
                     current_status = 'in_progress'
                 except Exception as e:
-                    logger.error(f"Failed to auto-start session {ruck_id}: {e}")
+                    logger.error(f"[LOC_UPLOAD][AUTO_START_FAIL] session={ruck_id} user={g.user.id} error={e}")
                     return {'message': f"Failed to start session: {str(e)}"}, 500
             elif current_status != 'in_progress':
-                logger.warning(f"Session {ruck_id} status is '{current_status}', not 'in_progress'. User {g.user.id} attempted location upload.")
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                logger.warning(f"[LOC_UPLOAD][BAD_STATUS] session={ruck_id} user={g.user.id} ip={client_ip} status={current_status} expected=in_progress")
                 
                 # Allow location uploads to recently completed sessions (within 5 minutes)
                 if current_status == 'completed':
@@ -1827,14 +1833,15 @@ class RuckSessionLocationResource(Resource):
                         time_since_completion = datetime.now(tz.tzutc()) - completed_at
                         
                         if time_since_completion.total_seconds() <= 300:  # 5 minutes
-                            logger.info(f"Allowing location upload to recently completed session {ruck_id} (completed {time_since_completion.total_seconds():.0f}s ago)")
+                            logger.info(f"[LOC_UPLOAD][ALLOW_COMPLETED_RECENT] session={ruck_id} user={g.user.id} seconds_since_complete={time_since_completion.total_seconds():.0f}")
                         else:
-                            logger.warning(f"Session {ruck_id} completed {time_since_completion.total_seconds():.0f}s ago, rejecting location upload")
+                            logger.warning(f"[LOC_UPLOAD][REJECT_COMPLETED_OLD] session={ruck_id} user={g.user.id} seconds_since_complete={time_since_completion.total_seconds():.0f} limit_seconds=300")
                             return {'message': f"Session completed {time_since_completion.total_seconds():.0f}s ago, too late for location uploads"}, 400
                     else:
-                        logger.warning(f"Session {ruck_id} is completed but no completed_at timestamp found")
+                        logger.warning(f"[LOC_UPLOAD][REJECT_COMPLETED_NO_TS] session={ruck_id} user={g.user.id} reason=missing_completed_at")
                         return {'message': f"Session not in progress (status: {current_status})"}, 400
                 else:
+                    logger.warning(f"[LOC_UPLOAD][REJECT_STATUS] session={ruck_id} user={g.user.id} status={current_status} reason=not_in_progress")
                     return {'message': f"Session not in progress (status: {current_status})"}, 400
             
             # Insert location points (like heart rate samples)
@@ -1887,33 +1894,33 @@ class RuckSessionLocationResource(Resource):
                     continue
             
             if invalid_points:
-                logger.warning(f"Location upload to session {ruck_id}: {len(invalid_points)} invalid points: {'; '.join(invalid_points)}")
+                logger.warning(f"[LOC_UPLOAD][INVALID_POINTS] session={ruck_id} user={g.user.id} invalid_count={len(invalid_points)} details={' | '.join(invalid_points)}")
             
             if not location_rows:
                 error_msg = f"No valid location points from {len(location_points)} submitted. Errors: {'; '.join(invalid_points)}"
-                logger.error(f"Location upload to session {ruck_id}: {error_msg}")
+                logger.error(f"[LOC_UPLOAD][NO_VALID_POINTS] session={ruck_id} user={g.user.id} error=none_valid submitted={len(location_points)}")
                 return {'message': error_msg}, 400
                 
             try:
-                logger.debug(f"Location upload to session {ruck_id}: Inserting {len(location_rows)} valid location points")
+                logger.debug(f"[LOC_UPLOAD][DB_INSERT] session={ruck_id} user={g.user.id} inserting={len(location_rows)}")
                 insert_resp = supabase.table('location_point').insert(location_rows).execute()
                 if not insert_resp.data:
-                    logger.error(f"Location upload to session {ruck_id}: Database insert returned no data")
+                    logger.error(f"[LOC_UPLOAD][DB_NO_DATA] session={ruck_id} user={g.user.id} reason=no_data_returned")
                     return {'message': 'Database insert failed - no data returned'}, 500
-                    
+                
                 inserted_count = len(insert_resp.data)
-                logger.info(f"Location upload to session {ruck_id}: Successfully inserted {inserted_count} points")
+                logger.info(f"[LOC_UPLOAD][SUCCESS] session={ruck_id} user={g.user.id} inserted={inserted_count}")
                 
                 # Note: No need to invalidate session cache for location points
                 # Session data (distance, duration, etc.) is calculated separately
                 return {'status': 'ok', 'inserted': inserted_count}, 201
                 
             except Exception as db_error:
-                logger.error(f"Location upload to session {ruck_id}: Database insert failed - {db_error}")
+                logger.error(f"[LOC_UPLOAD][DB_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
                 return {'message': f'Database insert failed: {str(db_error)}'}, 500
             
         except Exception as e:
-            logger.error(f"Location upload to session {ruck_id}: Unexpected error - {e}")
+            logger.error(f"[LOC_UPLOAD][UNEXPECTED] session={ruck_id} user={getattr(g,'user',None) and g.user.id} error={e}")
             return {'message': f'Error uploading location points: {str(e)}'}, 500
 
 class RuckSessionEditResource(Resource):

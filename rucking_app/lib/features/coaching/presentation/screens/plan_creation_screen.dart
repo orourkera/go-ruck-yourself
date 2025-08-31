@@ -317,7 +317,7 @@ Goal Description: ${_selectedPlanType!.description}
 Duration: ${_selectedPlanType!.duration}
 
 User Details:
-- Why: ${_personalization!.why}
+- Why: ${_personalization!.why?.join(', ')}
 - Success Definition: ${_personalization!.successDefinition}
 - Training Days: ${_personalization!.trainingDaysPerWeek} days per week
 - Preferred Days: ${_personalization!.preferredDays?.join(', ')}
@@ -326,16 +326,19 @@ User Details:
 
 Generate a comprehensive plan brief that includes:
 
-1. **Mission Statement** - Their why and success definition
-2. **Weekly Structure** - Specific training schedule using their preferred days and training frequency
-3. **Session Details** - What each training day will include (duration, intensity, type)
-4. **Progression Rules** - How the plan will evolve over ${_selectedPlanType!.duration}
-5. **Safety Gates** - How to handle their specific challenges
-6. **Timeline Expectations** - What they'll experience each phase
+1. MISSION: Why they're here (${_personalization!.why?.join(', ')}) and what success looks like (${_personalization!.successDefinition})
 
-Make it detailed enough to show the actual plan structure, not just motivation. Use a confident coaching voice that addresses their specific challenges and schedule. Include specific session types appropriate for ${_selectedPlanType!.name}.
+2. WEEKLY RHYTHM: Specific ${_personalization!.trainingDaysPerWeek}-day training schedule using their preferred days (${_personalization!.preferredDays?.join(', ')}). Include what happens each training day with specific durations, intensities, and session types appropriate for ${_selectedPlanType!.name}.
 
-Keep it around 300-400 words, structured and actionable.
+3. SAFETY GATES: How to handle their specific challenges (${_personalization!.challenges?.join(', ')}). Include red/amber/green decision rules before each session.
+
+4. PROGRESSION: How the plan evolves over ${_selectedPlanType!.duration} with specific rules for increasing difficulty safely.
+
+5. WHAT TO EXPECT: Timeline of what they'll feel each phase of the ${_selectedPlanType!.duration} plan.
+
+6. MINIMUM DAYS: How their ${_personalization!.minimumSessionMinutes}-minute minimum sessions${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''} fit into the plan for busy days.
+
+Write in plain text with clear headings - no asterisks, no markdown formatting. Be specific about actual training sessions they'll do. Address their personal challenges directly. Keep it around 400-500 words, detailed and actionable.
 ''';
 
     setState(() {
@@ -346,10 +349,10 @@ Keep it around 300-400 words, structured and actionable.
     try {
       await _openAiService.stream(
         model: 'gpt-4.1',
-        instructions: 'You are an enthusiastic AI fitness coach creating a personalized plan summary for ${username}. Address them by name throughout. Be motivational, specific, and exciting.',
+        instructions: 'You are an enthusiastic AI fitness coach creating a personalized plan summary for ${username}. Address them by name throughout. Be motivational, specific, and exciting. Use plain text formatting only - no markdown, no asterisks, no special formatting. Write in clear paragraphs with proper headings.',
         input: prompt,
         temperature: 0.7,
-        maxOutputTokens: 500,
+        maxOutputTokens: 650,
         onDelta: (delta) {
           if (mounted) {
             setState(() {

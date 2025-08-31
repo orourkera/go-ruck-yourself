@@ -1,5 +1,5 @@
 class PlanPersonalization {
-  final String? why;
+  final List<String>? why;
   final String? successDefinition;
   final int? trainingDaysPerWeek;
   final List<String>? preferredDays;
@@ -18,7 +18,7 @@ class PlanPersonalization {
   });
 
   PlanPersonalization copyWith({
-    String? why,
+    List<String>? why,
     String? successDefinition,
     int? trainingDaysPerWeek,
     List<String>? preferredDays,
@@ -51,7 +51,7 @@ class PlanPersonalization {
 
   factory PlanPersonalization.fromJson(Map<String, dynamic> json) {
     return PlanPersonalization(
-      why: json['why'] as String?,
+      why: (json['why'] as List<dynamic>?)?.cast<String>(),
       successDefinition: json['successDefinition'] as String?,
       trainingDaysPerWeek: json['trainingDaysPerWeek'] as int?,
       preferredDays: (json['preferredDays'] as List<dynamic>?)?.cast<String>(),
@@ -62,7 +62,7 @@ class PlanPersonalization {
   }
 
   bool get isComplete {
-    return why != null &&
+    return why != null && why!.isNotEmpty &&
            successDefinition != null &&
            trainingDaysPerWeek != null &&
            preferredDays != null && preferredDays!.isNotEmpty &&
