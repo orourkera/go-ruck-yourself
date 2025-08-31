@@ -1664,59 +1664,87 @@ class RuckSessionCompleteResource(Resource):
                     prior_count = len(prior_resp.data or [])
 
                 if int(prior_count) == 0:
-                    # Fetch rucker display name
-                    user_resp = (
-                        supabase.table('users').select('id,username').eq('id', user_id).single().execute()
-                    )
-                    rucker_name = (user_resp.data or {}).get('username') or 'A new rucker'
-
-                    # Cutoff guard: only notify for sessions completed on/after 2025-08-27 (UTC)
-                    cutoff_dt = datetime(2025, 8, 27, tzinfo=timezone.utc)
-                    completed_at_str = completed_session.get('completed_at')
-                    completed_at_dt = None
-                    if isinstance(completed_at_str, str):
-                        try:
-                            completed_at_dt = datetime.fromisoformat(completed_at_str.replace('Z', '+00:00'))
-                        except Exception:
-                            completed_at_dt = None
-
-                    if not completed_at_dt or completed_at_dt < cutoff_dt:
-                        logger.info("[FIRST_RUCK] Suppressing broadcast due to cutoff date (pre-2025-08-27)")
-                        # Skip notification but continue normal completion flow
-                        pass
+                    # Only send first ruck notifications for public rucks from users who allow sharing
+                    if not completed_session.get('is_public', False):
+                        logger.info("[FIRST_RUCK] Skipping notification - ruck is not public")
                     else:
-                    # Feature gate to avoid spamming during testing
-                        broadcast_enabled = os.getenv('FIRST_RUCK_BROADCAST_ENABLED', 'false').lower() == 'true'
-                        if not broadcast_enabled:
-                            logger.info("[FIRST_RUCK] Broadcast disabled by FIRST_RUCK_BROADCAST_ENABLED")
+                        # Check if the completing user allows ruck sharing
+                        user_resp = (
+                            supabase.table('users')
+                            .select('allow_ruck_sharing, username')
+                            .eq('id', user_id)
+                            .single()
+                            .execute()
+                        )
+                        user_data = user_resp.data or {}
+                        
+                        if not user_data.get('allow_ruck_sharing', False):
+                            logger.info("[FIRST_RUCK] Skipping notification - user has sharing disabled")
                         else:
-                            # Get all users who allow ruck sharing (exclude the rucker themself)
-                            sharers_resp = (
-                                supabase.table('users')
+                            # Check if we've already sent first ruck notification for this session
+                            # to prevent duplicates from multiple /complete calls
+                            notification_check = (
+                                supabase.table('notifications')
                                 .select('id')
-                                .eq('allow_ruck_sharing', True)
-                                .neq('id', user_id)
-                                .limit(100000)
+                                .eq('type', 'first_ruck_global')
+                                .eq('data->>ruck_id', ruck_id)
+                                .limit(1)
                                 .execute()
                             )
-                            recipient_ids = [u['id'] for u in (sharers_resp.data or []) if u.get('id')]
-                            if recipient_ids:
-                                device_tokens = get_user_device_tokens(recipient_ids)
-                                if device_tokens:
-                                    pusher = PushNotificationService()
-                                    title = "🎉 First Ruck!"
-                                    body = f"{rucker_name} just completed their first ruck. Drop a congrats, like or follow!"
-                                    data = {
-                                        'type': 'first_ruck_global',
-                                        'ruck_id': ruck_id,
-                                        'user_id': user_id,
-                                    }
-                                    try:
-                                        pusher.send_notification(device_tokens, title, body, data)
-                                    except Exception as send_err:
-                                        logger.error(f"Failed to send first-ruck notification: {send_err}")
+                            
+                            if notification_check.data:
+                                logger.info(f"[FIRST_RUCK] Notification already sent for ruck {ruck_id}, skipping duplicate")
                             else:
-                                logger.info("No users with allow_ruck_sharing=true to notify for first ruck")
+                                # Use rucker display name from earlier query
+                                rucker_name = user_data.get('username') or 'A new rucker'
+
+                                # Cutoff guard: only notify for sessions completed on/after 2025-08-27 (UTC)
+                                cutoff_dt = datetime(2025, 8, 27, tzinfo=timezone.utc)
+                                completed_at_str = completed_session.get('completed_at')
+                                completed_at_dt = None
+                                if isinstance(completed_at_str, str):
+                                    try:
+                                        completed_at_dt = datetime.fromisoformat(completed_at_str.replace('Z', '+00:00'))
+                                    except Exception:
+                                        completed_at_dt = None
+
+                                if not completed_at_dt or completed_at_dt < cutoff_dt:
+                                    logger.info("[FIRST_RUCK] Suppressing broadcast due to cutoff date (pre-2025-08-27)")
+                                    # Skip notification but continue normal completion flow
+                                    pass
+                                else:
+                                    # Feature gate to avoid spamming during testing
+                                    broadcast_enabled = os.getenv('FIRST_RUCK_BROADCAST_ENABLED', 'false').lower() == 'true'
+                                    if not broadcast_enabled:
+                                        logger.info("[FIRST_RUCK] Broadcast disabled by FIRST_RUCK_BROADCAST_ENABLED")
+                                    else:
+                                        # Get all users who allow ruck sharing (exclude the rucker themself)
+                                        sharers_resp = (
+                                            supabase.table('users')
+                                            .select('id')
+                                            .eq('allow_ruck_sharing', True)
+                                            .neq('id', user_id)
+                                            .limit(100000)
+                                            .execute()
+                                        )
+                                        recipient_ids = [u['id'] for u in (sharers_resp.data or []) if u.get('id')]
+                                        if recipient_ids:
+                                            device_tokens = get_user_device_tokens(recipient_ids)
+                                            if device_tokens:
+                                                pusher = PushNotificationService()
+                                                title = "🎉 First Ruck!"
+                                                body = f"{rucker_name} just completed their first ruck. Drop a congrats, like or follow!"
+                                                data = {
+                                                    'type': 'first_ruck_global',
+                                                    'ruck_id': ruck_id,
+                                                    'user_id': user_id,
+                                                }
+                                                try:
+                                                    pusher.send_notification(device_tokens, title, body, data)
+                                                except Exception as send_err:
+                                                    logger.error(f"Failed to send first-ruck notification: {send_err}")
+                                        else:
+                                            logger.info("No users with allow_ruck_sharing=true to notify for first ruck")
             except Exception as first_err:
                 logger.error(f"Error handling first-ruck detection/notification: {first_err}")
 

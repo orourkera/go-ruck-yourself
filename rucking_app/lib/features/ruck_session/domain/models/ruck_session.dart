@@ -52,6 +52,7 @@ class RuckSession {
     Map<String, int>? timeInZones,
     List<Map<String, dynamic>>? hrZoneSnapshot,
     String? aiCompletionInsight,
+    String? calorieMethod,
   }) {
     return RuckSession(
       id: id ?? this.id,
@@ -89,6 +90,7 @@ class RuckSession {
       timeInZones: timeInZones ?? this.timeInZones,
       hrZoneSnapshot: hrZoneSnapshot ?? this.hrZoneSnapshot,
       aiCompletionInsight: aiCompletionInsight ?? this.aiCompletionInsight,
+      calorieMethod: calorieMethod ?? this.calorieMethod,
     );
   }
 
@@ -129,7 +131,8 @@ class RuckSession {
   final int? steps; // Optional step count
   final Map<String, int>? timeInZones; // Optional HR zone distribution
   final List<Map<String, dynamic>>? hrZoneSnapshot; // Optional snapshot of zone thresholds
-  final String? aiCompletionInsight; // AI-generated session summary
+  final String? aiCompletionInsight;
+  final String? calorieMethod; // Method used to compute calories: 'fusion', 'mechanical', or 'hr' // AI-generated session summary
 
   RuckSession({
     this.id,
@@ -167,6 +170,7 @@ class RuckSession {
     this.timeInZones,
     this.hrZoneSnapshot,
     this.aiCompletionInsight,
+    this.calorieMethod,
   });
 
   /// Calculate pace in minutes per kilometer
@@ -361,6 +365,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         timeInZones: (json['time_in_zones'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
         hrZoneSnapshot: (json['hr_zone_snapshot'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
         aiCompletionInsight: json['ai_completion_insight'] as String?,
+        calorieMethod: json['calorie_method'] as String?,
       );
     } catch (e) {
       AppLogger.error("Error parsing RuckSession from JSON: $e");
@@ -425,6 +430,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       if (timeInZones != null) 'time_in_zones': timeInZones,
       if (hrZoneSnapshot != null) 'hr_zone_snapshot': hrZoneSnapshot,
       if (aiCompletionInsight != null) 'ai_completion_insight': aiCompletionInsight,
+      if (calorieMethod != null) 'calorie_method': calorieMethod,
     };
   }
 }

@@ -41,4 +41,7 @@ class NotificationType {
   
   /// Session completion prompt notification
   static const String sessionCompletionPrompt = 'session_completion_prompt';
+  
+  /// First ruck celebration notification for new users
+  static const String firstRuckCelebration = 'first_ruck_celebration';
 }

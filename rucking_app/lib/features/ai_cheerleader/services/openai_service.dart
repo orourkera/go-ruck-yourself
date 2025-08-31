@@ -15,7 +15,7 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
-  static const String _model = 'gpt-4o-mini'; // default fallback model
+  static const String _model = 'gpt-4.1'; // default fallback model
   static const String _summaryModel = 'gpt-4.1'; // dedicated model for session summaries
   static const int _maxTokens = 120; // Allow for 2-3 sentences
   static const double _temperature = 0.7; // Slightly lower for tighter responses

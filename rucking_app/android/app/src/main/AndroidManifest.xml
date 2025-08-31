@@ -30,6 +30,8 @@
     <!-- Internet and billing permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="com.android.vending.BILLING" />
+    <!-- Step tracking permission for fitness data -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <queries>
         <!-- If your app opens https URLs -->

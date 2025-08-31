@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -28,6 +30,16 @@ class SessionStatsOverlay extends StatelessWidget {
     final m = (d.inMinutes % 60).toString().padLeft(2, '0');
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$h:$m:$s';
+  }
+  
+  bool _shouldShowSteps() {
+    try {
+      final prefs = GetIt.instance<SharedPreferences>();
+      return prefs.getBool('live_step_tracking') ?? true; // Default to true
+    } catch (e) {
+      // If preferences not available, default to showing steps
+      return true;
+    }
   }
 
 
@@ -59,7 +71,7 @@ class SessionStatsOverlay extends StatelessWidget {
               label: 'ELEV',
               value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)} m',
             ),
-            if (state.steps != null)
+            if (state.steps != null && _shouldShowSteps())
               _StatTile(
                 label: 'STEPS',
                 value: state.steps!.toString(),
@@ -91,7 +103,7 @@ class SessionStatsOverlay extends StatelessWidget {
         value: '+${state.elevationGain.toStringAsFixed(0)}/-${state.elevationLoss.toStringAsFixed(0)}',
         icon: Icons.terrain,
       ),
-      if (state.steps != null)
+      if (state.steps != null && _shouldShowSteps())
         _StatTile(
           label: 'Steps',
           value: state.steps!.toString(),

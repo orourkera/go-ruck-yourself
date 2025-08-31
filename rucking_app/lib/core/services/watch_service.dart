@@ -92,7 +92,13 @@ class WatchService {
   }
 
   /// Public stream of live step count updates from the watch
-  Stream<int> get stepsStream => _stepsController.stream;
+  Stream<int> get stepsStream {
+    print('[STEPS DEBUG] [WATCH] stepsStream getter called');
+    return _stepsController.stream.map((steps) {
+      print('[STEPS DEBUG] [WATCH] Stream emitting: $steps steps');
+      return steps;
+    });
+  }
   
   /// Check if a workout session is currently active
   bool get isSessionActive => _isSessionActive;

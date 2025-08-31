@@ -30,6 +30,7 @@ class FirebaseMessagingService {
   
   bool _isInitialized = false;
   String? _deviceToken;
+  int _notificationIdCounter = 1000; // Start from 1000 to avoid conflicts
 
   /// Initialize Firebase Messaging
   Future<void> initialize() async {
@@ -401,8 +402,11 @@ class FirebaseMessagingService {
         iOS: iosDetails,
       );
       
+      // Generate unique notification ID to prevent duplicates
+      final uniqueId = _generateUniqueNotificationId();
+      
       await _localNotifications.show(
-        message.hashCode,
+        uniqueId,
         notification.title,
         notification.body,
         details,
@@ -630,6 +634,15 @@ class FirebaseMessagingService {
       details,
       payload: encodedPayload,
     );
+  }
+
+  /// Generate unique notification ID to prevent duplicates
+  int _generateUniqueNotificationId() {
+    _notificationIdCounter++;
+    if (_notificationIdCounter > 999999) {
+      _notificationIdCounter = 1000; // Reset to avoid overflow
+    }
+    return _notificationIdCounter;
   }
 
   /// Force refresh and register token (for debugging)

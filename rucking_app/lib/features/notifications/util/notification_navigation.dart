@@ -23,14 +23,15 @@ class NotificationNavigation {
       case NotificationType.comment:
         final ruckId = notification.data!['ruck_id']?.toString();
         if (ruckId != null) {
-          // Extract the user_id from the notification data if available
-          final userId = notification.data!['user_id']?.toString() ?? '';
+          // Note: notification.data!['user_id'] contains the ID of the person who liked/commented,
+          // NOT the ruck owner. We want to show the ruck owner's info, so we'll let the detail 
+          // screen fetch the correct owner information via the API using the ruck_id.
           
-          // Create a minimal RuckBuddy with just the ID and userId
-          // The detail screen will fetch the full data including location points and user profile
+          // Create a minimal RuckBuddy with just the ruck ID
+          // The detail screen will fetch the complete ruck data including the owner's profile
           final ruckBuddy = RuckBuddy(
             id: ruckId,
-            userId: userId,  // Set the userId from notification data
+            userId: '',  // Leave empty - let detail screen fetch the correct ruck owner
             ruckWeightKg: 0,
             durationSeconds: 0,
             distanceKm: 0,
@@ -39,9 +40,9 @@ class NotificationNavigation {
             elevationLossM: 0,
             createdAt: DateTime.now(),
             user: UserInfo(
-              id: userId,  // Set the ID to match the userId
-              username: '',  // Leave empty to trigger profile fetch in detail screen
-              gender: '',    // Leave empty, will be properly set when profile is fetched
+              id: '',      // Leave empty - will be populated with ruck owner's info
+              username: '', // Leave empty to trigger full data fetch in detail screen
+              gender: '',   // Leave empty, will be properly set when profile is fetched
             ),
             locationPoints: null, // Will be loaded by detail screen
             photos: null, // Will be loaded by detail screen

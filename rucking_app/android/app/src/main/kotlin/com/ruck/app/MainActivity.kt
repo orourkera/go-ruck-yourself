@@ -27,6 +27,7 @@ class MainActivity : FlutterActivity() {
     private val WATCH_SESSION_CHANNEL = "com.ruck.app/watch_session"
     private val GPX_IMPORT_CHANNEL = "com.ruck.app/gpx_import"
     private val BAROMETER_CHANNEL = "com.ruck.app/barometerStream"
+    private val PEDOMETER_CHANNEL = "com.getrucky.gfy/pedometerStream"
     
     companion object {
         private const val TAG = "MainActivity"
@@ -55,6 +56,7 @@ class MainActivity : FlutterActivity() {
     // Track stream state to prevent cancellation errors
     private var heartRateEventSink: EventChannel.EventSink? = null
     private var barometerEventSink: EventChannel.EventSink? = null
+    private var pedometerStreamHandler: PedometerStreamHandler? = null
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -99,6 +101,12 @@ class MainActivity : FlutterActivity() {
                     // Android doesn't support Watch connectivity, return false/null
                     result.success(false)
                 }
+                "startPedometerSession" -> {
+                    // Start a new pedometer session for real-time step tracking
+                    Log.d(TAG, "Starting new pedometer session")
+                    PedometerStreamHandler.startNewSession()
+                    result.success(true)
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -138,6 +146,11 @@ class MainActivity : FlutterActivity() {
                 }
             }
         )
+        
+        // Pedometer event channel for real-time step counting
+        pedometerStreamHandler = PedometerStreamHandler(this)
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, PEDOMETER_CHANNEL).setStreamHandler(pedometerStreamHandler)
+        Log.d(TAG, "Pedometer event channel registered")
     }
     
     private fun hasRequiredPermissions(): Boolean {

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -336,7 +337,7 @@ class HealthService {
 
   Future<bool> isLiveStepTrackingEnabled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('live_step_tracking') ?? false;
+    return prefs.getBool('live_step_tracking') ?? true; // Default to true - steps enabled by default
   }
 
   /// Sets whether the user has an Apple Watch
@@ -448,15 +449,18 @@ class HealthService {
   
   /// Read total steps between start and end
   Future<int> getStepsBetween(DateTime start, DateTime end) async {
-    AppLogger.info('[STEPS DEBUG] getStepsBetween called: $start to $end');
+    print('[STEPS DEBUG] ===== getStepsBetween CALLED =====');
+    print('[STEPS DEBUG] Start: $start');
+    print('[STEPS DEBUG] End: $end');
+    print('[STEPS DEBUG] Duration: ${end.difference(start).inSeconds} seconds');
     
     if (!Platform.isIOS && !Platform.isAndroid) {
-      AppLogger.warning('[STEPS DEBUG] Not iOS/Android platform, returning 0');
+      print('[STEPS DEBUG] Not iOS/Android platform, returning 0');
       return 0;
     }
     
     try {
-    AppLogger.info('[STEPS DEBUG] Authorization status: $_isAuthorized');
+    print('[STEPS DEBUG] Current authorization status: $_isAuthorized');
     
     // If not authorized, try to get authorization first
     if (!_isAuthorized) {
@@ -470,20 +474,23 @@ class HealthService {
     }
     
     // Always check authorization status fresh (don't rely on cached _isAuthorized)
+    print('[STEPS DEBUG] Checking HealthKit permissions for STEPS...');
     final authStatuses = await _health.hasPermissions(
       [HealthDataType.STEPS],
       permissions: [HealthDataAccess.READ],
     );
+    print('[STEPS DEBUG] Permission check result: $authStatuses');
+    
     // On iOS, some plugin versions return null here even when authorized. Treat null as authorized if
     // we've already marked the session as authorized to avoid unnecessary re-prompts.
     bool hasStepPermission;
     if (authStatuses == null) {
       hasStepPermission = Platform.isIOS ? _isAuthorized : false;
-      AppLogger.warning('[STEPS DEBUG] hasPermissions returned null; inferring hasStepPermission=$hasStepPermission (iOS=$_isAuthorized)');
+      print('[STEPS DEBUG] hasPermissions returned null; using iOS authorized status: $hasStepPermission');
     } else {
       hasStepPermission = authStatuses;
+      print('[STEPS DEBUG] Step permission granted: $hasStepPermission');
     }
-    AppLogger.info('[STEPS DEBUG] Fresh permission check for STEPS: $hasStepPermission');
     // Extra diagnostics: dump broader permission status snapshot on iOS
     if (Platform.isIOS) {
       try {
@@ -663,31 +670,85 @@ class HealthService {
   Timer? _stepsTimer;
   
   Stream<int> startLiveSteps(DateTime start) {
-    AppLogger.info('[STEPS LIVE] startLiveSteps called with start=$start');
+    print('[STEPS DEBUG] ========== STARTING LIVE STEP TRACKING ==========');
+    print('[STEPS DEBUG] Start time: $start');
+    print('[STEPS DEBUG] Current time: ${DateTime.now()}');
     
-    // Check if we can get real-time steps from Apple Watch
+    // For iOS, use CMPedometer for real-time updates
+    if (Platform.isIOS) {
+      print('[STEPS DEBUG] iOS detected - using CMPedometer for real-time steps');
+      return _startCMPedometerStream(start);
+    }
+    
+    // For Android or if CMPedometer fails, check if we can get real-time steps from Apple Watch
     try {
       final watchService = GetIt.instance<WatchService>();
-      AppLogger.info('[STEPS LIVE] WatchService found - checking session status');
-      AppLogger.info('[STEPS LIVE] Watch session active: ${watchService.isSessionActive}');
+      print('[STEPS DEBUG] WatchService found - checking session status');
+      print('[STEPS DEBUG] Watch session active: ${watchService.isSessionActive}');
       
       // Only use watch stream if session is actually active AND producing data
       if (watchService.isSessionActive) {
         final watchStream = watchService.stepsStream;
-        AppLogger.info('[STEPS LIVE] ✅ Attempting Apple Watch steps stream (session active)');
+        print('[STEPS DEBUG] ✅ Setting up Apple Watch steps stream (session active)');
         
-        // Add timeout fallback since watch step monitoring appears broken
-        return watchStream.timeout(
-          const Duration(seconds: 15),
-          onTimeout: (sink) {
-            AppLogger.warning('[STEPS LIVE] ⚠️  Watch steps timeout - watch step monitoring broken, falling back to HealthKit');
-            // Force HealthKit polling when watch doesn't send steps
-            _startHealthKitPollingWithSink(start, sink);
-          },
-        ).map((steps) {
-          AppLogger.info('[STEPS LIVE] 📊 Watch stream emitted: $steps steps');
-          return steps;
+        // Create a stream controller to merge watch and HealthKit data
+        final controller = StreamController<int>.broadcast();
+        bool watchTimedOut = false;
+        Timer? timeoutTimer;
+        Timer? pollingTimer;
+        
+        // Set up timeout for watch data
+        timeoutTimer = Timer(const Duration(seconds: 15), () {
+          if (!watchTimedOut) {
+            print('[STEPS DEBUG] ⚠️ TIMEOUT: No watch steps received in 15 seconds');
+            print('[STEPS DEBUG] Starting HealthKit polling fallback');
+            watchTimedOut = true;
+            
+            // Start polling HealthKit
+            pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+              print('[STEPS DEBUG] ⏰ FALLBACK POLL TIMER FIRED');
+              try {
+                final now = DateTime.now();
+                final sessionDuration = now.difference(start);
+                
+                if (sessionDuration.inSeconds < 5) {
+                  print('[STEPS DEBUG] Session too new, skipping poll');
+                  controller.add(0);
+                  return;
+                }
+                
+                print('[STEPS DEBUG] Polling HealthKit for steps...');
+                final total = await getStepsBetween(start, now);
+                print('[STEPS DEBUG] HealthKit returned: $total steps');
+                
+                if (!controller.isClosed) {
+                  controller.add(total);
+                }
+              } catch (e) {
+                print('[STEPS DEBUG] Error polling HealthKit: $e');
+              }
+            });
+          }
         });
+        
+        // Listen to watch stream
+        watchStream.listen((steps) {
+          print('[STEPS DEBUG] 🎉 WATCH SENT STEPS: $steps');
+          timeoutTimer?.cancel();
+          pollingTimer?.cancel();
+          watchTimedOut = false;
+          if (!controller.isClosed) {
+            controller.add(steps);
+          }
+        });
+        
+        // Clean up on cancel
+        controller.onCancel = () {
+          timeoutTimer?.cancel();
+          pollingTimer?.cancel();
+        };
+        
+        return controller.stream;
       } else {
         AppLogger.warning('[STEPS LIVE] ⚠️  Watch session not active, falling back to polling');
       }
@@ -737,21 +798,23 @@ class HealthService {
     _stepsTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       final now = DateTime.now();
       final sessionDuration = now.difference(sessionStart);
-      AppLogger.debug('[STEPS LIVE] Polling steps - session duration: ${sessionDuration.inMinutes}min');
+      print('[STEPS DEBUG] ⏰ POLLING TIMER FIRED - session duration: ${sessionDuration.inSeconds}s');
       
       // Reduce delay to 10 seconds for testing (was 1 minute)
       // HealthKit might not have data immediately but 10s should be enough for testing
       if (sessionDuration.inSeconds < 10) {
-        AppLogger.info('[STEPS LIVE] Session too new (${sessionDuration.inSeconds}s), waiting for HealthKit data...');
+        print('[STEPS DEBUG] Session too new (${sessionDuration.inSeconds}s), waiting for HealthKit data...');
         if (_stepsController != null && !_stepsController!.isClosed) {
           _stepsController!.add(0);
         }
         return;
       }
       
+      print('[STEPS DEBUG] Querying HealthKit for steps between $sessionStart and $now');
       final total = await getStepsBetween(sessionStart, now);
-      AppLogger.info('[STEPS LIVE] Emitting total steps: $total');
+      print('[STEPS DEBUG] 📊 HEALTHKIT RETURNED: $total steps');
       if (_stepsController != null && !_stepsController!.isClosed) {
+        print('[STEPS DEBUG] Emitting $total steps to stream');
         _stepsController!.add(total);
       } else {
         AppLogger.warning('[STEPS LIVE] Steps controller is null/closed; skipping emit');
@@ -769,20 +832,92 @@ class HealthService {
     } catch (_) {}
     _stepsController = null;
   }
+  
+  /// Start CMPedometer stream for real-time iOS step counting
+  Stream<int> _startCMPedometerStream(DateTime sessionStart) {
+    print('[STEPS DEBUG] Setting up CMPedometer stream');
+    
+    // Tell iOS to start a new pedometer session
+    const platform = MethodChannel('com.getrucky.gfy/watch_session');
+    platform.invokeMethod('startPedometerSession').then((_) {
+      print('[STEPS DEBUG] Pedometer session started on iOS');
+    }).catchError((e) {
+      print('[STEPS DEBUG] Error starting pedometer session: $e');
+    });
+    
+    // Set up the event channel for receiving pedometer data
+    const EventChannel pedometerChannel = EventChannel('com.getrucky.gfy/pedometerStream');
+    
+    return pedometerChannel.receiveBroadcastStream().map((dynamic event) {
+      print('[STEPS DEBUG] 🎉 CMPedometer event received: $event');
+      
+      if (event is Map) {
+        final steps = event['steps'] as int?;
+        final distance = event['distance'] as double?;
+        final timestamp = event['timestamp'] as double?;
+        
+        print('[STEPS DEBUG] 📊 CMPedometer - Steps: $steps, Distance: ${distance?.toStringAsFixed(1)}m');
+        
+        return steps ?? 0;
+      }
+      
+      // Handle direct integer if iOS sends simplified format
+      if (event is int) {
+        print('[STEPS DEBUG] 📊 CMPedometer - Direct steps: $event');
+        return event;
+      }
+      
+      print('[STEPS DEBUG] Unexpected pedometer data format: ${event.runtimeType}');
+      return 0;
+    }).handleError((error) {
+      print('[STEPS DEBUG] ❌ CMPedometer stream error: $error');
+      print('[STEPS DEBUG] Falling back to HealthKit polling');
+      
+      // Fall back to HealthKit polling if CMPedometer fails
+      return _startHealthKitPollingStream(sessionStart);
+    });
+  }
+  
+  /// Fallback HealthKit polling stream
+  Stream<int> _startHealthKitPollingStream(DateTime sessionStart) {
+    print('[STEPS DEBUG] Starting HealthKit polling fallback');
+    
+    // Clean up existing resources
+    stopLiveSteps();
+    
+    _stepsController = StreamController<int>.broadcast();
+    
+    // Poll every 10 seconds
+    _stepsTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      final now = DateTime.now();
+      print('[STEPS DEBUG] ⏰ HealthKit polling timer fired');
+      
+      final total = await getStepsBetween(sessionStart, now);
+      print('[STEPS DEBUG] HealthKit returned: $total steps');
+      
+      if (_stepsController != null && !_stepsController!.isClosed) {
+        _stepsController!.add(total);
+      }
+    });
+    
+    return _stepsController!.stream;
+  }
 
   /// Helper method to start HealthKit polling with an existing sink
   void _startHealthKitPollingWithSink(DateTime sessionStart, EventSink<int> sink) {
-    AppLogger.info('[STEPS LIVE] Starting HealthKit polling fallback for watch session');
+    print('[STEPS DEBUG] 🔄 STARTING HEALTHKIT POLLING FALLBACK');
+    print('[STEPS DEBUG] Will poll every 5 seconds for step updates');
     
     // Poll every 5 seconds for step updates
     _stepsTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      print('[STEPS DEBUG] ⏰ HEALTHKIT POLL TIMER FIRED');
       try {
         final now = DateTime.now();
         final sessionDuration = now.difference(sessionStart);
         
-        // Cancel early for very new sessions
-        if (sessionDuration.inSeconds < 10) {
-          AppLogger.info('[STEPS LIVE] [HEALTHKIT_FALLBACK] Session too new (${sessionDuration.inSeconds}s), waiting for HealthKit data...');
+        // Cancel early for very new sessions - reduced from 10 to 5 seconds
+        if (sessionDuration.inSeconds < 5) {
+          print('[STEPS DEBUG] [HEALTHKIT_FALLBACK] Session too new (${sessionDuration.inSeconds}s), waiting for HealthKit data...');
           sink.add(0);
           return;
         }
@@ -791,18 +926,20 @@ class HealthService {
         final fallbackStart = now.subtract(const Duration(minutes: 10));
         final actualStart = sessionStart.isAfter(fallbackStart) ? sessionStart : fallbackStart;
         
+        print('[STEPS DEBUG] Querying HealthKit from $actualStart to $now');
         final total = await getStepsBetween(actualStart, now);
-        AppLogger.info('[STEPS LIVE] [HEALTHKIT_FALLBACK] HealthKit steps: $total (window: ${fallbackStart.difference(now).inMinutes.abs()}min)');
+        print('[STEPS DEBUG] [HEALTHKIT_FALLBACK] HealthKit returned: $total steps');
         
         // Try to add data - if sink is closed, this will throw
         try {
           sink.add(total);
+          print('[STEPS DEBUG] [HEALTHKIT_FALLBACK] Successfully sent $total steps to stream');
         } catch (e) {
-          AppLogger.info('[STEPS LIVE] [HEALTHKIT_FALLBACK] Sink closed, stopping timer: $e');
+          print('[STEPS DEBUG] [HEALTHKIT_FALLBACK] Sink closed, stopping timer: $e');
           timer.cancel();
         }
       } catch (e) {
-        AppLogger.warning('[STEPS LIVE] [HEALTHKIT_FALLBACK] Error during step polling: $e');
+        print('[STEPS DEBUG] [HEALTHKIT_FALLBACK] Error during step polling: $e');
         // Stop timer if sink is closed or other critical error
         timer.cancel();
       }

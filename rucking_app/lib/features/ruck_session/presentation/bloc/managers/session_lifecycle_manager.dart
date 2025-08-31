@@ -257,10 +257,17 @@ class SessionLifecycleManager implements SessionManager {
       _updateState(_currentState.copyWith(
         isSaving: true,
         pausedAt: null,  // Clear paused state immediately when stopping
+        isActive: false, // Mark session as inactive to prevent further state changes
       ));
       
-      // Stop watch session
-      await _watchService.endSessionOnWatch();
+      // Stop watch session - do this AFTER marking session inactive to prevent race conditions
+      try {
+        await _watchService.endSessionOnWatch();
+        AppLogger.info('[LIFECYCLE] Watch session ended successfully');
+      } catch (e) {
+        AppLogger.warning('[LIFECYCLE] Watch session end failed (non-critical): $e');
+        // Continue with completion even if watch fails
+      }
       
       // Calculate final duration at exact moment of stop
       final finalDuration = _sessionStartTime != null ? DateTime.now().difference(_sessionStartTime!) : Duration.zero;
@@ -320,7 +327,11 @@ class SessionLifecycleManager implements SessionManager {
         try {
           AppLogger.info('[LIFECYCLE] Sending completion data (attempt $attempt): ${completionData.keys.join(", ")}');
           AppLogger.info('[LIFECYCLE] CALORIES_DEBUG: Sending calories_burned=${completionData['calories_burned']} to backend');
-          await _apiClient.post('/rucks/$_activeSessionId/complete', completionData);
+          // Add timeout to prevent hanging on slow API responses
+          await _apiClient.post('/rucks/$_activeSessionId/complete', completionData)
+              .timeout(const Duration(seconds: 15), onTimeout: () {
+            throw Exception('Session completion API timeout after 15 seconds');
+          });
           completionSuccessful = true;
           AppLogger.info('[LIFECYCLE] Session completion successful with comprehensive data');
           break;

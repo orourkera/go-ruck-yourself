@@ -604,6 +604,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         heartRateSamples: widget.heartRateSamples,
         splits: widget.splits,
         isManual: widget.isManual, // Set based on your logic, or pass from creation
+        steps: widget.steps,
+        calorieMethod: context.read<AuthBloc>().state is Authenticated 
+            ? (context.read<AuthBloc>().state as Authenticated).user.calorieMethod 
+            : null,
       );
 
       // Check for in-app review prompt after successful session completion
@@ -650,6 +654,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           heartRateSamples: widget.heartRateSamples,
           splits: widget.splits,
           isManual: widget.isManual,
+          steps: widget.steps,
+          calorieMethod: context.read<AuthBloc>().state is Authenticated 
+              ? (context.read<AuthBloc>().state as Authenticated).user.calorieMethod 
+              : null,
         );
         
         // Clear caches and continue with achievements check
@@ -902,6 +910,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         elevationLoss: widget.elevationLoss,
         averagePace: widget.duration.inSeconds > 0 && widget.distance > 0 
             ? (widget.duration.inMinutes / (preferMetric ? widget.distance : widget.distance / 0.621371)) : 0.0,
+        steps: widget.steps,
+        calorieMethod: context.read<AuthBloc>().state is Authenticated 
+            ? (context.read<AuthBloc>().state as Authenticated).user.calorieMethod 
+            : null,
         ruckWeightKg: widget.ruckWeight ?? 0.0,
         status: RuckStatus.completed,
         heartRateSamples: _heartRateSamples,

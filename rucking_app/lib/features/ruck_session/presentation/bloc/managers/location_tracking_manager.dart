@@ -580,6 +580,10 @@ class LocationTrackingManager implements SessionManager {
     final newElevationGain = elevationData['gain'] ?? 0.0;
     final newElevationLoss = elevationData['loss'] ?? 0.0;
     
+    // Update the private elevation tracking variables
+    _elevationGain = newElevationGain;
+    _elevationLoss = newElevationLoss;
+    
     // Update splits
     if (_sessionStartTime != null) {
       _splitTrackingService.checkForMilestone(
@@ -1702,8 +1706,8 @@ class LocationTrackingManager implements SessionManager {
     double loss = 0.0;
     
     // Threshold and gating to reduce noise accumulation
-    const double elevationThreshold = 2.0; // 2 meters minimum net change before counting
-    const double minHorizontalMeters = 1.5; // ignore vertical changes when essentially stationary
+    const double elevationThreshold = 1.5; // Reduced from 2.0m - more sensitive to elevation changes
+    const double minHorizontalMeters = 0.3; // 30cm - captures walking but filters standing still
     const double maxStepMeters = 25.0; // clamp per-step vertical change to avoid rare spikes
     
     // Hysteresis accumulator: build up changes until they exceed threshold, then commit
@@ -1720,13 +1724,23 @@ class LocationTrackingManager implements SessionManager {
         prev.longitude,
         curr.latitude,
         curr.longitude,
-      );
+      ) * 1000.0; // Convert km to meters!
+      
+      // Clamp unrealistic single-step vertical changes (additional guard besides vertical speed gate)
+      double step = (curr.elevation - prev.elevation);
+      
+      // DEBUG: Log elevation values to understand the issue
+      if (i <= 10 || i % 10 == 0) { // Log first 10 and then every 10th
+        print('[ELEVATION DEBUG] Point $i: prev=${prev.elevation.toStringAsFixed(2)}m, curr=${curr.elevation.toStringAsFixed(2)}m, step=${step.toStringAsFixed(2)}m, hMeters=${hMeters.toStringAsFixed(2)}m, pending=${pending.toStringAsFixed(2)}m, dir=$dir');
+        if (hMeters < minHorizontalMeters) {
+          print('[ELEVATION DEBUG] Point $i SKIPPED - horizontal movement ${hMeters.toStringAsFixed(2)}m < ${minHorizontalMeters}m minimum');
+        }
+      }
+      
       if (hMeters < minHorizontalMeters) {
         continue;
       }
       
-      // Clamp unrealistic single-step vertical changes (additional guard besides vertical speed gate)
-      double step = (curr.elevation - prev.elevation);
       if (step > maxStepMeters) step = maxStepMeters;
       if (step < -maxStepMeters) step = -maxStepMeters;
       if (step == 0.0) {
@@ -1756,7 +1770,15 @@ class LocationTrackingManager implements SessionManager {
       }
     }
     
-    AppLogger.debug('[ELEVATION] Calculated from ${_locationPoints.length} points: gain=${gain.toStringAsFixed(1)}m, loss=${loss.toStringAsFixed(1)}m');
+    print('[ELEVATION] Calculated from ${_locationPoints.length} points: gain=${gain.toStringAsFixed(1)}m, loss=${loss.toStringAsFixed(1)}m');
+    
+    // Log sample of elevation values if we have points
+    if (_locationPoints.isNotEmpty) {
+      final firstElev = _locationPoints.first.elevation;
+      final lastElev = _locationPoints.last.elevation;
+      print('[ELEVATION] First point elevation: ${firstElev.toStringAsFixed(1)}m, Last point elevation: ${lastElev.toStringAsFixed(1)}m');
+    }
+    
     return {'gain': gain, 'loss': loss};
   }
 

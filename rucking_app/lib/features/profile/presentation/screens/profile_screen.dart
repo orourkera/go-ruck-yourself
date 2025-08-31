@@ -345,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.directions_walk,
                               label: 'Live Step Tracking',
                               trailing: FutureBuilder<bool>(
-                                future: SharedPreferences.getInstance().then((p) => p.getBool('live_step_tracking') ?? false),
+                                future: SharedPreferences.getInstance().then((p) => p.getBool('live_step_tracking') ?? true),
                                 builder: (context, snapshot) {
                                   final current = snapshot.data ?? false;
                                   return Switch(

@@ -397,7 +397,7 @@ class LocationServiceImpl implements LocationService {
         );
         
         // Log elevation data for debugging iOS vs Android differences
-        AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
+        print('[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
         
         // Cross-platform location tracking diagnostics (sends to Crashlytics)
         final platform = Platform.isIOS ? 'iOS' : 'Android';
@@ -677,7 +677,7 @@ class LocationServiceImpl implements LocationService {
         );
         
         // Log elevation data for debugging iOS vs Android differences
-        AppLogger.debug('Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m');
+        print('[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
         
         _locationBatch.add(locationPoint);
         _locationController.add(locationPoint); // For UI updates (distance, elevation, map)

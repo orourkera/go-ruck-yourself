@@ -577,6 +577,11 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         steps: _currentSteps,
       );
       
+      // Debug log elevation values
+      if (locationState.elevationGain > 0 || locationState.elevationLoss > 0) {
+        print('[COORDINATOR] Sending elevation to UI: gain=${locationState.elevationGain.toStringAsFixed(1)}m, loss=${locationState.elevationLoss.toStringAsFixed(1)}m');
+      }
+      
       _currentAggregatedState = ActiveSessionRunning(
         sessionId: lifecycleState.sessionId!,
         userWeightKg: lifecycleState.userWeightKg,
@@ -829,42 +834,43 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionStarted event,
     Emitter<ActiveSessionState> emit,
   ) async {
+    print('[STEPS DEBUG] ============ SESSION STARTED ============');
     AppLogger.info('[COORDINATOR] Session start requested');
     // Start live steps if enabled in preferences
     try {
       final prefs = GetIt.instance<SharedPreferences>();
-      final enabled = prefs.getBool('live_step_tracking') ?? true; // Default to true for Watch users
-      AppLogger.info('[STEPS LIVE] [COORDINATOR] Live step tracking preference: $enabled');
+      final enabled = prefs.getBool('live_step_tracking') ?? true; // Default to true - steps enabled by default
+      print('[STEPS DEBUG] [COORDINATOR] Live step tracking preference: $enabled');
       
       if (enabled) {
         final startTime = DateTime.now();
-        AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting live step tracking from: $startTime');
+        print('[STEPS DEBUG] [COORDINATOR] Starting live step tracking from: $startTime');
         // Initialize steps to 0 immediately so widget shows, will update with live values
         _currentSteps = 0;
         add(const StateAggregationRequested());
         
         // Delay step tracking to allow Watch session to initialize
-        AppLogger.info('[STEPS LIVE] [COORDINATOR] Delaying step tracking by 3 seconds for Watch session startup');
+        print('[STEPS DEBUG] [COORDINATOR] Delaying step tracking by 3 seconds for Watch session startup');
         Future.delayed(const Duration(seconds: 3), () {
-          AppLogger.info('[STEPS LIVE] [COORDINATOR] Starting delayed step tracking');
+          print('[STEPS DEBUG] [COORDINATOR] Starting delayed step tracking NOW');
           _stepsSub?.cancel();
           _stepsSub = _healthService.startLiveSteps(startTime).listen(
           (total) {
-            AppLogger.info('[STEPS LIVE] [COORDINATOR] ✅ Received step update: $total');
+            print('[STEPS DEBUG] [COORDINATOR] ✅ Received step update: $total');
             _currentSteps = total;
             add(const StateAggregationRequested());
           },
           onError: (error) {
-            AppLogger.error('[STEPS LIVE] [COORDINATOR] ❌ Steps stream error: $error');
+            print('[STEPS DEBUG] [COORDINATOR] ❌ Steps stream error: $error');
           },
           onDone: () {
-            AppLogger.warning('[STEPS LIVE] [COORDINATOR] ⚠️  Steps stream ended unexpectedly');
+            print('[STEPS DEBUG] [COORDINATOR] ⚠️  Steps stream ended unexpectedly');
           },
         );
-        AppLogger.info('[COORDINATOR] Live step tracking subscription created');
+        print('[STEPS DEBUG] [COORDINATOR] Live step tracking subscription created');
         }); // Close the Future.delayed block
       } else {
-        AppLogger.info('[COORDINATOR] Live step tracking disabled in preferences - initializing steps to 0 for UI display');
+        print('[STEPS DEBUG] [COORDINATOR] Live step tracking DISABLED - initializing steps to 0 for UI display');
         // Initialize steps to 0 so the widget appears, will be estimated at session end
         _currentSteps = 0;
         add(const StateAggregationRequested());
@@ -999,6 +1005,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionPaused event,
     Emitter<ActiveSessionState> emit,
   ) async {
+    // CRITICAL FIX: Ignore pause events if session is already being saved/completed
+    final lifecycleState = _lifecycleManager.currentState;
+    if (lifecycleState.isSaving || !lifecycleState.isActive) {
+      AppLogger.info('[COORDINATOR] Ignoring pause event - session is completing (isSaving=${lifecycleState.isSaving}, isActive=${lifecycleState.isActive})');
+      return;
+    }
+    
     AppLogger.info('[COORDINATOR] Session paused');
     await _routeEventToManagers(event);
   }
@@ -1007,6 +1020,13 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
     SessionResumed event,
     Emitter<ActiveSessionState> emit,
   ) async {
+    // CRITICAL FIX: Ignore resume events if session is already being saved/completed
+    final lifecycleState = _lifecycleManager.currentState;
+    if (lifecycleState.isSaving || !lifecycleState.isActive) {
+      AppLogger.info('[COORDINATOR] Ignoring resume event - session is completing (isSaving=${lifecycleState.isSaving}, isActive=${lifecycleState.isActive})');
+      return;
+    }
+    
     AppLogger.info('[COORDINATOR] Session resumed');
     await _routeEventToManagers(event);
   }
