@@ -18,6 +18,17 @@ BLOG_POSTS = [
         "image": "images/blog/gear.jpg",
     },
     {
+        "slug": "lcda-vs-pandolf-vs-fusion",
+        "title": "LCDA vs Pandolf vs Fusion: Rucking Calories Debate (No Perfect Answer)",
+        "description": "LCDA vs Pandolf vs our proprietary Fusion: which rucking calorie model fits best? Evidence, trade-offs, and why our defaults favor stability—no perfect answer.",
+        "date": "2025-08-31",
+        "author": "rory@getrucky.com",
+        "tags": ["calories", "science", "weighted vest", "modeling"],
+        "read_time": 9,
+        "template": "blog/posts/lcda-vs-pandolf-vs-fusion.html",
+        "image": "images/blog/gear.jpg",
+    },
+    {
         "slug": "how-to-ruck-with-weighted-vest",
         "title": "How to Ruck with a Weighted Vest: Fit, Progressions, and When to Switch",
         "description": "Can you ruck with a weighted vest? Yes—fit it snug, start light, build time before weight, and know when a backpack is better for longer or hillier sessions.",

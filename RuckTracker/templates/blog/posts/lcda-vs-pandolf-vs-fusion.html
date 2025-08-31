@@ -1,0 +1,143 @@
+<figure style="margin:0 0 1rem 0;">
+  <img src="{{ url_for('static', filename='images/blog/gear.jpg') }}"
+       alt="Debate: LCDA vs Pandolf vs Fusion rucking calorie models"
+       style="width:33%; height:auto; border-radius:8px; margin: 1rem 0;">
+</figure>
+
+<p><strong>LCDA vs Pandolf rucking calories</strong> is a friendly nerd fight. The new LCDA weighted‑vest model (Looney 2024) reports higher accuracy than classic Pandolf mechanics, while our app’s <strong>proprietary Fusion</strong> blends mechanics with heart rate and weather controls for real‑world stability. There’s no single perfect answer—each method makes trade‑offs. Here’s the debate in plain English, and how we choose inside the app.</p>
+
+<div style="background:#f6f9f6; border:1px solid #e4efe4; border-radius:8px; padding:1rem; margin:1rem 0;">
+  <strong>Quick Takeaways</strong>
+  <ul style="margin:.5rem 0 0 1.25rem;">
+    <li><strong>LCDA (vest‑specific):</strong> Predicts metabolic rate in W/kg with speed and vest load fraction; excellent lab/field validation.</li>
+    <li><strong>Pandolf (mechanics):</strong> Simple, time‑tested backpack model; can drift at high loads unless corrected.</li>
+    <li><strong>Fusion (our app):</strong> Proprietary blend of mechanical + heart‑rate with weather/terrain caps—built for day‑to‑day consistency.</li>
+    <li><strong>No one model wins everywhere:</strong> Pick by context—data quality, terrain, gear (vest vs pack), and your tolerance for variance.</li>
+  </ul>
+</div>
+
+<h2>What each model actually is</h2>
+<p><strong>LCDA (Looney 2024, vest):</strong> Equation predicts metabolic rate as <em>W/kg</em> from walking speed and <em>vest load as a fraction of body mass</em> plus a resting term; validated internally and externally with high concordance. The broader LCDA framework also supports grade and surface adjustments.<sup><a href="#ref-1">[1]</a>, <a href="#ref-2">[2]</a></sup></p>
+<p><strong>Pandolf (mechanics):</strong> A classic backpacking model that outputs <em>Watts</em> from body mass, load, speed, and grade. In our calculator we use a conservative load‑ratio correction and clamp extremes to avoid silly outputs. It’s robust and transparent.<sup><a href="#ref-4">[4]</a></sup></p>
+<p><strong>Fusion (our approach):</strong> A proprietary blend that leans on <em>mechanics</em> when heart‑rate is sparse and leans more on <em>HR‑based physiology</em> when coverage is good. We include weather/terrain controls and caps to prevent extreme swings from noisy sensors. It’s designed for <em>free‑living conditions</em>, not just the lab.</p>
+
+<h2>Where they agree—and where they argue</h2>
+<ul>
+  <li><strong>Speed matters:</strong> Faster walking raises energy cost in all models.</li>
+  <li><strong>Load matters:</strong> Heavier load increases cost; LCDA treats vest load explicitly as a body‑mass fraction, while Pandolf uses a generic load ratio.</li>
+  <li><strong>Grade/terrain:</strong> Uphill and unstable surfaces increase cost in both frameworks; LCDA and Pandolf handle this via different terms.</li>
+  <li><strong>Output units:</strong> LCDA predicts <em>W/kg</em>; Pandolf predicts <em>W</em>. We convert both to kcal with duration.</li>
+  <li><strong>Backpack vs vest:</strong> LCDA includes a vest‑specific term validated up to ~66% body mass; traditional Pandolf was fit for backpacking and can mis‑estimate vest scenarios without adjustments.<sup><a href="#ref-1">[1]</a>, <a href="#ref-2">[2]</a></sup></li>
+</ul>
+
+<h2>Our choices in the app (and why)</h2>
+<ul>
+  <li><strong>Calculator default:</strong> We use an <em>enhanced Pandolf</em> implementation with a conservative load‑ratio correction, grade handling, and terrain multipliers. Why? It’s transparent, fast on‑device, and behaves well when you tweak inputs. Try it here: <a href="/rucking-calorie-calculator">Rucking Calorie Calculator</a>.</li>
+  <li><strong>Session calories:</strong> When you record a ruck, our <em>proprietary Fusion</em> blends mechanical and HR‑based estimates with weather/terrain controls and safety caps. This reduces spiky readings from sensors and better reflects <em>your</em> physiology day‑to‑day.</li>
+  <li><strong>LCDA status:</strong> We have not shipped LCDA’s vest‑specific term in the app yet. We’re benchmarking it side‑by‑side against our data. If it improves accuracy without creating volatility, we’ll add it as an option or a context‑aware toggle.</li>
+</ul>
+
+<h2>So which model should <em>you</em> trust?</h2>
+<ul>
+  <li><strong>Planning a session:</strong> Use the calculator’s mechanics for quick "what‑if" scenarios by weight, pace, grade, and terrain.</li>
+  <li><strong>Reviewing a recorded ruck:</strong> Trust Fusion’s smoothed result when HR coverage is good; it’s designed for real life, not just lab averages.</li>
+  <li><strong>Weighted vest focus:</strong> LCDA’s vest term is compelling; we’ll add it if our validation shows a practical improvement.</li>
+</ul>
+
+<h2 id="rucking-calorie-calculator">Rucking Calorie Calculator</h2>
+<p>
+  Estimate calories by body weight, pack/vest weight, pace, grade, and terrain with our free tool:
+  <a href="/rucking-calorie-calculator"><strong>Open the Rucking Calorie Calculator</strong></a>.
+</p>
+
+<h2>References</h2>
+<ol id="references">
+  <li id="ref-1">Looney, D.P. et al. (2024). Metabolic Costs of Walking with Weighted Vests. <em>Med Sci Sports Exerc</em>. <a href="https://journals.lww.com/acsm-msse/fulltext/2024/06000/metabolic_costs_of_walking_with_weighted_vests.19.aspx" target="_blank" rel="noopener">Publisher</a>.</li>
+  <li id="ref-2">Looney, D.P. et al. (2022). Modeling the Metabolic Costs of Heavy Military Backpacking (LCDA). <em>Med Sci Sports Exerc</em>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8919998/" target="_blank" rel="noopener">Open access</a>.</li>
+  <li id="ref-3">Weyand, P.G. et al. (2021). Real‑world walking economy on mixed‑terrain course. <em>J Appl Physiol</em>. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8560389/" target="_blank" rel="noopener">Open access</a>.</li>
+  <li id="ref-4">Complex Terrain Load Carriage Energy Expenditure (2018). <em>Med Sci Sports Exerc</em>. <a href="https://journals.lww.com/acsm-msse/fulltext/2018/10000/complex_terrain_load_carriage_energy_expenditure.19.aspx" target="_blank" rel="noopener">Publisher</a>.</li>
+  <li id="ref-5">Review: Physiological impact of load carriage (2022). <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9630762/" target="_blank" rel="noopener">Open access</a>.</li>
+</ol>
+
+<div id="faq" style="margin-top:1.25rem; font-weight:700;">LCDA vs Pandolf vs Fusion: FAQ</div>
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Why do my app calories differ from online calculators?</h3>
+<div class="faq-answer" data-open="false">Online tools often use a single mechanical or MET model. Our app’s Fusion blends mechanical and heart‑rate data with weather/terrain controls and caps to stabilize real‑world noise, so results can differ—and often be more consistent for you.</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Is LCDA always more accurate than Pandolf?</h3>
+<div class="faq-answer" data-open="false">LCDA’s vest‑specific term showed excellent accuracy in its datasets. But performance depends on your speed, load, grade, and conditions. That’s why we benchmark before shipping changes.</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Does a weighted vest burn different calories than a backpack?</h3>
+<div class="faq-answer" data-open="false">Same weight, different placement. LCDA treats vest loads explicitly and shows meaningful differences vs backpack assumptions. Comfort and breathing also change with load distribution.</div>
+
+<h3 class="faq-question" tabindex="0" aria-expanded="false">Will you switch the app to LCDA?</h3>
+<div class="faq-answer" data-open="false">If our validation shows an improvement without added volatility, we’ll add LCDA as an option or smart toggle. Until then, mechanics and our proprietary Fusion remain the defaults.</div>
+
+<style>
+  /* Progressive enhancement: only hide/toggle when JS adds .faq-collapsible */
+  .faq-collapsible #faq + h3.faq-question,
+  .faq-collapsible #faq ~ h3.faq-question { cursor: pointer; position: relative; }
+  .faq-collapsible #faq + h3.faq-question::after,
+  .faq-collapsible #faq ~ h3.faq-question::after {
+    content: '\25BC'; font-size: 0.8em; color: #728C69; margin-left: 8px; transition: transform 0.15s ease-in-out;
+  }
+  .faq-collapsible #faq + h3.faq-question[aria-expanded="true"]::after,
+  .faq-collapsible #faq ~ h3.faq-question[aria-expanded="true"]::after { transform: rotate(180deg); }
+  .faq-collapsible .faq-answer { display: none; margin-top: .25rem; }
+  .faq-collapsible .faq-answer[data-open="true"] { display: block; }
+  .faq-collapsible .faq-question:focus { outline: 2px dashed #cfd7cf; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .faq-collapsible #faq + h3.faq-question::after,
+    .faq-collapsible #faq ~ h3.faq-question::after { transition: none; }
+  }
+</style>
+
+<script>
+  (function(){
+    var faqRoot = document.getElementById('faq');
+    if (!faqRoot) return;
+    document.documentElement.classList.add('faq-collapsible');
+    function toggle(q){
+      var ans = q.nextElementSibling; if (!ans || !ans.classList.contains('faq-answer')) return;
+      var expanded = q.getAttribute('aria-expanded') === 'true';
+      q.setAttribute('aria-expanded', String(!expanded));
+      ans.setAttribute('data-open', String(!expanded));
+    }
+    var node = faqRoot.nextElementSibling; var qs = [];
+    while (node) {
+      if (node.matches && node.matches('h3.faq-question')) qs.push(node);
+      if (node.tagName === 'H2') break;
+      node = node.nextElementSibling;
+    }
+    qs.forEach(function(q){
+      q.setAttribute('role','button'); q.setAttribute('aria-expanded','false');
+      var ans = q.nextElementSibling; if (ans && ans.classList) ans.setAttribute('data-open','false');
+      q.addEventListener('click', function(){ toggle(q); });
+      q.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle(q);} });
+    });
+  })();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Why do my app calories differ from online calculators?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Online tools often use a single mechanical or MET model. Our app’s Fusion blends mechanical and heart-rate data with weather/terrain controls and caps to stabilize real-world noise, so results can differ—and often be more consistent for you."}},
+    {"@type": "Question", "name": "Is LCDA always more accurate than Pandolf?",
+     "acceptedAnswer": {"@type": "Answer", "text": "LCDA’s vest-specific term showed excellent accuracy in its datasets. But performance depends on your speed, load, grade, and conditions. That’s why we benchmark before shipping changes."}},
+    {"@type": "Question", "name": "Does a weighted vest burn different calories than a backpack?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Same weight, different placement. LCDA treats vest loads explicitly and shows meaningful differences vs backpack assumptions. Comfort and breathing also change with load distribution."}},
+    {"@type": "Question", "name": "Will you switch the app to LCDA?",
+     "acceptedAnswer": {"@type": "Answer", "text": "If our validation shows an improvement without added volatility, we’ll add LCDA as an option or smart toggle. Until then, mechanics and our proprietary Fusion remain the defaults."}}
+  ]
+}
+</script>
+
+<h2>Related Guides</h2>
+<ul>
+  <li><a href="/blog/rucking-calories-burned">Rucking Calories Burned</a> - Mechanics, models, and estimates</li>
+  <li><a href="/blog/calories-weighted-vest-walking-vs-rucking">Weighted Vest vs Rucking Calories</a> - Compare contexts</li>
+  <li><a href="/blog/what-is-rucking">What Is Rucking?</a> - Complete beginner's guide</li>
+  <li><a href="/rucking-calorie-calculator">Rucking Calorie Calculator</a> - Estimate your exact burn</li>
+</ul>
