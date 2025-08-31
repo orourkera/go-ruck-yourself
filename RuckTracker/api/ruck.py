@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 import json
 import math
 from typing import Optional, Union
+from dateutil import tz
 from ..supabase_client import get_supabase_client
 from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 from .goals import _compute_window_bounds, _km_to_mi
