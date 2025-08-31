@@ -2246,6 +2246,8 @@ class RuckSessionRouteChunkResource(Resource):
         """
         # Feature flag for safe deployment
         deprecate_chunks = os.getenv('DEPRECATE_ROUTE_CHUNKS', 'false').lower() == 'true'
+        # Explicitly ensure chunks are processed
+        deprecate_chunks = False
         
         if deprecate_chunks:
             # New behavior: ignore route chunks but return success
