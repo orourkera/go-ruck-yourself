@@ -1779,10 +1779,13 @@ class RuckSessionLocationResource(Resource):
                 logger.debug(f"[LOC_UPLOAD][BATCH] session={ruck_id} user={g.user.id} count={len(location_points)}")
             else:
                 # Legacy mode - single point (backwards compatibility)
-                if 'latitude' not in data or 'longitude' not in data:
+                # Support both field name formats
+                lat = data.get('lat') or data.get('latitude')
+                lng = data.get('lng') or data.get('longitude')
+                if lat is None or lng is None:
                     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
                     logger.error(f"[LOC_UPLOAD][MISSING_LATLNG] session={ruck_id} user={g.user.id} ip={client_ip} keys={list(data.keys())}")
-                    return {'message': f"Missing latitude/longitude in single point mode. Provided keys: {list(data.keys())}"}, 400
+                    return {'message': f"Missing lat/latitude or lng/longitude in single point mode. Provided keys: {list(data.keys())}"}, 400
                 location_points = [data]  # Convert to array format
                 logger.debug(f"[LOC_UPLOAD][LEGACY_SINGLE] session={ruck_id} user={g.user.id}")
             
@@ -1850,15 +1853,20 @@ class RuckSessionLocationResource(Resource):
             
             for i, point in enumerate(location_points):
                 try:
+                    # Support both field name formats for backward compatibility
+                    # Accept lat/lng (new) or latitude/longitude (old Flutter format)
+                    lat = point.get('lat') or point.get('latitude')
+                    lng = point.get('lng') or point.get('longitude')
+                    
                     # Validate required fields
-                    if 'latitude' not in point or 'longitude' not in point:
-                        invalid_points.append(f"Point {i}: missing latitude/longitude, keys: {list(point.keys())}")
+                    if lat is None or lng is None:
+                        invalid_points.append(f"Point {i}: missing lat/latitude or lng/longitude, keys: {list(point.keys())}")
                         continue
                     
                     # Validate data types and ranges
                     try:
-                        lat = float(point['latitude'])
-                        lng = float(point['longitude'])
+                        lat = float(lat)
+                        lng = float(lng)
                     except (ValueError, TypeError) as e:
                         invalid_points.append(f"Point {i}: invalid lat/lng format - lat={point.get('latitude')}, lng={point.get('longitude')}, error={e}")
                         continue
@@ -1885,6 +1893,7 @@ class RuckSessionLocationResource(Resource):
                         'session_id': ruck_id,
                         'latitude': lat,
                         'longitude': lng,
+                        # TODO: Remove elevation_meters fallback once Flutter app is updated
                         'altitude': point.get('elevation') or point.get('elevation_meters'),
                         'timestamp': timestamp
                     })
@@ -2278,6 +2287,7 @@ class RuckSessionRouteChunkResource(Resource):
                     'timestamp': point['timestamp'],
                     'latitude': lat,
                     'longitude': lng,
+                    # TODO: Remove elevation_meters fallback once Flutter app is updated
                     'altitude': point.get('altitude') or point.get('elevation_meters'),
                     'accuracy': accuracy,
                     'speed': point.get('speed'),

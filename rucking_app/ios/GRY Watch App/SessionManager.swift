@@ -181,6 +181,73 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 "activation_state": self.session.activationState.rawValue,
                 "is_reachable": self.session.isReachable
             ])
+            
+            // CRITICAL: Check if there's an active session on the phone
+            self.checkForActiveSession()
+        }
+    }
+    
+    /// Check if there's an active session on the phone and sync if needed
+    private func checkForActiveSession() {
+        print("[WATCH] 🔍 Checking for active session on phone...")
+        
+        // First check the application context for any session state
+        if let context = session.receivedApplicationContext as? [String: Any] {
+            print("[WATCH] 📱 Found application context: \(context)")
+            
+            // Check for active session indicators
+            if let isSessionActive = context["isSessionActive"] as? Bool, isSessionActive {
+                print("[WATCH] ✅ Active session detected in application context!")
+                processActiveSessionFromPhone(context)
+                return
+            }
+        }
+        
+        // Send a query to the phone to check if there's an active session
+        sendMessage([
+            "command": "checkActiveSession",
+            "source": "watch",
+            "timestamp": Date().timeIntervalSince1970
+        ])
+        
+        print("[WATCH] 📤 Sent active session check to phone")
+    }
+    
+    /// Process an active session detected from the phone
+    private func processActiveSessionFromPhone(_ sessionData: [String: Any]) {
+        print("[WATCH] 🎯 Processing active session from phone: \(sessionData)")
+        
+        DispatchQueue.main.async {
+            // Extract session data
+            if let metrics = sessionData["metrics"] as? [String: Any] {
+                self.updateMetricsFromData(metrics)
+            }
+            
+            // Extract session settings
+            if let isMetric = sessionData["isMetric"] as? Bool {
+                self.isMetric = isMetric
+            }
+            
+            if let ruckWeight = sessionData["ruckWeight"] as? Double {
+                self.lastRuckWeightKg = ruckWeight
+            }
+            
+            // Set session as active
+            self.isSessionActive = true
+            self.isPaused = sessionData["isPaused"] as? Bool ?? false
+            self.sessionStartedFromPhone = true
+            
+            print("[WATCH] 🚀 Starting workout to sync with phone session...")
+            
+            // Start the workout manager to begin tracking
+            self.setupWorkoutHandlers()
+            self.startSession()
+            
+            // Navigate to active session view
+            self.navigateToActiveSession()
+            
+            // Notify user with haptic
+            WKInterfaceDevice.current().play(.start)
         }
     }
     
@@ -524,6 +591,19 @@ public class SessionManager: NSObject, ObservableObject, WCSessionDelegate, Work
                 
             case "sessionStartAlert":
                 processSessionStartAlert(message)
+                
+            case "activeSessionResponse":
+                // Response from phone about active session status
+                if let hasActiveSession = message["hasActiveSession"] as? Bool {
+                    print("[WATCH] 📱 Active session response from phone: \(hasActiveSession)")
+                    
+                    if hasActiveSession {
+                        // Process the active session data
+                        processActiveSessionFromPhone(message)
+                    } else {
+                        print("[WATCH] 📱 No active session on phone")
+                    }
+                }
                 
             case "requestHealthKitPermissions":
                 // Check existing permissions status (don't request again)

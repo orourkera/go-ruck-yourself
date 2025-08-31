@@ -234,6 +234,10 @@ class WatchService {
           } else {
             AppLogger.warning('[WATCH_SERVICE] ❌ Heart rate permission not authorized: $heartRateAuth');
           }
+        } else if (command == 'checkActiveSession') {
+          // Watch is checking if there's an active session
+          AppLogger.info('[WATCH] Watch checking for active session');
+          await _handleWatchActiveSessionCheck();
         } else if (command == 'pingResponse') {
           AppLogger.info('[WATCH] Ping response received from watch: ${data['message']}');
         } else if (command == 'watchTelemetry') {
@@ -247,6 +251,80 @@ class WatchService {
           code: 'UNIMPLEMENTED',
           message: 'Method ${call.method} not implemented',
         );
+    }
+  }
+
+  /// Handle watch checking for active session
+  Future<void> _handleWatchActiveSessionCheck() async {
+    AppLogger.info('[WATCH] Responding to watch active session check');
+    
+    // Get current session state
+    ActiveSessionBloc? activeBloc;
+    try {
+      activeBloc = GetIt.I.isRegistered<ActiveSessionBloc>() ? GetIt.I<ActiveSessionBloc>() : null;
+    } catch (e) {
+      AppLogger.debug('[WATCH] ActiveSessionBloc not available: $e');
+    }
+    
+    final currentState = activeBloc?.state;
+    final bool hasActiveSession = currentState is ActiveSessionRunning;
+    
+    if (hasActiveSession) {
+      AppLogger.info('[WATCH] Active session found - sending session data to watch');
+      
+      // Prepare comprehensive session data for the watch
+      final sessionData = {
+        'command': 'activeSessionResponse',
+        'hasActiveSession': true,
+        'sessionId': (currentState as ActiveSessionRunning).sessionId,
+        'isPaused': currentState.isPaused,
+        'isMetric': currentState.isMetric,
+        'ruckWeight': _ruckWeight,
+        'metrics': {
+          'distance': _currentDistance,
+          'durationSeconds': _currentDuration.inSeconds.toDouble(),
+          'pace': _currentPace,
+          'calories': _currentCalories,
+          'elevationGain': _currentElevationGain,
+          'elevationLoss': _currentElevationLoss,
+          'steps': _currentSteps ?? 0,
+        },
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      // Send both as immediate message and update application context
+      await _sendMessageToWatch(sessionData);
+      
+      // Also update application context so watch can read it anytime
+      try {
+        await _watchSessionChannel.invokeMethod('updateApplicationContext', sessionData);
+        AppLogger.info('[WATCH] Application context updated with session data');
+      } catch (e) {
+        AppLogger.debug('[WATCH] Could not update application context: $e');
+      }
+      
+      // Trigger a full metrics update
+      if (activeBloc != null && currentState is ActiveSessionRunning) {
+        await updateSessionOnWatch(
+          distance: currentState.distance,
+          duration: currentState.duration,
+          pace: currentState.pace,
+          isPaused: currentState.isPaused,
+          calories: currentState.calories,
+          elevationGain: currentState.elevationGain,
+          elevationLoss: currentState.elevationLoss,
+          isMetric: currentState.isMetric,
+          steps: _currentSteps,
+        );
+      }
+    } else {
+      AppLogger.info('[WATCH] No active session - notifying watch');
+      
+      await _sendMessageToWatch({
+        'command': 'activeSessionResponse',
+        'hasActiveSession': false,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
     }
   }
 
@@ -518,6 +596,28 @@ class WatchService {
       // Send detailed data after a short delay to ensure watch app is launched
       await Future.delayed(const Duration(milliseconds: 200));
       await _sendMessageToWatch(message);
+      
+      // Update application context so watch can read session state when it opens
+      try {
+        final contextData = {
+          ...message,
+          'isSessionActive': true,
+          'metrics': {
+            'distance': 0.0,
+            'durationSeconds': 0.0,
+            'pace': 0.0,
+            'calories': 0,
+            'elevationGain': 0.0,
+            'elevationLoss': 0.0,
+            'steps': 0,
+          },
+        };
+        await _watchSessionChannel.invokeMethod('updateApplicationContext', contextData);
+        AppLogger.info('[WATCH_SERVICE] Application context updated with session start');
+      } catch (e) {
+        AppLogger.debug('[WATCH_SERVICE] Could not update application context: $e');
+      }
+      
       // Start watchdog to ensure we recover if HR updates stall
       _startHeartRateWatchdog();
       

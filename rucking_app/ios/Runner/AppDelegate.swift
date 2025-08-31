@@ -105,6 +105,25 @@ import CoreMotion
                 } else {
                     result(FlutterError(code: "-1", message: "Invalid arguments", details: nil))
                 }
+            case "updateApplicationContext":
+                // Update the application context with current session state
+                if let contextData = call.arguments as? [String: Any] {
+                    print("[WATCH] Updating application context with session data")
+                    if let session = self.session {
+                        do {
+                            try session.updateApplicationContext(contextData)
+                            print("[WATCH] Application context updated successfully")
+                            result(true)
+                        } catch {
+                            print("[WATCH] Failed to update application context: \(error)")
+                            result(FlutterError(code: "-1", message: "Failed to update context", details: error.localizedDescription))
+                        }
+                    } else {
+                        result(FlutterError(code: "-1", message: "Watch session not available", details: nil))
+                    }
+                } else {
+                    result(FlutterError(code: "-1", message: "Invalid context data", details: nil))
+                }
             case "transferSplitNotification":
                 // Queue split notification for background delivery when watch app opens
                 if let splitData = call.arguments as? [String: Any] {
@@ -475,6 +494,21 @@ import CoreMotion
                     // Acknowledge the step reception if reply handler is available
                     replyHandler?(["status": "success", "stepsReceived": steps])
                 }
+            case "checkActiveSession":
+                // Watch is checking if there's an active session
+                print("[WATCH] Watch requesting active session status")
+                
+                // Forward to Flutter to check session state
+                if let controller = self.window?.rootViewController as? FlutterViewController {
+                    let chan = FlutterMethodChannel(name: self.watchSessionChannelName, binaryMessenger: controller.binaryMessenger)
+                    chan.invokeMethod("onWatchSessionUpdated", arguments: [
+                        "command": "checkActiveSession",
+                        "source": "watch"
+                    ]) { _ in }
+                }
+                
+                // Send acknowledgment if reply handler exists
+                replyHandler?(["status": "checking"])
             default:
                 print("[WATCH] Unknown command: \(command)")
                 replyHandler?(["status": "error", "message": "Unknown command \(command)"])
