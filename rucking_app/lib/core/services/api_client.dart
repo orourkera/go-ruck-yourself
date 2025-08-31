@@ -765,10 +765,6 @@ class ApiClient {
     });
     final sessionId = _extractSessionIdFromPath(path);
     
-    // Then upload route data in chunks if it exists
-    if (route.isNotEmpty) {
-      await _uploadRouteDataInChunks(sessionId, route);
-    }
     
     // Upload heart rate data in chunks if it exists  
     if (heartRateSamples.isNotEmpty) {
@@ -782,36 +778,6 @@ class ApiClient {
     });
     
     return response.data;
-  }
-  
-  /// Upload route data in manageable chunks
-  Future<void> _uploadRouteDataInChunks(String sessionId, List<dynamic> route) async {
-    const chunkSize = 100; // 100 location points per chunk
-    
-    for (int i = 0; i < route.length; i += chunkSize) {
-      final chunk = route.skip(i).take(chunkSize).toList();
-      
-      AppLogger.sessionCompletion('Uploading route chunk', context: {
-        'session_id': sessionId,
-        'chunk_start': i,
-        'chunk_size': chunk.length,
-      });
-      
-      await _dio.post(
-        '/rucks/$sessionId/route-chunk',
-        data: {'route_points': chunk, 'chunk_index': i ~/ chunkSize},
-        options: Options(
-          headers: await _getHeaders(),
-          sendTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
-        ),
-      );
-      AppLogger.sessionCompletion('Route chunk uploaded', context: {
-        'session_id': sessionId,
-        'chunk_start': i,
-        'chunk_size': chunk.length,
-      });
-    }
   }
   
   /// Upload heart rate data in manageable chunks

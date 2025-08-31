@@ -1,13 +1,13 @@
+import logging
+import os
 from flask import request, g
 from flask_restful import Resource
-from datetime import datetime, timedelta
-from dateutil import tz
-import uuid
-import logging
+from sqlalchemy import text
+from decimal import Decimal, InvalidOperation
+from datetime import datetime, timezone, timedelta
 import json
-import os
 import math
-
+from typing import Optional, Union
 from ..supabase_client import get_supabase_client
 from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 from .goals import _compute_window_bounds, _km_to_mi
@@ -2231,22 +2231,43 @@ class HeartRateSampleUploadResource(Resource):
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
             return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
         except Exception as e:
+            logger.error(f"Error uploading heart rate samples for session {ruck_id}: {e}")
             return {'message': f'Error uploading heart rate samples: {str(e)}'}, 500
+
+
 
 
 class RuckSessionRouteChunkResource(Resource):
     def post(self, ruck_id):
         """Upload route data chunk for a session (POST /api/rucks/<ruck_id>/route-chunk)
 
+        Feature flag controlled: Set DEPRECATE_ROUTE_CHUNKS=true to disable processing.
         Accepted session statuses: 'in_progress', 'paused', 'completed'.
         """
-        try:
-            if not hasattr(g, 'user') or g.user is None:
-                return {'message': 'User not authenticated'}, 401
+        # Feature flag for safe deployment
+        deprecate_chunks = os.getenv('DEPRECATE_ROUTE_CHUNKS', 'false').lower() == 'true'
         
+        if deprecate_chunks:
+            # New behavior: ignore route chunks but return success
+            try:
+                data = request.get_json()
+                route_points_count = len(data.get('route_points', [])) if data else 0
+                logger.info(f"[ROUTE_CHUNK_DEPRECATED] Ignoring route chunk for session {ruck_id}: {route_points_count} points (deprecated via feature flag)")
+                return {'status': 'ok', 'message': 'Route chunks deprecated - data handled by real-time uploads', 'ignored': route_points_count}, 200
+            except Exception as e:
+                logger.error(f"Error in deprecated route chunk endpoint for session {ruck_id}: {e}")
+                return {'message': 'Route chunks deprecated'}, 200
+        
+        # Original behavior: process route chunks normally
+        try:
             data = request.get_json()
-            if not data or 'route_points' not in data or not isinstance(data['route_points'], list):
-                return {'message': 'Missing or invalid route_points'}, 400
+            if not data or 'route_points' not in data:
+                return {'message': 'Missing route_points in request body'}, 400
+        
+            if not data['route_points']:
+                return {'message': 'Empty route_points array'}, 400
+        
+            logger.info(f"[ROUTE_CHUNK] Uploading route chunk for session {ruck_id}: {len(data['route_points'])} points")
         
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
         
@@ -2309,6 +2330,7 @@ class RuckSessionRouteChunkResource(Resource):
 class RuckSessionHeartRateChunkResource(Resource):
     def post(self, ruck_id):
         """Upload heart rate data chunk for a session (POST /api/rucks/<ruck_id>/heart-rate-chunk)
+{{ ... }}
 
         Accepted session statuses: 'in_progress', 'completed'.
         """
