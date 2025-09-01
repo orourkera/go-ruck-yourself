@@ -11,100 +11,35 @@ from ..utils.response_helper import success_response, error_response
 
 logger = logging.getLogger(__name__)
 
-# Base plan templates (matching the Dart models)
-BASE_PLANS = {
-    'fat-loss': {
-        'name': 'Fat Loss & Feel Better',
-        'duration_weeks': 12,
-        'base_structure': {
-            'sessions_per_week': {
-                'rucks': 3,
-                'unloaded_cardio': 2,
-                'strength': 2,
-            },
-            'strength_duration': '30-35 min',
-            'starting_load': {
-                'percentage': '10-15% bodyweight',
-                'cap': '18 kg / 40 lb',
-            },
-            'weekly_ruck_minutes': {
-                'start': '120-150',
-                'end': '170-200',
-            },
-            'intensity': {
-                'z2': '40-59% HRR (RPE 3-4)',
-            },
-        }
-    },
-    'get-faster': {
-        'name': 'Get Faster at Rucking',
-        'duration_weeks': 8,
-        'base_structure': {
-            'sessions_per_week': {
-                'rucks': 3,
-                'unloaded_cardio': 1,
-            },
-            'ruck_types': {
-                'A_Z2_duration': '45→70 min',
-                'B_tempo': '20-35 min "comfortably hard" in 40-55 min session',
-                'C_hills_z2': '40-60 min; +50-100 m vert/week if green',
+def _get_coaching_plan_templates(supabase_client) -> Dict[str, Any]:
+    """Fetch coaching plan templates from database"""
+    try:
+        response = supabase_client.table('coaching_plan_templates').select('*').eq('is_active', True).execute()
+        
+        templates = {}
+        for template in response.data or []:
+            templates[template['plan_id']] = {
+                'name': template['name'],
+                'duration_weeks': template['duration_weeks'],
+                'base_structure': template['base_structure'],
+                'progression_rules': template['progression_rules'],
+                'non_negotiables': template['non_negotiables'],
+                'retests': template['retests'],
+                'personalization_knobs': template['personalization_knobs']
             }
-        }
-    },
-    'event-prep': {
-        'name': '12-mile under 3:00 (or custom event)',
-        'duration_weeks': 12,
-        'base_structure': {
-            'sessions_per_week': {
-                'rucks': 3,
-                'easy_run_bike': 1,
-            },
-            'target_load_range': '≈14-20 kg (30-45 lb), personalized',
-        }
-    },
-    'daily-discipline': {
-        'name': 'Daily Discipline Streak',
-        'duration_weeks': 4,
-        'base_structure': {
-            'primary_aim': 'daily movement without overuse',
-            'weekly_structure': {
-                'light_vest_recovery_walks': '2-3 × 10-20 min @ 5-10% BW',
-                'unloaded_z2': '2 × 30-45 min',
-                'unloaded_long': '1 × 60-75 min',
-                'optional_strength': '30 min',
-            }
-        }
-    },
-    'age-strong': {
-        'name': 'Posture/Balance & Age Strong',
-        'duration_weeks': 8,
-        'base_structure': {
-            'sessions_per_week': {
-                'light_rucks': '2-3 × 30-50 min @ 6-12% BW',
-                'strength_balance': '2 × step-ups, sit-to-stand, suitcase carries, side planks',
-                'mobility': '10 min',
-            }
-        }
-    },
-    'load-capacity': {
-        'name': 'Load Capacity Builder',
-        'duration_weeks': 8,
-        'base_structure': {
-            'who_why': 'time-capped users or load-specific goals',
-            'sessions_per_week': {
-                'rucks': '2-3',
-                'unloaded_cardio': '1-2',
-                'short_strength': '2 × 30-35 min (include suitcase carries)',
-            }
-        }
-    }
-}
+        
+        return templates
+    except Exception as e:
+        logger.error(f"Failed to fetch coaching plan templates from database: {e}")
+        # Fallback to empty dict - could add hardcoded fallback if needed
+        return {}
 
-def personalize_plan(base_plan_id: str, personalization: Dict[str, Any]) -> Dict[str, Any]:
+def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabase_client) -> Dict[str, Any]:
     """
     Generate a personalized plan based on the base plan and user's personalization data
     """
-    base_plan = BASE_PLANS.get(base_plan_id)
+    templates = _get_coaching_plan_templates(supabase_client)
+    base_plan = templates.get(base_plan_id)
     if not base_plan:
         raise ValueError(f"Unknown base plan: {base_plan_id}")
     
@@ -202,6 +137,23 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any]) -> Dict
         'adaptations': adaptations
     }
 
+class CoachingPlanTemplatesResource(Resource):
+    """Resource for managing coaching plan templates"""
+    
+    def get(self):
+        """Get all available coaching plan templates"""
+        try:
+            supabase = get_supabase_client()
+            templates = _get_coaching_plan_templates(supabase)
+            
+            return success_response({
+                "templates": templates
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching coaching plan templates: {str(e)}")
+            return error_response(f"Error fetching coaching plan templates: {str(e)}", 500)
+
 class CoachingPlansResource(Resource):
     """Resource for managing coaching plans"""
     
@@ -225,17 +177,20 @@ class CoachingPlansResource(Resource):
             coaching_personality = data['coaching_personality']
             personalization = data['personalization']
             
-            # Validate base plan exists
-            if base_plan_id not in BASE_PLANS:
-                return error_response(f"Invalid base plan ID: {base_plan_id}", 400)
-            
-            base_plan = BASE_PLANS[base_plan_id]
-            
-            # Generate personalized plan
-            personalized_plan = personalize_plan(base_plan_id, personalization)
-            
             # Get Supabase client
             supabase = get_supabase_client()
+            
+            # Get coaching plan templates from database
+            templates = _get_coaching_plan_templates(supabase)
+            
+            # Validate base plan exists
+            if base_plan_id not in templates:
+                return error_response(f"Invalid base plan ID: {base_plan_id}", 400)
+            
+            base_plan = templates[base_plan_id]
+            
+            # Generate personalized plan
+            personalized_plan = personalize_plan(base_plan_id, personalization, supabase)
             
             # Check if user already has an active plan of this type
             existing_response = supabase.table("coaching_plans").select("id").eq(
@@ -376,5 +331,6 @@ coaching_plans_bp = Blueprint('coaching_plans', __name__)
 coaching_plans_api = Api(coaching_plans_bp)
 
 # Add resources
+coaching_plans_api.add_resource(CoachingPlanTemplatesResource, '/coaching-plan-templates')
 coaching_plans_api.add_resource(CoachingPlansResource, '/coaching-plans')
 coaching_plans_api.add_resource(CoachingPlanResource, '/coaching-plans/<string:plan_id>')

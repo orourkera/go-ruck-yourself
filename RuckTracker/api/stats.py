@@ -40,6 +40,7 @@ def calculate_aggregates(sessions):
             'total_distance_km': 0.0,
             'total_duration_seconds': 0,
             'total_calories': 0,
+            'total_power_points': 0,
             'performance': { # Nest performance metrics
                  'avg_pace_seconds_per_km': 0.0,
                  'avg_distance_km': 0.0,
@@ -51,6 +52,7 @@ def calculate_aggregates(sessions):
     total_distance_km = sum(s.get('distance_km', 0) or 0 for s in sessions)
     total_duration_seconds = sum(s.get('duration_seconds', 0) or 0 for s in sessions)
     total_calories = sum(s.get('calories_burned', 0) or 0 for s in sessions)
+    total_power_points = sum(s.get('power_points', 0) or 0 for s in sessions)
 
     avg_distance_km = total_distance_km / total_sessions if total_sessions > 0 else 0.0
     avg_duration_seconds = total_duration_seconds / total_sessions if total_sessions > 0 else 0
@@ -64,6 +66,7 @@ def calculate_aggregates(sessions):
         'total_distance_km': float(total_distance_km),
         'total_duration_seconds': int(total_duration_seconds),
         'total_calories': int(total_calories),
+        'total_power_points': int(total_power_points),
         'performance': {
              'avg_pace_seconds_per_km': float(avg_pace_seconds_per_km),
              'avg_distance_km': float(avg_distance_km),
@@ -73,7 +76,13 @@ def calculate_aggregates(sessions):
     
 def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at'):
     """Calculates daily breakdown for weekly view."""
-    daily_data = {i: {'sessions_count': 0, 'distance_km': 0.0} for i in range(7)}
+    daily_data = {i: {
+        'sessions_count': 0, 
+        'distance_km': 0.0,
+        'duration_seconds': 0,
+        'calories': 0,
+        'power_points': 0
+    } for i in range(7)}
     day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     
     for s in sessions:
@@ -85,6 +94,9 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
                     day_index = session_time_dt.weekday()
                     daily_data[day_index]['sessions_count'] += 1
                     daily_data[day_index]['distance_km'] += float(s.get('distance_km', 0) or 0)
+                    daily_data[day_index]['duration_seconds'] += int(s.get('duration_seconds', 0) or 0)
+                    daily_data[day_index]['calories'] += int(s.get('calories_burned', 0) or 0)
+                    daily_data[day_index]['power_points'] += int(s.get('power_points', 0) or 0)
             except (ValueError, TypeError) as e:
                 logger.warning(f"Error parsing timestamp for daily breakdown: {e}")
     
@@ -94,10 +106,124 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
         # Calculate the actual date for this day of the week
         day_date = start_date + timedelta(days=i)
         result.append({
-            'day_name': day_names[i],  # Frontend expects 'day_name' field
-            'date': day_date.strftime('%Y-%m-%d'),  # Also provide date as backup
+            'period': day_names[i][:3],  # Mon, Tue, Wed for chart labels
+            'date': day_date.strftime('%Y-%m-%d'),
             'sessions_count': daily_data[i]['sessions_count'],
-            'distance_km': daily_data[i]['distance_km']
+            'distance_km': daily_data[i]['distance_km'],
+            'duration_seconds': daily_data[i]['duration_seconds'],
+            'calories': daily_data[i]['calories'],
+            'power_points': daily_data[i]['power_points']
+        })
+    
+    return result
+
+def get_weekly_breakdown(sessions, start_date, end_date, date_field='completed_at'):
+    """Calculates weekly breakdown for monthly view."""
+    # Get the first Monday of the month for week calculation
+    first_day_of_month = start_date.replace(day=1)
+    first_monday = first_day_of_month - timedelta(days=first_day_of_month.weekday())
+    
+    weekly_data = {}
+    
+    for s in sessions:
+        session_time_str = s.get(date_field)
+        if session_time_str:
+            try:
+                session_time_dt = datetime.fromisoformat(session_time_str.replace('Z', '+00:00')).astimezone(timezone.utc)
+                if start_date <= session_time_dt <= end_date:
+                    # Calculate which week this session belongs to
+                    days_since_first_monday = (session_time_dt - first_monday).days
+                    week_index = days_since_first_monday // 7
+                    
+                    if week_index not in weekly_data:
+                        weekly_data[week_index] = {
+                            'sessions_count': 0,
+                            'distance_km': 0.0,
+                            'duration_seconds': 0,
+                            'calories': 0,
+                            'power_points': 0
+                        }
+                    
+                    weekly_data[week_index]['sessions_count'] += 1
+                    weekly_data[week_index]['distance_km'] += float(s.get('distance_km', 0) or 0)
+                    weekly_data[week_index]['duration_seconds'] += int(s.get('duration_seconds', 0) or 0)
+                    weekly_data[week_index]['calories'] += int(s.get('calories_burned', 0) or 0)
+                    weekly_data[week_index]['power_points'] += int(s.get('power_points', 0) or 0)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error parsing timestamp for weekly breakdown: {e}")
+    
+    # Convert to array format for frontend
+    result = []
+    max_weeks = 6  # Max weeks in a month view
+    for week_index in range(max_weeks):
+        week_start = first_monday + timedelta(weeks=week_index)
+        if week_start > end_date + timedelta(days=7):
+            break
+            
+        data = weekly_data.get(week_index, {
+            'sessions_count': 0,
+            'distance_km': 0.0,
+            'duration_seconds': 0,
+            'calories': 0,
+            'power_points': 0
+        })
+        
+        result.append({
+            'period': f'W{week_index + 1}',
+            'date': week_start.strftime('%Y-%m-%d'),
+            **data
+        })
+    
+    return result
+
+def get_monthly_breakdown(sessions, start_date, end_date, date_field='completed_at'):
+    """Calculates monthly breakdown for yearly view."""
+    monthly_data = {}
+    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
+    for s in sessions:
+        session_time_str = s.get(date_field)
+        if session_time_str:
+            try:
+                session_time_dt = datetime.fromisoformat(session_time_str.replace('Z', '+00:00')).astimezone(timezone.utc)
+                if start_date <= session_time_dt <= end_date:
+                    month_key = session_time_dt.month - 1  # 0-based index
+                    
+                    if month_key not in monthly_data:
+                        monthly_data[month_key] = {
+                            'sessions_count': 0,
+                            'distance_km': 0.0,
+                            'duration_seconds': 0,
+                            'calories': 0,
+                            'power_points': 0
+                        }
+                    
+                    monthly_data[month_key]['sessions_count'] += 1
+                    monthly_data[month_key]['distance_km'] += float(s.get('distance_km', 0) or 0)
+                    monthly_data[month_key]['duration_seconds'] += int(s.get('duration_seconds', 0) or 0)
+                    monthly_data[month_key]['calories'] += int(s.get('calories_burned', 0) or 0)
+                    monthly_data[month_key]['power_points'] += int(s.get('power_points', 0) or 0)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error parsing timestamp for monthly breakdown: {e}")
+    
+    # Convert to array format for frontend
+    result = []
+    for month_index in range(12):
+        month_start = datetime(start_date.year, month_index + 1, 1, tzinfo=timezone.utc)
+        
+        data = monthly_data.get(month_index, {
+            'sessions_count': 0,
+            'distance_km': 0.0,
+            'duration_seconds': 0,
+            'calories': 0,
+            'power_points': 0
+        })
+        
+        result.append({
+            'period': month_names[month_index],
+            'date': month_start.strftime('%Y-%m-%d'),
+            **data
         })
     
     return result
@@ -131,7 +257,7 @@ class WeeklyStatsResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             logger.info(f"[STATS_PERF] WeeklyStatsResource: Executing query for user {g.user.id} from {start_iso} to {end_iso}")
             response = supabase.table('ruck_session') \
-                .select('distance_km, duration_seconds, calories_burned, completed_at') \
+                .select('distance_km, duration_seconds, calories_burned, power_points, completed_at') \
                 .eq('user_id', g.user.id) \
                 .gte('completed_at', start_iso) \
                 .lte('completed_at', end_iso) \
@@ -188,7 +314,7 @@ class MonthlyStatsResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             logger.info(f"[STATS_PERF] MonthlyStatsResource: Executing query for user {g.user.id} from {start_iso} to {end_iso}")
             response = supabase.table('ruck_session') \
-                .select('distance_km, duration_seconds, calories_burned, completed_at') \
+                .select('distance_km, duration_seconds, calories_burned, power_points, completed_at') \
                 .eq('user_id', g.user.id) \
                 .gte('completed_at', start_iso) \
                 .lte('completed_at', end_iso) \
@@ -203,8 +329,10 @@ class MonthlyStatsResource(Resource):
                       error_detail = getattr(response, 'message', 'Failed to fetch data')
                  return {'message': f'Error fetching monthly sessions: {error_detail}'}, 500
 
-            stats = calculate_aggregates(response.data)
+            sessions = response.data
+            stats = calculate_aggregates(sessions)
             stats['date_range'] = date_range_str
+            stats['time_series'] = get_weekly_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
 
             cache_set(cache_key, stats)
             return {'data': stats}, 200
@@ -234,7 +362,7 @@ class YearlyStatsResource(Resource):
             # Use the authenticated user's JWT for RLS
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             response = supabase.table('ruck_session') \
-                .select('distance_km, duration_seconds, calories_burned, completed_at') \
+                .select('distance_km, duration_seconds, calories_burned, power_points, completed_at') \
                 .eq('user_id', g.user.id) \
                 .gte('completed_at', start_iso) \
                 .lte('completed_at', end_iso) \
@@ -248,8 +376,10 @@ class YearlyStatsResource(Resource):
                       error_detail = getattr(response, 'message', 'Failed to fetch data')
                  return {'message': f'Error fetching yearly sessions: {error_detail}'}, 500
 
-            stats = calculate_aggregates(response.data)
+            sessions = response.data
+            stats = calculate_aggregates(sessions)
             stats['date_range'] = date_range_str
+            stats['time_series'] = get_monthly_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
 
             cache_set(cache_key, stats)
             return {'data': stats}, 200

@@ -153,6 +153,13 @@ class HealthService {
     }
   }
   
+  /// Get the appropriate workout activity type based on VO2 Max Protection setting
+  Future<HealthWorkoutActivityType> _getWorkoutActivityType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final vo2MaxProtection = prefs.getBool('vo2_max_protection') ?? false;
+    return vo2MaxProtection ? HealthWorkoutActivityType.OTHER : HealthWorkoutActivityType.HIKING;
+  }
+
   /// Write workout data to health store
   Future<bool> writeHealthData(double distanceMeters, double caloriesBurned, DateTime startTime, DateTime endTime) async {
     if (!_isAuthorized) {
@@ -236,8 +243,9 @@ class HealthService {
       if (Platform.isIOS) {
         try {
           // If the health package provides writeWorkoutData (>=5.0.0)
+          final activityType = await _getWorkoutActivityType();
           workoutSuccess = await _health.writeWorkoutData(
-            activityType: HealthWorkoutActivityType.HIKING,
+            activityType: activityType,
             start: startDate,
             end: endDate,
             totalEnergyBurned: caloriesBurned,

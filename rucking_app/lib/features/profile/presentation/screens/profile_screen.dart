@@ -364,6 +364,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const Divider(),
                             _buildSettingItem(
+                              icon: Icons.fitness_center_outlined,
+                              label: 'VO2 Max Protection',
+                              trailing: FutureBuilder<bool>(
+                                future: SharedPreferences.getInstance().then((p) => p.getBool('vo2_max_protection') ?? false),
+                                builder: (context, snapshot) {
+                                  final current = snapshot.data ?? false;
+                                  return Switch(
+                                    value: current,
+                                    activeColor: isDark 
+                                        ? const Color(0xFF728C69)
+                                        : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                    onChanged: (value) async {
+                                      final prefs = await SharedPreferences.getInstance();
+                                      await prefs.setBool('vo2_max_protection', value);
+                                      setState(() {});
+                                      
+                                      // Show informational message
+                                      StyledSnackBar.show(
+                                        context: context,
+                                        message: value 
+                                            ? 'VO2 Max Protection enabled - workouts saved as "Other" in HealthKit'
+                                            : 'VO2 Max Protection disabled - workouts saved as "Hiking" in HealthKit',
+                                        type: SnackBarType.info,
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            const Divider(),
+                            _buildSettingItem(
                               icon: Icons.share_outlined,
                               label: 'Allow Ruck Sharing',
                               trailing: Switch(

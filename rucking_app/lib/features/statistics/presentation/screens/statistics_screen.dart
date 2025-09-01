@@ -8,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/statistics/presentation/widgets/ruck_stats_chart.dart';
 
 /// Screen for displaying statistics and analytics
 class StatisticsScreen extends StatefulWidget {
@@ -352,6 +353,7 @@ class _StatsContentWidget extends StatelessWidget {
     final totalDistanceKm = (stats['total_distance_km'] ?? 0.0).toDouble();
     final totalCalories = stats['total_calories'] ?? 0;
     final totalDurationSecs = stats['total_duration_seconds'] ?? 0;
+    final totalPowerPoints = stats['total_power_points'] ?? 0;
     
     // Format stats
     final distanceValue = MeasurementUtils.formatDistance(totalDistanceKm, metric: preferMetric);
@@ -375,6 +377,19 @@ class _StatsContentWidget extends StatelessWidget {
                   : _buildYearSelector(stats['date_range'] ?? 'This Year'),
           
           const SizedBox(height: 24),
+          
+          // Chart
+          if (stats['time_series'] != null && (stats['time_series'] as List).isNotEmpty)
+            Column(
+              children: [
+                RuckStatsChart(
+                  timeSeriesData: stats['time_series'] as List,
+                  timeframe: timeframe,
+                  preferMetric: preferMetric,
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           
           // Summary cards
           Text(
@@ -429,6 +444,22 @@ class _StatsContentWidget extends StatelessWidget {
                   color: AppColors.info,
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  context: context,
+                  icon: Icons.star,
+                  value: totalPowerPoints.toString(),
+                  label: 'Power Points',
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: Container()), // Empty space to balance the layout
             ],
           ),
           
