@@ -15,11 +15,11 @@ class CoachingService {
   }) async {
     try {
       final responseData = await _apiClient.post(
-        '/coaching-plans',
+        '/user-coaching-plans',
         {
-          'base_plan_id': basePlanId,
+          'template_id': int.parse(basePlanId), // Convert to int for our backend
           'coaching_personality': coachingPersonality,
-          'personalization': personalization.toJson(),
+          'start_date': DateTime.now().toIso8601String().split('T')[0], // Today
         },
       );
 
@@ -41,90 +41,38 @@ class CoachingService {
     }
   }
 
-  /// Get all coaching plans for the current user
-  Future<List<Map<String, dynamic>>> getCoachingPlans({String? status}) async {
+  /// Get active coaching plan for the current user
+  Future<Map<String, dynamic>?> getActiveCoachingPlan() async {
     try {
-      final queryParams = status != null ? {'status': status} : <String, dynamic>{};
-      
-      final responseData = await _apiClient.get(
-        '/coaching-plans',
-        queryParams: queryParams,
-      );
+      final responseData = await _apiClient.get('/user-coaching-plans');
 
-      // Handle both direct response and wrapped response formats
-      if (responseData is Map<String, dynamic>) {
-        if (responseData.containsKey('success') && responseData['success'] == true) {
-          final List<dynamic> plans = responseData['data']['coaching_plans'];
-          return plans.cast<Map<String, dynamic>>();
-        } else if (responseData.containsKey('success') && responseData['success'] == false) {
-          throw Exception(responseData['message'] ?? 'Failed to fetch coaching plans');
-        } else {
-          // Direct response format - assume it's a list
-          if (responseData is List) {
-            return (responseData as List).cast<Map<String, dynamic>>();
-          } else {
-            throw Exception('Unexpected response format');
-          }
-        }
-      } else if (responseData is List) {
-        return (responseData as List).cast<Map<String, dynamic>>();
-      } else {
-        throw Exception('Unexpected response format');
-      }
+      // Our API returns null if no active plan, or the plan data
+      return responseData;
     } catch (e) {
-      throw Exception('Failed to fetch coaching plans: $e');
+      throw Exception('Failed to fetch active coaching plan: $e');
     }
   }
 
-  /// Get a specific coaching plan
-  Future<Map<String, dynamic>> getCoachingPlan(String planId) async {
+  /// Get detailed progress for the current user's active plan
+  Future<Map<String, dynamic>> getCoachingPlanProgress() async {
     try {
-      final responseData = await _apiClient.get('/coaching-plans/$planId');
-
-      // Handle both direct response and wrapped response formats
-      if (responseData is Map<String, dynamic>) {
-        if (responseData.containsKey('success') && responseData['success'] == true) {
-          return responseData['data']['coaching_plan'];
-        } else if (responseData.containsKey('success') && responseData['success'] == false) {
-          throw Exception(responseData['message'] ?? 'Failed to fetch coaching plan');
-        } else {
-          // Direct response format
-          return responseData;
-        }
-      } else {
-        throw Exception('Unexpected response format: $responseData');
-      }
+      final responseData = await _apiClient.get('/user-coaching-plan-progress');
+      return responseData;
     } catch (e) {
-      throw Exception('Failed to fetch coaching plan: $e');
+      throw Exception('Failed to fetch coaching plan progress: $e');
     }
   }
 
-  /// Update a coaching plan's status
-  Future<Map<String, dynamic>> updateCoachingPlanStatus(
-    String planId,
-    String status,
-  ) async {
+  /// Track session completion against the coaching plan
+  Future<Map<String, dynamic>> trackSessionCompletion(int sessionId) async {
     try {
-      final responseData = await _apiClient.patch(
-        '/coaching-plans/$planId',
-        {'status': status},
+      final responseData = await _apiClient.post(
+        '/plan-session-tracking',
+        {'session_id': sessionId},
       );
-
-      // Handle both direct response and wrapped response formats
-      if (responseData is Map<String, dynamic>) {
-        if (responseData.containsKey('success') && responseData['success'] == true) {
-          return responseData['data']['coaching_plan'];
-        } else if (responseData.containsKey('success') && responseData['success'] == false) {
-          throw Exception(responseData['message'] ?? 'Failed to update coaching plan');
-        } else {
-          // Direct response format
-          return responseData;
-        }
-      } else {
-        throw Exception('Unexpected response format: $responseData');
-      }
+      return responseData;
     } catch (e) {
-      throw Exception('Failed to update coaching plan: $e');
+      throw Exception('Failed to track session completion: $e');
     }
   }
 }

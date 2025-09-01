@@ -32,14 +32,19 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: isDark 
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -78,6 +83,9 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
   }
 
   Widget _buildMetricSelector() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -94,16 +102,28 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.grey[100],
+                  color: isSelected 
+                      ? AppColors.primary 
+                      : isDark 
+                          ? Colors.grey[800] 
+                          : Colors.grey[100],
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                    color: isSelected 
+                        ? AppColors.primary 
+                        : isDark 
+                            ? Colors.grey[600]! 
+                            : Colors.grey[300]!,
                   ),
                 ),
                 child: Text(
                   _getMetricDisplayName(metric),
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: isSelected ? Colors.white : AppColors.textDarkSecondary,
+                    color: isSelected 
+                        ? Colors.white 
+                        : isDark 
+                            ? Colors.grey[300] 
+                            : AppColors.textDarkSecondary,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
@@ -116,6 +136,9 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
   }
 
   Widget _buildChart() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     if (widget.timeSeriesData.isEmpty) {
       return SizedBox(
         height: 200,
@@ -126,13 +149,13 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
               Icon(
                 Icons.bar_chart_outlined,
                 size: 48,
-                color: AppColors.grey,
+                color: isDark ? Colors.grey[400] : AppColors.grey,
               ),
               const SizedBox(height: 8),
               Text(
                 'No data available',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textDarkSecondary,
+                  color: isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
                 ),
               ),
             ],
@@ -156,7 +179,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
             horizontalInterval: _getMaxY() / 4,
             getDrawingHorizontalLine: (value) {
               return FlLine(
-                color: Colors.grey[300]!,
+                color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
                 strokeWidth: 1,
               );
             },
@@ -193,6 +216,9 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
   }
 
   FlTitlesData _buildTitlesData() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return FlTitlesData(
       show: true,
       rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -214,7 +240,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
               child: Text(
                 period,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textDarkSecondary,
+                  color: isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
                   fontSize: 10,
                 ),
               ),
@@ -230,7 +256,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
             return Text(
               _formatAxisValue(value),
               style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textDarkSecondary,
+                color: isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
                 fontSize: 10,
               ),
             );
@@ -241,6 +267,9 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
   }
 
   List<BarChartGroupData> _buildBarGroups() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return widget.timeSeriesData.asMap().entries.map((entry) {
       final index = entry.key;
       final data = entry.value;
@@ -260,7 +289,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
             backDrawRodData: BackgroundBarChartRodData(
               show: true,
               toY: _getMaxY(),
-              color: Colors.grey[100],
+              color: isDark ? Colors.grey[800] : Colors.grey[100],
             ),
           ),
         ],

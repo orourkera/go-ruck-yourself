@@ -678,10 +678,10 @@ Benefits:
 ### Implementation Phases
 ```
 Phase 1: Basic Integration
-- [ ] Update "Create Goal" to "Create Coaching Plan"
-- [ ] Add plan preview step to existing goal flow
-- [ ] Basic plan templates (3-4 goal types)
-- [ ] Simple coaching personality selection
+- [x] Update "Create Goal" to "Create Coaching Plan" (already exists as "Start AI Coaching Plan")
+- [x] Add plan preview step to existing goal flow (PlanCreationScreen flow exists)
+- [x] Basic plan templates (6 goal types in database + frontend)
+- [x] Simple coaching personality selection (PersonalitySelector widget exists)
 - [ ] Plan progress widget on achievements page
 
 Phase 2: Enhanced Features
@@ -1006,22 +1006,22 @@ Backend Services:
 ### Implementation Priority Order
 
 #### Week 1-2: Foundation
-- [ ] Database schema creation and migrations
-- [ ] Basic plan template seeding
-- [ ] Core domain models in Flutter
-- [ ] Basic API endpoints for plan CRUD
+- [x] Database schema creation and migrations (user_coaching_plans, plan_sessions, plan_modifications)
+- [x] Basic plan template seeding (6 plans in coaching_plan_templates)
+- [x] Core domain models in Flutter (UserCoachingPlan, PlanSession, PlanProgress)
+- [x] Basic API endpoints for plan CRUD (UserCoachingPlansResource, progress, session tracking)
 
 #### Week 3-4: Create Goal Enhancement  
-- [ ] Update achievements page UI for plan creation
-- [ ] Implement plan preview flow
-- [ ] Add coaching personality selection
-- [ ] Create plan commitment confirmation
+- [x] Update achievements page UI for plan creation ("Start AI Coaching Plan" button exists)
+- [x] Implement plan preview flow (PlanCreationScreen with full flow)
+- [x] Add coaching personality selection (PersonalitySelector widget exists)
+- [x] Create plan commitment confirmation (commitment step in PlanCreationScreen)
 
 #### Week 5-6: Progress Integration
 - [ ] Homepage AI insights plan integration
 - [ ] Session creation plan recommendations  
-- [ ] Basic progress tracking and display
-- [ ] Plan adherence scoring
+- [x] Basic progress tracking and display (UserCoachingPlanProgressResource API)
+- [x] Plan adherence scoring (PlanSessionTrackingResource with adherence calculation)
 
 #### Week 7-8: Plan Management
 - [ ] Plan overview and modification screens
@@ -1078,8 +1078,8 @@ Holistic Coaching Features:
 ## Implementation Phases
 
 ### Phase 1: Foundation (MVP)
-- [ ] Basic plan templates (3-4 goal types)
-- [ ] Progress tracking dashboard
+- [x] Basic plan templates (6 goal types in database)
+- [x] Progress tracking dashboard (backend APIs built)
 - [ ] Plan-aware homepage insights
 - [ ] Session recommendations based on plan
 - [ ] Simple plan modification options

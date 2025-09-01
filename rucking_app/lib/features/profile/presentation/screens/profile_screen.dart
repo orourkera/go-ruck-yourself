@@ -386,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         message: value 
                                             ? 'VO2 Max Protection enabled - workouts saved as "Other" in HealthKit'
                                             : 'VO2 Max Protection disabled - workouts saved as "Hiking" in HealthKit',
-                                        type: SnackBarType.info,
+                                        type: SnackBarType.normal,
                                       );
                                     },
                                   );

@@ -4,7 +4,7 @@
 -- Table 1: user_coaching_plans (active user plans with dates and progress)
 CREATE TABLE user_coaching_plans (
     id SERIAL PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES "user"(id) ON DELETE CASCADE,
     coaching_plan_id INTEGER REFERENCES coaching_plan_templates(id) ON DELETE RESTRICT,
     coaching_personality VARCHAR(50) NOT NULL DEFAULT 'supportive_friend',
     start_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -27,7 +27,7 @@ CREATE TABLE user_coaching_plans (
 CREATE TABLE plan_sessions (
     id SERIAL PRIMARY KEY,
     user_coaching_plan_id INTEGER REFERENCES user_coaching_plans(id) ON DELETE CASCADE,
-    session_id UUID REFERENCES ruck_session(id) ON DELETE SET NULL,
+    session_id INTEGER REFERENCES ruck_session(id) ON DELETE SET NULL,
     planned_week INTEGER NOT NULL,
     planned_session_type VARCHAR(100) NOT NULL,
     completion_status VARCHAR(50) NOT NULL DEFAULT 'planned',

@@ -879,6 +879,12 @@ api.add_resource(GoalMessagesResource, '/api/goals/<string:goal_id>/messages')
 api.add_resource(GoalEvaluateAllResource, '/api/goals/evaluate-all')
 api.add_resource(GoalNotificationSendResource, '/api/goals/<string:goal_id>/notify')
 
+# User Coaching Plans Endpoints
+from .api.user_coaching_plans import UserCoachingPlansResource, UserCoachingPlanProgressResource, PlanSessionTrackingResource
+api.add_resource(UserCoachingPlansResource, '/api/user-coaching-plans')
+api.add_resource(UserCoachingPlanProgressResource, '/api/user-coaching-plan-progress')
+api.add_resource(PlanSessionTrackingResource, '/api/plan-session-tracking')
+
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
 api.add_resource(ClubDeeplinkResource, '/clubs/<string:club_id>')
