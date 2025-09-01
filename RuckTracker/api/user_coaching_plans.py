@@ -5,10 +5,11 @@ Handles plan instantiation, progress tracking, and plan management
 
 import logging
 from datetime import datetime, timedelta
-from flask import request
+from flask import request, g
 from flask_restful import Resource
-from RuckTracker.api import require_auth, client
-from RuckTracker.api.achievements import _require_auth
+from ..supabase_client import get_supabase_client
+from ..utils.auth_helper import get_current_user_id
+from ..utils.api_response import check_auth_and_respond
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +18,14 @@ class UserCoachingPlansResource(Resource):
     
     def get(self):
         """Get user's active coaching plan with progress"""
-        ok, err = _require_auth()
-        if not ok:
-            return err
-            
         try:
-            user_id = request.current_user_id
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
             
             # Get active plan with template info
+            client = get_supabase_client()
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
                 'coaching_plan_templates!coaching_plan_id(id, name, goal_type, duration_weeks, plan_structure, success_metrics, tracking_elements)'
@@ -70,12 +71,11 @@ class UserCoachingPlansResource(Resource):
     
     def post(self):
         """Create new coaching plan from template"""
-        ok, err = _require_auth()
-        if not ok:
-            return err
-            
         try:
-            user_id = request.current_user_id
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
             body = request.get_json() or {}
             
             template_id = body.get('template_id')
@@ -86,6 +86,7 @@ class UserCoachingPlansResource(Resource):
                 return {"error": "template_id required"}, 400
                 
             # Validate template exists
+            client = get_supabase_client()
             template_resp = client.table('coaching_plan_templates').select(
                 'id, name, duration_weeks, plan_structure'
             ).eq('id', template_id).single().execute()
@@ -148,14 +149,14 @@ class UserCoachingPlanProgressResource(Resource):
     
     def get(self):
         """Get detailed progress and next recommendations"""
-        ok, err = _require_auth()
-        if not ok:
-            return err
-            
         try:
-            user_id = request.current_user_id
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
             
             # Get active plan
+            client = get_supabase_client()
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, start_date, current_week, '
                 'coaching_plan_templates!coaching_plan_id(name, duration_weeks, plan_structure, success_metrics)'
@@ -204,12 +205,11 @@ class PlanSessionTrackingResource(Resource):
     
     def post(self):
         """Mark session as completed against plan"""
-        ok, err = _require_auth()
-        if not ok:
-            return err
-            
         try:
-            user_id = request.current_user_id
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
             body = request.get_json() or {}
             
             session_id = body.get('session_id')
@@ -217,6 +217,7 @@ class PlanSessionTrackingResource(Resource):
                 return {"error": "session_id required"}, 400
                 
             # Get user's active plan
+            client = get_supabase_client()
             plan_resp = client.table('user_coaching_plans').select('id').eq(
                 'user_id', user_id
             ).eq('current_status', 'active').maybe_single().execute()
@@ -308,6 +309,7 @@ def _calculate_adherence_stats(sessions):
 def _generate_plan_sessions(user_plan_id, template, start_date):
     """Generate plan sessions based on template structure"""
     try:
+        client = get_supabase_client()
         plan_structure = template['plan_structure']
         duration_weeks = template['duration_weeks']
         
@@ -457,6 +459,7 @@ def _calculate_session_adherence(session_id, planned_session_type):
     """Calculate how well a session matched the plan"""
     try:
         # Get session data
+        client = get_supabase_client()
         session_resp = client.table('ruck_session').select(
             'duration_s, distance_km, ruck_weight_kg, heart_rate_avg'
         ).eq('id', session_id).single().execute()
