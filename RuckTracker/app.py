@@ -87,7 +87,7 @@ if os.environ.get("SENTRY_DSN") and os.environ.get("FLASK_ENV") != "development"
             url = event.get('request', {}).get('url', '').lower()
             bot_url_patterns = [
                 'robots.txt', 'sitemap.xml', 'favicon.ico', '.well-known', 'app-ads.txt',
-                'wp-admin', 'wp-login', 'admin', 'phpmyadmin', 'xmlrpc.php',
+                'wp-admin', 'wp-login', 'wp-content', 'wp-includes', 'wp-json', 'admin', 'phpmyadmin', 'xmlrpc.php',
                 '.php', '.asp', '.jsp', '.do', '/cgi-bin/', '/.env',
                 '/.git/', '/config/', '/backup/', '/tmp/', '/var/'
             ]
