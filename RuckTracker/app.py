@@ -64,19 +64,21 @@ if os.environ.get("SENTRY_DSN") and os.environ.get("FLASK_ENV") != "development"
     def before_send_filter(event, hint):
         """Filter out bot 404 errors and other noise from Sentry"""
         
-        # Check if this is a 404 error
+        # Check if this is a 404 or 403 error from bots
         if 'request' in event and 'response' in event:
             status_code = event.get('response', {}).get('status_code')
-            if status_code == 404:
+            if status_code in [403, 404]:
                 # Check user agent for common bots
                 user_agent = event.get('request', {}).get('headers', {}).get('User-Agent', '').lower()
                 bot_patterns = [
-                    'bot', 'crawler', 'spider', 'scraper', 'facebookexternalhit',
-                    'twitterbot', 'linkedinbot', 'whatsapp', 'telegram', 'discord',
-                    'googlebot', 'bingbot', 'yandexbot', 'baiduspider', 'slurp',
-                    'duckduckbot', 'applebot', 'facebot', 'ia_archiver', 'wayback',
-                    'curl', 'wget', 'python-requests', 'go-http-client', 'php',
-                    'postman', 'insomnia', 'axios', 'okhttp', 'apache-httpclient'
+                    'googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot',
+                    'facebookexternalhit', 'twitterbot', 'rogerbot', 'linkedinbot', 'embedly',
+                    'quora link preview', 'showyoubot', 'outbrain', 'pinterest/0.', 'developers.google.com/+/web/snippet',
+                    'www.google.com/webmasters/tools/richsnippets', 'slackbot', 'vkshare', 'w3c_validator',
+                    'redditbot', 'applebot', 'whatsapp', 'flipboard', 'tumblr', 'bitlybot', 'skypeuripreview',
+                    'nuzzel', 'discordbot', 'google page speed', 'qwantify', 'pinterestbot', 'bitrix link preview',
+                    'xing-contenttabreceiver', 'chrome-lighthouse', 'telegrambot', 'integration-test',
+                    'wp_is_mobile', 'ifttt', 'survey', 'scanner', 'bot', 'crawler', 'spider', 'com/bot'
                 ]
                 
                 if any(pattern in user_agent for pattern in bot_patterns):
@@ -484,7 +486,6 @@ from .api.ruck import (
     RuckSessionCompleteResource,
     RuckSessionLocationResource,
     RuckSessionEditResource,
-    RuckSessionRouteChunkResource,
     RuckSessionHeartRateChunkResource,
     # RuckSessionDetailResource # Commented out - not found in api.ruck.py
 )
@@ -550,7 +551,6 @@ from .api.weather import WeatherResource
 from .api.ai_cheerleader import (
     AICheerleaderLogResource,
     AICheerleaderLogsResource,
-    AICheerleaderUserHistoryResource,
 )
 from .api.user_insights import UserInsightsResource
 from .api.goals import (
@@ -725,8 +725,7 @@ api.add_resource(RuckSessionEditResource, '/api/rucks/<string:ruck_id>/edit')
 # User insights snapshot
 api.add_resource(UserInsightsResource, '/api/user-insights')
 
-# Chunked upload endpoints for session completion (no rate limits - only used post-completion)
-api.add_resource(RuckSessionRouteChunkResource, '/api/rucks/<string:ruck_id>/route-chunk')
+# Heart rate chunked upload endpoint for session completion (no rate limits - only used post-completion)  
 api.add_resource(RuckSessionHeartRateChunkResource, '/api/rucks/<string:ruck_id>/heart-rate-chunk')
 
 # Heart rate sample upload resource
@@ -850,7 +849,7 @@ api.add_resource(WeatherResource, '/api/weather')
 # Register both the legacy '/api/ai-cheerleader/log' and the client-used '/api/ai-cheerleader'
 api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader', '/api/ai-cheerleader/log')
 api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs')
-api.add_resource(AICheerleaderUserHistoryResource, '/api/ai-cheerleader/user-history')
+# AICheerleaderUserHistoryResource removed - now using /api/user-insights for structured data
 
 # Goals Endpoints
 app.logger.info("Setting Goals API rate limits")

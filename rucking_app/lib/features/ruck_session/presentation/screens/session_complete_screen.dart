@@ -254,7 +254,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
 
   /// Auto-save the main session data immediately when screen loads
   Future<void> _autoSaveBasicSession() async {
-    if (_isSessionSaved) return;
+    if (_isSessionSaved || _isSaving) {
+      AppLogger.warning('[SESSION_SAVE] _autoSaveBasicSession skipped: saved=$_isSessionSaved, saving=$_isSaving');
+      return;
+    }
+    
+    // Set saving state to prevent multiple concurrent calls
+    if (mounted) {
+      setState(() => _isSaving = true);
+    }
     
     try {
       AppLogger.info('[SESSION_SAVE] Auto-saving basic session data for ${widget.ruckId}');
@@ -379,6 +387,11 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     } catch (e) {
       AppLogger.error('[SESSION_SAVE] Failed to auto-save basic session: $e');
       // Don't show error to user for auto-save failure - they can still manually save
+    } finally {
+      // Always reset saving state
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -536,7 +549,10 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
 
   // Session management - now only handles additional user data since basic session is auto-saved
   Future<void> _saveAndContinue() async {
-    if (_isSaving) return;
+    if (_isSaving) {
+      AppLogger.warning('[SESSION_SAVE] _saveAndContinue called while already saving, ignoring');
+      return;
+    }
     
     if (mounted) {
       setState(() => _isSaving = true);
@@ -548,7 +564,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
       
       // If basic session isn't saved yet, save it first
-      if (!_isSessionSaved) {
+      if (!_isSessionSaved && !_isSaving) {
         await _autoSaveBasicSession();
       }
       
@@ -702,7 +718,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     
     try {
       // Check connection status first
-      final status = await _stravaService.getConnectionStatus();
+      StravaConnectionStatus status;
+      try {
+        status = await _stravaService.getConnectionStatus();
+      } catch (e) {
+        // Handle auth errors gracefully - treat as disconnected
+        if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+          AppLogger.info('[SESSION_COMPLETE] Auth error getting Strava status - treating as disconnected');
+          status = StravaConnectionStatus(connected: false);
+        } else {
+          rethrow;
+        }
+      }
+      
       if (!status.connected) {
         // Show dialog to connect to Strava directly
         if (mounted) {

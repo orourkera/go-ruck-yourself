@@ -444,7 +444,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       double finalElevationLoss = 0.0;
       
       AppLogger.info('[COORDINATOR] Current aggregated state type: ${_currentAggregatedState.runtimeType}');
-      AppLogger.info('[COORDINATOR] Location manager distance: ${_locationManager.currentState.totalDistance}km');
+      AppLogger.info('[COORDINATOR] Location manager distance: ${_locationManager.totalDistance}km');
       AppLogger.info('[COORDINATOR] Location manager elevation: ${_locationManager.elevationGain}m gain/${_locationManager.elevationLoss}m loss');
       
       if (_currentAggregatedState is ActiveSessionRunning) {
@@ -463,7 +463,8 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         AppLogger.info('[COORDINATOR] Using preserved running state metrics: distance=${finalDistance}km, calories=${finalCalories}, elevation=${finalElevationGain}m gain/${finalElevationLoss}m loss');
       } else {
         // Final fallback to location manager if no preserved state available
-        finalDistance = _locationManager.currentState.totalDistance;
+        // Use getter which returns preserved cumulative distance
+        finalDistance = _locationManager.totalDistance;
         finalElevationGain = _locationManager.elevationGain;
         finalElevationLoss = _locationManager.elevationLoss;
         
@@ -483,7 +484,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       
       final route = _locationManager.locationPoints;
       final duration = lifecycleState.duration;
-      AppLogger.info('[COORDINATOR] DEBUG: LocationManager state - totalDistance=${_locationManager.currentState.totalDistance}, elevationGain=${_locationManager.elevationGain}, elevationLoss=${_locationManager.elevationLoss}');
+      AppLogger.info('[COORDINATOR] DEBUG: LocationManager state - totalDistance=${_locationManager.totalDistance}, elevationGain=${_locationManager.elevationGain}, elevationLoss=${_locationManager.elevationLoss}');
       AppLogger.info('[CALORIE_DEBUG] duration.inSeconds: ${duration.inSeconds}');
       AppLogger.info('[CALORIE_DEBUG] duration.inMinutes: ${duration.inMinutes}');
     
@@ -1208,7 +1209,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         if (computedSteps == 0) {
           final double distance = (_currentAggregatedState is ActiveSessionRunning)
               ? (_currentAggregatedState as ActiveSessionRunning).distanceKm
-              : _locationManager.currentState.totalDistance;
+              : _locationManager.totalDistance;
               
           double? heightCm;
           final authState = GetIt.instance<AuthBloc>().state;
@@ -1227,7 +1228,7 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
       // Fallback to distance estimation
       final double distance = (_currentAggregatedState is ActiveSessionRunning)
           ? (_currentAggregatedState as ActiveSessionRunning).distanceKm
-          : _locationManager.currentState.totalDistance;
+          : _locationManager.totalDistance;
           
       double? heightCm;
       final authState = GetIt.instance<AuthBloc>().state;

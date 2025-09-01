@@ -65,8 +65,8 @@ class LocationPoint extends Equatable {
   /// Convert LocationPoint to JSON
   Map<String, dynamic> toJson() {
     return {
-      'lat': latitude,  // Backend expects 'lat' for route-chunk endpoint
-      'lng': longitude,  // Backend expects 'lng' for route-chunk endpoint
+      'lat': latitude,  // Backend expects 'lat' format
+      'lng': longitude,  // Backend expects 'lng' format
       'latitude': latitude,  // Keep for compatibility with other endpoints
       'longitude': longitude,  // Keep for compatibility with other endpoints
       'altitude': elevation,  // Backend expects 'altitude', not 'elevation_meters'

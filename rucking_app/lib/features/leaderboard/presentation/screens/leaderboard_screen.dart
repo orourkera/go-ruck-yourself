@@ -67,12 +67,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     // Listen for scroll to load more users
     _scrollController.addListener(_onScroll);
 
-    // Set up real-time updates every 15 seconds
-    _realTimeUpdateTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      // Only update if not currently loading to avoid conflicts
+    // Set up real-time updates every 30 seconds (reduced from 15s to avoid conflicts)
+    _realTimeUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      // Only update if not currently loading, searching, or in error state
       final currentState = context.read<LeaderboardBloc>().state;
       if (currentState is! LeaderboardLoading && 
-          currentState is! LeaderboardLoadingMore) {
+          currentState is! LeaderboardLoadingMore &&
+          currentState is! LeaderboardError &&
+          !_isSearching && // Don't interrupt user searches
+          _scrollController.hasClients && // Ensure scroll controller is ready
+          _scrollController.position.pixels < _scrollController.position.maxScrollExtent * 0.8) { // Only if user isn't near bottom
         context.read<LeaderboardBloc>().add(const RefreshLeaderboard());
       }
     });
@@ -108,10 +112,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   /// Listen for scroll events like a hawk watching for mice
   void _onScroll() {
+    final currentState = context.read<LeaderboardBloc>().state;
+    
+    // Prevent multiple load requests and don't load on error states
+    if (currentState is LeaderboardLoadingMore || 
+        currentState is LeaderboardLoading ||
+        currentState is LeaderboardError) {
+      return;
+    }
+    
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
-      // Load more when near bottom
-      context.read<LeaderboardBloc>().add(const LoadMoreUsers());
+      // Only load more if we have more data available
+      if (currentState is LeaderboardLoaded && currentState.hasMore) {
+        context.read<LeaderboardBloc>().add(const LoadMoreUsers());
+      }
     }
   }
 

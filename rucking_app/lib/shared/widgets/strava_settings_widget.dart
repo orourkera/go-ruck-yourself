@@ -52,8 +52,22 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
       }
     } catch (e) {
       AppLogger.error('[STRAVA_SETTINGS] Failed to load status: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
+      
+      // Handle authentication errors gracefully - show as disconnected
+      // The API client will handle token refresh automatically
+      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+        AppLogger.info('[STRAVA_SETTINGS] Authentication error - showing as disconnected');
+        if (mounted) {
+          setState(() {
+            _connectionStatus = StravaConnectionStatus(connected: false);
+            _isLoading = false;
+          });
+        }
+      } else {
+        // For other errors, show loading failed state
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }

@@ -55,16 +55,70 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     _progressBloc = getIt<EventProgressBloc>();
     _tabController = TabController(length: 3, vsync: this);
     
-    // Load event details and related data
+    // Load event details first
     _eventsBloc.add(LoadEventDetails(widget.eventId));
-    _commentsBloc.add(LoadEventComments(widget.eventId));
-    _progressBloc.add(LoadEventLeaderboard(widget.eventId));
+    // Comments and leaderboard will be loaded after we get event details
+    // and can check user participation status
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Check if user can access event comments and leaderboard data
+  /// Only participants (approved/pending) and event creators should have access
+  bool _canAccessEventData(Event event) {
+    // Event creators always have access
+    if (event.isCreator) {
+      return true;
+    }
+    
+    // Participants (approved or pending) have access
+    if (event.isUserParticipating) {
+      return true;
+    }
+    
+    // All other users don't have access
+    return false;
+  }
+
+  /// Build unauthorized access message for restricted tabs
+  Widget _buildUnauthorizedTab(String message) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 64,
+              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_eventDetails?.event.canJoin == true)
+              ElevatedButton(
+                onPressed: () {
+                  _eventsBloc.add(JoinEvent(_eventDetails!.event.id));
+                },
+                child: const Text('Join Event'),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -84,6 +138,13 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               setState(() {
                 _eventDetails = state.eventDetails;
               });
+              
+              // Only load comments and leaderboard if user is authorized
+              final event = state.eventDetails.event;
+              if (_canAccessEventData(event)) {
+                _commentsBloc.add(LoadEventComments(widget.eventId));
+                _progressBloc.add(LoadEventLeaderboard(widget.eventId));
+              }
             } else if (state is EventActionSuccess) {
               print('✅ EventActionSuccess received: sessionId=${state.sessionId}, eventId=${state.eventId}');
               
@@ -94,7 +155,10 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               
               if (state.shouldRefresh) {
                 _eventsBloc.add(LoadEventDetails(widget.eventId));
-                _progressBloc.add(LoadEventLeaderboard(widget.eventId));
+                // Only refresh leaderboard if user is authorized
+                if (_eventDetails != null && _canAccessEventData(_eventDetails!.event)) {
+                  _progressBloc.add(LoadEventLeaderboard(widget.eventId));
+                }
               }
               
               // Handle navigation after starting ruck session
@@ -370,8 +434,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 controller: _tabController,
                 children: [
                   _buildDetailsTab(event, eventDetails.participants),
-                  EventLeaderboardWidget(eventId: widget.eventId),
-                  EventCommentsSection(eventId: widget.eventId),
+                  _canAccessEventData(event) 
+                    ? EventLeaderboardWidget(eventId: widget.eventId)
+                    : _buildUnauthorizedTab('You must be a participant to view the leaderboard'),
+                  _canAccessEventData(event)
+                    ? EventCommentsSection(eventId: widget.eventId)
+                    : _buildUnauthorizedTab('You must be a participant to view comments'),
                 ],
               ),
             ),

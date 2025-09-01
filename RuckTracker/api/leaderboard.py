@@ -26,8 +26,8 @@ class LeaderboardResource(Resource):
             if not hasattr(g, 'user') or g.user is None:
                 return {'error': 'Authentication required'}, 401
             
-            # Parse query parameters
-            sort_by = request.args.get('sortBy', 'powerPoints')
+            # Parse query parameters - match frontend default
+            sort_by = request.args.get('sortBy', 'distance')
             ascending = request.args.get('ascending', 'false').lower() == 'true'
             # Always enforce pagination to prevent memory issues
             _limit_param = request.args.get('limit')
@@ -51,9 +51,9 @@ class LeaderboardResource(Resource):
                 logger.debug(f"Returning cached leaderboard data for key: {cache_key}")
                 return cached_result
             
-            # Get Supabase admin client to bypass RLS for public leaderboard data
-            supabase: Client = get_supabase_admin_client()
-            logger.debug(f"Using admin client: {type(supabase)}")
+            # Use authenticated client with proper RLS for security
+            supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            logger.debug(f"Using authenticated client with RLS: {type(supabase)}")
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
@@ -94,34 +94,45 @@ class LeaderboardResource(Resource):
                 has_ruck_session_data = False
                 if response.data and len(response.data) > 0:
                     first_user = response.data[0]
-                    has_ruck_session_data = 'ruck_session' in first_user
+                    has_ruck_session_data = 'ruck_session' in first_user and first_user['ruck_session'] is not None
                 
-                # If embed failed, fall back to manual approach
+                # If embed failed, fall back to manual approach (and clear any partial embed data)
                 if not has_ruck_session_data:
+                    # Clear any partial embedded data to prevent double counting
+                    for user in response.data:
+                        user['ruck_session'] = []
                     logger.debug("Embed failed, using manual approach")
                     
                     # Get user IDs for manual session query
                     user_ids = [user['id'] for user in response.data]
                     
-                    # Query ruck sessions separately with pagination to prevent memory issues
-                    sessions_query = supabase.table('ruck_session').select(
-                        'id, user_id, distance_km, elevation_gain_m, calories_burned, '
-                        'power_points, completed_at, started_at, status'
-                    ).in_('user_id', user_ids).limit(1000)  # Limit total sessions to prevent memory explosion
+                    # Query ruck sessions in chunks with per-user limits to prevent memory explosion  
+                    sessions_data = []
+                    for user_id_chunk in [user_ids[i:i+50] for i in range(0, len(user_ids), 50)]:
+                        sessions_query = supabase.table('ruck_session').select(
+                            'id, user_id, distance_km, elevation_gain_m, calories_burned, '
+                            'power_points, completed_at, started_at, status'
+                        ).in_('user_id', user_id_chunk)
+                        
+                        # Apply time period filter
+                        if time_period == 'last_7_days':
+                            cutoff_date = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+                            sessions_query = sessions_query.gte('completed_at', cutoff_date)
+                        elif time_period == 'last_30_days':
+                            cutoff_date = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+                            sessions_query = sessions_query.gte('completed_at', cutoff_date)
+                        elif time_period == 'rucking_now':
+                            sessions_query = sessions_query.in_('status', ['in_progress', 'paused']).is_('completed_at', None)
+                        
+                        # Limit sessions per user to max 100 recent sessions
+                        sessions_query = sessions_query.order('completed_at', desc=True).limit(min(len(user_id_chunk) * 100, 1000))
+                        
+                        chunk_response = sessions_query.execute()
+                        sessions_data.extend(chunk_response.data)
                     
-                    # Apply time period filter
-                    if time_period == 'last_7_days':
-                        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-                        sessions_query = sessions_query.gte('completed_at', cutoff_date)
-                    elif time_period == 'last_30_days':
-                        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-                        sessions_query = sessions_query.gte('completed_at', cutoff_date)
-                    elif time_period == 'rucking_now':
-                        # Only show currently active sessions (in_progress or paused)
-                        sessions_query = sessions_query.in_('status', ['in_progress', 'paused']).is_('completed_at', None)
-                    
-                    sessions_response = sessions_query.execute()
-                    logger.debug(f"Manual sessions query returned: {len(sessions_response.data)} sessions")
+                    # Create combined response object
+                    sessions_response = type('Response', (), {'data': sessions_data})()
+                    logger.debug(f"Chunked sessions query returned: {len(sessions_data)} sessions")
                     
                     # Group sessions by user_id
                     sessions_by_user = {}
@@ -268,14 +279,28 @@ class LeaderboardResource(Resource):
                             stats['caloriesBurned'] += ruck.get('calories_burned') or 0
                             stats['powerPoints'] += ruck.get('power_points') or 0.0
             
-            # Filter out users with zero completed rucks - only show active ruckers!
-            # For rucking_now, show all users with active sessions even if distance is 0
-            if time_period == 'rucking_now':
-                active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
-                                    if stats['stats']['rucks'] > 0 or stats['isCurrentlyRucking']}
-            else:
-                active_user_stats = {user_id: stats for user_id, stats in user_stats.items() 
-                                    if stats['stats']['rucks'] > 0}
+            # Filter out users with no meaningful stats - consistent across all time periods
+            # Require either completed rucks OR currently active with progress
+            active_user_stats = {}
+            for user_id, stats in user_stats.items():
+                user_has_meaningful_data = False
+                
+                if time_period == 'rucking_now':
+                    # For live view: show users currently rucking with some progress OR completed sessions
+                    if (stats['isCurrentlyRucking'] and 
+                        (stats['stats']['distanceKm'] > 0.01 or stats['stats']['powerPoints'] > 0)) or \
+                       stats['stats']['rucks'] > 0:
+                        user_has_meaningful_data = True
+                else:
+                    # For historical views: require completed sessions with meaningful stats
+                    if (stats['stats']['rucks'] > 0 and 
+                        (stats['stats']['distanceKm'] > 0.01 or 
+                         stats['stats']['powerPoints'] > 0 or 
+                         stats['stats']['elevationGainMeters'] > 1)):
+                        user_has_meaningful_data = True
+                
+                if user_has_meaningful_data:
+                    active_user_stats[user_id] = stats
             
             logger.debug(f"Filtered leaderboard: {len(user_stats)} total users -> {len(active_user_stats)} active ruckers")
             
@@ -293,11 +318,11 @@ class LeaderboardResource(Resource):
             
             users_list.sort(key=sort_key_map[sort_by], reverse=not ascending)
             
-            # Add rank to each user
+            # Add rank to each user BEFORE pagination
             for i, user in enumerate(users_list):
                 user['rank'] = i + 1
             
-            # Apply pagination (always enforced now)
+            # Apply pagination after ranking
             total_users = len(users_list)
             start = max(offset, 0)
             end = max(start + limit, 0)
@@ -311,8 +336,8 @@ class LeaderboardResource(Resource):
                 'activeRuckersCount': active_ruckers_count
             }
             
-            # Cache the result for 30 seconds to maintain vibrancy
-            cache_service.set(cache_key, result, expire_seconds=30)
+            # Cache the result for 60 seconds to align with frontend refresh timing
+            cache_service.set(cache_key, result, expire_seconds=60)
             
             logger.debug(f"Leaderboard query successful: {len(users_list)} users returned")
             return result
@@ -337,7 +362,7 @@ class LeaderboardMyRankResource(Resource):
             current_user_id = g.user.id
             
             # Parse sort parameters (same as main leaderboard)
-            sort_by = request.args.get('sortBy', 'powerPoints')
+            sort_by = request.args.get('sortBy', 'distance')
             ascending = request.args.get('ascending', 'false').lower() == 'true'
             
             # Validate sort_by parameter
@@ -354,9 +379,9 @@ class LeaderboardMyRankResource(Resource):
             if cached_rank is not None:
                 return {'rank': cached_rank}
             
-            # Get Supabase admin client to bypass RLS for public leaderboard data
-            supabase: Client = get_supabase_admin_client()
-            logger.debug(f"My-rank using admin client: {type(supabase)}")
+            # Use authenticated client with proper RLS for security  
+            supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            logger.debug(f"My-rank using authenticated client with RLS: {type(supabase)}")
             
             # Build the query - users with public ruck sharing enabled only
             query = (
@@ -387,11 +412,14 @@ class LeaderboardMyRankResource(Resource):
             has_ruck_session_data = False
             if response.data and len(response.data) > 0:
                 first_user = response.data[0]
-                has_ruck_session_data = 'ruck_session' in first_user
+                has_ruck_session_data = 'ruck_session' in first_user and first_user['ruck_session'] is not None
                 logger.debug(f"My-rank first user has ruck_session data: {has_ruck_session_data}")
             
-            # If embed failed, fall back to manual approach for my-rank too
+            # If embed failed, fall back to manual approach for my-rank too (clear partial data)
             if not has_ruck_session_data:
+                # Clear any partial embedded data to prevent double counting
+                for user in response.data:
+                    user['ruck_session'] = []
                 logger.debug("My-rank embed failed, using manual approach")
                 
                 # Get user IDs for manual session query
@@ -477,8 +505,8 @@ class LeaderboardMyRankResource(Resource):
                     user_rank = i + 1
                     break
             
-            # Cache the result for 2 minutes
-            cache_service.set(cache_key, user_rank, expire_seconds=120)
+            # Cache the result for 60 seconds to align with leaderboard cache
+            cache_service.set(cache_key, user_rank, expire_seconds=60)
             
             return {'rank': user_rank}
             

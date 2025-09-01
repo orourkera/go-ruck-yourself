@@ -763,6 +763,42 @@ class RuckSessionStartResource(Resource):
                 return {'message': 'Session not found or not owned by user'}, 404
 
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            # Send push notifications to followers (like other features do)
+            try:
+                from ..supabase_client import get_supabase_admin_client
+                
+                admin_client = get_supabase_admin_client()
+                
+                # Get user's followers
+                followers_response = admin_client.table('user_follows').select(
+                    'follower_id'
+                ).eq('followed_id', g.user.id).execute()
+                
+                if followers_response.data:
+                    follower_ids = [f['follower_id'] for f in followers_response.data]
+                    device_tokens = get_user_device_tokens(follower_ids)
+                    
+                    if device_tokens:
+                        # Get user's name for notification
+                        user_response = admin_client.table('user').select('username').eq('id', g.user.id).single().execute()
+                        user_name = user_response.data.get('username', 'Someone') if user_response.data else 'Someone'
+                        
+                        push_service = PushNotificationService()
+                        push_service.send_ruck_started_notification(
+                            device_tokens=device_tokens,
+                            rucker_name=user_name,
+                            ruck_id=str(ruck_id)
+                        )
+                        logger.info(f"🔔 PUSH NOTIFICATION: Sent ruck started notification to {len(device_tokens)} devices")
+                    else:
+                        logger.info(f"No device tokens found for {len(follower_ids)} followers")
+                else:
+                    logger.info("No followers to notify for ruck start")
+                    
+            except Exception as e:
+                logger.error(f"Error sending ruck started push notifications: {e}")
+            
             return resp.data[0], 200
         except Exception as e:
             logger.error(f"Error starting session {ruck_id}: {e}")
@@ -827,6 +863,42 @@ class RuckSessionResumeResource(Resource):
                 return {'message': 'Session not found or not owned by user'}, 404
 
             cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+            
+            # Send push notifications to followers (like other features do)
+            try:
+                from ..supabase_client import get_supabase_admin_client
+                
+                admin_client = get_supabase_admin_client()
+                
+                # Get user's followers
+                followers_response = admin_client.table('user_follows').select(
+                    'follower_id'
+                ).eq('followed_id', g.user.id).execute()
+                
+                if followers_response.data:
+                    follower_ids = [f['follower_id'] for f in followers_response.data]
+                    device_tokens = get_user_device_tokens(follower_ids)
+                    
+                    if device_tokens:
+                        # Get user's name for notification
+                        user_response = admin_client.table('user').select('username').eq('id', g.user.id).single().execute()
+                        user_name = user_response.data.get('username', 'Someone') if user_response.data else 'Someone'
+                        
+                        push_service = PushNotificationService()
+                        push_service.send_ruck_started_notification(
+                            device_tokens=device_tokens,
+                            rucker_name=user_name,
+                            ruck_id=str(ruck_id)
+                        )
+                        logger.info(f"🔔 PUSH NOTIFICATION: Sent ruck started notification to {len(device_tokens)} devices")
+                    else:
+                        logger.info(f"No device tokens found for {len(follower_ids)} followers")
+                else:
+                    logger.info("No followers to notify for ruck start")
+                    
+            except Exception as e:
+                logger.error(f"Error sending ruck started push notifications: {e}")
+            
             return resp.data[0], 200
         except Exception as e:
             logger.error(f"Error resuming session {ruck_id}: {e}")
@@ -2348,94 +2420,7 @@ class HeartRateSampleUploadResource(Resource):
 
 
 
-class RuckSessionRouteChunkResource(Resource):
-    def post(self, ruck_id):
-        """Upload route data chunk for a session (POST /api/rucks/<ruck_id>/route-chunk)
-
-        Feature flag controlled: Set DEPRECATE_ROUTE_CHUNKS=true to disable processing.
-        Accepted session statuses: 'in_progress', 'paused', 'completed'.
-        """
-        # Feature flag for safe deployment
-        deprecate_chunks = os.getenv('DEPRECATE_ROUTE_CHUNKS', 'false').lower() == 'true'
-        
-        if deprecate_chunks:
-            # New behavior: ignore route chunks but return success
-            try:
-                data = request.get_json()
-                route_points_count = len(data.get('route_points', [])) if data else 0
-                logger.info(f"[ROUTE_CHUNK_DEPRECATED] Ignoring route chunk for session {ruck_id}: {route_points_count} points (deprecated via feature flag)")
-                return {'status': 'ok', 'message': 'Route chunks deprecated - data handled by real-time uploads', 'ignored': route_points_count}, 200
-            except Exception as e:
-                logger.error(f"Error in deprecated route chunk endpoint for session {ruck_id}: {e}")
-                return {'message': 'Route chunks deprecated'}, 200
-        
-        # Original behavior: process route chunks normally
-        try:
-            data = request.get_json()
-            if not data or 'route_points' not in data:
-                return {'message': 'Missing route_points in request body'}, 400
-        
-            if not data['route_points']:
-                return {'message': 'Empty route_points array'}, 400
-        
-            logger.info(f"[ROUTE_CHUNK] Uploading route chunk for session {ruck_id}: {len(data['route_points'])} points")
-        
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-        
-            # Check if session exists and belongs to user
-            session_resp = supabase.table('ruck_session') \
-                .select('id,status') \
-                .eq('id', ruck_id) \
-                .eq('user_id', g.user.id) \
-                .execute()
-        
-            if not session_resp.data:
-                logger.warning(f"Session {ruck_id} not found or not accessible for user {g.user.id}")
-                return {'message': 'Session not found or access denied'}, 404
-        
-            session_data = session_resp.data[0]
-            current_status = session_data['status']
-            allowed_statuses = ('in_progress', 'paused', 'completed')
-            if current_status not in allowed_statuses:
-                logger.warning(f"[ROUTE_CHUNK] Session {ruck_id} has invalid status '{current_status}' for route upload")
-                return {'message': f"Invalid session status for route upload: {current_status}"}, 400
-        
-            # Insert location points
-            location_rows = []
-            for point in data['route_points']:
-                # Support both field name formats for backward compatibility
-                # Accept lat/lng (new) or latitude/longitude (old Flutter format)
-                lat = point.get('lat') or point.get('latitude')
-                lng = point.get('lng') or point.get('longitude')
-                
-                if 'timestamp' not in point or lat is None or lng is None:
-                    continue
-                    
-                location_rows.append({
-                    'session_id': ruck_id,
-                    'timestamp': point['timestamp'],
-                    'latitude': lat,
-                    'longitude': lng,
-                    # TODO: Remove elevation_meters fallback once Flutter app is updated
-                    'altitude': point.get('altitude') or point.get('elevation_meters')
-                })
-            
-            if not location_rows:
-                return {'message': 'No valid location points in chunk'}, 400
-            
-            insert_resp = supabase.table('location_point').insert(location_rows).execute()
-            if not insert_resp.data:
-                return {'message': 'Failed to insert location points'}, 500
-            
-            # Clear cache for this user's sessions
-            cache_delete_pattern(f"ruck_session:{g.user.id}:*")
-            
-            logger.info(f"Successfully uploaded route chunk for session {ruck_id}: {len(insert_resp.data)} points")
-            return {'status': 'ok', 'inserted': len(insert_resp.data)}, 201
-            
-        except Exception as e:
-            logger.error(f"Error uploading route chunk for session {ruck_id}: {e}")
-            return {'message': f'Error uploading route chunk: {str(e)}'}, 500
+# RuckSessionRouteChunkResource removed - route chunks deprecated in favor of real-time location uploads
 
 
 class RuckSessionHeartRateChunkResource(Resource):

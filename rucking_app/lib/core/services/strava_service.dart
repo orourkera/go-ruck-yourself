@@ -37,6 +37,15 @@ class StravaService {
       return StravaConnectionStatus.fromJson(response);
     } catch (e) {
       AppLogger.error('[STRAVA] Failed to get connection status: $e');
+      
+      // For authentication errors, let the API client handle token refresh
+      // Don't mask 401 errors - they indicate auth issues that should be handled upstream
+      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+        AppLogger.warning('[STRAVA] Authentication error - user may need to re-login');
+        rethrow; // Let the calling code handle auth errors appropriately
+      }
+      
+      // For other errors (network, server), return disconnected status
       return StravaConnectionStatus(connected: false);
     }
   }

@@ -135,6 +135,7 @@ class LocationTrackingManager implements SessionManager {
   final Map<String, int> _validationRejectCounts = {};
   DateTime? _validationRejectWindowStart;
   DateTime? _lowAccuracyBypassUntil;
+  DateTime? _lowAccuracyBypassStarted;
 
   // Sensor fusion estimation state
   StreamSubscription<AccelerometerEvent>? _accelerometerSub;
@@ -154,6 +155,7 @@ class LocationTrackingManager implements SessionManager {
   // Barometric altitude fusion state
   StreamSubscription<BarometricReading>? _barometerSubscription;
   double? _lastBarometricAltitude;
+  double? _lastBarometricPressure;
   DateTime? _lastBarometricTimestamp;
   bool _isBarometerCalibrated = false;
   int _gpsCalibrationCount = 0;
@@ -261,8 +263,7 @@ class LocationTrackingManager implements SessionManager {
     _validationService.reset();
     _sessionValidationService.reset();
     
-    // CRITICAL FIX: Force garbage collection after clearing large lists
-    _triggerGarbageCollection();
+    // Memory cleanup completed - Dart's GC will handle memory reclamation automatically
     
     AppLogger.info('[LOCATION_MANAGER] MEMORY_RESET: Session started, all lists cleared and validation reset');
     
@@ -364,8 +365,7 @@ class LocationTrackingManager implements SessionManager {
     // Force upload of pending data
     _triggerAggressiveDataOffload();
     
-    // Trigger garbage collection
-    _triggerGarbageCollection();
+    // Memory cleanup completed
     
     AppLogger.info('[LOCATION_MANAGER] MEMORY_PRESSURE: Aggressive cleanup completed');
   }
@@ -442,22 +442,36 @@ class LocationTrackingManager implements SessionManager {
           now.difference(_lastDistanceIncreaseTime!).inSeconds >= 120;
       final bool bypassActive = _lowAccuracyBypassUntil != null && now.isBefore(_lowAccuracyBypassUntil!);
 
-      // Auto-extend bypass window while stall persists
+      // Auto-extend bypass window while stall persists, but enforce 10-minute maximum
       if (isLowAccuracy && gpsHealthy && distanceStalled) {
-        _lowAccuracyBypassUntil = now.add(const Duration(minutes: 2));
-        await AppErrorHandler.handleError(
-          'low_accuracy_bypass_enabled',
-          'Temporarily bypassing low accuracy validation to prevent distance stall',
-          context: {
-            'session_id': _activeSessionId ?? 'unknown',
-            'rejects_in_window': _validationRejectCounts[message] ?? 1,
-            'time_since_last_raw_s': timeSinceLastRaw,
-            'time_since_last_valid_s': timeSinceLastValid,
-            'total_distance_km': _lastKnownTotalDistance.toStringAsFixed(3),
-          },
-          severity: ErrorSeverity.warning,
-        );
-        AppLogger.warning('[LOCATION_MANAGER] LOW_ACCURACY_BYPASS enabled for 2 minutes');
+        // Track when bypass first started
+        if (_lowAccuracyBypassStarted == null) {
+          _lowAccuracyBypassStarted = now;
+        }
+        
+        // Only extend if we haven't exceeded 10-minute maximum
+        final bypassDuration = now.difference(_lowAccuracyBypassStarted!);
+        if (bypassDuration.inMinutes < 10) {
+          _lowAccuracyBypassUntil = now.add(const Duration(minutes: 2));
+          await AppErrorHandler.handleError(
+            'low_accuracy_bypass_enabled',
+            'Temporarily bypassing low accuracy validation to prevent distance stall',
+            context: {
+              'session_id': _activeSessionId ?? 'unknown',
+              'rejects_in_window': _validationRejectCounts[message] ?? 1,
+              'time_since_last_raw_s': timeSinceLastRaw,
+              'time_since_last_valid_s': timeSinceLastValid,
+              'total_distance_km': _lastKnownTotalDistance.toStringAsFixed(3),
+              'bypass_duration_minutes': bypassDuration.inMinutes,
+            },
+            severity: ErrorSeverity.warning,
+          );
+          AppLogger.warning('[LOCATION_MANAGER] LOW_ACCURACY_BYPASS extended for 2 minutes (${bypassDuration.inMinutes}min total)');
+        } else {
+          AppLogger.warning('[LOCATION_MANAGER] LOW_ACCURACY_BYPASS maximum duration (10min) reached, stopping bypass');
+          _lowAccuracyBypassUntil = null;
+          _lowAccuracyBypassStarted = null;
+        }
       }
 
       // If bypass is active and this is a low-accuracy rejection, accept the point to keep distance monotonic
@@ -795,8 +809,7 @@ class LocationTrackingManager implements SessionManager {
         AppLogger.debug('[LOCATION_MANAGER] MEMORY_PRESSURE: Queued ${batchToUpload.length} points for upload, not marking as uploaded until success');
       }
       
-      // Force garbage collection to free memory immediately
-      _triggerGarbageCollection();
+      // Memory cleanup completed - pending upload will free memory on success
       
     } catch (e) {
       AppLogger.error('[LOCATION_MANAGER] Error during aggressive data offload: $e');
@@ -840,8 +853,7 @@ class LocationTrackingManager implements SessionManager {
       AppLogger.info('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Safely trimmed $pointsToRemove uploaded location points '
           '(${_locationPoints.length} remaining, processed index: $_lastProcessedLocationIndex, distance preserved: ${_lastKnownTotalDistance.toStringAsFixed(3)}km)');
       
-      // Force garbage collection after trimming
-      _triggerGarbageCollection();
+      // Trimming completed
     }
   }
   
@@ -855,7 +867,7 @@ class LocationTrackingManager implements SessionManager {
         _lastUploadedTerrainIndex -= segmentsToRemove;
         
         AppLogger.info('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Safely trimmed $segmentsToRemove uploaded terrain segments (${_terrainSegments.length} remaining)');
-        _triggerGarbageCollection();
+        // Trimming completed
       } else {
         AppLogger.warning('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Cannot trim terrain segments - not enough uploaded segments');
       }
@@ -864,17 +876,6 @@ class LocationTrackingManager implements SessionManager {
   
 
   
-  /// Trigger garbage collection to free memory immediately
-  void _triggerGarbageCollection() {
-    try {
-      // Force garbage collection (Dart/Flutter runtime dependent)
-      // This is a hint to the VM, not guaranteed to trigger GC
-      AppLogger.info('[LOCATION_MANAGER] MEMORY_OPTIMIZATION: Requesting garbage collection');
-      // No direct GC API in Dart, but clearing references and setting to null helps
-    } catch (e) {
-      AppLogger.error('[LOCATION_MANAGER] Error during garbage collection trigger: $e');
-    }
-  }
 
   Future<void> _startLocationTracking() async {
     AppLogger.info('[LOCATION_MANAGER] Starting location tracking');
@@ -1553,7 +1554,7 @@ class LocationTrackingManager implements SessionManager {
       AppLogger.debug('[PACE DEBUG] Total time over 5 points: ${totalTime} seconds');
       
       if (totalTime > 0 && totalDistance > 0.01) { // Require at least 10 meters total
-        final paceMinutesPerKm = (totalTime / 60) / (totalDistance / 1000);
+        final paceMinutesPerKm = (totalTime / 60) / totalDistance;
         rawPace = paceMinutesPerKm * 60; // Convert to seconds per km
         
         AppLogger.debug('[PACE DEBUG] Multi-point paceMinutesPerKm: $paceMinutesPerKm');
@@ -1731,9 +1732,9 @@ class LocationTrackingManager implements SessionManager {
       
       // DEBUG: Log elevation values to understand the issue
       if (i <= 10 || i % 10 == 0) { // Log first 10 and then every 10th
-        print('[ELEVATION DEBUG] Point $i: prev=${prev.elevation.toStringAsFixed(2)}m, curr=${curr.elevation.toStringAsFixed(2)}m, step=${step.toStringAsFixed(2)}m, hMeters=${hMeters.toStringAsFixed(2)}m, pending=${pending.toStringAsFixed(2)}m, dir=$dir');
+        AppLogger.debug('[ELEVATION DEBUG] Point $i: prev=${prev.elevation.toStringAsFixed(2)}m, curr=${curr.elevation.toStringAsFixed(2)}m, step=${step.toStringAsFixed(2)}m, hMeters=${hMeters.toStringAsFixed(2)}m, pending=${pending.toStringAsFixed(2)}m, dir=$dir');
         if (hMeters < minHorizontalMeters) {
-          print('[ELEVATION DEBUG] Point $i SKIPPED - horizontal movement ${hMeters.toStringAsFixed(2)}m < ${minHorizontalMeters}m minimum');
+          AppLogger.debug('[ELEVATION DEBUG] Point $i SKIPPED - horizontal movement ${hMeters.toStringAsFixed(2)}m < ${minHorizontalMeters}m minimum');
         }
       }
       
@@ -1776,7 +1777,7 @@ class LocationTrackingManager implements SessionManager {
     if (_locationPoints.isNotEmpty) {
       final firstElev = _locationPoints.first.elevation;
       final lastElev = _locationPoints.last.elevation;
-      print('[ELEVATION] First point elevation: ${firstElev.toStringAsFixed(1)}m, Last point elevation: ${lastElev.toStringAsFixed(1)}m');
+      AppLogger.debug('[ELEVATION] First point elevation: ${firstElev.toStringAsFixed(1)}m, Last point elevation: ${lastElev.toStringAsFixed(1)}m');
     }
     
     return {'gain': gain, 'loss': loss};
@@ -1969,7 +1970,10 @@ class LocationTrackingManager implements SessionManager {
   }
 
   // Getters for other managers
-  double get totalDistance => _currentState.totalDistance;
+  // CRITICAL FIX: Use preserved cumulative distance to prevent data loss after trimming
+  double get totalDistance => _lastKnownTotalDistance > _currentState.totalDistance 
+    ? _lastKnownTotalDistance 
+    : _currentState.totalDistance;
   bool get isGpsReady => _validLocationCount > 5;
   List<LocationPoint> get locationPoints => List.unmodifiable(_locationPoints);
   List<TerrainSegment> get terrainSegments => List.unmodifiable(_terrainSegments);
@@ -2087,8 +2091,8 @@ class LocationTrackingManager implements SessionManager {
   }) {
     // Calibrate barometer with GPS if not yet calibrated
     if (!_isBarometerCalibrated && _lastBarometricAltitude != null) {
-      // Use estimated pressure from barometric service for calibration
-      final estimatedPressure = 101325.0; // Fallback pressure if not available
+      // Use actual barometric pressure if available, otherwise use sea-level fallback
+      final estimatedPressure = _lastBarometricPressure ?? 101325.0;
       _calibrateBarometer(
         gpsAltitude: rawAltitude,
         gpsAccuracy: altitudeAccuracy,
@@ -2148,6 +2152,7 @@ class LocationTrackingManager implements SessionManager {
   /// Handle barometric pressure readings for altitude fusion
   void _onBarometricReading(BarometricReading reading) {
     _lastBarometricTimestamp = reading.timestamp;
+    _lastBarometricPressure = reading.pressurePa;
     
     // On iOS, use relative altitude directly from CMAltimeter
     if (reading.relativeAltitudeM != null) {
