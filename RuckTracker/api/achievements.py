@@ -173,13 +173,13 @@ class CheckSessionAchievementsResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Get session details
-            session_response = supabase.table('ruck_session').select('*').eq('id', session_id).single().execute()
+            session_response = supabase.table('ruck_session').select('*').eq('id', session_id).execute()
             
             if not session_response.data:
                 logger.warning(f"🎯 SESSION {session_id} NOT FOUND IN DATABASE")
                 return {'error': 'Session not found'}, 404
                 
-            session = session_response.data
+            session = session_response.data[0]
             user_id = session['user_id']
             
             logger.info(f"🎯 FOUND SESSION {session_id} FOR USER {user_id}")
@@ -202,8 +202,8 @@ class CheckSessionAchievementsResource(Resource):
             logger.info("Starting batch achievement check...")
             
             # Single query: Get user data + existing achievements + user stats
-            user_data_response = supabase.table('user').select('prefer_metric').eq('id', user_id).single().execute()
-            prefer_metric = user_data_response.data.get('prefer_metric', True) if user_data_response.data else True
+            user_data_response = supabase.table('user').select('prefer_metric').eq('id', user_id).execute()
+            prefer_metric = user_data_response.data[0].get('prefer_metric', True) if user_data_response.data else True
             unit_preference = 'metric' if prefer_metric else 'standard'
             logger.info(f"Unit preference resolved: prefer_metric={prefer_metric}, unit_preference={unit_preference}")
             

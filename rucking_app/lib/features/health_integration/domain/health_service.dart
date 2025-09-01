@@ -668,6 +668,7 @@ class HealthService {
   // Live steps polling
   StreamController<int>? _stepsController;
   Timer? _stepsTimer;
+  StreamSubscription<int>? _pedometerSubscription;
   
   Stream<int> startLiveSteps(DateTime start) {
     print('[STEPS DEBUG] ========== STARTING LIVE STEP TRACKING ==========');
@@ -827,6 +828,15 @@ class HealthService {
     AppLogger.info('[STEPS LIVE] stopLiveSteps invoked');
     _stepsTimer?.cancel();
     _stepsTimer = null;
+    
+    // Cancel pedometer subscription safely
+    try {
+      _pedometerSubscription?.cancel();
+    } catch (e) {
+      AppLogger.debug('[STEPS LIVE] Pedometer subscription cancel (safe to ignore): $e');
+    }
+    _pedometerSubscription = null;
+    
     try {
       _stepsController?.close();
     } catch (_) {}
@@ -836,6 +846,12 @@ class HealthService {
   /// Start CMPedometer stream for real-time iOS step counting
   Stream<int> _startCMPedometerStream(DateTime sessionStart) {
     print('[STEPS DEBUG] Setting up CMPedometer stream');
+    
+    // Clean up any existing resources
+    stopLiveSteps();
+    
+    // Create new StreamController
+    _stepsController = StreamController<int>.broadcast();
     
     // Tell iOS to start a new pedometer session
     const platform = MethodChannel('com.getrucky.gfy/watch_session');
@@ -848,7 +864,8 @@ class HealthService {
     // Set up the event channel for receiving pedometer data
     const EventChannel pedometerChannel = EventChannel('com.getrucky.gfy/pedometerStream');
     
-    return pedometerChannel.receiveBroadcastStream().map((dynamic event) {
+    // Store the subscription so we can cancel it properly
+    _pedometerSubscription = pedometerChannel.receiveBroadcastStream().map<int>((dynamic event) {
       print('[STEPS DEBUG] 🎉 CMPedometer event received: $event');
       
       if (event is Map) {
@@ -869,12 +886,41 @@ class HealthService {
       
       print('[STEPS DEBUG] Unexpected pedometer data format: ${event.runtimeType}');
       return 0;
-    }).handleError((error) {
+    }).listen((int steps) {
+      // Forward steps to our controller
+      if (_stepsController != null && !_stepsController!.isClosed) {
+        _stepsController!.add(steps);
+      }
+    }, onError: (error) {
       print('[STEPS DEBUG] ❌ CMPedometer stream error: $error');
       print('[STEPS DEBUG] Falling back to HealthKit polling');
       
-      // Fall back to HealthKit polling if CMPedometer fails
-      return _startHealthKitPollingStream(sessionStart);
+      // Cancel the failed subscription
+      try {
+        _pedometerSubscription?.cancel();
+      } catch (_) {}
+      _pedometerSubscription = null;
+      
+      // Fall back to HealthKit polling
+      _startHealthKitPollingFallbackInternal(sessionStart);
+    });
+    
+    return _stepsController!.stream;
+  }
+  
+  /// Internal method to start HealthKit polling when controller is already set up
+  void _startHealthKitPollingFallbackInternal(DateTime sessionStart) {
+    // Poll every 10 seconds
+    _stepsTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      final now = DateTime.now();
+      print('[STEPS DEBUG] ⏰ HealthKit fallback polling timer fired');
+      
+      final total = await getStepsBetween(sessionStart, now);
+      print('[STEPS DEBUG] HealthKit returned: $total steps');
+      
+      if (_stepsController != null && !_stepsController!.isClosed) {
+        _stepsController!.add(total);
+      }
     });
   }
   

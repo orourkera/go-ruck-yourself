@@ -337,6 +337,7 @@ class RuckLikesResource(Resource):
         Expects 'ruck_id' as a query parameter.
         The user must be authenticated and must be the one who added the like.
         """
+        logger.info(f"RuckLikesResource.delete() called - path: {request.path}, args: {dict(request.args)}")
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
             logger.warning("RuckLikesResource: Missing or invalid Authorization header.")

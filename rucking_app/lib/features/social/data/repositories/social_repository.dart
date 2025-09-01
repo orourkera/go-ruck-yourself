@@ -207,6 +207,8 @@ class SocialRepository {
       }
 
       final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
+      debugPrint('[REMOVE_LIKE] Constructed endpoint: $endpoint');
+      
       final response = await _httpClient.delete(
         Uri.parse(endpoint),
         headers: {
@@ -214,6 +216,9 @@ class SocialRepository {
           'Authorization': 'Bearer $token',
         },
       );
+
+      debugPrint('[REMOVE_LIKE] Response status: ${response.statusCode}');
+      debugPrint('[REMOVE_LIKE] Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
@@ -231,14 +236,50 @@ class SocialRepository {
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 404) {
+        debugPrint('[REMOVE_LIKE] 404 Error: Like not found or endpoint not found');
         clearRuckCache(ruckId.toString());
-        return; // Return since like already doesn't exist
+        // Try to parse error message to distinguish between "like not found" vs "endpoint not found"
+        try {
+          final Map<String, dynamic> errorData = json.decode(response.body);
+          final errorMsg = errorData['error'] ?? 'Unknown error';
+          debugPrint('[REMOVE_LIKE] 404 Error details: $errorMsg');
+          
+          if (errorMsg.toLowerCase().contains('not found') && !errorMsg.toLowerCase().contains('endpoint')) {
+            // This is a "like not found" error, which is acceptable
+            return;
+          } else {
+            // This might be an endpoint routing issue
+            throw ServerException(message: 'DELETE endpoint not found: $errorMsg');
+          }
+        } catch (jsonError) {
+          // If we can't parse the error, assume like doesn't exist and return successfully
+          debugPrint('[REMOVE_LIKE] Could not parse 404 error response, assuming like already removed');
+          return;
+        }
       } else {
         throw ServerException(
             message: 'Failed to remove like: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
+      
+      // Enhanced error reporting for like removal issues
+      try {
+        await AppErrorHandler.handleError(
+          'social_remove_like',
+          e,
+          context: {
+            'ruck_id': ruckId,
+            'operation': 'remove_like',
+            'endpoint': '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId',
+          },
+          userId: (await _authService.getCurrentUser())?.userId,
+          sendToBackend: true,
+        );
+      } catch (errorHandlerException) {
+        debugPrint('Error reporting failed during social remove like: $errorHandlerException');
+      }
+      
       throw ServerException(message: 'Failed to remove like: $e');
     }
   }

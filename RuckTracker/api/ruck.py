@@ -103,15 +103,79 @@ class RuckSessionListResource(Resource):
                 'created_at': datetime.utcnow().isoformat()
             }
 
-            # Add optional fields
+            # Add optional fields with validation to prevent timestamp overflow
             if data.get('event_id'):
-                session_data['event_id'] = data['event_id']
+                try:
+                    event_id = int(data['event_id'])
+                    if event_id <= 2147483647:  # PostgreSQL integer max
+                        session_data['event_id'] = event_id
+                    else:
+                        logger.warning(f"event_id value {event_id} too large for integer, skipping")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid event_id value: {data.get('event_id')}")
+                    
             if data.get('route_id'):
-                session_data['route_id'] = data['route_id']
+                try:
+                    route_id = int(data['route_id'])
+                    if route_id <= 2147483647:  # PostgreSQL integer max
+                        session_data['route_id'] = route_id
+                    else:
+                        logger.warning(f"route_id value {route_id} too large for integer, skipping")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid route_id value: {data.get('route_id')}")
+                    
             if data.get('planned_ruck_id'):
-                session_data['planned_ruck_id'] = data['planned_ruck_id']
+                try:
+                    planned_ruck_id = int(data['planned_ruck_id'])
+                    if planned_ruck_id <= 2147483647:  # PostgreSQL integer max
+                        session_data['planned_ruck_id'] = planned_ruck_id
+                    else:
+                        logger.warning(f"planned_ruck_id value {planned_ruck_id} too large for integer, skipping")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid planned_ruck_id value: {data.get('planned_ruck_id')}")
+                    
             if data.get('planned_duration_minutes'):
-                session_data['planned_duration_minutes'] = data['planned_duration_minutes']
+                try:
+                    duration_mins = int(data['planned_duration_minutes'])
+                    if duration_mins <= 2147483647:  # PostgreSQL integer max
+                        session_data['planned_duration_minutes'] = duration_mins
+                    else:
+                        logger.warning(f"planned_duration_minutes value {duration_mins} too large for integer, skipping")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid planned_duration_minutes value: {data.get('planned_duration_minutes')}")
+                    
+            # Validate duration_seconds if present (from manual sessions)
+            if data.get('duration_seconds'):
+                try:
+                    duration_secs = int(data['duration_seconds'])
+                    # Reasonable upper limit: 30 days = 2,592,000 seconds (no one rucks for more than 30 days straight)
+                    if 0 <= duration_secs <= 2592000:  
+                        session_data['duration_seconds'] = duration_secs
+                    else:
+                        logger.warning(f"duration_seconds value {duration_secs} out of reasonable range [0, 2592000], skipping")
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid duration_seconds value: {data.get('duration_seconds')}")
+                    
+            # Validate other integer fields that could overflow
+            integer_fields = [
+                ('calories_burned', 100000, 'calories'),  # No one burns more than 100k calories in one session
+                ('avg_heart_rate', 300, 'bpm'),          # Max human heart rate ~300 bpm
+                ('max_heart_rate', 300, 'bpm'), 
+                ('min_heart_rate', 300, 'bpm'),
+                ('steps', 1000000, 'steps'),              # No one takes more than 1M steps in one session
+                ('paused_duration_seconds', 86400, 'seconds'),  # Max 24 hours paused
+            ]
+            
+            for field_name, max_val, unit in integer_fields:
+                if data.get(field_name):
+                    try:
+                        val = int(data[field_name])
+                        if 0 <= val <= max_val:
+                            session_data[field_name] = val
+                        else:
+                            logger.warning(f"{field_name} value {val} out of reasonable range [0, {max_val}] {unit}, skipping")
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid {field_name} value: {data.get(field_name)}")
 
             resp = supabase.table('ruck_session').insert(session_data).execute()
             
@@ -1940,8 +2004,14 @@ class RuckSessionLocationResource(Resource):
             
             if not location_rows:
                 error_msg = f"No valid location points from {len(location_points)} submitted. Errors: {'; '.join(invalid_points)}"
-                logger.error(f"[LOC_UPLOAD][NO_VALID_POINTS] session={ruck_id} user={g.user.id} error=none_valid submitted={len(location_points)}")
-                return {'message': error_msg}, 400
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                logger.error(f"[LOC_UPLOAD][NO_VALID_POINTS] session={ruck_id} user={g.user.id} ip={client_ip} error=none_valid submitted={len(location_points)} errors={'; '.join(invalid_points)}")
+                return {
+                    'message': error_msg,
+                    'validation_errors': invalid_points,
+                    'submitted_count': len(location_points),
+                    'valid_count': 0
+                }, 400
                 
             try:
                 logger.debug(f"[LOC_UPLOAD][DB_INSERT] session={ruck_id} user={g.user.id} inserting={len(location_rows)}")
@@ -1951,11 +2021,18 @@ class RuckSessionLocationResource(Resource):
                     return {'message': 'Database insert failed - no data returned'}, 500
                 
                 inserted_count = len(insert_resp.data)
-                logger.info(f"[LOC_UPLOAD][SUCCESS] session={ruck_id} user={g.user.id} inserted={inserted_count}")
+                success_msg = f"[LOC_UPLOAD][SUCCESS] session={ruck_id} user={g.user.id} inserted={inserted_count}"
+                if invalid_points:
+                    success_msg += f" skipped={len(invalid_points)} invalid_points"
+                logger.info(success_msg)
                 
                 # Note: No need to invalidate session cache for location points
                 # Session data (distance, duration, etc.) is calculated separately
-                return {'status': 'ok', 'inserted': inserted_count}, 201
+                result = {'status': 'ok', 'inserted': inserted_count}
+                if invalid_points:
+                    result['warnings'] = invalid_points
+                    result['submitted_count'] = len(location_points)
+                return result, 201
                 
             except Exception as db_error:
                 logger.error(f"[LOC_UPLOAD][DB_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
@@ -2279,8 +2356,6 @@ class RuckSessionRouteChunkResource(Resource):
         """
         # Feature flag for safe deployment
         deprecate_chunks = os.getenv('DEPRECATE_ROUTE_CHUNKS', 'false').lower() == 'true'
-        # Explicitly ensure chunks are processed
-        deprecate_chunks = False
         
         if deprecate_chunks:
             # New behavior: ignore route chunks but return success

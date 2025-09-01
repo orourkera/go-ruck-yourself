@@ -48,6 +48,14 @@ class AppErrorHandler {
       return;
     }
     
+    // Skip reporting 403/Forbidden errors as they're expected authorization failures, not bugs
+    if (error.toString().contains('403') ||
+        error.toString().contains('Forbidden') ||
+        error.toString().contains('forbidden')) {
+      AppLogger.info('Authorization error (403) - not reporting to Sentry: $error');
+      return;
+    }
+    
     // Handle GPU memory issues more gracefully
     if (error.toString().contains('loss of GPU access') ||
         error.toString().contains('Image upload failed due to loss of GPU access')) {
