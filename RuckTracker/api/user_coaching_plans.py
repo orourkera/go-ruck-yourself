@@ -28,7 +28,7 @@ class UserCoachingPlansResource(Resource):
             client = get_supabase_client()
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
-                'coaching_plan_templates!coaching_plan_id(id, name, goal_type, duration_weeks, plan_structure, success_metrics, tracking_elements)'
+                'coaching_plan_templates!coaching_plan_id(id, name, goal_type, duration_weeks, plan_structure, success_metrics, tracking_elements, expert_tips)'
             ).eq('user_id', user_id).eq('current_status', 'active').maybe_single().execute()
             
             if not plan_resp.data:

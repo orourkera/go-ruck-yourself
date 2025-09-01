@@ -533,7 +533,7 @@ Reference historical trends and achievements when relevant.''';
         : '\n\nVariety Guidelines:\nAvoid repeating these exact phrases from recent responses:\n- ' + avoidLines.join('\n- ') + '\n\nFor variety, try referencing different aspects of their performance each time.\n';
     
     // Add coaching plan guidance to the prompt
-    final coachingPlan = (context['coachingPlan'] as Map<String, dynamic>?);
+    final coachingPlan = (history is Map && history['coachingPlan'] is Map) ? history['coachingPlan'] as Map<String, dynamic>? : null;
     final coachingGuidance = coachingPlan != null && coachingPlan.isNotEmpty 
         ? '''
 

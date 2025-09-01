@@ -275,7 +275,7 @@ class WeeklyStatsResource(Resource):
             sessions = response.data
             stats = calculate_aggregates(sessions)
             stats['date_range'] = date_range_str
-            stats['daily_breakdown'] = get_daily_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
+            stats['time_series'] = get_daily_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
 
             cache_set(cache_key, stats)
             return {'data': stats}, 200

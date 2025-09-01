@@ -681,6 +681,7 @@ Phase 1: Basic Integration
 - [x] Update "Create Goal" to "Create Coaching Plan" (already exists as "Start AI Coaching Plan")
 - [x] Add plan preview step to existing goal flow (PlanCreationScreen flow exists)
 - [x] Basic plan templates (6 goal types in database + frontend)
+- [x] Expert tips integration (added expert_tips JSONB field to templates)
 - [x] Simple coaching personality selection (PersonalitySelector widget exists)
 - [ ] Plan progress widget on achievements page
 
@@ -1079,8 +1080,10 @@ Holistic Coaching Features:
 
 ### Phase 1: Foundation (MVP)
 - [x] Basic plan templates (6 goal types in database)
+- [x] Expert tips integration (Terminator Training 12-miler tips added to all plans)
 - [x] Progress tracking dashboard (backend APIs built)
-- [ ] Plan-aware homepage insights
+- [x] Plan-aware homepage insights (AI Insights Service updated)
+- [x] AI coaching system integration (all 3 AI tools now use coaching plan context)
 - [ ] Session recommendations based on plan
 - [ ] Simple plan modification options
 
