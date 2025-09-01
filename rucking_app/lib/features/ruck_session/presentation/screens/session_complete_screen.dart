@@ -170,9 +170,22 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         if (_heartRateSamples != null && _heartRateSamples!.isNotEmpty) 'heart_rate_zones': {'has_data': true},
       };
 
-      AppLogger.info('[AI_COMPLETION] Calling OpenAI generateSessionSummary with context: ${summaryContext.toString()}');
-      final summary = await ai.generateSessionSummary(
+      // Fetch coaching plan data for session summary context
+      Map<String, dynamic>? coachingPlan;
+      try {
+        final coachingResponse = await _apiClient.get('/user-coaching-plans');
+        if (coachingResponse != null && coachingResponse is Map<String, dynamic>) {
+          coachingPlan = coachingResponse;
+          AppLogger.info('[AI_COMPLETION] Fetched coaching plan for summary: ${coachingPlan['plan_name']}');
+        }
+      } catch (e) {
+        AppLogger.info('[AI_COMPLETION] No coaching plan for summary: $e');
+      }
+
+      AppLogger.info('[AI_COMPLETION] Calling OpenAI generateSessionSummaryWithCoachingContext with context: ${summaryContext.toString()}');
+      final summary = await ai.generateSessionSummaryWithCoachingContext(
         context: summaryContext,
+        coachingPlan: coachingPlan,
       );
 
       AppLogger.info('[AI_COMPLETION] OpenAI response: ${summary ?? 'null'}');

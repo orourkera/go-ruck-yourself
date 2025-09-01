@@ -7,6 +7,7 @@ class ScienceBasedPlan {
   final Map<String, dynamic> progressionRules;
   final Map<String, dynamic> nonNegotiables;
   final Map<String, dynamic> retests;
+  final Map<String, dynamic>? expertTips;
 
   const ScienceBasedPlan({
     required this.planId,
@@ -17,6 +18,7 @@ class ScienceBasedPlan {
     required this.progressionRules,
     required this.nonNegotiables,
     required this.retests,
+    this.expertTips,
   });
 
   Map<String, dynamic> toJson() {
@@ -29,6 +31,7 @@ class ScienceBasedPlan {
       'progressionRules': progressionRules,
       'nonNegotiables': nonNegotiables,
       'retests': retests,
+      'expertTips': expertTips,
     };
   }
 
@@ -42,6 +45,7 @@ class ScienceBasedPlan {
       progressionRules: json['progressionRules'] as Map<String, dynamic>,
       nonNegotiables: json['nonNegotiables'] as Map<String, dynamic>,
       retests: json['retests'] as Map<String, dynamic>,
+      expertTips: json['expertTips'] as Map<String, dynamic>?,
     );
   }
 
@@ -152,6 +156,23 @@ class ScienceBasedPlan {
         'intensityControl': true,
         'riskProfile': true,
         'routeWeatherSwaps': true,
+      },
+      expertTips: {
+        'trainingFocus': [
+          'Strength + cardio combo is key for fast rucking',
+          'Elite runners need strength training to become elite ruckers',
+          'Strong people need more cardio volume for speed gains'
+        ],
+        'pacing': [
+          'Always aim for negative splits (second half faster)',
+          'Start conservatively, finish strong',
+          'Save energy for the back half'
+        ],
+        'specificity': [
+          'Less ruck running = better results until 3 months out',
+          'Focus on running and strength training for base building',
+          '1x/week ruck running maximum when event-specific'
+        ]
       },
     ),
 
@@ -327,6 +348,21 @@ class ScienceBasedPlan {
         'intensityControl': true,
         'riskProfile': true,
         'routeWeatherSwaps': true,
+      },
+      expertTips: {
+        'loadProgression': [
+          'Only progress load on your longest ruck day',
+          'Hold load constant on shorter sessions',
+          '20% bodyweight is practical ceiling for most people'
+        ],
+        'tissueTolerance': [
+          'Gradually build carrying capacity over months not weeks',
+          'Suitcase carries build anti-lateral strength for rucking'
+        ],
+        'capacityBuilding': [
+          'Time under load matters more than speed',
+          'Focus on posture and gait efficiency under load'
+        ]
       },
     ),
   ];

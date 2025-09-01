@@ -307,15 +307,17 @@ class CheckSessionAchievementsResource(Resource):
             
             # Send push notification
             if new_achievements:
-                device_tokens = get_user_device_tokens([user_id])
-                if device_tokens:
-                    push_service = PushNotificationService()
-                    achievement_names = [achievement['name'] for achievement in new_achievements]
-                    push_service.send_achievement_notification(
-                        device_tokens=device_tokens,
-                        achievement_names=achievement_names,
-                        session_id=session_id
-                    )
+                # Send unified notification (database + push)
+                from RuckTracker.services.notification_manager import notification_manager
+                
+                achievement_names = [achievement['name'] for achievement in new_achievements]
+                logger.info(f"🔔 UNIFIED NOTIFICATION: Sending achievement notification for {len(achievement_names)} achievements")
+                result = notification_manager.send_achievement_notification(
+                    recipient_id=user_id,
+                    achievement_names=achievement_names,
+                    session_id=session_id
+                )
+                logger.info(f"🔔 UNIFIED NOTIFICATION: Achievement notification result: {result}")
             
             logger.info(f"🎯 ACHIEVEMENT CHECK COMPLETE - FOUND {len(new_achievements)} NEW ACHIEVEMENTS")
             if new_achievements:

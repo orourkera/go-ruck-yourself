@@ -322,8 +322,74 @@ class OpenAIService {
     }
   }
 
+  /// Generate a concise post-session summary message with coaching plan context.
+  Future<String?> generateSessionSummaryWithCoachingContext({
+    required Map<String, dynamic> context,
+    Map<String, dynamic>? coachingPlan,
+  }) async {
+    try {
+      // Build session-summary-specific prompt with coaching context
+      final prompt = _buildSessionSummaryPrompt(context, coachingPlan: coachingPlan);
+
+      // Debug logging: Show full prompt being sent to OpenAI
+      AppLogger.info('[OPENAI_DEBUG][SUMMARY] ===== START PROMPT =====');
+      AppLogger.info('[OPENAI_DEBUG][SUMMARY] $prompt');
+      AppLogger.info('[OPENAI_DEBUG][SUMMARY] ===== END PROMPT =====');
+
+      final completion = await OpenAI.instance.chat
+          .create(
+            model: _summaryModel,
+            messages: [
+              OpenAIChatCompletionChoiceMessageModel(
+                content: [OpenAIChatCompletionChoiceMessageContentItemModel.text(prompt)],
+                role: OpenAIChatMessageRole.user,
+              ),
+            ],
+            maxTokens: _maxTokens,
+            temperature: 0.5, // slightly tighter for summaries
+          )
+          .timeout(_timeout);
+
+      var message = completion.choices.first.message.content?.first.text?.trim();
+
+      if (message == null || message.isEmpty) return null;
+
+      // Reuse sanitization rules from generateMessage
+      message = message
+          .split(RegExp(r"\s+"))
+          .where((w) => !w.startsWith('#'))
+          .join(' ')
+          .trim();
+      final emojiRegex = RegExp(r"[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]", unicode: true);
+      message = message.replaceAll(emojiRegex, '');
+      message = message.replaceAll('\n', ' ').replaceAll(RegExp(r"\s+"), ' ').trim();
+      final split = message.split(RegExp(r"(?<=[.!?])\s+"));
+      if (split.length > 3) {
+        message = split.take(3).join(' ').trim();
+      }
+      final words = message.split(' ');
+      if (words.length > 75) {
+        message = words.take(75).join(' ');
+      }
+      if (!RegExp(r"[.!?]$").hasMatch(message)) {
+        message = message + '.';
+      }
+
+      return message;
+    } on TimeoutException {
+      AppLogger.error('[OPENAI][SUMMARY] Request timed out');
+      return null;
+    } on SocketException {
+      AppLogger.error('[OPENAI][SUMMARY] Network error - no internet connection');
+      return null;
+    } catch (e, st) {
+      AppLogger.error('[OPENAI][SUMMARY] Unexpected error: $e', stackTrace: st);
+      return null;
+    }
+  }
+
   /// Build a focused session summary prompt separate from the cheerleader system prompt.
-  String _buildSessionSummaryPrompt(Map<String, dynamic> context) {
+  String _buildSessionSummaryPrompt(Map<String, dynamic> context, {Map<String, dynamic>? coachingPlan}) {
     // Get dedicated system prompt from Remote Config if present, else fallback
     String systemPrompt;
     try {
@@ -389,6 +455,19 @@ Focus on factual metrics, notable achievements, and one meaningful insight. Keep
     if (context['heart_rate_zones'] is Map) sb.writeln('  "has_hr_zones": true,');
     sb.writeln('}');
 
+    // Add coaching plan context to session summary
+    final coachingContext = coachingPlan != null && coachingPlan.isNotEmpty
+        ? '''
+Coaching Plan Context:
+- Active Plan: "${coachingPlan['plan_name']}" (Week ${coachingPlan['current_week']}/${coachingPlan['duration_weeks']})
+- Plan Goal: ${coachingPlan['goal'] ?? 'fitness improvement'}
+- Current Phase: ${coachingPlan['current_phase']} phase
+- Plan Progress: ${coachingPlan['adherence_percentage'] ?? 0}% adherence
+- Status: ${(coachingPlan['adherence_percentage'] ?? 0) >= 70 ? 'ON TRACK' : 'BEHIND SCHEDULE'}
+
+IMPORTANT: Reference the coaching plan context in your summary. If user is on track, acknowledge their plan adherence. If behind, encourage them to get back on track.'''
+        : '';
+
     final guidelines = [
       '- 2-3 sentences, max 75 words. No hashtags.',
       '- Reference at least one concrete metric (distance, duration, pace, HR, elevation, weight).',
@@ -397,13 +476,15 @@ Focus on factual metrics, notable achievements, and one meaningful insight. Keep
       preferMetric 
         ? '- Use metric units (km, kg, meters) when referencing measurements.'
         : '- Use imperial units (miles, lb, feet) when referencing measurements.',
-    ].join('\n');
+      coachingPlan != null ? '- PRIORITY: Include coaching plan context - reference plan progress and adherence.' : '',
+    ].where((g) => g.isNotEmpty).join('\n');
 
     return [
       systemPrompt,
       '',
       'Context:',
       sb.toString(),
+      coachingContext,
       '',
       'Response Requirements:',
       guidelines,
@@ -451,12 +532,32 @@ Reference historical trends and achievements when relevant.''';
         ? ''
         : '\n\nVariety Guidelines:\nAvoid repeating these exact phrases from recent responses:\n- ' + avoidLines.join('\n- ') + '\n\nFor variety, try referencing different aspects of their performance each time.\n';
     
+    // Add coaching plan guidance to the prompt
+    final coachingPlan = (context['coachingPlan'] as Map<String, dynamic>?);
+    final coachingGuidance = coachingPlan != null && coachingPlan.isNotEmpty 
+        ? '''
+
+COACHING PLAN PRIORITY:
+- User has active coaching plan: "${coachingPlan['name']}" (Week ${coachingPlan['weekNumber']}/${coachingPlan['duration']})
+- Plan adherence: ${coachingPlan['adherence']}% ${coachingPlan['isOnTrack'] == true ? '(ON TRACK)' : '(BEHIND - needs encouragement)'}
+- Current phase: ${coachingPlan['phase']}
+- PRIORITY: Reference their plan progress and encourage plan adherence
+- If they're behind, motivate them to get back on track
+- If they're on track, celebrate their commitment to the plan
+${coachingPlan['nextSession'] != null ? '- Mention their next planned session if relevant to current performance' : ''}'''
+        : '''
+
+COACHING PLAN OPPORTUNITY:
+- User has no active coaching plan
+- If they show goal-oriented behavior, subtly suggest considering a structured training plan''';
+
     return '''
 $systemPrompt
 
 Personality: $personality
 User: $userName
 Guidelines: $contentGuidelines
+$coachingGuidance
 
 Context:
 $baseContext
@@ -466,6 +567,7 @@ Response Requirements:
 - Output 2-3 sentences, maximum 75 words total, no emojis, no hashtags.
 - Reference at least one specific, relevant data point from the context/history.
 - Vary your approach and focus different aspects of their performance for variety.
+${coachingPlan != null ? '- PRIORITIZE coaching plan context - reference their plan progress and encourage adherence.' : ''}
 
 Respond with your motivational message:''';
   }
@@ -643,6 +745,44 @@ Respond with your motivational message:''';
     
     if (achievements.isNotEmpty) {
       contextText += "\nRecent achievements: ${achievements.length} unlocked";
+    }
+
+    // Add coaching plan context if available
+    final coachingPlan = (history is Map && history['coachingPlan'] is Map) ? history['coachingPlan'] as Map<String, dynamic> : null;
+    if (coachingPlan != null && coachingPlan.isNotEmpty) {
+      final planName = coachingPlan['name'] ?? 'Training Plan';
+      final week = coachingPlan['weekNumber'] ?? 1;
+      final totalWeeks = coachingPlan['duration'] ?? 0;
+      final phase = coachingPlan['phase'] ?? 'training';
+      final adherence = coachingPlan['adherence'] ?? 0;
+      final isOnTrack = (adherence >= 70);
+      
+      contextText += "\n\nActive Coaching Plan: \"$planName\" (Week $week/$totalWeeks, $phase phase)";
+      contextText += "\nPlan Progress: $adherence% adherence ${isOnTrack ? '(ON TRACK)' : '(NEEDS ENCOURAGEMENT)'}";
+      
+      final nextSession = coachingPlan['nextSession'];
+      if (nextSession is Map) {
+        final sessionType = nextSession['type'] ?? 'workout';
+        final sessionDistance = nextSession['distance_km'];
+        final sessionNotes = nextSession['notes'];
+        
+        if (sessionDistance != null) {
+          final distance = preferMetric ? sessionDistance : (sessionDistance * 0.621371);
+          final unit = preferMetric ? 'km' : 'mi';
+          contextText += "\nNext Planned: $sessionType at ${distance.toStringAsFixed(1)}$unit";
+        } else {
+          contextText += "\nNext Planned: $sessionType";
+        }
+        
+        if (sessionNotes != null && sessionNotes.toString().isNotEmpty) {
+          contextText += " ($sessionNotes)";
+        }
+      }
+      
+      final recommendations = coachingPlan['recommendations'];
+      if (recommendations is List && recommendations.isNotEmpty) {
+        contextText += "\nCoach Notes: ${recommendations.join('; ')}";
+      }
     }
 
     return contextText;

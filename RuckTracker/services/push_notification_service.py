@@ -806,19 +806,16 @@ class PushNotificationService:
         )
 
     def notify_stuck_session(self, user_id, session_id):
-        tokens = self.get_user_device_tokens(user_id)
-        if not tokens:
-            logger.info(f'📱 No device tokens for user {user_id} - stuck session notification disabled')
-            return True  # Graceful handling, not a failure
+        """Send stuck session notification using unified notification manager"""
+        from .notification_manager import notification_manager
         
-        notification_data = {
-            'type': 'stuck_session',
-            'session_id': session_id,
-            'title': 'Active Ruck Session',
-            'body': 'Your ruck session is still running! Open the app to continue or complete it.',
-        }
-        
-        return self.send_notification(tokens, notification_data)
+        logger.info(f"🔔 UNIFIED NOTIFICATION: Sending stuck session notification to user {user_id}")
+        result = notification_manager.send_stuck_session_notification(
+            recipient_id=user_id,
+            session_id=session_id
+        )
+        logger.info(f"🔔 UNIFIED NOTIFICATION: Stuck session notification result: {result}")
+        return result
 
 
 # Helper function to get user device tokens

@@ -213,7 +213,7 @@ class AICheerleaderService {
     User user,
     String personality,
     bool explicitContent,
-    {Map<String, dynamic>? history}
+    {Map<String, dynamic>? history, Map<String, dynamic>? coachingPlan}
   ) {
     AppLogger.info('[AI_CONTEXT_DEBUG] Starting context assembly for trigger type: ${trigger.type}');
     AppLogger.info('[AI_CONTEXT_DEBUG] User data: ${user.toJson()}');
@@ -270,7 +270,9 @@ class AICheerleaderService {
       'environment': <String, dynamic>{
         'timeOfDay': _getTimeOfDay(),
         'sessionPhase': _getSessionPhase(state),
-      }
+      },
+      // Coaching plan context for personalized guidance
+      'coachingPlan': coachingPlan,
     };
     
     AppLogger.info('[AI_CONTEXT_DEBUG] Final assembled context:');

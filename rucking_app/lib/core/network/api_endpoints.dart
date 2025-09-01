@@ -55,6 +55,10 @@ class ApiEndpoints {
   static const String goalNotify = '$baseApi/goals/{goal_id}/notify';
   static const String goalsEvaluateAll = '$baseApi/goals/evaluate-all';
 
+  // Coaching Plans
+  static const String userCoachingPlans = '$baseApi/user-coaching-plans';
+  static const String userCoachingPlanProgress = '$baseApi/user-coaching-plan-progress';
+
   // Helper methods for path parameters
   static String getRuckEndpoint(String ruckId) => '$ruckById/$ruckId';
   static String getLikesEndpoint(String ruckId) => likes.replaceAll('{id}', ruckId);

@@ -1421,6 +1421,18 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
         AppLogger.warning('[COORDINATOR] Failed to fetch user history: $e');
       }
 
+      // Fetch coaching plan data for session summary context
+      Map<String, dynamic>? coachingPlan;
+      try {
+        final coachingResponse = await _apiClient.get('/user-coaching-plans');
+        if (coachingResponse != null && coachingResponse is Map<String, dynamic>) {
+          coachingPlan = coachingResponse;
+          AppLogger.info('[COORDINATOR] Fetched coaching plan for summary: ${coachingPlan['plan_name']}');
+        }
+      } catch (e) {
+        AppLogger.info('[COORDINATOR] No coaching plan for summary: $e');
+      }
+
       // Build full context for OpenAI
       final context = {
         'trigger': {'type': 'session_completion'},
@@ -1432,11 +1444,10 @@ class ActiveSessionCoordinator extends Bloc<ActiveSessionEvent, ActiveSessionSta
 
       AppLogger.info('[COORDINATOR] Calling OpenAI with session summary context: $context');
 
-      // Generate summary using OpenAI service
-      final summary = await _openAIService.generateMessage(
+      // Generate summary using enhanced method with coaching context
+      final summary = await _openAIService.generateSessionSummaryWithCoachingContext(
         context: context,
-        personality: 'Session Analyst', // Use Session Analyst personality for completion summaries
-        explicitContent: false,
+        coachingPlan: coachingPlan,
       );
 
       if (summary != null && summary.isNotEmpty) {

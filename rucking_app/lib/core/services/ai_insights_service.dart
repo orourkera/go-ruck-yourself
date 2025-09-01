@@ -38,7 +38,18 @@ class AIInsightsService {
       final now = DateTime.now();
       final timeOfDay = _getTimeOfDay(now);
       final dayOfWeek = DateFormat('EEEE').format(now);
-      var insights = await _fetchUserInsights();
+      
+      // Fetch user insights and coaching plan data in parallel
+      final futures = await Future.wait([
+        _fetchUserInsights(),
+        _fetchCoachingPlanData(),
+        _fetchCoachingPlanProgress(),
+      ]);
+      
+      var insights = futures[0];
+      final coachingPlan = futures[1];
+      final coachingProgress = futures[2];
+      
       if (insights.isEmpty) {
         await Future.delayed(const Duration(milliseconds: 400));
         insights = await _fetchUserInsights();
@@ -49,6 +60,8 @@ class AIInsightsService {
         timeOfDay: timeOfDay,
         dayOfWeek: dayOfWeek,
         username: username,
+        coachingPlan: coachingPlan,
+        coachingProgress: coachingProgress,
       );
       final instructions = _buildInsightInstructions(context);
       final userInput = _buildUserContextInput(context);
@@ -166,12 +179,37 @@ class AIInsightsService {
     }
   }
 
+  /// Fetch user's active coaching plan data
+  Future<Map<String, dynamic>> _fetchCoachingPlanData() async {
+    try {
+      AppLogger.info('[AI_INSIGHTS] Fetching coaching plan data');
+      final response = await _apiClient.get(ApiEndpoints.userCoachingPlans);
+      return Map<String, dynamic>.from(response ?? {});
+    } catch (e) {
+      AppLogger.info('[AI_INSIGHTS] No active coaching plan or error fetching: $e');
+      return {};
+    }
+  }
+
+  /// Fetch detailed coaching plan progress
+  Future<Map<String, dynamic>> _fetchCoachingPlanProgress() async {
+    try {
+      final response = await _apiClient.get(ApiEndpoints.userCoachingPlanProgress);
+      return Map<String, dynamic>.from(response ?? {});
+    } catch (e) {
+      AppLogger.info('[AI_INSIGHTS] No coaching plan progress available: $e');
+      return {};
+    }
+  }
+
   Map<String, dynamic> _buildInsightContext({
     required Map<String, dynamic> userInsights,
     required bool preferMetric,
     required String timeOfDay,
     required String dayOfWeek,
     required String username,
+    Map<String, dynamic>? coachingPlan,
+    Map<String, dynamic>? coachingProgress,
   }) {
     // Extract from user_insights snapshot
     final facts = Map<String, dynamic>.from(userInsights['facts'] ?? const {});
@@ -233,6 +271,34 @@ class AIInsightsService {
     final totalSessions = (allTime['sessions'] as num?)?.toInt() ?? 0;
     context['sessionsTo100'] = (100 - totalSessions).clamp(0, 100);
 
+    // Add coaching plan context if available
+    if (coachingPlan != null && coachingPlan.isNotEmpty) {
+      context['hasCoachingPlan'] = true;
+      context['coachingPlan'] = {
+        'name': coachingPlan['plan_name'] ?? 'Training Plan',
+        'duration': coachingPlan['duration_weeks'] ?? 0,
+        'difficulty': coachingPlan['difficulty_level'] ?? 'beginner',
+        'goal': coachingPlan['goal'] ?? '',
+        'phase': coachingPlan['current_phase'] ?? 'preparation',
+        'weekNumber': coachingPlan['current_week'] ?? 1,
+      };
+    } else {
+      context['hasCoachingPlan'] = false;
+    }
+
+    // Add coaching progress context if available
+    if (coachingProgress != null && coachingProgress.isNotEmpty) {
+      context['coachingProgress'] = {
+        'adherence': coachingProgress['adherence_percentage'] ?? 0,
+        'completedSessions': coachingProgress['completed_sessions'] ?? 0,
+        'totalSessions': coachingProgress['total_sessions'] ?? 0,
+        'nextSession': coachingProgress['next_session'],
+        'isOnTrack': (coachingProgress['adherence_percentage'] ?? 0) >= 70,
+        'daysInPlan': coachingProgress['days_in_plan'] ?? 0,
+        'recommendations': coachingProgress['recommendations'] ?? [],
+      };
+    }
+
     return context;
   }
 
@@ -289,6 +355,15 @@ Rich Behavioral Patterns (USE THESE FOR CREATIVE INSIGHTS):
 - Challenge Elements: ${behavioralTriggers['hasPersonalChallenge'] == true ? 'self-challenger' : 'steady builder'}
 - Motivation Themes: ${behavioralTriggers['motivationThemes']?.join(', ') ?? 'general fitness'}
 
+Coaching Plan Context:
+${context['hasCoachingPlan'] == true ? '''- Active Plan: "${context['coachingPlan']?['name']}" (Week ${context['coachingPlan']?['weekNumber']} of ${context['coachingPlan']?['duration']}, ${context['coachingPlan']?['phase']} phase)
+- Plan Goal: ${context['coachingPlan']?['goal'] ?? 'fitness improvement'}
+- Difficulty: ${context['coachingPlan']?['difficulty']} level
+${context['coachingProgress'] != null ? '''- Progress: ${context['coachingProgress']?['adherence']}% adherence (${context['coachingProgress']?['completedSessions']}/${context['coachingProgress']?['totalSessions']} sessions)
+- Status: ${context['coachingProgress']?['isOnTrack'] == true ? 'ON TRACK' : 'NEEDS FOCUS'}
+- Next Session: ${context['coachingProgress']?['nextSession']?['type'] ?? 'TBD'} ${context['coachingProgress']?['nextSession']?['distance_km'] != null ? '(${(context['coachingProgress']?['nextSession']?['distance_km'] * (context['preferMetric'] ? 1 : 0.621371)).toStringAsFixed(1)} $distanceUnit)' : ''}
+${context['coachingProgress']?['recommendations']?.isNotEmpty == true ? '- Coach Recommendations: ${(context['coachingProgress']?['recommendations'] as List).join(', ')}' : ''}''' : ''}''' : '- No active coaching plan'}
+
 CRITICAL: Combine behavioral insights WITH concrete stats. Use both the rich behavioral patterns AND the basic numbers to create insights that are both personal and grounded in data. For example: "Your 5:30am habit + 2 sessions this month shows real commitment" rather than just "you're consistent."
 
 Special Guidelines:
@@ -305,12 +380,19 @@ $firstSessionGuidance
 - Be concise and concrete. One distinct idea per field.
 - Do not mention BPM, medical advice, or anything not present in context.
 
+COACHING PLAN INTEGRATION:
+${context['hasCoachingPlan'] == true ? '''- PRIORITIZE coaching plan context: The user has an active plan - focus insights and recommendations around their plan progress
+- Plan-driven insights: Reference their current phase, week, and adherence when relevant
+- Next session focus: If next session details available, tailor recommendation to that specific workout
+- Progress acknowledgment: Acknowledge their plan adherence and progress (${context['coachingProgress']?['isOnTrack'] == true ? 'on track' : 'needing encouragement'})
+- Coach recommendations: Incorporate any coach recommendations into your advice''' : '''- No coaching plan: Focus on general rucking habits and suggest considering a structured plan if they seem goal-oriented'''}
+
 Generate a JSON response with:
 {
   "greeting": "Time-appropriate greeting with name that reflects their personality/timing patterns",
-  "insight": "Behavioral insight that INCLUDES concrete stats (sessions, distance, achievements, streak) combined with personality patterns",
-  "recommendation": "Specific action with target distance/time based on their history, patterns, and behavioral style",
-  "motivation": "Encouraging line that combines their achievements/progress with their motivation style",
+  "insight": "Behavioral insight that INCLUDES concrete stats (sessions, distance, achievements, streak) combined with personality patterns${context['hasCoachingPlan'] == true ? ' and coaching plan progress' : ''}",
+  "recommendation": "Specific action with target distance/time based on their history, patterns, and behavioral style${context['hasCoachingPlan'] == true ? ', prioritizing their coaching plan next session' : ''}",
+  "motivation": "Encouraging line that combines their achievements/progress with their motivation style${context['hasCoachingPlan'] == true ? ' and plan adherence' : ''}",
   "emoji": "Single relevant emoji that matches their personality/focus area"
 }
 
@@ -353,7 +435,17 @@ Behavioral Profile:
 - Weather Profile: ${weatherPatterns['weatherTolerance']} tolerance${weatherPatterns['coldWeatherWarrior'] == true ? ', cold weather warrior' : ''}${weatherPatterns['rainTolerance'] == true ? ', rain-ready' : ''}
 - Progress Pattern: ${progressionTrends['improvementTrend']} improvement, ${achievementPatterns['progressionStyle']} achievement pace
 - Challenge Mindset: ${behavioralTriggers['hasPersonalChallenge'] == true ? 'self-challenger who pushes limits' : 'steady consistent builder'}
-- Motivation Drivers: ${behavioralTriggers['motivationThemes']?.join(', ') ?? 'fitness and wellness'}''';
+- Motivation Drivers: ${behavioralTriggers['motivationThemes']?.join(', ') ?? 'fitness and wellness'}
+
+Active Coaching Plan:
+${context['hasCoachingPlan'] == true ? '''- Plan: "${context['coachingPlan']?['name']}" (${context['coachingPlan']?['difficulty']} level)
+- Current Status: Week ${context['coachingPlan']?['weekNumber']} of ${context['coachingPlan']?['duration']} (${context['coachingPlan']?['phase']} phase)
+- Plan Goal: ${context['coachingPlan']?['goal']}
+- Progress: ${context['coachingProgress']?['adherence']}% adherence (${context['coachingProgress']?['completedSessions']}/${context['coachingProgress']?['totalSessions']} sessions completed)
+- Status: ${context['coachingProgress']?['isOnTrack'] == true ? 'ON TRACK with plan' : 'BEHIND SCHEDULE - needs encouragement'}
+${context['coachingProgress']?['nextSession'] != null ? '''- Next Planned Session: ${context['coachingProgress']?['nextSession']?['type'] ?? 'workout'} ${context['coachingProgress']?['nextSession']?['distance_km'] != null ? 'at ${(context['coachingProgress']?['nextSession']?['distance_km'] * (context['preferMetric'] ? 1 : 0.621371)).toStringAsFixed(1)} $distanceUnit' : ''}
+${context['coachingProgress']?['nextSession']?['notes'] != null ? '- Session Notes: ${context['coachingProgress']?['nextSession']?['notes']}' : ''}''' : ''}
+${context['coachingProgress']?['recommendations']?.isNotEmpty == true ? '- Coach Recommendations: ${(context['coachingProgress']?['recommendations'] as List).join('; ')}' : ''}''' : '''- No active coaching plan (suggest structured training if user seems goal-oriented)'''}''';
   }
 
 

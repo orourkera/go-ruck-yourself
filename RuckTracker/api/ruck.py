@@ -784,11 +784,14 @@ class RuckSessionStartResource(Resource):
                         user_response = admin_client.table('user').select('username').eq('id', g.user.id).single().execute()
                         user_name = user_response.data.get('username', 'Someone') if user_response.data else 'Someone'
                         
-                        push_service = PushNotificationService()
-                        push_service.send_ruck_started_notification(
-                            device_tokens=device_tokens,
+                        # Send unified notification (database + push)
+                        from RuckTracker.services.notification_manager import notification_manager
+                        
+                        result = notification_manager.send_ruck_started_notification(
+                            recipients=follower_ids,
                             rucker_name=user_name,
-                            ruck_id=str(ruck_id)
+                            ruck_id=str(ruck_id),
+                            rucker_id=g.user.id
                         )
                         logger.info(f"🔔 PUSH NOTIFICATION: Sent ruck started notification to {len(device_tokens)} devices")
                     else:
@@ -884,11 +887,14 @@ class RuckSessionResumeResource(Resource):
                         user_response = admin_client.table('user').select('username').eq('id', g.user.id).single().execute()
                         user_name = user_response.data.get('username', 'Someone') if user_response.data else 'Someone'
                         
-                        push_service = PushNotificationService()
-                        push_service.send_ruck_started_notification(
-                            device_tokens=device_tokens,
+                        # Send unified notification (database + push)
+                        from RuckTracker.services.notification_manager import notification_manager
+                        
+                        result = notification_manager.send_ruck_started_notification(
+                            recipients=follower_ids,
                             rucker_name=user_name,
-                            ruck_id=str(ruck_id)
+                            ruck_id=str(ruck_id),
+                            rucker_id=g.user.id
                         )
                         logger.info(f"🔔 PUSH NOTIFICATION: Sent ruck started notification to {len(device_tokens)} devices")
                     else:

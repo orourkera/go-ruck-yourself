@@ -428,7 +428,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.warning('[AI_CHEERLEADER_DEBUG] Failed to fetch user history (continuing without it): $e');
       }
 
-      // 2. Assemble context for AI generation (including history if available)
+      // 2. Fetch coaching plan data for AI context
+      Map<String, dynamic>? coachingPlan;
+      try {
+        final coachingResponse = await _apiClient.get('/user-coaching-plans');
+        if (coachingResponse != null && coachingResponse is Map<String, dynamic>) {
+          coachingPlan = coachingResponse;
+          AppLogger.info('[AI_CHEERLEADER_DEBUG] Fetched coaching plan data: ${coachingPlan?['plan_name']}');
+        }
+      } catch (e) {
+        AppLogger.info('[AI_CHEERLEADER_DEBUG] No coaching plan available: $e');
+      }
+
+      // 3. Assemble context for AI generation (including history and coaching plan if available)
       final context = _aiCheerleaderService.assembleContext(
         state,
         trigger,
@@ -436,6 +448,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _aiCheerleaderPersonality!,
         _aiCheerleaderExplicitContent,
         history: history,
+        coachingPlan: coachingPlan,
       );
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Context keys: ${context.keys.toList()}');

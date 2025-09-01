@@ -211,27 +211,32 @@ class RuckCommentsResource(Resource):
 
                 commenter_name = user_profile['username']
 
+                # Import unified notification manager
+                from RuckTracker.services.notification_manager import notification_manager
+                
                 # 1) Notify owner with owner-specific message
                 if ruck_owner_id and ruck_owner_id != user_id:
-                    owner_tokens = get_user_device_tokens([ruck_owner_id])
-                    if owner_tokens:
-                        push_service.send_ruck_comment_notification(
-                            device_tokens=owner_tokens,
-                            commenter_name=commenter_name,
-                            ruck_id=ruck_id,
-                            comment_id=str(created_comment['id'])
-                        )
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Sending ruck comment notification to owner {ruck_owner_id}")
+                    result_owner = notification_manager.send_ruck_comment_notification(
+                        recipient_id=ruck_owner_id,
+                        commenter_name=commenter_name,
+                        ruck_id=ruck_id,
+                        comment_id=str(created_comment['id']),
+                        commenter_id=user_id
+                    )
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Comment owner notification result: {result_owner}")
 
                 # 2) Notify prior participants with participant activity message
                 if participant_ids:
-                    tokens = get_user_device_tokens(list(participant_ids))
-                    if tokens:
-                        push_service.send_ruck_participant_activity_notification(
-                            device_tokens=tokens,
-                            actor_name=commenter_name,
-                            ruck_id=str(ruck_id),
-                            activity_type='comment'
-                        )
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Sending participant activity notifications to {len(participant_ids)} users")
+                    result_participants = notification_manager.send_ruck_participant_activity_notification(
+                        recipients=list(participant_ids),
+                        actor_name=commenter_name,
+                        ruck_id=str(ruck_id),
+                        activity_type='comment',
+                        actor_id=user_id
+                    )
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Participant activity notification result: {result_participants}")
             except Exception as e:
                 logger.error(f"Failed to send comment notifications: {e}")
                 # Don't fail the comment if notification fails

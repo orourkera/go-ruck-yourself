@@ -210,20 +210,16 @@ def follow_user(user_id):
                     
                     logger.info(f"🔔 PUSH NOTIFICATION: Sending to followed user {user_id}, from follower {follower_name}")
                     
-                    # Get device tokens for the followed user
-                    device_tokens = get_user_device_tokens([str(user_id)])
-                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens: {device_tokens}")
+                    # Send unified notification (database + push)
+                    from RuckTracker.services.notification_manager import notification_manager
                     
-                    if device_tokens:
-                        logger.info(f"🔔 PUSH NOTIFICATION: Calling send_new_follower_notification...")
-                        result = push_service.send_new_follower_notification(
-                            device_tokens=device_tokens,
-                            follower_name=follower_name,
-                            follower_id=str(current_user_id)
-                        )
-                        logger.info(f"🔔 PUSH NOTIFICATION: New follower notification sent successfully, result: {result}")
-                    else:
-                        logger.warning(f"🔔 PUSH NOTIFICATION: No device tokens found for user {user_id}")
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Sending new follower notification from {current_user_id} to {user_id}")
+                    result = notification_manager.send_new_follower_notification(
+                        recipient_id=str(user_id),
+                        follower_name=follower_name,
+                        follower_id=str(current_user_id)
+                    )
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: New follower notification result: {result}")
                         
                 except Exception as e:
                     logger.error(f"🔔 PUSH NOTIFICATION: Failed to send new follower notification: {e}", exc_info=True)

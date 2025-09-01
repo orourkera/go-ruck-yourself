@@ -218,9 +218,9 @@ class RuckLikesResource(Resource):
                 logger.error(f"RuckLikesResource: Error adding like: {insert_response.error}")
                 return build_api_response(success=False, error="Failed to add like", status_code=500)
             
-            # Send push notification to ruck owner
+            # Send unified notification (database + push)
             try:
-                logger.info(f"🔔 PUSH NOTIFICATION: Starting ruck like push notification for ruck {ruck_id}")
+                logger.info(f"🔔 UNIFIED NOTIFICATION: Starting ruck like notification for ruck {ruck_id}")
                 
                 # Get ruck owner info
                 ruck_response = supabase.table('ruck_session') \
@@ -228,7 +228,7 @@ class RuckLikesResource(Resource):
                     .eq('id', ruck_id) \
                     .execute()
                 
-                logger.info(f"🔔 PUSH NOTIFICATION: Ruck owner query result: {ruck_response.data}")
+                logger.info(f"🔔 UNIFIED NOTIFICATION: Ruck owner query result: {ruck_response.data}")
                 
                 if ruck_response.data and ruck_response.data[0]['user_id'] != user_id:
                     ruck_owner_id = ruck_response.data[0]['user_id']
@@ -241,29 +241,17 @@ class RuckLikesResource(Resource):
                     
                     liker_name = user_response.data[0]['username'] if user_response.data else 'Someone'
                     
-                    logger.info(f"🔔 PUSH NOTIFICATION: Sending to ruck owner {ruck_owner_id}, from liker {liker_name}")
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Sending to ruck owner {ruck_owner_id}, from liker {liker_name}")
                     
-                    # Send push notification
-                    logger.info(f"🔔 PUSH NOTIFICATION: Using global push service")
-                    cache_key = f'user_device_tokens:{ruck_owner_id}'
-                    cached_tokens = cache_get(cache_key)
-                    if cached_tokens:
-                        device_tokens = cached_tokens
-                        logger.info(f"[LIKE_PERF] Using cached device tokens for {ruck_owner_id}")
-                    else:
-                        device_tokens = get_user_device_tokens([ruck_owner_id])
-                        cache_set(cache_key, device_tokens, 3600)
-                    
-                    logger.info(f"🔔 PUSH NOTIFICATION: Retrieved {len(device_tokens)} device tokens: {device_tokens}")
-                    
-                    if device_tokens:
-                        logger.info(f"🔔 PUSH NOTIFICATION: Calling send_ruck_like_notification...")
-                        result = push_service.send_ruck_like_notification(
-                            device_tokens=device_tokens,
-                            liker_name=liker_name,
-                            ruck_id=ruck_id
-                        )
-                        logger.info(f"🔔 PUSH NOTIFICATION: Like notification sent successfully, result: {result}")
+                    # Send unified notification (DB + push)
+                    from RuckTracker.services.notification_manager import notification_manager
+                    result = notification_manager.send_ruck_like_notification(
+                        recipient_id=ruck_owner_id,
+                        liker_name=liker_name,
+                        ruck_id=ruck_id,
+                        liker_id=user_id
+                    )
+                    logger.info(f"🔔 UNIFIED NOTIFICATION: Ruck like notification result: {result}")
 
                     # Notify other prior participants (commenters and likers) except owner and current liker
                     try:
@@ -295,15 +283,15 @@ class RuckLikesResource(Resource):
                                     prior_participants.add(l['user_id'])
 
                         if prior_participants:
-                            logger.info(f"🔔 PUSH NOTIFICATION: Notifying {len(prior_participants)} prior participants of like activity")
-                            tokens_pp = get_user_device_tokens(list(prior_participants))
-                            if tokens_pp:
-                                push_service.send_ruck_participant_activity_notification(
-                                    device_tokens=tokens_pp,
-                                    actor_name=liker_name,
-                                    ruck_id=str(ruck_id),
-                                    activity_type='like'
-                                )
+                            logger.info(f"🔔 UNIFIED NOTIFICATION: Notifying {len(prior_participants)} prior participants of like activity")
+                            result_pp = notification_manager.send_ruck_participant_activity_notification(
+                                recipients=list(prior_participants),
+                                actor_name=liker_name,
+                                ruck_id=str(ruck_id),
+                                activity_type='like',
+                                actor_id=user_id
+                            )
+                            logger.info(f"🔔 UNIFIED NOTIFICATION: Participant activity notification result: {result_pp}")
                     except Exception as e:
                         logger.error(f"🔔 PUSH NOTIFICATION: Failed notifying prior participants: {e}")
                     else:
