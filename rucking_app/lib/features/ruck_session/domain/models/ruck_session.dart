@@ -373,6 +373,17 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     }
   }
 
+  /// Validate duration to prevent integer overflow
+  static int _validateDuration(int durationSeconds) {
+    // Maximum reasonable duration: 30 days = 2,592,000 seconds
+    const maxDuration = 2592000;
+    if (durationSeconds < 0 || durationSeconds > maxDuration) {
+      AppLogger.warning('[DURATION_VALIDATION] Invalid duration: ${durationSeconds}s, clamping to reasonable range');
+      return durationSeconds.clamp(0, maxDuration);
+    }
+    return durationSeconds;
+  }
+
   /// Convert the RuckSession to a JSON map
   Map<String, dynamic> toJson() {
     final dateFormat = DateFormat("yyyy-MM-ddTHH:mm:ss");
@@ -398,7 +409,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       'start_time': dateFormat.format(startTime),
       'average_pace': averagePace,
       'end_time': dateFormat.format(endTime),
-      'duration_seconds': duration.inSeconds,
+      'duration_seconds': _validateDuration(duration.inSeconds),
       'distance_km': distance,
       'elevation_gain_meters': elevationGain,
       'elevation_loss_meters': elevationLoss,

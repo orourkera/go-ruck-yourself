@@ -299,9 +299,10 @@ class RuckSessionResource(Resource):
                 # Some clients of supabase-py return None on delete; treat as success
                 pass
 
-            # Invalidate any cached user session lists
+            # Invalidate any cached user session lists and ruck buddies cache
             try:
                 cache_delete_pattern(f"ruck_session:{g.user.id}:*")
+                cache_delete_pattern("ruck_buddies:*")  # Clear ruck buddies cache to update first_ruck flags
             except Exception:
                 pass
 

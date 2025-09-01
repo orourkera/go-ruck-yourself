@@ -279,7 +279,7 @@ def get_ruck_buddies():
         ) \
         .eq('is_public', True) \
         .neq('user_id', g.user.id) \
-        .gt('duration_seconds', 180) \
+        .gte('duration_seconds', 300) \
         .gte('distance_km', 0.5)
     
     # If following_only is true, filter to only show rucks from users the current user follows
@@ -321,11 +321,14 @@ def get_ruck_buddies():
     try:
         if user_ids_in_page:
             # Fetch earliest completed session per user (private or public) to flag first ruck
+            # Only consider sessions that meet the same criteria as ruck buddies display
             rs = (
                 supabase.table('ruck_session')
-                .select('id,user_id,completed_at,status')
+                .select('id,user_id,completed_at,status,duration_seconds,distance_km')
                 .in_('user_id', user_ids_in_page)
                 .eq('status', 'completed')
+                .gte('duration_seconds', 300)  # Same filter as ruck buddies display
+                .gte('distance_km', 0.5)       # Same filter as ruck buddies display
                 .order('user_id')
                 .order('completed_at')
                 .limit(10000)
