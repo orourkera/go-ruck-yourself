@@ -29,12 +29,12 @@ class UserCoachingPlansResource(Resource):
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
                 'coaching_plan_templates!coaching_plan_id(id, name, goal_type, duration_weeks, plan_structure, success_metrics, tracking_elements, expert_tips)'
-            ).eq('user_id', user_id).eq('current_status', 'active').maybe_single().execute()
+            ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
             
             if not plan_resp.data:
                 return {"active_plan": None}, 200
                 
-            plan = plan_resp.data
+            plan = plan_resp.data[0]
             
             # Calculate plan progress
             weeks_elapsed = _calculate_weeks_elapsed(plan['start_date'])
@@ -89,17 +89,17 @@ class UserCoachingPlansResource(Resource):
             client = get_supabase_client()
             template_resp = client.table('coaching_plan_templates').select(
                 'id, name, duration_weeks, plan_structure'
-            ).eq('id', template_id).single().execute()
+            ).eq('id', template_id).limit(1).execute()
             
             if not template_resp.data:
                 return {"error": "Template not found"}, 404
                 
-            template = template_resp.data
+            template = template_resp.data[0]
             
             # Check if user already has active plan
             existing_resp = client.table('user_coaching_plans').select('id').eq(
                 'user_id', user_id
-            ).eq('current_status', 'active').maybe_single().execute()
+            ).eq('current_status', 'active').limit(1).execute()
             
             if existing_resp.data:
                 return {"error": "User already has an active coaching plan"}, 409
@@ -160,12 +160,12 @@ class UserCoachingPlanProgressResource(Resource):
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, start_date, current_week, '
                 'coaching_plan_templates!coaching_plan_id(name, duration_weeks, plan_structure, success_metrics)'
-            ).eq('user_id', user_id).eq('current_status', 'active').maybe_single().execute()
+            ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
             
             if not plan_resp.data:
                 return {"error": "No active coaching plan found"}, 404
                 
-            plan = plan_resp.data
+            plan = plan_resp.data[0]
             template = plan['coaching_plan_templates']
             
             # Get all plan sessions

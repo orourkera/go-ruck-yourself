@@ -183,6 +183,62 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     
   }
 
+  /// Load coaching plan data for session recommendations
+  Future<void> _loadCoachingPlanData() async {
+    try {
+      final apiClient = GetIt.instance<ApiClient>();
+      
+      // Fetch active coaching plan
+      final planResponse = await apiClient.get('/user-coaching-plans/active');
+      if (planResponse.isNotEmpty) {
+        _coachingPlan = planResponse;
+        
+        // Fetch next session recommendations
+        final progressResponse = await apiClient.get('/user-coaching-plans/${_coachingPlan!['id']}/progress');
+        if (progressResponse != null && progressResponse['nextSession'] != null) {
+          _nextSession = progressResponse['nextSession'];
+        }
+      }
+    } catch (e) {
+      AppLogger.info('[CREATE_SESSION] No active coaching plan or error loading: $e');
+      // Silently continue - coaching plan recommendations are optional
+    }
+  }
+
+  /// Apply coaching plan recommended settings to the session
+  void _applyCoachingRecommendations() {
+    if (_nextSession == null) return;
+
+    setState(() {
+      // Apply recommended weight
+      if (_nextSession!['weight_kg'] != null) {
+        final recommendedWeightKg = (_nextSession!['weight_kg'] as double);
+        _ruckWeight = recommendedWeightKg;
+        _selectedRuckWeight = recommendedWeightKg;
+        
+        // Update display weight based on preference
+        if (_preferMetric) {
+          _displayRuckWeight = recommendedWeightKg;
+        } else {
+          _displayRuckWeight = recommendedWeightKg * AppConfig.kgToLbs;
+        }
+      }
+
+      // Apply recommended duration
+      if (_nextSession!['duration_minutes'] != null) {
+        _plannedDuration = _nextSession!['duration_minutes'] as int;
+        _durationController.text = _plannedDuration.toString();
+      }
+    });
+
+    // Show confirmation
+    StyledSnackBar.show(
+      context: context,
+      message: 'Applied coaching plan recommendations',
+      type: SnackBarType.success,
+    );
+  }
+
   /// Saves the last used session duration to SharedPreferences
   Future<void> _saveLastDuration(int durationMinutes) async {
     final prefs = await SharedPreferences.getInstance();
@@ -1076,6 +1132,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   style: AppTextStyles.titleLarge, // headline6 -> titleLarge
                 ),
                 const SizedBox(height: 24),
+                
+                // Coaching plan recommendations
+                PlanSessionRecommendations(
+                  coachingPlan: _coachingPlan,
+                  nextSession: _nextSession,
+                  preferMetric: _preferMetric,
+                  onUseRecommended: _applyCoachingRecommendations,
+                ),
                 
                 // Quick ruck weight selection
                 Text(

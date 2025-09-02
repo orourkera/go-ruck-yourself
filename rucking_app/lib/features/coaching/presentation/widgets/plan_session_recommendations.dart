@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:rucking_app/core/config/app_config.dart';
 
 /// Widget that shows AI coaching plan recommendations for the current session
 class PlanSessionRecommendations extends StatelessWidget {
@@ -18,12 +19,12 @@ class PlanSessionRecommendations extends StatelessWidget {
   final VoidCallback? onUseRecommended;
 
   const PlanSessionRecommendations({
-    Key? key,
+    super.key,
     this.coachingPlan,
     this.nextSession,
     required this.preferMetric,
     this.onUseRecommended,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -47,10 +48,10 @@ class PlanSessionRecommendations extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
+        color: AppColors.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.2),
+          color: AppColors.primary.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -81,7 +82,7 @@ class PlanSessionRecommendations extends StatelessWidget {
           Text(
             '$phase Phase',
             style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textSecondary,
+              color: AppColors.textDarkSecondary,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -141,7 +142,7 @@ class PlanSessionRecommendations extends StatelessWidget {
     if (distanceKm != null && distanceKm > 0) {
       final distance = preferMetric 
           ? '${distanceKm.toStringAsFixed(1)} km'
-          : '${MeasurementUtils.kmToMiles(distanceKm).toStringAsFixed(1)} miles';
+          : '${MeasurementUtils.distance(distanceKm, metric: false).toStringAsFixed(1)} miles';
       details.add(_buildDetailChip(Icons.straighten, 'Distance: $distance'));
     }
 
@@ -157,7 +158,7 @@ class PlanSessionRecommendations extends StatelessWidget {
     if (recommendedWeightKg != null && recommendedWeightKg > 0) {
       final weight = preferMetric
           ? '${recommendedWeightKg.toStringAsFixed(0)} kg'
-          : '${MeasurementUtils.kgToLbs(recommendedWeightKg).toStringAsFixed(0)} lbs';
+          : '${(recommendedWeightKg * AppConfig.kgToLbs).toStringAsFixed(0)} lbs';
       details.add(_buildDetailChip(Icons.fitness_center, 'Weight: $weight'));
     }
 
@@ -168,7 +169,7 @@ class PlanSessionRecommendations extends StatelessWidget {
           margin: const EdgeInsets.only(top: 8),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.background.withOpacity(0.5),
+            color: AppColors.backgroundLight.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -177,14 +178,14 @@ class PlanSessionRecommendations extends StatelessWidget {
               Icon(
                 Icons.lightbulb_outline,
                 size: 16,
-                color: AppColors.textSecondary,
+                color: AppColors.textDarkSecondary,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   notes,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
+                    color: AppColors.textDarkSecondary,
                   ),
                 ),
               ),
@@ -198,7 +199,7 @@ class PlanSessionRecommendations extends StatelessWidget {
       return Text(
         'Follow your plan guidelines',
         style: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textSecondary,
+          color: AppColors.textDarkSecondary,
         ),
       );
     }
@@ -214,10 +215,10 @@ class PlanSessionRecommendations extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.background.withOpacity(0.7),
+        color: AppColors.backgroundLight.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.border.withOpacity(0.3),
+          color: AppColors.greyLight.withValues(alpha: 0.3),
           width: 1,
         ),
       ),

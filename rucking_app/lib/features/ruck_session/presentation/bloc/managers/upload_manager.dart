@@ -484,8 +484,10 @@ class UploadManager implements SessionManager {
     
     final locationData = uniqueLocations.map((point) => point.toJson()).toList();
     
-    await _apiClient.post('/rucks/$_activeSessionId/location-batch', {
-      'location_points': locationData,
+    // Fixed: Use the correct endpoint that exists on the backend
+    // The backend expects 'points' field for batch uploads
+    await _apiClient.post('/rucks/$_activeSessionId/location', {
+      'points': locationData,
       'batch_timestamp': DateTime.now().toIso8601String(),
     });
     

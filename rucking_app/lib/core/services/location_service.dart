@@ -258,6 +258,11 @@ class LocationServiceImpl implements LocationService {
         elevation: position.altitude,
         accuracy: position.accuracy,
         timestamp: position.timestamp,
+        speed: position.speed,
+        verticalAccuracyM: position.altitudeAccuracy,
+        speedAccuracyMps: position.speedAccuracy,
+        courseDeg: position.heading,
+        courseAccuracyDeg: position.headingAccuracy,
       );
     } catch (e) {
       // Handle specific iOS location permission errors more gracefully
@@ -394,6 +399,11 @@ class LocationServiceImpl implements LocationService {
           elevation: position.altitude,
           accuracy: position.accuracy,
           timestamp: position.timestamp,
+          speed: position.speed,
+          verticalAccuracyM: position.altitudeAccuracy,
+          speedAccuracyMps: position.speedAccuracy,
+          courseDeg: position.heading,
+          courseAccuracyDeg: position.headingAccuracy,
         );
         
         // Log elevation data for debugging iOS vs Android differences
@@ -640,6 +650,11 @@ class LocationServiceImpl implements LocationService {
             elevation: position.altitude,
             accuracy: position.accuracy,
             timestamp: position.timestamp,
+            speed: position.speed,
+            verticalAccuracyM: position.altitudeAccuracy,
+            speedAccuracyMps: position.speedAccuracy,
+            courseDeg: position.heading,
+            courseAccuracyDeg: position.headingAccuracy,
           );
           
           _locationBatch.add(locationPoint);
@@ -674,6 +689,11 @@ class LocationServiceImpl implements LocationService {
           elevation: position.altitude,
           accuracy: position.accuracy,
           timestamp: position.timestamp,
+          speed: position.speed,
+          verticalAccuracyM: position.altitudeAccuracy,
+          speedAccuracyMps: position.speedAccuracy,
+          courseDeg: position.heading,
+          courseAccuracyDeg: position.headingAccuracy,
         );
         
         // Log elevation data for debugging iOS vs Android differences
@@ -876,6 +896,11 @@ class LocationServiceImpl implements LocationService {
               elevation: position.altitude,
               accuracy: position.accuracy,
               timestamp: position.timestamp,
+              speed: position.speed,
+              verticalAccuracyM: position.altitudeAccuracy,
+              speedAccuracyMps: position.speedAccuracy,
+              courseDeg: position.heading,
+              courseAccuracyDeg: position.headingAccuracy,
             );
             
             _locationBatch.add(locationPoint);
@@ -930,6 +955,10 @@ class LocationServiceImpl implements LocationService {
            accuracy: math.max(position.accuracy, 100.0), // Mark as coarse
            timestamp: position.timestamp,
            speed: position.speed,
+           verticalAccuracyM: position.altitudeAccuracy,
+           speedAccuracyMps: position.speedAccuracy,
+           courseDeg: position.heading,
+           courseAccuracyDeg: position.headingAccuracy,
          );
          _locationController.add(point);
          AppLogger.info('Significant location update received during fallback');

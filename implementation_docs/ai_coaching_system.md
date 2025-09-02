@@ -1020,8 +1020,8 @@ Backend Services:
 - [x] Create plan commitment confirmation (commitment step in PlanCreationScreen)
 
 #### Week 5-6: Progress Integration
-- [ ] Homepage AI insights plan integration
-- [ ] Session creation plan recommendations  
+- [x] Homepage AI insights plan integration (AI Insights Service already integrated with coaching plans)
+- [x] Session creation plan recommendations (PlanSessionRecommendations widget implemented)
 - [x] Basic progress tracking and display (UserCoachingPlanProgressResource API)
 - [x] Plan adherence scoring (PlanSessionTrackingResource with adherence calculation)
 
@@ -1085,7 +1085,7 @@ Holistic Coaching Features:
 - [x] Progress tracking dashboard (backend APIs built)
 - [x] Plan-aware homepage insights (AI Insights Service updated)
 - [x] AI coaching system integration (all 3 AI tools now use coaching plan context)
-- [ ] Session recommendations based on plan
+- [x] Session recommendations based on plan (PlanSessionRecommendations widget in CreateSessionScreen)
 - [ ] Simple plan modification options
 
 ### Phase 2: Personalization
