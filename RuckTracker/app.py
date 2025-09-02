@@ -1355,11 +1355,11 @@ def health():
 def app_version_info():
     """App version information for update checks"""
     return jsonify({
-        'latest_version': '1.0.0',
-        'min_required_version': '1.0.0',
+        'latest_version': '3.3.4',
+        'min_required_version': '3.2.0',
         'force_update': False,
-        'update_url': 'https://apps.apple.com/app/rucking-app',
-        'release_notes': 'Latest version with improved performance and bug fixes.'
+        'update_url': 'https://apps.apple.com/app/ruck-app/id6738063624',
+        'release_notes': 'Latest version with improved performance, bug fixes, and enhanced stability.'
     })
 
 logger.info("Application initialized successfully! All API endpoints registered.")

@@ -1208,11 +1208,25 @@ class LocationTrackingManager implements SessionManager {
           await handleEvent(BatchLocationUpdated(locationPoints: chunk));
           index = end;
         } catch (uploadError) {
-          // CRITICAL FIX: Re-queue the failed chunk, not just remaining ones
-          AppLogger.error('[LOCATION_MANAGER] Failed to upload chunk $chunkNumber: $uploadError');
-          _pendingLocationPoints.addAll(chunk);
-          // Re-throw to trigger the outer catch block for remaining chunks
-          rethrow;
+          // CRITICAL FIX: Check if it's a stale session error before re-queuing
+          final errorMsg = uploadError.toString().toLowerCase();
+          final isStaleSessionError = errorMsg.contains('session not found') || 
+                                    errorMsg.contains('session not in progress') ||
+                                    errorMsg.contains('404') ||
+                                    errorMsg.contains('session completed');
+          
+          if (isStaleSessionError) {
+            AppLogger.warning('[LOCATION_MANAGER] Session no longer accepts uploads, CLEARING $_activeSessionId to prevent infinite retry');
+            AppLogger.warning('[LOCATION_MANAGER] DROPPING ${chunk.length} location points for completed session');
+            _activeSessionId = null;
+            break; // Stop processing remaining chunks
+          } else {
+            // Only re-queue for retryable errors (network, etc)
+            AppLogger.error('[LOCATION_MANAGER] Failed to upload chunk $chunkNumber (retryable): $uploadError');
+            _pendingLocationPoints.addAll(chunk);
+            // Re-throw to trigger the outer catch block for remaining chunks
+            rethrow;
+          }
         }
       }
     } catch (e) {

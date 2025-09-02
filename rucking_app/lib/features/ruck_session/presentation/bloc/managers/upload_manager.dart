@@ -36,6 +36,7 @@ class UploadManager implements SessionManager {
   static const int _maxRetries = 3;
   static const int _maxQueueSize = 100;
   static const Duration _uploadTimeout = Duration(seconds: 30);
+  static const int _maxStaleRetries = 10; // Max retries for session-not-found errors
   
   UploadManager({
     required SessionRepository sessionRepository,
@@ -321,16 +322,27 @@ class UploadManager implements SessionManager {
       } catch (e) {
         AppLogger.error('[UPLOAD_MANAGER] Upload failed for ${upload['type']}: $e');
         
-        // Retry logic
-        upload['retries'] = (upload['retries'] ?? 0) + 1;
+        final errorMsg = e.toString().toLowerCase();
+        final isStaleSessionError = errorMsg.contains('session not found') || 
+                                  errorMsg.contains('session not in progress') ||
+                                  errorMsg.contains('404') ||
+                                  errorMsg.contains('session completed');
         
-        if (upload['retries'] < _maxRetries) {
+        // Different retry logic for stale session vs network errors
+        upload['retries'] = (upload['retries'] ?? 0) + 1;
+        upload['stale_retries'] = (upload['stale_retries'] ?? 0) + (isStaleSessionError ? 1 : 0);
+        
+        if (isStaleSessionError && upload['stale_retries'] >= _maxStaleRetries) {
+          // Too many stale session errors - permanently drop this upload
+          AppLogger.warning('[UPLOAD_MANAGER] DROPPING upload after ${upload['stale_retries']} stale session errors: ${upload['type']}');
+          AppLogger.warning('[UPLOAD_MANAGER] This prevents infinite retry loops for completed sessions');
+        } else if (upload['retries'] < _maxRetries) {
           _uploadQueue.add(upload); // Re-add to queue
-          AppLogger.info('[AI_DEBUG][UPLOAD_MANAGER] Retrying upload (${upload['retries']}/$_maxRetries)');
+          AppLogger.info('[UPLOAD_MANAGER] Retrying upload (${upload['retries']}/$_maxRetries, stale: ${upload['stale_retries']}/$_maxStaleRetries)');
         } else {
           // Save failed upload for manual retry later
           await _saveFailedUpload(upload);
-          AppLogger.warning('[AI_DEBUG][UPLOAD_MANAGER] Max retries exceeded, saving for later: ${upload['type']}');
+          AppLogger.warning('[UPLOAD_MANAGER] Max retries exceeded, saving for later: ${upload['type']}');
         }
         
         _updateState(_currentState.copyWith(
@@ -467,6 +479,12 @@ class UploadManager implements SessionManager {
   Future<void> _uploadLocationBatch(List<LocationPoint> locations) async {
     if (_activeSessionId == null || locations.isEmpty) return;
     
+    // CRITICAL FIX: Check session state before attempting upload
+    if (_activeSessionId!.startsWith('offline_')) {
+      AppLogger.warning('[UPLOAD_MANAGER] Skipping location upload for offline session: $_activeSessionId');
+      return;
+    }
+    
     // Deduplicate using uniqueId
     final seenIds = <String>{};
     final uniqueLocations = locations.where((point) {
@@ -480,18 +498,36 @@ class UploadManager implements SessionManager {
       return;
     }
     
-    AppLogger.info('[UPLOAD_MANAGER] Uploading ${uniqueLocations.length} unique location points (deduped from ${locations.length})');
+    AppLogger.info('[UPLOAD_MANAGER] Uploading ${uniqueLocations.length} unique location points (deduped from ${locations.length}) to session $_activeSessionId');
     
     final locationData = uniqueLocations.map((point) => point.toJson()).toList();
     
-    // Fixed: Use the correct endpoint that exists on the backend
-    // The backend expects 'points' field for batch uploads
-    await _apiClient.post('/rucks/$_activeSessionId/location', {
-      'points': locationData,
-      'batch_timestamp': DateTime.now().toIso8601String(),
-    });
-    
-    AppLogger.info('[UPLOAD_MANAGER] Location batch uploaded successfully');
+    try {
+      // Fixed: Use the correct endpoint that exists on the backend
+      // The backend expects 'points' field for batch uploads
+      await _apiClient.post('/rucks/$_activeSessionId/location', {
+        'points': locationData,
+        'batch_timestamp': DateTime.now().toIso8601String(),
+      });
+      
+      AppLogger.info('[UPLOAD_MANAGER] Location batch uploaded successfully');
+    } catch (e) {
+      // CRITICAL FIX: Handle session-not-found or session-completed errors specifically
+      final errorMsg = e.toString().toLowerCase();
+      if (errorMsg.contains('session not found') || 
+          errorMsg.contains('session not in progress') ||
+          errorMsg.contains('404') ||
+          errorMsg.contains('session completed')) {
+        AppLogger.warning('[UPLOAD_MANAGER] Session $_activeSessionId no longer accepts uploads: $e');
+        AppLogger.warning('[UPLOAD_MANAGER] CLEARING session to prevent infinite retry loop');
+        _activeSessionId = null; // Clear session to stop further uploads
+        return; // Don't rethrow - this prevents infinite retry
+      }
+      
+      // For other errors, still rethrow to trigger retry logic
+      AppLogger.error('[UPLOAD_MANAGER] Location batch upload failed (retryable): $e');
+      rethrow;
+    }
   }
   
   /// Upload heart rate batch to server

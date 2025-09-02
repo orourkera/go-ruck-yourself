@@ -57,13 +57,13 @@ class NotificationsResource(Resource):
             notifications = response.data
             
             # Format the response with pagination info
-            return jsonify({
+            return {
                 "notifications": notifications,
                 "count": len(notifications),
                 "page": page,
                 "limit": limit,
                 "has_more": len(notifications) == limit
-            })
+            }
             
         except Exception as e:
             logger.error(f"Exception in get notifications: {str(e)}")

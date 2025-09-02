@@ -82,10 +82,12 @@ class UserCoachingPlansResource(Resource):
             personality = body.get('personality', 'supportive_friend')
             start_date = body.get('start_date')  # Optional, defaults to today
             
+            logger.info(f"Creating coaching plan with template_id={template_id}, personality={personality}")
+            
             if not template_id:
                 return {"error": "template_id required"}, 400
                 
-            # Validate template exists (fixed to match actual database schema)
+            # Validate template exists (query by template_id which could be the primary key)
             client = get_supabase_client()
             template_resp = client.table('coaching_plan_templates').select(
                 'id, plan_id, name, duration_weeks, base_structure'
@@ -141,7 +143,8 @@ class UserCoachingPlansResource(Resource):
             
         except Exception as e:
             logger.error(f"POST /user-coaching-plans failed: {e}")
-            return {"error": "Failed to create coaching plan"}, 500
+            # Return more detailed error for debugging
+            return {"error": f"Failed to create coaching plan: {str(e)}"}, 500
 
 
 class UserCoachingPlanProgressResource(Resource):

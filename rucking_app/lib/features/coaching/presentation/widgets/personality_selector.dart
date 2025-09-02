@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_personality.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/shared/theme/app_colors.dart';
 
 class PersonalitySelector extends StatefulWidget {
   final void Function(CoachingPersonality) onPersonalitySelected;
@@ -40,16 +41,16 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: isSelected 
-                    ? personality.color 
-                    : personality.color.withOpacity(0.1),
+                    ? AppColors.primary 
+                    : Colors.white,
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
-                    color: personality.color.withOpacity(isSelected ? 1.0 : 0.3),
+                    color: AppColors.primary.withOpacity(isSelected ? 1.0 : 0.5),
                     width: isSelected ? 2 : 1,
                   ),
                   boxShadow: isSelected ? [
                     BoxShadow(
-                      color: personality.color.withOpacity(0.3),
+                      color: AppColors.primary.withOpacity(0.3),
                       blurRadius: 8,
                       spreadRadius: 1,
                     ),
@@ -62,7 +63,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                       personality.icon,
                       color: isSelected 
                         ? Colors.white 
-                        : personality.color,
+                        : AppColors.primary,
                       size: 18,
                     ),
                     const SizedBox(width: 8),
@@ -71,7 +72,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: isSelected 
                           ? Colors.white 
-                          : personality.color,
+                          : AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -92,15 +93,15 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  _selectedPersonality!.color.withOpacity(0.15),
-                  _selectedPersonality!.color.withOpacity(0.05),
+                  AppColors.primary.withOpacity(0.15),
+                  AppColors.primary.withOpacity(0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: _selectedPersonality!.color.withOpacity(0.2),
+                color: AppColors.primary.withOpacity(0.3),
                 width: 1,
               ),
             ),
@@ -112,12 +113,12 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _selectedPersonality!.color.withOpacity(0.2),
+                        color: AppColors.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         _selectedPersonality!.icon,
-                        color: _selectedPersonality!.color,
+                        color: AppColors.primary,
                         size: 24,
                       ),
                     ),
@@ -130,7 +131,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                             _selectedPersonality!.name,
                             style: AppTextStyles.titleMedium.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: _selectedPersonality!.color,
+                              color: AppColors.primary,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -156,7 +157,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                     color: Colors.white.withOpacity(0.7),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: _selectedPersonality!.color.withOpacity(0.2),
+                      color: AppColors.primary.withOpacity(0.3),
                     ),
                   ),
                   child: Row(
@@ -164,7 +165,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                     children: [
                       Icon(
                         Icons.format_quote,
-                        color: _selectedPersonality!.color.withOpacity(0.7),
+                        color: AppColors.primary.withOpacity(0.7),
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -173,7 +174,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                           _selectedPersonality!.example,
                           style: AppTextStyles.bodyLarge.copyWith(
                             fontStyle: FontStyle.italic,
-                            color: _selectedPersonality!.color.withOpacity(0.9),
+                            color: AppColors.primary.withOpacity(0.9),
                             height: 1.5,
                           ),
                         ),
@@ -226,14 +227,14 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
             child: ElevatedButton(
               onPressed: () => widget.onPersonalitySelected(_selectedPersonality!),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedPersonality!.color,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 4,
-                shadowColor: _selectedPersonality!.color.withOpacity(0.3),
+                shadowColor: AppColors.primary.withOpacity(0.3),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

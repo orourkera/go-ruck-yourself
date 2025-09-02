@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
@@ -138,6 +139,16 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     super.dispose();
   }
 
+  void _dismissKeyboard() {
+    // Multiple approaches to ensure keyboard is dismissed
+    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    // Also try to remove focus from any text field
+    if (FocusScope.of(context).hasFocus) {
+      FocusScope.of(context).requestFocus(FocusNode());
+    }
+  }
+
   void _startGreetingSequence() {
     _animationController.forward();
     
@@ -209,6 +220,9 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     // Show goal summary and confirmation dialog
     final confirmed = await _showGoalConfirmationDialog(planType);
     if (confirmed == true) {
+      // Dismiss keyboard before moving to personalization step
+      _dismissKeyboard();
+      
       setState(() {
         _selectedPlanType = planType;
         _currentStep = PlanCreationStep.personalization;
@@ -295,6 +309,9 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   }
 
   void _onPersonalizationComplete(PlanPersonalization personalization) {
+    // Dismiss keyboard when moving to next step
+    _dismissKeyboard();
+    
     setState(() {
       _personalization = personalization;
       _currentStep = PlanCreationStep.planPreview;
@@ -380,6 +397,9 @@ Write in plain text with clear headings - no asterisks, no markdown formatting. 
   }
 
   void _onPersonalitySelected(CoachingPersonality personality) {
+    // Dismiss keyboard when moving to next step
+    _dismissKeyboard();
+    
     setState(() {
       _selectedPersonality = personality;
       _currentStep = PlanCreationStep.commitment;
@@ -422,10 +442,10 @@ Keep it under 200 words, motivational, and specific to their answers.
 
       await _openAiService.stream(
         model: 'gpt-4.1',
-        instructions: 'You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan.',
+        instructions: 'You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan. Use markdown formatting with headers, bullet points, and emphasis for better readability.',
         input: prompt,
         temperature: 0.7,
-        maxOutputTokens: 250,
+        maxOutputTokens: 1000,
         onDelta: (delta) {
           if (mounted) {
             setState(() {
@@ -516,6 +536,9 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   void _onBackPressed() {
+    // Always dismiss keyboard when navigating
+    _dismissKeyboard();
+    
     switch (_currentStep) {
       case PlanCreationStep.goalSelection:
         Navigator.of(context).pop();
@@ -551,25 +574,32 @@ Keep it under 200 words, motivational, and specific to their answers.
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      appBar: _currentStep != PlanCreationStep.greeting && 
-              _currentStep != PlanCreationStep.creating &&
-              _currentStep != PlanCreationStep.generatingSummary &&
-              _currentStep != PlanCreationStep.complete
-          ? AppBar(
-              title: const Text('AI Coaching Plan'),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _onBackPressed,
-              ),
-            )
-          : null,
-      body: SafeArea(
-        child: _buildCurrentStep(),
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping anywhere
+        FocusScope.of(context).unfocus();
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        appBar: _currentStep != PlanCreationStep.greeting && 
+                _currentStep != PlanCreationStep.creating &&
+                _currentStep != PlanCreationStep.generatingSummary &&
+                _currentStep != PlanCreationStep.complete
+            ? AppBar(
+                title: const Text('AI Coaching Plan'),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _onBackPressed,
+                ),
+              )
+            : null,
+        body: SafeArea(
+          child: _buildCurrentStep(),
+        ),
       ),
     );
   }
@@ -814,7 +844,7 @@ Keep it under 200 words, motivational, and specific to their answers.
   Widget _buildPlanPreviewStep() {
     if (_selectedPlanType == null || _personalization == null) return const SizedBox.shrink();
     
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
@@ -869,11 +899,14 @@ Keep it under 200 words, motivational, and specific to their answers.
           const SizedBox(height: 32),
           
           // AI-generated personalized summary
-          Expanded(
-            child: SingleChildScrollView(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
+          Flexible(
+            child: Container(
+              width: double.infinity,
+              constraints: BoxConstraints(
+                minHeight: 300,
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
+              padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -885,8 +918,9 @@ Keep it under 200 words, motivational, and specific to their answers.
                     ),
                   ],
                 ),
-                child: Column(
-                  children: [
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
                     Text(
                       _planPreviewSummary + (_isGeneratingPreview ? '▌' : ''),
                       style: AppTextStyles.bodyLarge.copyWith(
@@ -916,11 +950,11 @@ Keep it under 200 words, motivational, and specific to their answers.
                         ],
                       ),
                     ],
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
           
           const SizedBox(height: 24),
           
@@ -928,6 +962,9 @@ Keep it under 200 words, motivational, and specific to their answers.
             width: double.infinity,
             child: ElevatedButton(
               onPressed: !_isGeneratingPreview ? () {
+                // Dismiss keyboard when moving to next step
+                _dismissKeyboard();
+                
                 setState(() {
                   _currentStep = PlanCreationStep.personalitySelection;
                 });
@@ -955,7 +992,7 @@ Keep it under 200 words, motivational, and specific to their answers.
 
 
   Widget _buildPersonalitySelectionStep() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -975,10 +1012,8 @@ Keep it under 200 words, motivational, and specific to their answers.
           ),
           const SizedBox(height: 24),
           
-          Expanded(
-            child: PersonalitySelector(
-              onPersonalitySelected: _onPersonalitySelected,
-            ),
+          PersonalitySelector(
+            onPersonalitySelected: _onPersonalitySelected,
           ),
         ],
       ),
@@ -1280,7 +1315,7 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   Widget _buildCompleteStep() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
@@ -1312,23 +1347,26 @@ Keep it under 200 words, motivational, and specific to their answers.
           const SizedBox(height: 24),
           
           // AI-generated summary
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
+          Container(
+            width: double.infinity,
+            constraints: BoxConstraints(
+              minHeight: 200,
+              maxHeight: 400,
+            ),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -1349,19 +1387,47 @@ Keep it under 200 words, motivational, and specific to their answers.
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      _generatedSummary.isNotEmpty 
-                        ? _generatedSummary 
-                        : 'Your personalized ${_selectedPlanType?.name ?? "training"} plan is ready! Let\'s crush those goals together.',
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        height: 1.5,
-                      ),
-                    ),
+                    _generatedSummary.isNotEmpty 
+                        ? MarkdownBody(
+                            data: _generatedSummary,
+                            styleSheet: MarkdownStyleSheet(
+                              p: AppTextStyles.bodyLarge.copyWith(height: 1.5),
+                              h1: AppTextStyles.headlineLarge.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 24,
+                              ),
+                              h2: AppTextStyles.headlineMedium.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 20,
+                              ),
+                              h3: AppTextStyles.titleLarge.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 18,
+                              ),
+                              listBullet: AppTextStyles.bodyLarge.copyWith(
+                                color: AppColors.primary,
+                                height: 1.5,
+                              ),
+                              strong: AppTextStyles.bodyLarge.copyWith(
+                                fontWeight: FontWeight.bold,
+                                height: 1.5,
+                              ),
+                              em: AppTextStyles.bodyLarge.copyWith(
+                                fontStyle: FontStyle.italic,
+                                height: 1.5,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            'Your personalized ${_selectedPlanType?.name ?? "training"} plan is ready! Let\'s crush those goals together.',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              height: 1.5,
+                            ),
+                          ),
                   ],
                 ),
               ),
             ),
-          ),
           
           const SizedBox(height: 24),
           

@@ -46,7 +46,7 @@ class ImportMethodSelector extends StatelessWidget {
           children: [
             Text(
               'Import Method',
-              style: AppTextStyles.headingSmall.copyWith(
+              style: AppTextStyles.titleLarge.copyWith(
                 color: AppColors.textDark,
               ),
             ),

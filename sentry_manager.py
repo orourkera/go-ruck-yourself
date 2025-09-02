@@ -334,16 +334,14 @@ Ready to start fixing! Which issue should we tackle first?
     def resolve_issue(self, issue_id: str) -> bool:
         """Mark a specific issue as resolved in Sentry."""
         org_slug = self.config['organization_slug']
-        project_slug = self.config['project_slug']
         
         print(f"✅ Marking issue {issue_id} as resolved...")
         
-        endpoint = f"/projects/{org_slug}/{project_slug}/issues/{issue_id}/"
+        # Use the correct organization-based endpoint as per Sentry API docs
+        endpoint = f"/organizations/{org_slug}/issues/{issue_id}/"
         data = {
             'status': 'resolved',
-            'statusDetails': {
-                'inNextRelease': False
-            }
+            'statusDetails': {}
         }
         
         response = self._make_request(endpoint, method='PUT', data=data)
