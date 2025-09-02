@@ -1204,9 +1204,16 @@ class LocationTrackingManager implements SessionManager {
         AppLogger.debug('[LOCATION_MANAGER] Uploading chunk $chunkNumber/$totalChunks (${chunk.length} pts)');
 
         // Delegate to existing handler for actual upload + error handling
-        await handleEvent(BatchLocationUpdated(locationPoints: chunk));
-
-        index = end;
+        try {
+          await handleEvent(BatchLocationUpdated(locationPoints: chunk));
+          index = end;
+        } catch (uploadError) {
+          // CRITICAL FIX: Re-queue the failed chunk, not just remaining ones
+          AppLogger.error('[LOCATION_MANAGER] Failed to upload chunk $chunkNumber: $uploadError');
+          _pendingLocationPoints.addAll(chunk);
+          // Re-throw to trigger the outer catch block for remaining chunks
+          rethrow;
+        }
       }
     } catch (e) {
       AppLogger.warning('[LOCATION_MANAGER] Batch upload processing error: $e');
