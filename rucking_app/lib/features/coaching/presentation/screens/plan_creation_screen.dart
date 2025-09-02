@@ -62,7 +62,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       description: 'Build a steady calorie deficit and improve everyday energy with low-impact, progressive rucking plus complementary cardio/strength. We keep it safe, sustainable, and data-driven—no crash tactics.',
       duration: '12 weeks',
       icon: Icons.favorite,
-      color: Colors.red,
+      color: AppColors.error,
       emoji: '❤️',
     ),
     CoachingPlanType(
@@ -71,7 +71,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       description: 'Improve your 60-minute ruck pace at a fixed load using aerobic base, controlled tempo work, and smart hills—without trashing your legs.',
       duration: '10 weeks',
       icon: Icons.speed,
-      color: Colors.blue,
+      color: AppColors.primary,
       emoji: '⚡',
     ),
     CoachingPlanType(
@@ -80,7 +80,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       description: 'Arrive prepared for your event with focused quality sessions, a long-ruck progression, and a taper that respects your feet and recovery.',
       duration: '16 weeks',
       icon: Icons.flag,
-      color: Colors.orange,
+      color: AppColors.secondary,
       emoji: '🏁',
     ),
     CoachingPlanType(
@@ -89,7 +89,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       description: 'Build an unbreakable habit with bite-size sessions, flexible scheduling, and gentle accountability—movement every day, without overuse.',
       duration: '8 weeks',
       icon: Icons.calendar_today,
-      color: Colors.green,
+      color: AppColors.success,
       emoji: '🗓️',
     ),
     CoachingPlanType(
@@ -98,7 +98,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       description: 'Move taller and steadier with light loaded walks plus simple balance/strength work that supports joints and confidence.',
       duration: '12 weeks',
       icon: Icons.accessibility_new,
-      color: Colors.purple,
+      color: AppColors.accent,
       emoji: '🧘',
     ),
     CoachingPlanType(
@@ -107,7 +107,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       description: 'Safely increase how much weight you can carry. We progress one knob at a time (time → hills → small load bumps) with readiness checks so feet, knees, and back adapt without flare-ups.',
       duration: '14 weeks',
       icon: Icons.fitness_center,
-      color: Colors.brown,
+      color: AppColors.brown,
       emoji: '💪',
     ),
   ];
@@ -245,7 +245,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
               decoration: BoxDecoration(
                 color: planType.color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: planType.color.withOpacity(0.3)),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
               ),
               child: Text(
                 planType.duration,
@@ -281,7 +281,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: planType.color,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -701,7 +701,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(25),
                           border: Border.all(
-                            color: planType.color.withOpacity(0.3),
+                            color: AppColors.primary.withOpacity(0.3),
                             width: 2,
                           ),
                           boxShadow: [
@@ -723,7 +723,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                             Text(
                               planType.name,
                               style: AppTextStyles.bodyMedium.copyWith(
-                                color: planType.color,
+                                color: AppColors.primary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -859,7 +859,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                   _selectedPlanType!.name,
                   style: AppTextStyles.headlineMedium.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: _selectedPlanType!.color,
+                    color: AppColors.primary,
                   ),
                   textAlign: TextAlign.center,
                 ),

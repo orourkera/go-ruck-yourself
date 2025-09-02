@@ -1,6 +1,6 @@
 import logging
 import time
-from flask import g, jsonify
+from flask import g, jsonify, request
 from flask_restful import Resource
 from datetime import datetime, timedelta, timezone
 
@@ -239,18 +239,27 @@ class WeeklyStatsResource(Resource):
 
         try:
             logger.info("[STATS_PERF] WeeklyStatsResource: Starting date calculations")
+            
+            # Get offset parameter (0 = current week, -1 = last week, +1 = next week)
+            offset = int(request.args.get('offset', 0))
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Using offset: {offset}")
+            
             today = datetime.now(timezone.utc)
-            start_dt, end_dt = get_week_range(today)
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Today is: {today}")
+            # Apply week offset
+            target_date = today + timedelta(weeks=offset)
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Target date with offset: {target_date}")
+            start_dt, end_dt = get_week_range(target_date)
             date_range_str = f"{start_dt.strftime('%b %d')} - {end_dt.strftime('%b %d, %Y')}"
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
-            logger.info(f"[STATS_PERF] WeeklyStatsResource: Date range calculated: {date_range_str}")
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Date range calculated: {date_range_str} (from {start_dt} to {end_dt})")
 
             cache_key = f"weekly_stats:{g.user.id}:{start_iso}:{end_iso}"
             logger.info(f"[STATS_PERF] WeeklyStatsResource: Checking cache with key: {cache_key}")
             cached_response = cache_get(cache_key)
             if cached_response:
-                logger.info("[STATS_PERF] WeeklyStatsResource: Returning cached response")
+                logger.info(f"[STATS_PERF] WeeklyStatsResource: Returning cached response for date range: {cached_response.get('date_range', 'No date_range')}")
                 return {'data': cached_response}, 200
 
             # Use the authenticated user's JWT for RLS
@@ -276,7 +285,8 @@ class WeeklyStatsResource(Resource):
             stats = calculate_aggregates(sessions)
             stats['date_range'] = date_range_str
             stats['time_series'] = get_daily_breakdown(sessions, start_dt, end_dt, date_field='completed_at')
-
+            
+            logger.info(f"[STATS_PERF] WeeklyStatsResource: Calculated stats for {date_range_str} with {len(sessions)} sessions, caching with key: {cache_key}")
             cache_set(cache_key, stats)
             return {'data': stats}, 200
 
@@ -296,9 +306,30 @@ class MonthlyStatsResource(Resource):
 
         try:
             logger.info("[STATS_PERF] MonthlyStatsResource: Starting date calculations")
+            
+            # Get offset parameter (0 = current month, -1 = last month, +1 = next month)
+            offset = int(request.args.get('offset', 0))
+            logger.info(f"[STATS_PERF] MonthlyStatsResource: Using offset: {offset}")
+            
             today = datetime.now(timezone.utc)
-            start_dt, end_dt = get_month_range(today)
-            date_range_str = today.strftime('%B %Y')
+            # Apply month offset
+            if offset != 0:
+                # Calculate target month by adjusting the current date
+                year = today.year
+                month = today.month + offset
+                # Handle year boundary
+                while month <= 0:
+                    month += 12
+                    year -= 1
+                while month > 12:
+                    month -= 12
+                    year += 1
+                target_date = today.replace(year=year, month=month, day=1)
+            else:
+                target_date = today
+                
+            start_dt, end_dt = get_month_range(target_date)
+            date_range_str = target_date.strftime('%B %Y')
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
             logger.info(f"[STATS_PERF] MonthlyStatsResource: Date range calculated: {date_range_str}")
@@ -348,9 +379,16 @@ class YearlyStatsResource(Resource):
             return {'message': 'User not authenticated'}, 401
 
         try:
+            # Get offset parameter (0 = current year, -1 = last year, +1 = next year)
+            offset = int(request.args.get('offset', 0))
+            
             today = datetime.now(timezone.utc)
-            start_dt, end_dt = get_year_range(today)
-            date_range_str = str(today.year)
+            # Apply year offset
+            target_year = today.year + offset
+            target_date = today.replace(year=target_year)
+            
+            start_dt, end_dt = get_year_range(target_date)
+            date_range_str = str(target_year)
             start_iso = start_dt.isoformat()
             end_iso = end_dt.isoformat()
             

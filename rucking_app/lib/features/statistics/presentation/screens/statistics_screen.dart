@@ -31,6 +31,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   Map<String, dynamic> _monthlyStats = {};
   Map<String, dynamic> _yearlyStats = {};
   
+  // Date navigation offsets from current date
+  int _weekOffset = 0;  // 0 = current week, -1 = last week, +1 = next week
+  int _monthOffset = 0; // 0 = current month, -1 = last month, +1 = next month
+  int _yearOffset = 0;  // 0 = current year, -1 = last year, +1 = next year
+  
   @override
   void initState() {
     super.initState();
@@ -53,8 +58,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
     
     try {
       // Fetch weekly stats
-      AppLogger.info('[STATS_SCREEN] Fetching weekly stats from /stats/weekly');
-      final weeklyResponse = await _apiClient.get('/stats/weekly');
+      final weeklyUrl = _weekOffset == 0 ? '/stats/weekly' : '/stats/weekly?offset=$_weekOffset';
+      AppLogger.info('[STATS_SCREEN] Fetching weekly stats from $weeklyUrl');
+      final weeklyResponse = await _apiClient.get(weeklyUrl);
       AppLogger.info('[STATS_SCREEN] Weekly stats API response: ${weeklyResponse?.runtimeType}');
       
       // Process weekly stats
@@ -80,8 +86,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
       
       // Fetch monthly stats
-      AppLogger.info('[STATS_SCREEN] Fetching monthly stats from /stats/monthly');
-      final monthlyResponse = await _apiClient.get('/stats/monthly');
+      final monthlyUrl = _monthOffset == 0 ? '/stats/monthly' : '/stats/monthly?offset=$_monthOffset';
+      AppLogger.info('[STATS_SCREEN] Fetching monthly stats from $monthlyUrl');
+      final monthlyResponse = await _apiClient.get(monthlyUrl);
       AppLogger.info('[STATS_SCREEN] Monthly stats API response: ${monthlyResponse?.runtimeType}');
       
       // Process monthly stats
@@ -108,8 +115,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
       
       // Fetch yearly stats
-      AppLogger.info('[STATS_SCREEN] Fetching yearly stats from /stats/yearly');
-      final yearlyResponse = await _apiClient.get('/stats/yearly');
+      final yearlyUrl = _yearOffset == 0 ? '/stats/yearly' : '/stats/yearly?offset=$_yearOffset';
+      AppLogger.info('[STATS_SCREEN] Fetching yearly stats from $yearlyUrl');
+      final yearlyResponse = await _apiClient.get(yearlyUrl);
       AppLogger.info('[STATS_SCREEN] Yearly stats API response: ${yearlyResponse?.runtimeType}');
       
       // Process yearly stats
@@ -161,6 +169,100 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
     } else {
       AppLogger.warning('[STATS_SCREEN] Widget not mounted when handling error');
     }
+    }
+  }
+
+  /// Fetch only weekly stats
+  Future<void> _fetchWeeklyStats() async {
+    try {
+      final weeklyUrl = _weekOffset == 0 ? '/stats/weekly' : '/stats/weekly?offset=$_weekOffset';
+      AppLogger.info('[STATS_SCREEN] Fetching weekly stats with URL: $weeklyUrl (offset: $_weekOffset)');
+      final weeklyResponse = await _apiClient.get(weeklyUrl);
+      
+      Map<String, dynamic> weeklyStats = {};
+      if (weeklyResponse is Map) {
+        if (weeklyResponse.containsKey('data')) {
+          weeklyStats = weeklyResponse['data'] is Map ? 
+              Map<String, dynamic>.from(weeklyResponse['data']) : {};
+        } else {
+          weeklyStats = Map<String, dynamic>.from(weeklyResponse);
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _weeklyStats = weeklyStats;
+          _isLoadingWeekly = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingWeekly = false;
+        });
+      }
+    }
+  }
+
+  /// Fetch only monthly stats
+  Future<void> _fetchMonthlyStats() async {
+    try {
+      final monthlyUrl = _monthOffset == 0 ? '/stats/monthly' : '/stats/monthly?offset=$_monthOffset';
+      final monthlyResponse = await _apiClient.get(monthlyUrl);
+      
+      Map<String, dynamic> monthlyStats = {};
+      if (monthlyResponse is Map) {
+        if (monthlyResponse.containsKey('data')) {
+          monthlyStats = monthlyResponse['data'] is Map ? 
+              Map<String, dynamic>.from(monthlyResponse['data']) : {};
+        } else {
+          monthlyStats = Map<String, dynamic>.from(monthlyResponse);
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _monthlyStats = monthlyStats;
+          _isLoadingMonthly = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMonthly = false;
+        });
+      }
+    }
+  }
+
+  /// Fetch only yearly stats
+  Future<void> _fetchYearlyStats() async {
+    try {
+      final yearlyUrl = _yearOffset == 0 ? '/stats/yearly' : '/stats/yearly?offset=$_yearOffset';
+      final yearlyResponse = await _apiClient.get(yearlyUrl);
+      
+      Map<String, dynamic> yearlyStats = {};
+      if (yearlyResponse is Map) {
+        if (yearlyResponse.containsKey('data')) {
+          yearlyStats = yearlyResponse['data'] is Map ? 
+              Map<String, dynamic>.from(yearlyResponse['data']) : {};
+        } else {
+          yearlyStats = Map<String, dynamic>.from(yearlyResponse);
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _yearlyStats = yearlyStats;
+          _isLoadingYearly = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingYearly = false;
+        });
+      }
     }
   }
   
@@ -240,6 +342,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                               stats: _weeklyStats,
                               timeframe: 'weekly',
                               preferMetric: preferMetric,
+                              onPreviousPeriod: () {
+                                AppLogger.info('[STATS_SCREEN] Previous week button tapped, offset: $_weekOffset -> ${_weekOffset - 1}');
+                                setState(() {
+                                  _weekOffset--;
+                                  _isLoadingWeekly = true;
+                                });
+                                _fetchWeeklyStats();
+                              },
+                              onNextPeriod: () {
+                                AppLogger.info('[STATS_SCREEN] Next week button tapped, offset: $_weekOffset -> ${_weekOffset + 1}');
+                                setState(() {
+                                  _weekOffset++;
+                                  _isLoadingWeekly = true;
+                                });
+                                _fetchWeeklyStats();
+                              },
                             );
                           }),
                 
@@ -260,6 +378,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                               stats: _monthlyStats,
                               timeframe: 'monthly',
                               preferMetric: preferMetric,
+                              onPreviousPeriod: () {
+                                setState(() {
+                                  _monthOffset--;
+                                  _isLoadingMonthly = true;
+                                });
+                                _fetchMonthlyStats();
+                              },
+                              onNextPeriod: () {
+                                setState(() {
+                                  _monthOffset++;
+                                  _isLoadingMonthly = true;
+                                });
+                                _fetchMonthlyStats();
+                              },
                             );
                           }),
                 
@@ -280,6 +412,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                               stats: _yearlyStats,
                               timeframe: 'yearly',
                               preferMetric: preferMetric,
+                              onPreviousPeriod: () {
+                                setState(() {
+                                  _yearOffset--;
+                                  _isLoadingYearly = true;
+                                });
+                                _fetchYearlyStats();
+                              },
+                              onNextPeriod: () {
+                                setState(() {
+                                  _yearOffset++;
+                                  _isLoadingYearly = true;
+                                });
+                                _fetchYearlyStats();
+                              },
                             );
                           }),
               ],
@@ -334,6 +480,8 @@ class _StatsContentWidget extends StatelessWidget {
   final Map<String, dynamic> stats;
   final String timeframe;
   final bool preferMetric;
+  final VoidCallback? onPreviousPeriod;
+  final VoidCallback? onNextPeriod;
   
   static const List<String> _weekdayNames = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
@@ -344,6 +492,8 @@ class _StatsContentWidget extends StatelessWidget {
     required this.stats, 
     required this.timeframe,
     required this.preferMetric,
+    this.onPreviousPeriod,
+    this.onNextPeriod,
   }) : super(key: key);
 
   @override
@@ -370,11 +520,7 @@ class _StatsContentWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Period selector
-          timeframe == 'weekly'
-              ? _buildDateSelector(stats['date_range'] ?? 'This Week')
-              : timeframe == 'monthly'
-                  ? _buildMonthSelector(stats['date_range'] ?? 'This Month')
-                  : _buildYearSelector(stats['date_range'] ?? 'This Year'),
+          _buildPeriodSelector(stats['date_range'] ?? _getDefaultDateRange()),
           
           const SizedBox(height: 24),
           
@@ -389,6 +535,41 @@ class _StatsContentWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
               ],
+            )
+          else if (timeframe == 'weekly')
+            Container(
+              height: 200,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.bar_chart_outlined,
+                      size: 48,
+                      color: AppColors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Weekly chart data loading...',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textDarkSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Debug: time_series = ${stats['time_series']}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           
           // Summary cards
@@ -479,16 +660,20 @@ class _StatsContentWidget extends StatelessWidget {
     );
   }
 
-  /// Builds the date selector widget for weekly view
-  Widget _buildDateSelector(String dateRange) {
+
+  /// Builds the period selector widget
+  Widget _buildPeriodSelector(String dateRange) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
           icon: const Icon(Icons.chevron_left),
-          onPressed: () {
-            // Navigate to previous week
-          },
+          onPressed: onPreviousPeriod != null 
+              ? () {
+                  print('Previous period button tapped!');
+                  onPreviousPeriod!();
+                }
+              : null,
         ),
         Text(
           dateRange,
@@ -496,62 +681,28 @@ class _StatsContentWidget extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.chevron_right),
-          onPressed: () {
-            // Navigate to next week
-          },
+          onPressed: onNextPeriod != null 
+              ? () {
+                  print('Next period button tapped!');
+                  onNextPeriod!();
+                }
+              : null,
         ),
       ],
     );
   }
-
-  /// Builds the month selector widget
-  Widget _buildMonthSelector(String dateRange) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: () {
-            // Navigate to previous month
-          },
-        ),
-        Text(
-          dateRange,
-          style: AppTextStyles.titleLarge,
-        ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () {
-            // Navigate to next month
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Builds the year selector widget
-  Widget _buildYearSelector(String dateRange) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: () {
-            // Navigate to previous year
-          },
-        ),
-        Text(
-          dateRange,
-          style: AppTextStyles.titleLarge,
-        ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () {
-            // Navigate to next year
-          },
-        ),
-      ],
-    );
+  
+  String _getDefaultDateRange() {
+    switch (timeframe) {
+      case 'weekly':
+        return 'This Week';
+      case 'monthly':
+        return 'This Month';
+      case 'yearly':
+        return 'This Year';
+      default:
+        return 'This Period';
+    }
   }
 
   /// Builds a summary card

@@ -683,6 +683,7 @@ Phase 1: Basic Integration
 - [x] Basic plan templates (6 goal types in database + frontend)
 - [x] Expert tips integration (added expert_tips JSONB field to templates)
 - [x] Simple coaching personality selection (PersonalitySelector widget exists)
+- [x] UI color consistency (updated all coaching screens to use AppColors)
 - [ ] Plan progress widget on achievements page
 
 Phase 2: Enhanced Features
