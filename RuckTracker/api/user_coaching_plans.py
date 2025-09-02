@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import request, g
 from flask_restful import Resource
-from ..supabase_client import get_supabase_client
+from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..utils.auth_helper import get_current_user_id
 from ..utils.api_response import check_auth_and_respond
 
@@ -115,7 +115,8 @@ class UserCoachingPlansResource(Resource):
             else:
                 start_date_parsed = datetime.now().date()
                 
-            # Create user coaching plan
+            # Create user coaching plan using admin client to bypass RLS
+            admin_client = get_supabase_admin_client()
             plan_data = {
                 'user_id': user_id,
                 'coaching_plan_id': template_id,
@@ -126,7 +127,7 @@ class UserCoachingPlansResource(Resource):
                 'plan_modifications': {}
             }
             
-            plan_resp = client.table('user_coaching_plans').insert(plan_data).execute()
+            plan_resp = admin_client.table('user_coaching_plans').insert(plan_data).execute()
             created_plan = plan_resp.data[0]
             
             # Generate initial plan sessions
@@ -312,7 +313,7 @@ def _calculate_adherence_stats(sessions):
 def _generate_plan_sessions(user_plan_id, template, start_date):
     """Generate plan sessions based on template structure"""
     try:
-        client = get_supabase_client()
+        client = get_supabase_admin_client()  # Use admin client to bypass RLS
         plan_structure = template['base_structure']  # Fixed field name
         duration_weeks = template['duration_weeks']
         
