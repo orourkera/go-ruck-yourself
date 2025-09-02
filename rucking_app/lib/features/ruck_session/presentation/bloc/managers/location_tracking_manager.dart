@@ -525,20 +525,29 @@ class LocationTrackingManager implements SessionManager {
             }
           }
           
-          // Log the rejection for debugging older phones
-          AppLogger.warning('[LOCATION_MANAGER] Point fully rejected: ${validationResult['message']} - ${position.accuracy.toStringAsFixed(1)}m accuracy');
-          return;
+          // CRITICAL FIX: Don't return early - still add point for distance tracking
+          // Log the rejection but continue processing for distance calculation
+          AppLogger.warning('[LOCATION_MANAGER] Point validation failed: ${validationResult['message']} - ${position.accuracy.toStringAsFixed(1)}m accuracy - keeping for distance tracking');
+          
+          // Still add to location points for distance calculation even if validation failed
+          // This ensures distance continues to accumulate
+          _locationPoints.add(newPoint);
+          _lastLocationTimestamp = DateTime.now();
+          
+          // Note: We don't update _lastValidLocation or _validLocationCount for failed points
+          // This preserves validation integrity while still tracking distance
         }
       }
+    } else {
+      // Validation passed - update valid location tracking
+      _validLocationCount++;
+      _lastValidLocation = newPoint;
+      
+      // Add to location points
+      _locationPoints.add(newPoint);
+      // Update last valid location timestamp only after accepting the point
+      _lastLocationTimestamp = DateTime.now();
     }
-    
-    _validLocationCount++;
-    _lastValidLocation = newPoint;
-    
-    // Add to location points
-    _locationPoints.add(newPoint);
-    // Update last valid location timestamp only after accepting the point
-    _lastLocationTimestamp = DateTime.now();
     
     // CRITICAL FIX: Manage memory pressure through data offloading, not data loss
     _manageMemoryPressure();
