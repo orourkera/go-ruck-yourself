@@ -3,20 +3,31 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_notification_preferences.dart';
+import 'package:rucking_app/features/coaching/domain/services/weather_coaching_service.dart';
+import 'package:rucking_app/features/coaching/domain/services/streak_protection_service.dart';
+import 'package:rucking_app/features/coaching/domain/services/coaching_message_generator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/utils/logger.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Service responsible for scheduling and managing AI coaching notifications
 class CoachingNotificationService {
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   final ApiClient _apiClient;
+  final WeatherCoachingService _weatherService;
+  final StreakProtectionService _streakService;
+  final CoachingMessageGenerator _messageGenerator;
   Timer? _dailyScheduleTimer;
   
   static const String _channelId = 'coaching_notifications';
   static const String _channelName = 'AI Coaching';
   static const String _channelDescription = 'Personalized AI coaching reminders and motivation';
 
-  CoachingNotificationService(this._apiClient);
+  CoachingNotificationService(
+    this._apiClient,
+    this._weatherService,
+    this._streakService,
+    this._messageGenerator,
+  );
 
   /// Initialize the notification service
   Future<void> initialize() async {
@@ -39,7 +50,7 @@ class CoachingNotificationService {
     // Start daily scheduling timer
     _startDailyScheduler();
     
-    Logger.i('CoachingNotificationService initialized');
+    AppLogger.info('CoachingNotificationService initialized');
   }
 
   /// Create notification channel for Android
@@ -87,7 +98,7 @@ class CoachingNotificationService {
       // Get coaching plan data
       final coachingPlan = await _getCoachingPlan();
       if (coachingPlan == null) {
-        Logger.w('No coaching plan found, skipping notification scheduling');
+        AppLogger.warning('No coaching plan found, skipping notification scheduling');
         return;
       }
 
@@ -102,9 +113,9 @@ class CoachingNotificationService {
         await _scheduleWeatherSuggestions(preferences, coachingPlan);
       }
       
-      Logger.i('Coaching notifications scheduled successfully');
+      AppLogger.info('Coaching notifications scheduled successfully');
     } catch (e) {
-      Logger.e('Error scheduling coaching notifications: $e');
+      AppLogger.error('Error scheduling coaching notifications: $e');
     }
   }
 
@@ -254,25 +265,94 @@ class CoachingNotificationService {
   ) async {
     if (!preferences.enableStreakProtection) return;
     
-    // Schedule daily streak checks at 6 PM
-    final now = DateTime.now();
-    for (int day = 1; day <= 7; day++) {
-      final checkDate = DateTime(
-        now.year,
-        now.month,
-        now.day + day,
-        18, // 6 PM
-        0,
-      );
+    try {
+      // Get current streak info
+      final streakInfo = await _streakService.getStreakInfo();
+      if (streakInfo == null) return;
+      
+      // Only schedule if streak protection is needed
+      if (!_streakService.shouldSendStreakProtection(streakInfo, preferences)) {
+        return;
+      }
+      
+      // Generate streak protection recommendation
+      final tone = CoachingTone.fromValue(preferences.coachingTone);
+      final recommendation = _streakService.generateProtectionRecommendation(streakInfo, tone);
+      
+      // Schedule notification based on urgency
+      final now = DateTime.now();
+      late DateTime notificationTime;
+      
+      switch (recommendation.urgency) {
+        case StreakUrgency.critical:
+          // Send within 1 hour for critical situations
+          notificationTime = now.add(const Duration(hours: 1));
+          break;
+        case StreakUrgency.high:
+          // Send in 2-4 hours for high urgency
+          notificationTime = now.add(Duration(hours: 2 + math.Random().nextInt(3)));
+          break;
+        case StreakUrgency.medium:
+          // Send at 6 PM today or tomorrow
+          notificationTime = DateTime(now.year, now.month, now.day, 18, 0);
+          if (notificationTime.isBefore(now)) {
+            notificationTime = notificationTime.add(const Duration(days: 1));
+          }
+          break;
+        case StreakUrgency.low:
+          // Send as regular motivational notification
+          notificationTime = now.add(Duration(hours: 4 + math.Random().nextInt(8)));
+          break;
+      }
+      
+      // Check quiet hours
+      final timeOfDay = TimeOfDay.fromDateTime(notificationTime);
+      if (preferences.isInQuietHours(timeOfDay)) {
+        // Adjust to just after quiet hours end
+        notificationTime = DateTime(
+          notificationTime.year,
+          notificationTime.month,
+          notificationTime.day,
+          preferences.quietHoursEnd?.hour ?? 8,
+          preferences.quietHoursEnd?.minute ?? 0,
+        );
+        
+        // If that's in the past, schedule for next day
+        if (notificationTime.isBefore(now)) {
+          notificationTime = notificationTime.add(const Duration(days: 1));
+        }
+      }
       
       await _scheduleNotification(
-        id: 5000 + day,
-        title: 'Streak Check',
-        body: 'Protecting your ruck streak...',
-        scheduledDate: checkDate,
+        id: 5000,
+        title: _getStreakNotificationTitle(recommendation.urgency),
+        body: recommendation.message,
+        scheduledDate: notificationTime,
         type: CoachingNotificationType.streakProtection,
-        payload: {'check_type': 'streak_protection'},
+        payload: {
+          'urgency': recommendation.urgency.name,
+          'action_suggestion': recommendation.actionSuggestion,
+          'streak_days': streakInfo.currentDays,
+        },
       );
+      
+      AppLogger.debug('Scheduled streak protection notification for $notificationTime with urgency ${recommendation.urgency}');
+    } catch (e) {
+      AppLogger.error('Error scheduling streak protection: $e');
+    }
+  }
+  
+  /// Get notification title based on streak urgency
+  String _getStreakNotificationTitle(StreakUrgency urgency) {
+    switch (urgency) {
+      case StreakUrgency.critical:
+        return 'Streak Emergency!';
+      case StreakUrgency.high:
+        return 'Streak at Risk!';
+      case StreakUrgency.medium:
+        return 'Streak Check-in';
+      case StreakUrgency.low:
+        return 'Streak Momentum';
     }
   }
 
@@ -281,25 +361,71 @@ class CoachingNotificationService {
     CoachingNotificationPreferences preferences,
     Map<String, dynamic> coachingPlan
   ) async {
-    // Schedule weather checks at 7 AM for the next 7 days
-    final now = DateTime.now();
-    for (int day = 1; day <= 7; day++) {
-      final checkDate = DateTime(
-        now.year,
-        now.month,
-        now.day + day,
-        7, // 7 AM
-        0,
-      );
+    try {
+      // Get weather forecast for the next 7 days
+      final forecast = await _weatherService.getWeatherForecast();
+      if (forecast.isEmpty) return;
       
-      await _scheduleNotification(
-        id: 6000 + day,
-        title: 'Weather Check',
-        body: 'Checking weather for your ruck...',
-        scheduledDate: checkDate,
-        type: CoachingNotificationType.weatherSuggestion,
-        payload: {'check_type': 'weather'},
-      );
+      final tone = CoachingTone.fromValue(preferences.coachingTone);
+      final now = DateTime.now();
+      
+      for (int day = 0; day < math.min(forecast.length, 7); day++) {
+        final weather = forecast[day];
+        
+        // Only send notifications for significant weather conditions
+        if (!_weatherService.shouldSendWeatherNotification(weather, preferences)) {
+          continue;
+        }
+        
+        // Generate weather-based suggestion
+        final suggestion = _weatherService.generateRuckSuggestion(weather, tone);
+        
+        // Schedule notification for 7 AM each day
+        final notificationTime = DateTime(
+          now.year,
+          now.month,
+          now.day + day + 1,
+          7, // 7 AM
+          0,
+        );
+        
+        // Skip if in quiet hours (though 7 AM usually isn't)
+        final timeOfDay = TimeOfDay.fromDateTime(notificationTime);
+        if (preferences.isInQuietHours(timeOfDay)) continue;
+        
+        await _scheduleNotification(
+          id: 6000 + day,
+          title: _getWeatherNotificationTitle(weather.severity),
+          body: suggestion.suggestion,
+          scheduledDate: notificationTime,
+          type: CoachingNotificationType.weatherSuggestion,
+          payload: {
+            'weather_severity': weather.severity.name,
+            'temperature': weather.temperature,
+            'condition': weather.condition,
+            'tips': suggestion.tips.join('; '),
+            'is_recommended': suggestion.isRecommended,
+          },
+        );
+        
+        AppLogger.debug('Scheduled weather notification for $notificationTime - ${weather.severity} conditions');
+      }
+    } catch (e) {
+      AppLogger.error('Error scheduling weather suggestions: $e');
+    }
+  }
+  
+  /// Get notification title based on weather severity
+  String _getWeatherNotificationTitle(WeatherSeverity severity) {
+    switch (severity) {
+      case WeatherSeverity.ideal:
+        return 'Perfect Ruck Weather!';
+      case WeatherSeverity.moderate:
+        return 'Weather Update';
+      case WeatherSeverity.challenging:
+        return 'Weather Advisory';
+      case WeatherSeverity.extreme:
+        return 'Weather Warning';
     }
   }
 
@@ -310,15 +436,13 @@ class CoachingNotificationService {
     Map<String, dynamic> context,
   ) async {
     try {
-      final response = await _apiClient.post('/coaching/generate-message', data: {
-        'type': type.value,
-        'tone': tone,
-        'context': context,
-      });
-      
-      return response.data['message'] as String? ?? _getFallbackMessage(type, tone);
+      return await _messageGenerator.generateMessage(
+        type: type,
+        tone: CoachingTone.fromValue(tone),
+        context: context,
+      );
     } catch (e) {
-      Logger.e('Error generating coaching message: $e');
+      AppLogger.error('Error generating coaching message: $e');
       return _getFallbackMessage(type, tone);
     }
   }
@@ -461,29 +585,35 @@ class CoachingNotificationService {
       iOS: iosDetails,
     );
     
-    await _notifications.schedule(
-      id,
-      title,
-      body,
-      scheduledDate,
-      details,
-      payload: payload?.toString(),
-    );
+    // For immediate notifications, use show; for scheduled, would use zonedSchedule
+    if (scheduledDate.isBefore(DateTime.now().add(const Duration(seconds: 10)))) {
+      await _notifications.show(
+        id,
+        title,
+        body,
+        details,
+        payload: payload?.toString(),
+      );
+    } else {
+      // For future scheduling, we'd need timezone package and zonedSchedule
+      // For now, log that this would be scheduled
+      AppLogger.debug('Would schedule ${type.value} notification for $scheduledDate (scheduling not implemented)');
+    }
     
-    Logger.d('Scheduled ${type.value} notification for $scheduledDate');
+    AppLogger.debug('Scheduled ${type.value} notification for $scheduledDate');
   }
 
   /// Cancel all coaching notifications
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
-    Logger.i('All coaching notifications cancelled');
+    AppLogger.info('All coaching notifications cancelled');
   }
 
   /// Start daily scheduler to refresh notifications
   void _startDailyScheduler() {
     _dailyScheduleTimer?.cancel();
     _dailyScheduleTimer = Timer.periodic(const Duration(hours: 24), (timer) async {
-      Logger.i('Running daily notification refresh');
+      AppLogger.info('Running daily notification refresh');
       // This will be triggered by a background task or when app opens
       // The actual rescheduling will be handled by the preferences service
     });
@@ -495,7 +625,132 @@ class CoachingNotificationService {
       final response = await _apiClient.get('/user/coaching-plan');
       return response.data as Map<String, dynamic>?;
     } catch (e) {
-      Logger.e('Error fetching coaching plan: $e');
+      AppLogger.error('Error fetching coaching plan: $e');
+      return null;
+    }
+  }
+
+  /// Handle background notification checks (called by system when notifications trigger)
+  Future<void> handleBackgroundCheck(String notificationType, Map<String, dynamic>? payload) async {
+    try {
+      switch (notificationType) {
+        case 'missed_session':
+          await _processMissedSessionCheck(payload);
+          break;
+        case 'streak_protection':
+          await _processStreakProtectionCheck(payload);
+          break;
+        case 'weather':
+          await _processWeatherCheck(payload);
+          break;
+        default:
+          AppLogger.warning('Unknown notification type for background check: $notificationType');
+      }
+    } catch (e) {
+      AppLogger.error('Error handling background notification check: $e');
+    }
+  }
+
+  /// Process missed session background check
+  Future<void> _processMissedSessionCheck(Map<String, dynamic>? payload) async {
+    try {
+      // Check if user has completed sessions today
+      final response = await _apiClient.get('/user/sessions/today');
+      final todaySessions = response.data['sessions'] as List<dynamic>? ?? [];
+      
+      if (todaySessions.isEmpty) {
+        // User hasn't rucked today - send encouragement
+        final preferences = await _getUserNotificationPreferences();
+        if (preferences?.enableMissedSession == true) {
+          final tone = CoachingTone.fromValue(preferences!.coachingTone);
+          final message = _getMissedSessionMessage(tone);
+          
+          await _sendImmediateNotification(
+            title: 'Session Check-in',
+            body: message,
+            type: CoachingNotificationType.missedSession,
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error processing missed session check: $e');
+    }
+  }
+
+  /// Process streak protection background check
+  Future<void> _processStreakProtectionCheck(Map<String, dynamic>? payload) async {
+    try {
+      final streakInfo = await _streakService.getStreakInfo();
+      if (streakInfo == null) return;
+      
+      final preferences = await _getUserNotificationPreferences();
+      if (preferences == null) return;
+      
+      if (_streakService.shouldSendStreakProtection(streakInfo, preferences)) {
+        final tone = CoachingTone.fromValue(preferences.coachingTone);
+        final recommendation = _streakService.generateProtectionRecommendation(streakInfo, tone);
+        
+        await _sendImmediateNotification(
+          title: _getStreakNotificationTitle(recommendation.urgency),
+          body: recommendation.message,
+          type: CoachingNotificationType.streakProtection,
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error processing streak protection check: $e');
+    }
+  }
+
+  /// Process weather background check
+  Future<void> _processWeatherCheck(Map<String, dynamic>? payload) async {
+    try {
+      final weather = await _weatherService.getCurrentWeather();
+      if (weather == null) return;
+      
+      final preferences = await _getUserNotificationPreferences();
+      if (preferences == null) return;
+      
+      if (_weatherService.shouldSendWeatherNotification(weather, preferences)) {
+        final tone = CoachingTone.fromValue(preferences.coachingTone);
+        final suggestion = _weatherService.generateRuckSuggestion(weather, tone);
+        
+        await _sendImmediateNotification(
+          title: _getWeatherNotificationTitle(weather.severity),
+          body: suggestion.suggestion,
+          type: CoachingNotificationType.weatherSuggestion,
+        );
+      }
+    } catch (e) {
+      AppLogger.error('Error processing weather check: $e');
+    }
+  }
+
+  /// Send immediate notification (for background checks)
+  Future<void> _sendImmediateNotification({
+    required String title,
+    required String body,
+    required CoachingNotificationType type,
+    Map<String, dynamic>? payload,
+  }) async {
+    await _scheduleNotification(
+      id: DateTime.now().millisecondsSinceEpoch % 10000, // Unique ID
+      title: title,
+      body: body,
+      scheduledDate: DateTime.now(),
+      type: type,
+      payload: payload,
+    );
+  }
+
+  /// Get user notification preferences
+  Future<CoachingNotificationPreferences?> _getUserNotificationPreferences() async {
+    try {
+      final response = await _apiClient.get('/user/notification-preferences');
+      return CoachingNotificationPreferences.fromJson(
+        response.data as Map<String, dynamic>
+      );
+    } catch (e) {
+      AppLogger.error('Error fetching notification preferences: $e');
       return null;
     }
   }

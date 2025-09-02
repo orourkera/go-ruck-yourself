@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:rucking_app/features/coaching/domain/models/coaching_notification_preferences.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/utils/logger.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Service for generating personalized coaching messages with AI
 class CoachingMessageGenerator {
@@ -20,7 +20,7 @@ class CoachingMessageGenerator {
       // Build AI prompt based on context
       final prompt = _buildCoachingPrompt(type, tone, context);
       
-      final response = await _apiClient.post('/ai/coaching-message', data: {
+      final response = await _apiClient.post('/ai/coaching-message', {
         'prompt': prompt,
         'tone': tone.value,
         'type': type.value,
@@ -35,7 +35,7 @@ class CoachingMessageGenerator {
       
       return _getFallbackMessage(type, tone, context);
     } catch (e) {
-      Logger.e('Error generating AI coaching message: $e');
+      AppLogger.error('Error generating AI coaching message: $e');
       return _getFallbackMessage(type, tone, context);
     }
   }

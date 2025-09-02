@@ -24,11 +24,11 @@ class UserCoachingPlansResource(Resource):
             if auth_response:
                 return auth_response
             
-            # Get active plan with template info
+            # Get active plan with template info (fixed to match actual database schema)
             client = get_supabase_client()
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
-                'coaching_plan_templates!coaching_plan_id(id, name, goal_type, duration_weeks, plan_structure, success_metrics, tracking_elements, expert_tips)'
+                'coaching_plan_templates!coaching_plan_id(id, plan_id, name, duration_weeks, base_structure, progression_rules, non_negotiables, retests, personalization_knobs, expert_tips, is_active)'
             ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
             
             if not plan_resp.data:
@@ -85,10 +85,10 @@ class UserCoachingPlansResource(Resource):
             if not template_id:
                 return {"error": "template_id required"}, 400
                 
-            # Validate template exists
+            # Validate template exists (fixed to match actual database schema)
             client = get_supabase_client()
             template_resp = client.table('coaching_plan_templates').select(
-                'id, name, duration_weeks, plan_structure'
+                'id, plan_id, name, duration_weeks, base_structure'
             ).eq('id', template_id).limit(1).execute()
             
             if not template_resp.data:
@@ -155,11 +155,11 @@ class UserCoachingPlanProgressResource(Resource):
             if auth_response:
                 return auth_response
             
-            # Get active plan
+            # Get active plan (fixed to match actual database schema)
             client = get_supabase_client()
             plan_resp = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, start_date, current_week, '
-                'coaching_plan_templates!coaching_plan_id(name, duration_weeks, plan_structure, success_metrics)'
+                'coaching_plan_templates!coaching_plan_id(plan_id, name, duration_weeks, base_structure, retests)'
             ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
             
             if not plan_resp.data:
@@ -310,7 +310,7 @@ def _generate_plan_sessions(user_plan_id, template, start_date):
     """Generate plan sessions based on template structure"""
     try:
         client = get_supabase_client()
-        plan_structure = template['plan_structure']
+        plan_structure = template['base_structure']  # Fixed field name
         duration_weeks = template['duration_weeks']
         
         sessions_to_create = []

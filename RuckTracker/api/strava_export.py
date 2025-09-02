@@ -343,21 +343,30 @@ class StravaExportResource(Resource):
             
     def _fetch_location_points(self, supabase, session_id: int) -> List[Dict[str, Any]]:
         """Fetch location points for the session from the database."""
-        try:
-            # Query location_point table for this session
-            location_resp = supabase.table('location_point').select(
-                'latitude, longitude, altitude, timestamp'
-            ).eq('session_id', session_id).order('timestamp').execute()
-            
-            if location_resp.data:
-                logger.info(f"[STRAVA] Found {len(location_resp.data)} location points for session {session_id}")
-                return location_resp.data
-            else:
-                logger.info(f"[STRAVA] No location points found for session {session_id}")
-                return []
-        except Exception as e:
-            logger.error(f"[STRAVA] Error fetching location points: {e}")
-            return []
+        all_points = []
+        if str(session_id).startswith('offline_'):
+            last_timestamp = None
+            while True:
+                query = supabase.table('location_point').select('latitude, longitude, altitude, timestamp').eq('session_id', session_id).order('timestamp', desc=False)
+                if last_timestamp:
+                    query = query.gt('timestamp', last_timestamp)
+                resp = query.execute()
+                if not resp.data:
+                    break
+                all_points.extend(resp.data)
+                last_timestamp = resp.data[-1]['timestamp']
+        else:
+            # Similar loop for regular, using gt('id', last_id) assuming auto-increment ID
+            last_id = 0
+            while True:
+                query = supabase.table('location_point').select('latitude, longitude, altitude, timestamp').eq('ruck_session_id', session_id).gt('id', last_id).order('timestamp', desc=False)
+                resp = query.execute()
+                if not resp.data:
+                    break
+                all_points.extend(resp.data)
+                last_id = max(p['id'] for p in resp.data)  # Assuming 'id' field
+        logger.info(f"Fetched {len(all_points)} points for session {session_id}")
+        return all_points
     
     def _fetch_heart_rate_samples(self, supabase, session_id: int) -> List[Dict[str, Any]]:
         """Fetch heart rate samples for the session from the database."""
