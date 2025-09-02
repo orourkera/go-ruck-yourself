@@ -28,6 +28,7 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/session_c
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import '../widgets/active_session_dialog.dart';
+import 'package:rucking_app/features/coaching/presentation/widgets/plan_session_recommendations.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -81,6 +82,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   late final VoidCallback _durationListener;
 
   bool _isOfflineMode = false;
+  
+  // Coaching plan data
+  Map<String, dynamic>? _coachingPlan;
+  Map<String, dynamic>? _nextSession;
   final TextEditingController _offlineDurationMinutesController = TextEditingController();
   final TextEditingController _offlineDurationSecondsController = TextEditingController();
   final TextEditingController _offlineDistanceController = TextEditingController();
@@ -113,6 +118,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       } else {
         _displayRuckWeight = _ruckWeight * AppConfig.kgToLbs;
       }
+      
+      // Load coaching plan data for recommendations
+      await _loadCoachingPlanData();
       
       
       

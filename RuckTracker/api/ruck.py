@@ -218,7 +218,7 @@ class RuckSessionResource(Resource):
             try:
                 lp_resp = (
                     supabase.table('location_point')
-                    .select('latitude,longitude,altitude,timestamp')
+                    .select('latitude,longitude,altitude,timestamp,horizontal_accuracy_m,vertical_accuracy_m,speed_mps,speed_accuracy_mps,course_deg,course_accuracy_deg')
                     .eq('session_id', ruck_id)
                     .order('timestamp', desc=False)
                     .execute()
@@ -567,7 +567,7 @@ class RuckSessionDetailResource(Resource):
             try:
                 lp_resp = (
                     supabase.table('location_point')
-                    .select('latitude,longitude,altitude,timestamp')
+                    .select('latitude,longitude,altitude,timestamp,horizontal_accuracy_m,vertical_accuracy_m,speed_mps,speed_accuracy_mps,course_deg,course_accuracy_deg')
                     .eq('session_id', ruck_id)
                     .order('timestamp', desc=False)
                     .execute()

@@ -161,6 +161,13 @@ class LocationPoint(db.Model):
     latitude = db.Column(db.Float, nullable=False)
     longitude = db.Column(db.Float, nullable=False)
     altitude = db.Column(db.Float, nullable=True)  # Elevation in meters
+    # Optional accuracy/sensor metadata (all nullable and additive)
+    horizontal_accuracy_m = db.Column(db.Float, nullable=True)
+    vertical_accuracy_m = db.Column(db.Float, nullable=True)
+    speed_mps = db.Column(db.Float, nullable=True)
+    speed_accuracy_mps = db.Column(db.Float, nullable=True)
+    course_deg = db.Column(db.Float, nullable=True)
+    course_accuracy_deg = db.Column(db.Float, nullable=True)
     
     # Timestamp for this location point
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
@@ -173,6 +180,12 @@ class LocationPoint(db.Model):
             'latitude': self.latitude,
             'longitude': self.longitude,
             'altitude': self.altitude,
+            'horizontal_accuracy_m': self.horizontal_accuracy_m,
+            'vertical_accuracy_m': self.vertical_accuracy_m,
+            'speed_mps': self.speed_mps,
+            'speed_accuracy_mps': self.speed_accuracy_mps,
+            'course_deg': self.course_deg,
+            'course_accuracy_deg': self.course_accuracy_deg,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
 

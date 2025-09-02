@@ -118,18 +118,20 @@ class StravaExportResource(Resource):
             session_name = request_data.get('session_name', f'Ruck Session {session_id}')
             description = request_data.get('description', '')
             
-            # Fetch location points for GPS route
+            # Fetch location points and heart rate data for GPS route
             location_points = self._fetch_location_points(supabase, session_id)
+            heart_rate_samples = self._fetch_heart_rate_samples(supabase, session_id)
             
             # Upload to Strava with GPS data if available, otherwise fallback to basic activity
             if location_points and len(location_points) > 2:
-                logger.info(f"[STRAVA] Uploading GPS route with {len(location_points)} location points")
+                logger.info(f"[STRAVA] Uploading GPS route with {len(location_points)} location points and {len(heart_rate_samples)} HR samples")
                 activity_id, duplicate = self._upload_gpx_to_strava(
                     access_token=access_token,
                     session=session,
                     session_name=session_name,
                     description=description,
-                    location_points=location_points
+                    location_points=location_points,
+                    heart_rate_samples=heart_rate_samples
                 )
             else:
                 logger.info("[STRAVA] No GPS data available, using basic activity creation")
@@ -357,15 +359,35 @@ class StravaExportResource(Resource):
             logger.error(f"[STRAVA] Error fetching location points: {e}")
             return []
     
+    def _fetch_heart_rate_samples(self, supabase, session_id: int) -> List[Dict[str, Any]]:
+        """Fetch heart rate samples for the session from the database."""
+        try:
+            # Query heart_rate_sample table for this session
+            hr_resp = supabase.table('heart_rate_sample').select(
+                'heart_rate, timestamp'
+            ).eq('session_id', session_id).order('timestamp').execute()
+            
+            if hr_resp.data:
+                logger.info(f"[STRAVA] Found {len(hr_resp.data)} heart rate samples for session {session_id}")
+                return hr_resp.data
+            else:
+                logger.info(f"[STRAVA] No heart rate samples found for session {session_id}")
+                return []
+        except Exception as e:
+            logger.error(f"[STRAVA] Error fetching heart rate samples: {e}")
+            return []
+    
     def _generate_gpx_content(self, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]]) -> str:
         """Generate GPX XML content from session data and location points."""
-        # Create root GPX element
+        # Create root GPX element with proper Strava-compatible creator
         gpx = ET.Element('gpx')
         gpx.set('version', '1.1')
-        gpx.set('creator', 'Rucking App - https://getrucky.com')
+        # Use proper device name format that Strava recognizes + barometer indicator
+        gpx.set('creator', 'Rucking App with barometer')
         gpx.set('xmlns', 'http://www.topografix.com/GPX/1/1')
         gpx.set('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
-        gpx.set('xsi:schemaLocation', 'http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd')
+        gpx.set('xmlns:gpxtpx', 'http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd')
+        gpx.set('xsi:schemaLocation', 'http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd')
         
         # Add metadata
         metadata = ET.SubElement(gpx, 'metadata')
@@ -398,6 +420,18 @@ class StravaExportResource(Resource):
         # Add track segment
         trkseg = ET.SubElement(trk, 'trkseg')
         
+        # Create a mapping of timestamps to heart rate values for efficient lookup
+        hr_by_timestamp = {}
+        if hasattr(self, '_current_hr_samples'):
+            for hr_sample in self._current_hr_samples:
+                hr_timestamp = hr_sample.get('timestamp')
+                if hr_timestamp:
+                    # Convert to comparable format
+                    if isinstance(hr_timestamp, str):
+                        hr_by_timestamp[hr_timestamp] = hr_sample.get('heart_rate')
+                    else:
+                        hr_by_timestamp[hr_timestamp.isoformat()] = hr_sample.get('heart_rate')
+        
         for point in location_points:
             trkpt = ET.SubElement(trkseg, 'trkpt')
             trkpt.set('lat', str(point['latitude']))
@@ -409,18 +443,31 @@ class StravaExportResource(Resource):
                 ele.text = str(point['altitude'])
             
             # Add timestamp
+            point_timestamp = None
             if point.get('timestamp'):
                 time_pt = ET.SubElement(trkpt, 'time')
                 timestamp = point['timestamp']
                 if isinstance(timestamp, str):
                     time_pt.text = timestamp
+                    point_timestamp = timestamp
                 else:
                     time_pt.text = timestamp.isoformat() + 'Z'
+                    point_timestamp = timestamp.isoformat()
+            
+            # Add heart rate extension if available for this timestamp
+            if point_timestamp and point_timestamp in hr_by_timestamp:
+                heart_rate = hr_by_timestamp[point_timestamp]
+                if heart_rate and heart_rate > 0:
+                    # Add Garmin TrackPoint Extension for heart rate
+                    extensions = ET.SubElement(trkpt, 'extensions')
+                    tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
+                    hr_elem = ET.SubElement(tpx_elem, 'gpxtpx:hr')
+                    hr_elem.text = str(int(heart_rate))
         
         # Convert to string
         return ET.tostring(gpx, encoding='unicode')
     
-    def _upload_gpx_to_strava(self, access_token: str, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]]) -> Tuple[Optional[int], bool]:
+    def _upload_gpx_to_strava(self, access_token: str, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]], heart_rate_samples: List[Dict[str, Any]] = None) -> Tuple[Optional[int], bool]:
         """Upload GPX file to Strava and poll for completion."""
         try:
             # Generate fun AI summary for description if none provided
@@ -431,7 +478,10 @@ class StravaExportResource(Resource):
                 moving_time = max(0, elapsed_time - paused_time)
                 description = self._generate_fun_summary(session, distance_meters, elapsed_time, moving_time)
             
-            # Generate GPX content
+            # Store heart rate samples for GPX generation
+            self._current_hr_samples = heart_rate_samples or []
+            
+            # Generate GPX content with heart rate data
             gpx_content = self._generate_gpx_content(session, session_name, description, location_points)
             
             # Prepare upload data
