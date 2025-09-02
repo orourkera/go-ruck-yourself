@@ -45,7 +45,7 @@ class EventProgressResource(Resource):
             logger.info(f"Participant check result: {participant_check.data}")
             
             if not (is_participant or is_creator):
-                logger.warning(f"User {current_user_id} not authorized to view progress for event {event_id}")
+                logger.info(f"[EVENT_PROGRESS] User {current_user_id} denied access to progress for event {event_id} (not participant/creator)")
                 return {'error': 'Only event participants can view progress'}, 403
             
             # Get all approved participants for this event

@@ -776,7 +776,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               StyledSnackBar.show(
                 context: context,
                 message: 'Opening Strava authorization... Please complete the process and try exporting again.',
-                type: SnackBarType.info,
+                type: SnackBarType.normal,
               );
               // Don't auto-retry - let user manually retry after completing OAuth
               // This prevents 400 errors from premature API calls

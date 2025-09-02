@@ -36,6 +36,7 @@ class EventCommentsResource(Resource):
             is_creator = event_check.data and event_check.data[0]['creator_user_id'] == current_user_id
             
             if not (is_participant or is_creator):
+                logger.info(f"[EVENT_COMMENTS] User {current_user_id} denied access to comments for event {event_id} (not participant/creator)")
                 return {'error': 'Only event participants can view comments'}, 403
             
             # Get comments with user info

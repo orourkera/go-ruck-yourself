@@ -22,9 +22,18 @@ class EventProgressBloc extends Bloc<EventProgressEvent, EventProgressState> {
       emit(EventLeaderboardLoaded(leaderboard));
     } catch (e) {
       debugPrint('Error loading event leaderboard: $e');
+      
+      // Handle 403 (unauthorized) errors with specific message
+      String errorMessage;
+      if (e.toString().contains('403') || e.toString().toLowerCase().contains('unauthorized')) {
+        errorMessage = 'You no longer have access to this event\'s leaderboard';
+      } else {
+        errorMessage = 'Failed to load leaderboard';
+      }
+      
       emit(EventLeaderboardError(
         eventId: event.eventId,
-        message: 'Failed to load leaderboard: ${e.toString()}',
+        message: errorMessage,
       ));
     }
   }

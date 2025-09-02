@@ -27,9 +27,18 @@ class EventCommentsBloc extends Bloc<EventCommentsEvent, EventCommentsState> {
       ));
     } catch (e) {
       debugPrint('Error loading event comments: $e');
+      
+      // Handle 403 (unauthorized) errors with specific message
+      String errorMessage;
+      if (e.toString().contains('403') || e.toString().toLowerCase().contains('unauthorized')) {
+        errorMessage = 'You no longer have access to this event\'s comments';
+      } else {
+        errorMessage = 'Failed to load comments';
+      }
+      
       emit(EventCommentsError(
         eventId: event.eventId,
-        message: 'Failed to load comments: ${e.toString()}',
+        message: errorMessage,
       ));
     }
   }

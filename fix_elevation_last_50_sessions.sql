@@ -137,8 +137,7 @@ elevation_calculations AS (
 UPDATE ruck_session 
 SET 
     elevation_gain_m = ROUND(ec.calculated_elevation_gain_m::numeric, 1),
-    elevation_loss_m = ROUND(ec.calculated_elevation_loss_m::numeric, 1),
-    updated_at = NOW()
+    elevation_loss_m = ROUND(ec.calculated_elevation_loss_m::numeric, 1)
 FROM elevation_calculations ec
 WHERE ruck_session.id = ec.session_id
   AND ruck_session.status = 'completed';

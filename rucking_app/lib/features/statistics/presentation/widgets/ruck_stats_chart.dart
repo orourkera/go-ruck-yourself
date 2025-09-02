@@ -77,7 +77,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
           const SizedBox(height: 16),
           _buildMetricSelector(),
           const SizedBox(height: 20),
-          _buildChart(),
+_buildChart(),
         ],
       ),
     );
@@ -94,41 +94,93 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _isLineChart = !_isLineChart;
-            });
-            _saveChartTypePreference();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isLineChart ? Icons.show_chart : Icons.bar_chart,
-                  color: AppColors.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _isLineChart ? 'Line' : 'Bars',
-                  style: AppTextStyles.bodySmall.copyWith(
+        Row(
+          children: [
+            // Bar Chart Button
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isLineChart = false;
+                });
+                _saveChartTypePreference();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: !_isLineChart 
+                      ? AppColors.primary 
+                      : AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(6),
+                    bottomLeft: Radius.circular(6),
+                  ),
+                  border: Border.all(
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.bar_chart,
+                      color: !_isLineChart ? Colors.white : AppColors.primary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Bar',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: !_isLineChart ? Colors.white : AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            // Line Chart Button
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isLineChart = true;
+                });
+                _saveChartTypePreference();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isLineChart 
+                      ? AppColors.primary 
+                      : AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(6),
+                    bottomRight: Radius.circular(6),
+                  ),
+                  border: Border.all(
+                    color: AppColors.primary,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.show_chart,
+                      color: _isLineChart ? Colors.white : AppColors.primary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Line',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: _isLineChart ? Colors.white : AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
