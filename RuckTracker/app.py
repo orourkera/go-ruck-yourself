@@ -721,6 +721,9 @@ except AttributeError as e:
 
 # Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
+# CRITICAL FIX: Add alias for location-batch endpoint that Flutter app is incorrectly using
+# This is needed because app updates take days to propagate through App Store
+api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location-batch', endpoint='location_batch_alias')
 api.add_resource(RuckSessionRouteChunkResource, '/api/rucks/<string:ruck_id>/route-chunk')
 api.add_resource(RuckSessionEditResource, '/api/rucks/<string:ruck_id>/edit')
 

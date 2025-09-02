@@ -1959,13 +1959,16 @@ class RuckSessionLocationResource(Resource):
             logger.debug(f"[LOC_UPLOAD][RAW] session={ruck_id} user={g.user.id} data_keys={list(data.keys())}")
             
             # Support both single point and batch of points (like heart rate)
-            if 'points' in data:
+            # CRITICAL FIX: Accept both 'points' and 'location_points' fields for compatibility
+            if 'points' in data or 'location_points' in data:
                 # Batch mode - array of location points
-                if not isinstance(data['points'], list):
+                # Support both field names for backward compatibility with app that can't be updated immediately
+                points_data = data.get('points') or data.get('location_points')
+                if not isinstance(points_data, list):
                     client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-                    logger.error(f"[LOC_UPLOAD][BAD_POINTS_TYPE] session={ruck_id} user={g.user.id} ip={client_ip} type={type(data['points'])}")
-                    return {'message': f"'points' field must be a list, got {type(data['points']).__name__}"}, 400
-                location_points = data['points']
+                    logger.error(f"[LOC_UPLOAD][BAD_POINTS_TYPE] session={ruck_id} user={g.user.id} ip={client_ip} type={type(points_data)}")
+                    return {'message': f"'points' or 'location_points' field must be a list, got {type(points_data).__name__}"}, 400
+                location_points = points_data
                 logger.debug(f"[LOC_UPLOAD][BATCH] session={ruck_id} user={g.user.id} count={len(location_points)}")
             else:
                 # Legacy mode - single point (backwards compatibility)
