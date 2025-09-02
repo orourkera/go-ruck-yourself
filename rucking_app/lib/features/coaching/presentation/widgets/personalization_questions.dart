@@ -360,43 +360,63 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           ),
           const SizedBox(height: 24),
           
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 12,
-            runSpacing: 12,
-            children: [2, 3, 4, 5, 6, 7].map((days) {
-              final isSelected = _personalization.trainingDaysPerWeek == days;
-              return GestureDetector(
-                onTap: () {
+          Column(
+            children: [
+              // Display current selection
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Text(
+                  '${_personalization.trainingDaysPerWeek ?? 4} days per week',
+                  style: AppTextStyles.titleLarge.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Slider
+              Slider(
+                value: (_personalization.trainingDaysPerWeek ?? 4).toDouble(),
+                min: 2,
+                max: 7,
+                divisions: 5, // 2,3,4,5,6,7 = 5 divisions
+                activeColor: AppColors.primary,
+                inactiveColor: Colors.grey.shade300,
+                thumbColor: AppColors.primary,
+                onChanged: (value) {
                   setState(() {
                     _personalization = _personalization.copyWith(
-                      trainingDaysPerWeek: days,
+                      trainingDaysPerWeek: value.round(),
                     );
                   });
                 },
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      days.toString(),
-                      style: AppTextStyles.titleLarge.copyWith(
-                        color: isSelected ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+              ),
+              
+              // Labels under slider
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('2', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                    Text('3', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                    Text('4', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                    Text('5', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                    Text('6', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                    Text('7', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                  ],
                 ),
-              );
-            }).toList(),
+              ),
+            ],
           ),
         ],
       ),

@@ -77,9 +77,12 @@ class StravaExportResource(Resource):
             expires_at = user_data.get('strava_expires_at')
             
             if not access_token or not refresh_token:
+                logger.warning(f"[STRAVA_EXPORT] User {g.user.id} attempted export without Strava connection")
                 return {
                     'success': False,
-                    'message': 'Strava not connected. Please re-authorize Strava in your profile.'
+                    'message': 'Strava not connected. Please connect your Strava account in your profile settings and try again.',
+                    'error_code': 'STRAVA_NOT_CONNECTED',
+                    'action_required': 'connect_strava'
                 }, 400
             
             # Check if token needs refresh
@@ -102,7 +105,13 @@ class StravaExportResource(Resource):
                     logger.info(f"[STRAVA] Refreshing expired token for user {g.user.id}")
                     access_token = self._refresh_strava_token(user_data, supabase)
                     if not access_token:
-                        return {'message': 'Failed to refresh Strava token. Please reconnect your account.'}, 400
+                        logger.warning(f"[STRAVA_EXPORT] Token refresh failed for user {g.user.id}")
+                        return {
+                            'success': False,
+                            'message': 'Strava token expired. Please reconnect your Strava account in profile settings.',
+                            'error_code': 'STRAVA_TOKEN_EXPIRED',
+                            'action_required': 'reconnect_strava'
+                        }, 400
             
             # Get request data
             request_data = request.get_json() or {}

@@ -1,0 +1,25 @@
+{
+  "api_token": "YOUR_SENTRY_API_TOKEN_HERE",
+  "organization_slug": "your-org-slug",
+  "project_slug": "your-project-slug",
+  "notes": {
+    "setup_instructions": [
+      "1. Go to Sentry > Settings > Account > API > Auth Tokens",
+      "2. Create a new token with 'project:read' and 'project:write' scopes",
+      "3. Copy your organization slug from the Sentry URL: sentry.io/organizations/YOUR_ORG_SLUG/",
+      "4. Copy your project slug from the project URL: .../projects/YOUR_PROJECT_SLUG/",
+      "5. Fill in the values above and rename this file to '.sentry_config.json'",
+      "6. The .sentry_config.json file will be gitignored for security"
+    ],
+    "required_scopes": [
+      "project:read - to fetch issues",
+      "project:write - to mark issues as resolved"
+    ],
+    "example_usage": [
+      "python sentry_manager.py fetch       # Get all open issues",
+      "python sentry_manager.py summary     # Show summary of fetched issues", 
+      "python sentry_manager.py resolve ABC123  # Mark issue ABC123 as resolved",
+      "python sentry_manager.py resolve --all   # Mark all fetched issues as resolved"
+    ]
+  }
+}

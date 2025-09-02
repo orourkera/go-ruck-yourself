@@ -978,9 +978,12 @@ Future<void> clearCrashRecoveryData() async {
         
         // Only switch to offline mode if we're not already offline
         if (_activeSessionId != null && !_activeSessionId!.startsWith('offline_')) {
-          // Emit validation message to inform user
+          // Log info message instead of error to avoid Sentry reporting
+          AppLogger.info('[SESSION_LIFECYCLE] Network unavailable - session continues in offline mode');
+          
+          // Emit informational message (not error) to inform user
           _updateState(_currentState.copyWith(
-            errorMessage: 'No network connection - session continues in offline mode',
+            errorMessage: 'Session continues in offline mode',
           ));
           
           // Clear the message after 3 seconds

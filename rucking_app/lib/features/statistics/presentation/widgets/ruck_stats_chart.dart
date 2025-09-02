@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum StatsMetric {
   distance,
@@ -10,6 +11,7 @@ enum StatsMetric {
   calories,
   powerPoints,
 }
+
 
 class RuckStatsChart extends StatefulWidget {
   final List<dynamic> timeSeriesData;
@@ -29,6 +31,25 @@ class RuckStatsChart extends StatefulWidget {
 
 class _RuckStatsChartState extends State<RuckStatsChart> {
   StatsMetric _selectedMetric = StatsMetric.distance;
+  bool _isLineChart = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadChartTypePreference();
+  }
+  
+  Future<void> _loadChartTypePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLineChart = prefs.getBool('chart_is_line') ?? false;
+    });
+  }
+  
+  Future<void> _saveChartTypePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('chart_is_line', _isLineChart);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,10 +94,41 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        Icon(
-          Icons.bar_chart,
-          color: AppColors.primary,
-          size: 24,
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _isLineChart = !_isLineChart;
+            });
+            _saveChartTypePreference();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _isLineChart ? Icons.show_chart : Icons.bar_chart,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isLineChart ? 'Line' : 'Bars',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -147,7 +199,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.bar_chart_outlined,
+                _isLineChart ? Icons.show_chart_outlined : Icons.bar_chart_outlined,
                 size: 48,
                 color: isDark ? Colors.grey[400] : AppColors.grey,
               ),
@@ -166,27 +218,103 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
 
     return SizedBox(
       height: 200,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: _getMaxY(),
-          barTouchData: _buildBarTouchData(),
-          titlesData: _buildTitlesData(),
-          borderData: FlBorderData(show: false),
-          barGroups: _buildBarGroups(),
-          gridData: FlGridData(
-            show: true,
-            horizontalInterval: _getMaxY() / 4,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
-                strokeWidth: 1,
-              );
+      child: _isLineChart 
+          ? _buildLineChart(isDark)
+          : _buildBarChart(isDark),
+    );
+  }
+  
+  Widget _buildBarChart(bool isDark) {
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: _getMaxY(),
+        barTouchData: _buildBarTouchData(),
+        titlesData: _buildTitlesData(),
+        borderData: FlBorderData(show: false),
+        barGroups: _buildBarGroups(),
+        gridData: _buildGridData(isDark),
+      ),
+    );
+  }
+  
+  Widget _buildLineChart(bool isDark) {
+    final spots = widget.timeSeriesData.asMap().entries.map((entry) {
+      final index = entry.key;
+      final data = entry.value;
+      final value = _getMetricValue(data);
+      return FlSpot(index.toDouble(), value);
+    }).toList();
+    
+    return LineChart(
+      LineChartData(
+        maxY: _getMaxY(),
+        titlesData: _buildTitlesData(),
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            color: _getMetricColor(),
+            barWidth: 3,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                return FlDotCirclePainter(
+                  radius: 4,
+                  color: _getMetricColor(),
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: _getMetricColor().withValues(alpha: 0.1),
+            ),
+          ),
+        ],
+        gridData: _buildGridData(isDark),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            tooltipBgColor: AppColors.primary.withValues(alpha: 0.9),
+            tooltipRoundedRadius: 8,
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((spot) {
+                final index = spot.x.toInt();
+                if (index >= widget.timeSeriesData.length) return null;
+                
+                final data = widget.timeSeriesData[index];
+                final period = data['period'] ?? 'Unknown';
+                final value = _getMetricValue(data);
+                final formattedValue = _formatMetricValue(value);
+                
+                return LineTooltipItem(
+                  '$period\n$formattedValue',
+                  AppTextStyles.bodySmall.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }).toList();
             },
-            drawVerticalLine: false,
           ),
         ),
       ),
+    );
+  }
+  
+  FlGridData _buildGridData(bool isDark) {
+    return FlGridData(
+      show: true,
+      horizontalInterval: _getSafeHorizontalInterval(),
+      getDrawingHorizontalLine: (value) {
+        return FlLine(
+          color: isDark ? Colors.grey[600]! : Colors.grey[300]!,
+          strokeWidth: 1,
+        );
+      },
+      drawVerticalLine: false,
     );
   }
 
@@ -319,6 +447,11 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
       if (value > maxValue) maxValue = value;
     }
     
+    // If maxValue is 0 or very small, return a minimum value to prevent chart errors
+    if (maxValue <= 0) {
+      return _getDefaultMaxForMetric();
+    }
+    
     // Add 20% padding to the top
     return maxValue * 1.2;
   }
@@ -326,7 +459,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
   Color _getMetricColor() {
     switch (_selectedMetric) {
       case StatsMetric.distance:
-        return AppColors.secondary;
+        return AppColors.ladyPrimary; // Sky blue from lady mode
       case StatsMetric.time:
         return AppColors.info;
       case StatsMetric.calories:
@@ -386,4 +519,30 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
         return value.round().toString();
     }
   }
+
+  double _getDefaultMaxForMetric() {
+    switch (_selectedMetric) {
+      case StatsMetric.distance:
+        return 10.0; // 10 km default
+      case StatsMetric.time:
+        return 2.0; // 2 hours default
+      case StatsMetric.calories:
+        return 500.0; // 500 calories default
+      case StatsMetric.powerPoints:
+        return 100.0; // 100 power points default
+    }
+  }
+
+  double _getSafeHorizontalInterval() {
+    final maxY = _getMaxY();
+    final interval = maxY / 4;
+    
+    // Ensure interval is never zero or negative
+    if (interval <= 0) {
+      return _getDefaultMaxForMetric() / 4;
+    }
+    
+    return interval;
+  }
+  
 }

@@ -775,20 +775,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
             if (success) {
               StyledSnackBar.show(
                 context: context,
-                message: 'Opening Strava authorization...',
-                type: SnackBarType.success,
+                message: 'Opening Strava authorization... Please complete the process and try exporting again.',
+                type: SnackBarType.info,
               );
-              // Wait a moment for OAuth flow then retry export
-              await Future.delayed(const Duration(seconds: 3));
-              final newStatus = await _stravaService.getConnectionStatus();
-              if (!newStatus.connected) {
-                StyledSnackBar.show(
-                  context: context,
-                  message: 'Strava connection required to export',
-                  type: SnackBarType.error,
-                );
-                return;
-              }
+              // Don't auto-retry - let user manually retry after completing OAuth
+              // This prevents 400 errors from premature API calls
+              return;
             } else {
               StyledSnackBar.show(
                 context: context,

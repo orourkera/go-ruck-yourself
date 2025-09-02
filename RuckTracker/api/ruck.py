@@ -1211,9 +1211,8 @@ class RuckSessionCompleteResource(Resource):
                                 segment_accepted = True
                                 logger.debug(f"[GPS_VALIDATION] Added segment via fallback: {distance_meters:.1f}m")
                         
-                        # Process elevation gain/loss (independent of distance validation)
-                        # Elevation is processed for all points to maintain continuity
-                        if curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
+                        # Process elevation gain/loss ONLY for validated segments to avoid GPS noise
+                        if segment_accepted and curr_point.get('altitude') is not None and prev_point.get('altitude') is not None:
                             alt_diff = float(curr_point['altitude']) - float(prev_point['altitude'])
                             if alt_diff > ELEV_THRESHOLD_M:
                                 elevation_gain_m += alt_diff
@@ -1243,9 +1242,24 @@ class RuckSessionCompleteResource(Resource):
                         update_data['distance_km'] = client_distance_km
                         logger.warning(f"[DISTANCE_SAFETY] ⚠️ Keeping client distance: {client_distance_km}km (server calculation {server_distance_km}km appears incomplete)")
                     
-                    # Always use server-calculated elevation as it's more reliable with larger datasets
-                    update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
-                    update_data['elevation_loss_m'] = round(elevation_loss_m, 1)
+                    # Only use server-calculated elevation if frontend values are missing or zero
+                    # Frontend now has corrected elevation logic, so prefer FE values
+                    client_elevation_gain = data.get('elevation_gain_m', 0.0) or 0.0
+                    client_elevation_loss = data.get('elevation_loss_m', 0.0) or 0.0
+                    
+                    if client_elevation_gain <= 0.0:
+                        update_data['elevation_gain_m'] = round(elevation_gain_m, 1)
+                        logger.info(f"[ELEVATION] Using server-calculated gain: {elevation_gain_m:.1f}m (client: {client_elevation_gain})")
+                    else:
+                        update_data['elevation_gain_m'] = client_elevation_gain
+                        logger.info(f"[ELEVATION] Preserving client gain: {client_elevation_gain}m (server would be: {elevation_gain_m:.1f}m)")
+                    
+                    if client_elevation_loss <= 0.0:
+                        update_data['elevation_loss_m'] = round(elevation_loss_m, 1)
+                        logger.info(f"[ELEVATION] Using server-calculated loss: {elevation_loss_m:.1f}m (client: {client_elevation_loss})")
+                    else:
+                        update_data['elevation_loss_m'] = client_elevation_loss
+                        logger.info(f"[ELEVATION] Preserving client loss: {client_elevation_loss}m (server would be: {elevation_loss_m:.1f}m)")
 
                     # Average pace (sec/km) from final distance (after safety check)
                     final_distance_km = update_data.get('distance_km', 0.0)
@@ -2036,60 +2050,111 @@ class RuckSessionLocationResource(Resource):
                     
                     # Validate required fields
                     if lat is None or lng is None:
-                        invalid_points.append(f"Point {i}: missing lat/latitude or lng/longitude, keys: {list(point.keys())}")
+                        invalid_points.append(f"MISSING_COORDS: Point {i} missing lat/lng, keys: {list(point.keys())}")
                         continue
                     
-                    # Validate data types and ranges
+                    # Validate data types and ranges with better error codes
                     try:
+                        # Handle edge cases: empty strings, null, infinity, NaN
+                        if lat == '' or lng == '' or lat is None or lng is None:
+                            invalid_points.append(f"EMPTY_COORDS: Point {i} has empty coordinates - lat='{lat}', lng='{lng}'")
+                            continue
+                            
                         lat = float(lat)
                         lng = float(lng)
+                        
+                        # Check for infinity and NaN
+                        import math
+                        if math.isnan(lat) or math.isnan(lng) or math.isinf(lat) or math.isinf(lng):
+                            invalid_points.append(f"INVALID_FLOAT: Point {i} has NaN/Infinity - lat={lat}, lng={lng}")
+                            continue
+                            
                     except (ValueError, TypeError) as e:
-                        invalid_points.append(f"Point {i}: invalid lat/lng format - lat={point.get('latitude')}, lng={point.get('longitude')}, error={e}")
+                        # Enhanced error reporting with original values
+                        original_lat = point.get('lat') or point.get('latitude')
+                        original_lng = point.get('lng') or point.get('longitude')
+                        invalid_points.append(f"TYPE_ERROR: Point {i} conversion failed - lat='{original_lat}' ({type(original_lat).__name__}), lng='{original_lng}' ({type(original_lng).__name__}) - {e}")
                         continue
                     
-                    # Validate coordinate ranges
+                    # Validate coordinate ranges with specific error codes
                     if not (-90 <= lat <= 90):
-                        invalid_points.append(f"Point {i}: latitude {lat} out of range [-90, 90]")
+                        invalid_points.append(f"LAT_RANGE: Point {i} latitude {lat} out of range [-90, 90]")
                         continue
                     if not (-180 <= lng <= 180):
-                        invalid_points.append(f"Point {i}: longitude {lng} out of range [-180, 180]")
+                        invalid_points.append(f"LNG_RANGE: Point {i} longitude {lng} out of range [-180, 180]")
                         continue
                     
-                    # Validate timestamp if provided
-                    timestamp = point.get('timestamp', datetime.now(tz.tzutc()).isoformat())
-                    if timestamp and timestamp != datetime.now(tz.tzutc()).isoformat():
+                    # Enhanced timestamp validation
+                    timestamp = point.get('timestamp')
+                    if timestamp is None:
+                        timestamp = datetime.now(tz.tzutc()).isoformat()
+                    elif timestamp != datetime.now(tz.tzutc()).isoformat():
                         try:
                             from dateutil import parser
                             parsed_time = parser.parse(timestamp)
+                            # Validate timestamp is not too far in future (max 1 hour ahead)
+                            now = datetime.now(tz.tzutc())
+                            if parsed_time > now + timedelta(hours=1):
+                                invalid_points.append(f"TIMESTAMP_FUTURE: Point {i} timestamp too far in future - {timestamp}")
+                                continue
                         except Exception as e:
-                            invalid_points.append(f"Point {i}: invalid timestamp format '{timestamp}', error={e}")
+                            invalid_points.append(f"TIMESTAMP_FORMAT: Point {i} invalid timestamp '{timestamp}' - {e}")
                             continue
+                    
+                    # Validate altitude if present
+                    altitude = point.get('elevation') or point.get('elevation_meters')
+                    if altitude is not None:
+                        try:
+                            altitude = float(altitude)
+                            # Reasonable altitude range: -500m to 9000m (below sea level to highest mountains)
+                            if not (-500 <= altitude <= 9000):
+                                logger.warning(f"[LOC_UPLOAD][ALTITUDE_WARNING] session={ruck_id} user={g.user.id} point={i} altitude={altitude} suspicious_range")
+                        except (ValueError, TypeError):
+                            altitude = None  # Ignore invalid altitude, don't fail the point
                     
                     location_rows.append({
                         'session_id': ruck_id,
                         'latitude': lat,
                         'longitude': lng,
-                        # TODO: Remove elevation_meters fallback once Flutter app is updated
-                        'altitude': point.get('elevation') or point.get('elevation_meters'),
+                        'altitude': altitude,
                         'timestamp': timestamp
                     })
                     
                 except Exception as e:
-                    invalid_points.append(f"Point {i}: processing error - {e}")
+                    invalid_points.append(f"PROCESSING_ERROR: Point {i} unexpected error - {e}")
+                    logger.error(f"[LOC_UPLOAD][POINT_PROCESSING_ERROR] session={ruck_id} user={g.user.id} point={i} data={point} error={e}")
                     continue
             
             if invalid_points:
                 logger.warning(f"[LOC_UPLOAD][INVALID_POINTS] session={ruck_id} user={g.user.id} invalid_count={len(invalid_points)} details={' | '.join(invalid_points)}")
             
             if not location_rows:
-                error_msg = f"No valid location points from {len(location_points)} submitted. Errors: {'; '.join(invalid_points)}"
+                # Categorize errors for better debugging
+                error_categories = {}
+                for error in invalid_points:
+                    category = error.split(':')[0]
+                    error_categories[category] = error_categories.get(category, 0) + 1
+                
+                error_msg = f"No valid location points from {len(location_points)} submitted"
                 client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-                logger.error(f"[LOC_UPLOAD][NO_VALID_POINTS] session={ruck_id} user={g.user.id} ip={client_ip} error=none_valid submitted={len(location_points)} errors={'; '.join(invalid_points)}")
+                
+                # Enhanced logging with error category breakdown
+                logger.error(f"[LOC_UPLOAD][NO_VALID_POINTS] session={ruck_id} user={g.user.id} ip={client_ip} "
+                           f"submitted={len(location_points)} error_categories={error_categories} "
+                           f"first_errors={'; '.join(invalid_points[:3])}{'...' if len(invalid_points) > 3 else ''}")
+                
                 return {
                     'message': error_msg,
-                    'validation_errors': invalid_points,
+                    'error_code': 'VALIDATION_FAILED',
                     'submitted_count': len(location_points),
-                    'valid_count': 0
+                    'valid_count': 0,
+                    'error_categories': error_categories,
+                    'sample_errors': invalid_points[:5],  # First 5 errors for debugging
+                    'debug_info': {
+                        'total_errors': len(invalid_points),
+                        'client_ip': client_ip,
+                        'session_id': ruck_id
+                    }
                 }, 400
                 
             try:
@@ -2100,17 +2165,40 @@ class RuckSessionLocationResource(Resource):
                     return {'message': 'Database insert failed - no data returned'}, 500
                 
                 inserted_count = len(insert_resp.data)
-                success_msg = f"[LOC_UPLOAD][SUCCESS] session={ruck_id} user={g.user.id} inserted={inserted_count}"
+                success_rate = (inserted_count / len(location_points)) * 100 if location_points else 0
+                
+                success_msg = f"[LOC_UPLOAD][SUCCESS] session={ruck_id} user={g.user.id} inserted={inserted_count} success_rate={success_rate:.1f}%"
                 if invalid_points:
-                    success_msg += f" skipped={len(invalid_points)} invalid_points"
+                    # Categorize validation errors for logging
+                    error_categories = {}
+                    for error in invalid_points:
+                        category = error.split(':')[0]
+                        error_categories[category] = error_categories.get(category, 0) + 1
+                    success_msg += f" skipped={len(invalid_points)} error_categories={error_categories}"
                 logger.info(success_msg)
                 
                 # Note: No need to invalidate session cache for location points
                 # Session data (distance, duration, etc.) is calculated separately
-                result = {'status': 'ok', 'inserted': inserted_count}
+                result = {
+                    'status': 'ok', 
+                    'inserted': inserted_count,
+                    'submitted_count': len(location_points),
+                    'success_rate': round(success_rate, 1)
+                }
+                
                 if invalid_points:
-                    result['warnings'] = invalid_points
-                    result['submitted_count'] = len(location_points)
+                    # Categorize errors for client debugging
+                    error_categories = {}
+                    for error in invalid_points:
+                        category = error.split(':')[0]
+                        error_categories[category] = error_categories.get(category, 0) + 1
+                    
+                    result['warnings'] = {
+                        'skipped_count': len(invalid_points),
+                        'error_categories': error_categories,
+                        'sample_errors': invalid_points[:3]  # First 3 for debugging
+                    }
+                    
                 return result, 201
                 
             except Exception as db_error:
@@ -2120,6 +2208,30 @@ class RuckSessionLocationResource(Resource):
         except Exception as e:
             logger.error(f"[LOC_UPLOAD][UNEXPECTED] session={ruck_id} user={getattr(g,'user',None) and g.user.id} error={e}")
             return {'message': f'Error uploading location points: {str(e)}'}, 500
+
+class RuckSessionRouteChunkResource(Resource):
+    def post(self, ruck_id):
+        """Legacy route-chunk endpoint (no-op for backward compatibility)"""
+        try:
+            if not hasattr(g, 'user') or g.user is None:
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                logger.warning(f"[ROUTE_CHUNK][AUTH_FAIL] session={ruck_id} ip={client_ip} reason=unauthenticated")
+                return {'message': 'User not authenticated'}, 401
+            
+            # Log the attempt for monitoring but don't process
+            client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+            logger.info(f"[ROUTE_CHUNK][NO_OP] session={ruck_id} user={g.user.id} ip={client_ip} reason=deprecated_endpoint")
+            
+            # Return success response to avoid client errors
+            return {
+                'status': 'ok',
+                'message': 'Route chunk upload is no longer required',
+                'deprecated': True
+            }, 200
+            
+        except Exception as e:
+            logger.error(f"[ROUTE_CHUNK][ERROR] session={ruck_id} user={getattr(g,'user',None) and g.user.id} error={e}")
+            return {'message': 'Route chunk upload is no longer supported'}, 200  # Still return 200 to avoid client failures
 
 class RuckSessionEditResource(Resource):
     def put(self, ruck_id):

@@ -33,7 +33,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _loadSessions();
   }
   
@@ -66,12 +66,12 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
           indicatorColor: Colors.white,
           tabs: const [
             Tab(
-              icon: Icon(Icons.history),
-              text: 'History',
-            ),
-            Tab(
               icon: Icon(Icons.analytics),
               text: 'Stats',
+            ),
+            Tab(
+              icon: Icon(Icons.history),
+              text: 'History',
             ),
           ],
         ),
@@ -79,12 +79,12 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildHistoryTab(),
           const PremiumTabInterceptor(
             tabIndex: 3,
             featureName: 'Statistics',
             child: StatisticsScreen(),
           ),
+          _buildHistoryTab(),
         ],
       ),
     );

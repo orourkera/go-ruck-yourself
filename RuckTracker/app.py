@@ -485,6 +485,7 @@ from .api.ruck import (
     RuckSessionResumeResource,
     RuckSessionCompleteResource,
     RuckSessionLocationResource,
+    RuckSessionRouteChunkResource,
     RuckSessionEditResource,
     RuckSessionHeartRateChunkResource,
     # RuckSessionDetailResource # Commented out - not found in api.ruck.py
@@ -720,6 +721,7 @@ except AttributeError as e:
 
 # Now register the resource with modified methods
 api.add_resource(RuckSessionLocationResource, '/api/rucks/<string:ruck_id>/location')
+api.add_resource(RuckSessionRouteChunkResource, '/api/rucks/<string:ruck_id>/route-chunk')
 api.add_resource(RuckSessionEditResource, '/api/rucks/<string:ruck_id>/edit')
 
 # User insights snapshot

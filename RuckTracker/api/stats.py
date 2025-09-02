@@ -10,11 +10,12 @@ from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pa
 logger = logging.getLogger(__name__)
 
 def get_week_range(date):
-    """Calculates the start (Monday) and end (Sunday) of the week for a given date."""
-    start_of_week = date - timedelta(days=date.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
-    start_dt = datetime(start_of_week.year, start_of_week.month, start_of_week.day, tzinfo=timezone.utc)
-    end_dt = datetime(end_of_week.year, end_of_week.month, end_of_week.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    """Calculates trailing 7 days ending on the given date."""
+    # End date is the given date at end of day
+    end_dt = datetime(date.year, date.month, date.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    # Start date is 6 days before (7 days total including end date)
+    start_date = date - timedelta(days=6)
+    start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
     return start_dt, end_dt
 
 def get_month_range(date):
@@ -75,7 +76,7 @@ def calculate_aggregates(sessions):
     }
     
 def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at'):
-    """Calculates daily breakdown for weekly view."""
+    """Calculates daily breakdown for trailing 7 days view."""
     daily_data = {i: {
         'sessions_count': 0, 
         'distance_km': 0.0,
@@ -91,22 +92,25 @@ def get_daily_breakdown(sessions, start_date, end_date, date_field='completed_at
             try:
                 session_time_dt = datetime.fromisoformat(session_time_str.replace('Z', '+00:00')).astimezone(timezone.utc)
                 if start_date <= session_time_dt <= end_date:
-                    day_index = session_time_dt.weekday()
-                    daily_data[day_index]['sessions_count'] += 1
-                    daily_data[day_index]['distance_km'] += float(s.get('distance_km', 0) or 0)
-                    daily_data[day_index]['duration_seconds'] += int(s.get('duration_seconds', 0) or 0)
-                    daily_data[day_index]['calories'] += int(s.get('calories_burned', 0) or 0)
-                    daily_data[day_index]['power_points'] += int(s.get('power_points', 0) or 0)
+                    # Calculate which day index (0-6) this session falls into within our 7-day window
+                    days_from_start = (session_time_dt.date() - start_date.date()).days
+                    if 0 <= days_from_start < 7:
+                        daily_data[days_from_start]['sessions_count'] += 1
+                        daily_data[days_from_start]['distance_km'] += float(s.get('distance_km', 0) or 0)
+                        daily_data[days_from_start]['duration_seconds'] += int(s.get('duration_seconds', 0) or 0)
+                        daily_data[days_from_start]['calories'] += int(s.get('calories_burned', 0) or 0)
+                        daily_data[days_from_start]['power_points'] += int(s.get('power_points', 0) or 0)
             except (ValueError, TypeError) as e:
                 logger.warning(f"Error parsing timestamp for daily breakdown: {e}")
     
     # Convert to array format for frontend
     result = []
     for i in range(7):
-        # Calculate the actual date for this day of the week
+        # Calculate the actual date for this day in our trailing 7-day window
         day_date = start_date + timedelta(days=i)
+        day_name = day_names[day_date.weekday()]  # Get correct day name for this date
         result.append({
-            'period': day_names[i][:3],  # Mon, Tue, Wed for chart labels
+            'period': day_name[:3],  # Mon, Tue, Wed for chart labels (based on actual date)
             'date': day_date.strftime('%Y-%m-%d'),
             'sessions_count': daily_data[i]['sessions_count'],
             'distance_km': daily_data[i]['distance_km'],

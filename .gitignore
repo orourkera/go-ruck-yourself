@@ -46,5 +46,10 @@ GoogleService-Info.plist
 go-ruck-yourself-c8eff3e1bdf9.json
 *.json
 
+# Sentry configuration and data files (contains API keys)
+.sentry_config.json
+sentry_issues.json
+sentry_issues_*.json
+
 # Web (if applicable)
 .dart_tool/build/
