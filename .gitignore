@@ -1,6 +1,8 @@
 # Ignore environment and secret files
 RuckTracker/.env
 /.env
+find_sentry_slugs.py
+sentry_config.py
 
 # Flutter/Dart
 .dart_tool/

@@ -6,8 +6,8 @@ Quick script to find Sentry organization and project slugs using the API
 import requests
 import json
 
-# Your API token
-API_TOKEN = "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"
+# Your API token - DO NOT COMMIT THIS FILE WITH REAL TOKEN
+API_TOKEN = "YOUR_SENTRY_API_TOKEN_HERE"
 
 headers = {
     'Authorization': f'Bearer {API_TOKEN}',
