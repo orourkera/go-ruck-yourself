@@ -373,7 +373,7 @@ class StravaExportResource(Resource):
         try:
             # Query heart_rate_sample table for this session
             hr_resp = supabase.table('heart_rate_sample').select(
-                'heart_rate, timestamp'
+                'bpm, timestamp'
             ).eq('session_id', session_id).order('timestamp').execute()
             
             if hr_resp.data:
@@ -386,8 +386,23 @@ class StravaExportResource(Resource):
             logger.error(f"[STRAVA] Error fetching heart rate samples: {e}")
             return []
     
+    def _sanitize_text_for_gpx(self, text: str) -> str:
+        """Remove or replace characters that cause UTF-8 encoding issues in GPX files."""
+        if not text:
+            return ""
+        
+        # Remove emoji and other problematic Unicode characters
+        import re
+        # Remove emoji and other high Unicode characters that cause encoding issues
+        sanitized = re.sub(r'[^\x00-\x7F]+', '', text)  # Keep only ASCII
+        return sanitized.strip()
+
     def _generate_gpx_content(self, session: Dict[str, Any], session_name: str, description: str, location_points: List[Dict[str, Any]]) -> str:
         """Generate GPX XML content from session data and location points."""
+        # Sanitize text fields to prevent UTF-8 encoding errors
+        session_name = self._sanitize_text_for_gpx(session_name)
+        description = self._sanitize_text_for_gpx(description)
+        
         # Create root GPX element with proper Strava-compatible creator
         gpx = ET.Element('gpx')
         gpx.set('version', '1.1')

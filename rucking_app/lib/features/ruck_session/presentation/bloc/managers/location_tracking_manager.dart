@@ -1055,7 +1055,30 @@ class LocationTrackingManager implements SessionManager {
     _watchdogStartTime = DateTime.now();
     _watchdogRestartCount = 0;
     
-    _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+    // Start with 30 second intervals, then use exponential backoff
+    _scheduleNextWatchdogCheck();
+  }
+  
+  void _scheduleNextWatchdogCheck() {
+    if (!_isWatchdogActive) return;
+    
+    // Exponential backoff: starts at 30s, maxes out at 5 minutes
+    // First 10 attempts: 30s (5 minutes)
+    // Next 10 attempts: 60s (10 minutes) 
+    // Next 20 attempts: 120s (40 minutes)
+    // Remaining attempts: 300s (5 minutes each) for ~2+ hours
+    int intervalSeconds;
+    if (_watchdogRestartCount < 10) {
+      intervalSeconds = 30; // First 5 minutes - aggressive
+    } else if (_watchdogRestartCount < 20) {
+      intervalSeconds = 60; // Next 10 minutes - moderate
+    } else if (_watchdogRestartCount < 40) {
+      intervalSeconds = 120; // Next 40 minutes - relaxed
+    } else {
+      intervalSeconds = 300; // Remaining 2+ hours - very relaxed
+    }
+    
+    _watchdogTimer = Timer(Duration(seconds: intervalSeconds), () async {
       if (!_isWatchdogActive) return;
       
       final now = DateTime.now();
@@ -1088,35 +1111,31 @@ class LocationTrackingManager implements SessionManager {
           // CRITICAL FIX: Don't stop the entire location service! Just reattach the listener
           _attachLocationListener();
           _lastRawLocationTimestamp = now;
-        } else if (_watchdogRestartCount <= 30) {
+        } else if (_watchdogRestartCount <= 50) {
           // High accuracy mode for next 20 attempts (10 minutes)
           AppLogger.info('[LOCATION] Watchdog: GPS reattach attempt $_watchdogRestartCount/60 (high accuracy mode)');
           // CRITICAL FIX: Just reattach listener, don't kill the service
           _attachLocationListener();
           _lastRawLocationTimestamp = now;
-        } else if (_watchdogRestartCount <= 50) {
-          // Emergency mode - try full restart
-          AppLogger.warning('[LOCATION] Watchdog: GPS FULL restart attempt $_watchdogRestartCount/60 (emergency mode)');
+        } else if (_watchdogRestartCount <= 100) {
+          // Emergency mode - try full restart (50-100 attempts = next ~2 hours)
+          final elapsedHours = now.difference(_watchdogStartTime!).inHours;
+          AppLogger.warning('[LOCATION] Watchdog: GPS FULL restart attempt $_watchdogRestartCount (${elapsedHours}h elapsed)');
           // Only do full restart in emergency mode after many failures
-          _locationService.stopLocationTracking();
-          await Future.delayed(const Duration(seconds: 2));
-          await _startLocationTracking();
-          _lastRawLocationTimestamp = now;
-        } else if (_watchdogRestartCount <= 60) {
-          // Final desperate attempts
-          AppLogger.error('[LOCATION] Watchdog: GPS FULL restart attempt $_watchdogRestartCount/60 (final attempt mode)');
           _locationService.stopLocationTracking();
           await Future.delayed(const Duration(seconds: 3));
           await _startLocationTracking();
           _lastRawLocationTimestamp = now;
         } else {
-          // Give up and switch to offline mode after 30 minutes
-          AppLogger.error('[LOCATION] Watchdog: GPS restart failed after 60 attempts (30 minutes). '
-              'Switching to offline mode.');
-          _stopWatchdog();
+          // After 3+ hours, continue trying but log as critical
+          final elapsedHours = now.difference(_watchdogStartTime!).inHours;
+          AppLogger.critical('[LOCATION] Watchdog: GPS still dead after ${elapsedHours} hours, attempt $_watchdogRestartCount');
           
-          // Start sensor estimation
-          _startSensorEstimation();
+          // Keep trying with full restart
+          _locationService.stopLocationTracking();
+          await Future.delayed(const Duration(seconds: 5));
+          await _startLocationTracking();
+          _lastRawLocationTimestamp = now;
 
           // Emit offline state
           _updateState(_currentState.copyWith(
@@ -1156,6 +1175,9 @@ class LocationTrackingManager implements SessionManager {
 
         // Inactivity detection removed - now handled by SessionCompletionDetectionService
   // This eliminates duplicate notifications and improves accuracy
+      
+      // Schedule next check with exponential backoff
+      _scheduleNextWatchdogCheck();
     });
   }
   
