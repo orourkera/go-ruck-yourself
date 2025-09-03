@@ -24,11 +24,18 @@ class AppUpdateNotificationResource(Resource):
             version = data.get('version', '3.5.1')
             is_critical = data.get('is_critical', True)
             test_mode = data.get('test_mode', False)  # For testing with limited users
+            specific_tokens = data.get('device_tokens', [])  # For testing with specific tokens
             
-            logger.info(f"🔔 App update notification request: platform={platform}, version={version}, critical={is_critical}, test={test_mode}")
+            logger.info(f"🔔 App update notification request: platform={platform}, version={version}, critical={is_critical}, test={test_mode}, specific_tokens={len(specific_tokens)}")
             
-            # Get device tokens for specified platform
-            device_tokens = self._get_device_tokens(platform, test_mode)
+            # Get device tokens
+            if specific_tokens:
+                # Use provided device tokens directly
+                device_tokens = specific_tokens
+                logger.info(f"🎯 Using {len(specific_tokens)} specific device tokens provided")
+            else:
+                # Get device tokens for specified platform
+                device_tokens = self._get_device_tokens(platform, test_mode)
             
             if not device_tokens:
                 return build_api_response(

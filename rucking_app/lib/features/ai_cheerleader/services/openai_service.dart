@@ -532,7 +532,7 @@ Reference historical trends and achievements when relevant.''';
         ? ''
         : '\n\nVariety Guidelines:\nAvoid repeating these exact phrases from recent responses:\n- ' + avoidLines.join('\n- ') + '\n\nFor variety, try referencing different aspects of their performance each time.\n';
     
-    // Add coaching plan guidance to the prompt
+    // Add coaching plan guidance to the prompt ONLY if we have actual coaching plan data
     final coachingPlan = (history is Map && history['coachingPlan'] is Map) ? history['coachingPlan'] as Map<String, dynamic>? : null;
     final coachingGuidance = coachingPlan != null && coachingPlan.isNotEmpty 
         ? '''
@@ -545,11 +545,7 @@ COACHING PLAN PRIORITY:
 - If they're behind, motivate them to get back on track
 - If they're on track, celebrate their commitment to the plan
 ${coachingPlan['nextSession'] != null ? '- Mention their next planned session if relevant to current performance' : ''}'''
-        : '''
-
-COACHING PLAN OPPORTUNITY:
-- User has no active coaching plan
-- If they show goal-oriented behavior, subtly suggest considering a structured training plan''';
+        : ''; // NO coaching plan guidance when API fails - avoid repetitive coaching plan mentions
 
     return '''
 $systemPrompt
