@@ -853,8 +853,9 @@ api.add_resource(WeatherResource, '/api/weather')
 # AI Cheerleader Endpoints
 # Register both the legacy '/api/ai-cheerleader/log' and the client-used '/api/ai-cheerleader'
 api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader', '/api/ai-cheerleader/log')
-api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs')
-# AICheerleaderUserHistoryResource removed - now using /api/user-insights for structured data
+api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs', '/api/ai-cheerleader/user-history')
+# TEMPORARY: Map deprecated user-history endpoint to logs endpoint until frontend is deployed
+# TODO: Remove /api/ai-cheerleader/user-history mapping after frontend update is deployed
 
 # Goals Endpoints
 app.logger.info("Setting Goals API rate limits")

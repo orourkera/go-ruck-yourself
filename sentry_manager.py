@@ -31,11 +31,22 @@ class SentryManager:
         self.issues_file = 'sentry_issues.json'
     
     def _load_config(self) -> Dict[str, str]:
-        """Load Sentry configuration from file."""
+        """Load Sentry configuration from file or environment variables."""
+        # Try environment variables first (more secure)
+        api_token = os.getenv('SENTRY_API_TOKEN')
+        if api_token:
+            return {
+                "api_token": api_token,
+                "organization_slug": "get-rucky-llc", 
+                "project_slug": "ruck"
+            }
+        
+        # Fallback to config file
         if not os.path.exists(self.config_file):
             self._create_config_template()
             print(f"❌ Config file not found. Created template at {self.config_file}")
             print("Please fill in your Sentry details and run again.")
+            print("Or set SENTRY_API_TOKEN environment variable.")
             sys.exit(1)
         
         try:
