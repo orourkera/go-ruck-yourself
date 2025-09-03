@@ -857,6 +857,10 @@ api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs', '/api/ai
 # TEMPORARY: Map deprecated user-history endpoint to logs endpoint until frontend is deployed
 # TODO: Remove /api/ai-cheerleader/user-history mapping after frontend update is deployed
 
+# App Update Notification Endpoints
+from .api.app_update_notifications import AppUpdateNotificationResource
+api.add_resource(AppUpdateNotificationResource, '/api/app/update-notifications')
+
 # Goals Endpoints
 app.logger.info("Setting Goals API rate limits")
 GoalsListResource.get = conditional_rate_limit("1000 per hour", key_func=get_user_id)(GoalsListResource.get)
@@ -1361,17 +1365,39 @@ def app_version_info():
     # Fallback to User-Agent detection if no platform parameter provided
     if not platform:
         user_agent = request.headers.get('User-Agent', '').lower()
-        # Check for iOS patterns in User-Agent
-        if 'ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent:
+        
+        # Check for iOS patterns in User-Agent (including iOS system User-Agents)
+        # iOS devices often include CFNetwork, Darwin, or iOS version info
+        if ('ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent or
+            'cfnetwork' in user_agent or 'darwin' in user_agent or
+            'os x' in user_agent or 'mac os' in user_agent):
             platform = 'ios'
-        elif 'android' in user_agent:
-            platform = 'android'
+        elif ('android' in user_agent or 'linux' in user_agent):
+            platform = 'android'  
         else:
-            # Default to treating unknown as Android (safer, no forced update)
-            platform = 'android'
+            # Check additional headers that might indicate iOS
+            # iOS apps often include specific headers
+            accept_language = request.headers.get('Accept-Language', '').lower()
+            accept_encoding = request.headers.get('Accept-Encoding', '').lower()
+            
+            # Check if this is our RuckingApp making the request
+            if 'ruckingapp' in user_agent and 'flutter' in user_agent:
+                # This is our app but we can't determine platform reliably
+                # Default to Android (no forced update) until frontend sends platform parameter
+                platform = 'android'
+                logger.warning(f"[VERSION_CHECK] RuckingApp request without platform detection - defaulting to Android: {user_agent}")
+                logger.warning("[VERSION_CHECK] ⚠️  iOS users with this User-Agent won't get forced update until frontend is deployed")
+            else:
+                # Default to Android for unknown requests
+                platform = 'android'
+                logger.info(f"[VERSION_CHECK] Unknown User-Agent, defaulting to Android: {user_agent}")
     
-    # Log the detection for debugging
-    logger.info(f"Version check - Platform: {platform}, User-Agent: {request.headers.get('User-Agent', 'None')}")
+    # Enhanced logging for debugging platform detection
+    logger.info(f"[VERSION_CHECK] Platform detected: {platform}")
+    logger.info(f"[VERSION_CHECK] User-Agent: {request.headers.get('User-Agent', 'None')}")
+    logger.info(f"[VERSION_CHECK] Accept-Language: {request.headers.get('Accept-Language', 'None')}")
+    logger.info(f"[VERSION_CHECK] Accept-Encoding: {request.headers.get('Accept-Encoding', 'None')}")
+    logger.info(f"[VERSION_CHECK] All headers: {dict(request.headers)}")
     
     if platform == 'ios':
         # Force iOS users to update to 3.5.1

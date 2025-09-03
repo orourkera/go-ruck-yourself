@@ -817,6 +817,36 @@ class PushNotificationService:
         logger.info(f"🔔 UNIFIED NOTIFICATION: Stuck session notification result: {result}")
         return result
 
+    def send_app_update_notification(self, device_tokens: List[str], version: str, is_critical: bool = False):
+        """Send app update notification to users"""
+        if is_critical:
+            title = "🚨 Critical App Update Available"
+            body = f"Update to v{version} now for important GPS tracking fixes and improvements. Tap to update."
+            notification_data = {
+                'type': 'critical_app_update',
+                'version': version,
+                'action': 'open_app_store',
+                'priority': 'high'
+            }
+        else:
+            title = "📱 App Update Available"
+            body = f"Version {version} is now available with new features and improvements. Tap to update."
+            notification_data = {
+                'type': 'app_update',
+                'version': version,
+                'action': 'open_app_store',
+                'priority': 'normal'
+            }
+        
+        logger.info(f"🔔 Sending {'CRITICAL' if is_critical else 'NORMAL'} app update notification for v{version} to {len(device_tokens)} devices")
+        
+        return self.send_notification(
+            device_tokens=device_tokens,
+            title=title,
+            body=body,
+            notification_data=notification_data
+        )
+
 
 # Helper function to get user device tokens
 def get_user_device_tokens(user_ids: List[str]) -> List[str]:
