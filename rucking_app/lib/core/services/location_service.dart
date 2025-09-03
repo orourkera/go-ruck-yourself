@@ -243,12 +243,12 @@ class LocationServiceImpl implements LocationService {
       // 🔥 FIX: Add timeout to prevent app hangs
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10), // Prevent infinite wait
+        timeLimit: const Duration(seconds: 15), // Increased from 10s - prevent infinite wait
       ).timeout(
-        const Duration(seconds: 15), // Double timeout protection
+        const Duration(seconds: 20), // Increased timeout protection
         onTimeout: () {
-          AppLogger.warning('⏰ Location request timed out after 15 seconds');
-          throw TimeoutException('Location request timed out', const Duration(seconds: 15));
+          AppLogger.warning('⏰ Location request timed out after 20 seconds');
+          throw TimeoutException('Location request timed out', const Duration(seconds: 20));
         },
       );
       
@@ -679,7 +679,7 @@ class LocationServiceImpl implements LocationService {
       AppLogger.info('Requesting fresh location...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: const Duration(seconds: 15), // Increased from 10s
       );
       
       if (_isTracking) {

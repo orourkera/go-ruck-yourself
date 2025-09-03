@@ -413,10 +413,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // 1. Fetch historical user data for richer AI context
       Map<String, dynamic>? history;
       try {
-        AppLogger.info('[AI_CHEERLEADER_DEBUG] Fetching user history from ${ApiEndpoints.aiCheerleaderUserHistory}');
-        final historyResp = await _apiClient.get(ApiEndpoints.aiCheerleaderUserHistory, queryParams: {
-          'ruck_limit': 50,
-          'achievements_limit': 50,
+        AppLogger.info('[AI_CHEERLEADER_DEBUG] Fetching user history from ${ApiEndpoints.aiCheerleaderLogs}');
+        final historyResp = await _apiClient.get(ApiEndpoints.aiCheerleaderLogs, queryParams: {
+          'limit': 20,
+          'offset': 0,
         });
         if (historyResp is Map<String, dynamic>) {
           history = historyResp;

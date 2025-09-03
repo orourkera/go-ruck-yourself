@@ -1525,7 +1525,7 @@ class RuckSessionCompleteResource(Resource):
                 
                     # Update event participant progress
                     progress_update = {
-                        'ruck_session_id': int(ruck_id),  # Convert to int to match database type
+                        'session_id': int(ruck_id),  # Convert to int to match database type
                         'distance_km': completed_session.get('distance_km', 0),
                         'duration_minutes': int(duration_seconds / 60) if duration_seconds else 0,
                         'calories_burned': completed_session.get('calories_burned', 0),

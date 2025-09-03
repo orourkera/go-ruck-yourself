@@ -162,10 +162,8 @@ class GoalsApiService {
 
   // Fetch AI Cheerleader user history for richer context (recent rucks, achievements, ai history)
   Future<Map<String, dynamic>> getAICheerleaderUserHistory({int? rucksLimit, int? achievementsLimit}) async {
-    final query = <String, dynamic>{};
-    if (rucksLimit != null) query['rucks_limit'] = rucksLimit;
-    if (achievementsLimit != null) query['achievements_limit'] = achievementsLimit;
-    final data = await _api.get(ApiEndpoints.aiCheerleaderUserHistory, queryParams: query);
+    // Now using user insights endpoint which provides structured historical data
+    final data = await _api.get(ApiEndpoints.userInsights);
     return Map<String, dynamic>.from((data ?? const <String, dynamic>{}) as Map);
   }
 }

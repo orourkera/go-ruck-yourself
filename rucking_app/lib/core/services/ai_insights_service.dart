@@ -100,7 +100,7 @@ class AIInsightsService {
           modelOverride: 'o3-mini',
           temperatureOverride: null,
           maxTokensOverride: null,
-          timeoutOverride: const Duration(seconds: 10),
+          timeoutOverride: const Duration(seconds: 15), // Increased from 10s
         );
         final insight = _parseAIResponse(aiResponse ?? '', context);
         onFinal(insight);

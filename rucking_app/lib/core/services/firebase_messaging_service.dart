@@ -537,7 +537,7 @@ class FirebaseMessagingService {
       // 6. Check API connectivity
       try {
         final apiClient = GetIt.I<ApiClient>();
-        await apiClient.get('/notifications').timeout(const Duration(seconds: 10));
+        await apiClient.get('/notifications').timeout(const Duration(seconds: 15)); // Increased from 10s
         results['api_connectivity'] = 'success';
         print('✅ API connectivity successful');
       } catch (e) {
