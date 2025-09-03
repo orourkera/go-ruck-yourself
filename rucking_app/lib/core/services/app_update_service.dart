@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 
 class AppUpdateService {
   static const String _dismissedVersionKey = 'update_dismissed_version';
@@ -71,14 +73,48 @@ class AppUpdateService {
     }
   }
   
+  /// Check if there's an active ruck session that would be disrupted by an update
+  bool _hasActiveSession() {
+    try {
+      if (!getIt.isRegistered<ActiveSessionBloc>()) {
+        return false;
+      }
+      
+      final activeSessionBloc = getIt<ActiveSessionBloc>();
+      final state = activeSessionBloc.state;
+      
+      // Consider ActiveSessionRunning as active, even if paused (user may resume)
+      final isActive = state is ActiveSessionRunning;
+      
+      if (isActive) {
+        final sessionState = state as ActiveSessionRunning;
+        final statusText = sessionState.isPaused ? 'PAUSED' : 'RUNNING';
+        AppLogger.warning('[UPDATE_SERVICE] 🚫 Active ruck session detected ($statusText) - blocking updates');
+        AppLogger.info('[UPDATE_SERVICE] Session ID: ${sessionState.sessionId}, Duration: ${sessionState.elapsedSeconds}s, Distance: ${sessionState.distanceKm.toStringAsFixed(2)}km');
+      }
+      
+      return isActive;
+    } catch (e) {
+      AppLogger.warning('[UPDATE_SERVICE] Error checking active session: $e');
+      return false; // Assume no active session if we can't check
+    }
+  }
+
   /// Check if a force update is required for the current version
   Future<bool> _isForceUpdateRequired(String currentVersion) async {
     try {
       final platform = Platform.isIOS ? 'ios' : 'android';
       final response = await _apiClient.get('/app/version-info', queryParams: {'platform': platform});
       final minRequiredVersion = response['min_required_version'] as String?;
+      final forceUpdate = response['force_update'] as bool? ?? false;
       
       if (minRequiredVersion == null) return false;
+      
+      // CRITICAL: Never force update during active ruck sessions
+      if (forceUpdate && _hasActiveSession()) {
+        AppLogger.critical('[UPDATE_SERVICE] 🛡️ BLOCKING force update - active ruck session in progress');
+        return false; // Override force update if session is active
+      }
       
       return _isVersionBelow(currentVersion, minRequiredVersion);
     } catch (e) {
@@ -90,6 +126,12 @@ class AppUpdateService {
   /// Check if we should show the update prompt for a specific version
   Future<bool> shouldShowUpdatePrompt(String latestVersion) async {
     try {
+      // CRITICAL: Never show update prompts during active sessions
+      if (_hasActiveSession()) {
+        AppLogger.info('[UPDATE_SERVICE] 🚫 Skipping update prompt - active ruck session in progress');
+        return false;
+      }
+      
       final prefs = await SharedPreferences.getInstance();
       
       // Don't show if user dismissed this version
