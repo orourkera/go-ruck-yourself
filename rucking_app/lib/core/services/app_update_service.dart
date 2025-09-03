@@ -62,7 +62,8 @@ class AppUpdateService {
   /// Get the latest version from your backend
   Future<String?> _getLatestVersionFromBackend() async {
     try {
-      final response = await _apiClient.get('/app/version-info');
+      final platform = Platform.isIOS ? 'ios' : 'android';
+      final response = await _apiClient.get('/app/version-info', queryParams: {'platform': platform});
       return response['latest_version'] as String?;
     } catch (e) {
       AppLogger.warning('[UPDATE_SERVICE] Failed to get version from backend: $e');
@@ -73,7 +74,8 @@ class AppUpdateService {
   /// Check if a force update is required for the current version
   Future<bool> _isForceUpdateRequired(String currentVersion) async {
     try {
-      final response = await _apiClient.get('/app/version-info');
+      final platform = Platform.isIOS ? 'ios' : 'android';
+      final response = await _apiClient.get('/app/version-info', queryParams: {'platform': platform});
       final minRequiredVersion = response['min_required_version'] as String?;
       
       if (minRequiredVersion == null) return false;

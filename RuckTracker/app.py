@@ -1355,11 +1355,25 @@ def health():
 @app.route('/api/app/version-info')
 def app_version_info():
     """App version information for update checks"""
-    # Check if request is from iOS by examining User-Agent header
-    user_agent = request.headers.get('User-Agent', '').lower()
-    is_ios = 'ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
+    # Get platform from query parameter (more reliable than User-Agent parsing)
+    platform = request.args.get('platform', '').lower()
     
-    if is_ios:
+    # Fallback to User-Agent detection if no platform parameter provided
+    if not platform:
+        user_agent = request.headers.get('User-Agent', '').lower()
+        # Check for iOS patterns in User-Agent
+        if 'ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent:
+            platform = 'ios'
+        elif 'android' in user_agent:
+            platform = 'android'
+        else:
+            # Default to treating unknown as Android (safer, no forced update)
+            platform = 'android'
+    
+    # Log the detection for debugging
+    logger.info(f"Version check - Platform: {platform}, User-Agent: {request.headers.get('User-Agent', 'None')}")
+    
+    if platform == 'ios':
         # Force iOS users to update to 3.5.1
         return jsonify({
             'latest_version': '3.5.1',
@@ -1369,7 +1383,7 @@ def app_version_info():
             'release_notes': 'Critical iOS update: Fixed GPS tracking issues, AI cheerleader improvements, and enhanced stability. Update required.'
         })
     else:
-        # Android users stay on current version
+        # Android users (and unknown platforms) stay on current version
         return jsonify({
             'latest_version': '3.3.4',
             'min_required_version': '3.2.0',
