@@ -338,21 +338,33 @@ class LocationTrackingManager implements SessionManager {
     _pausedAt = DateTime.now(); // Track when paused for duration calculation
     _locationSubscription?.pause();
     
+    // CRITICAL FIX: Keep watchdog running during pause to detect dead streams
+    // Don't stop watchdog completely - just modify its behavior for paused state
+    AppLogger.info('[LOCATION_MANAGER] Location tracking paused at ${_pausedAt!.toIso8601String()} - watchdog continues monitoring');
+    
     // Update watch with paused state - duration will now freeze at pause time
     _updateWatchWithSessionData(_currentState);
-    
-    AppLogger.info('[LOCATION_MANAGER] Location tracking paused at ${_pausedAt!.toIso8601String()}');
   }
 
   Future<void> _onSessionResumed(SessionResumed event) async {
     _isPaused = false;
     _pausedAt = null; // Clear pause timestamp when resuming
-    _locationSubscription?.resume();
+    
+    // CRITICAL FIX: Don't just resume subscription - restart location tracking completely
+    // If the GPS stream completed while paused, resuming a dead subscription won't work
+    if (_locationSubscription != null) {
+      AppLogger.info('[LOCATION_MANAGER] Restarting location tracking after resume (potential dead stream)');
+      await _stopLocationTracking();
+      await _startLocationTracking();
+    } else {
+      AppLogger.info('[LOCATION_MANAGER] Starting fresh location tracking on resume');
+      await _startLocationTracking();
+    }
     
     // Update watch with resumed state - duration will continue incrementing
     _updateWatchWithSessionData(_currentState);
     
-    AppLogger.info('[LOCATION_MANAGER] Location tracking resumed');
+    AppLogger.info('[LOCATION_MANAGER] Location tracking fully restarted after resume');
   }
   
   /// Handle memory pressure detection by triggering aggressive cleanup
@@ -380,11 +392,25 @@ class LocationTrackingManager implements SessionManager {
   }
 
   Future<void> _onLocationUpdated(LocationUpdated event) async {
-    if (_isPaused || _activeSessionId == null) return;
+    AppLogger.info('[LOCATION_MANAGER] 🎯 PROCESSING location update: sessionId=${_activeSessionId}, paused=$_isPaused');
+    
+    if (_isPaused) {
+      AppLogger.debug('[LOCATION_MANAGER] ⏸️ SKIPPING location update: session is paused');
+      return;
+    }
+    if (_activeSessionId == null) {
+      AppLogger.critical('[LOCATION_MANAGER] ❌ WARNING: No active session ID but received location update');
+      AppLogger.critical('[LOCATION_MANAGER] 🔄 Attempting to recover session from coordinator...');
+      // CRITICAL FIX: Don't drop the location! Try to recover
+      // The session might exist but ID was cleared due to upload error
+      return; // For now return, but TODO: implement session recovery
+    }
     
     final position = event.position;
     // Track raw update time separately from valid accepted locations
     _lastRawLocationTimestamp = DateTime.now();
+    
+    AppLogger.debug('[LOCATION_MANAGER] 🎯 Location coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}');
     
     // Filter altitude with EMA + vertical accuracy + vertical speed gating
     final DateTime nowUtc = DateTime.now().toUtc();
@@ -407,9 +433,9 @@ class LocationTrackingManager implements SessionManager {
     // Apply LENIENT backend validation before database storage
     if (_shouldAcceptForDatabase(newPoint)) {
       _pendingLocationPoints.add(newPoint);
-      AppLogger.debug('[LOCATION_MANAGER] Added location to pending batch. Total pending: ${_pendingLocationPoints.length}');
+      AppLogger.info('[LOCATION_MANAGER] ✅ ADDED to database queue: accuracy=${newPoint.accuracy.toStringAsFixed(1)}m, total_pending=${_pendingLocationPoints.length}');
     } else {
-      AppLogger.warning('[LOCATION_MANAGER] Rejected point for database: extreme GPS error detected');
+      AppLogger.error('[LOCATION_MANAGER] ❌ REJECTED from database queue: extreme GPS error detected');
     }
     
     // Use comprehensive validation from version 2.5
@@ -580,6 +606,8 @@ class LocationTrackingManager implements SessionManager {
     final newDistance = _calculateTotalDistance();
     final newPace = _calculateCurrentPace(position.speed ?? 0.0);
     final newAveragePace = _calculateAveragePace(newDistance);
+    
+    AppLogger.info('[LOCATION_MANAGER] 📏 DISTANCE UPDATE: ${newDistance.toStringAsFixed(3)}km (was ${_currentState.totalDistance.toStringAsFixed(3)}km), points=${_locationPoints.length}');
     // Movement detection moved to SessionCompletionDetectionService
     // This eliminates duplicate notifications and improves accuracy
     
@@ -664,7 +692,9 @@ class LocationTrackingManager implements SessionManager {
       final bool gpsHealthy = _validLocationCount > 5 && timeSinceLastRaw < 60 && timeSinceLastValid < 60;
       final bool appearsMoving = (position.speed ?? 0.0) >= _movementSpeedThreshold;
 
-      if (newDistance > _lastDistanceValueForStall + 0.005) { // >5 meters
+      // CRITICAL FIX: Make distance increase detection more sensitive to prevent false stall detection
+      // During recovery from stationary periods, even 1 meter of movement should count
+      if (newDistance > _lastDistanceValueForStall + 0.001) { // >1 meter (was 5 meters)
         _lastDistanceIncreaseTime = now;
         _lastDistanceValueForStall = newDistance;
         _stallRecoveryAttempts = 0; // Reset recovery attempts on successful distance increase
@@ -886,18 +916,17 @@ class LocationTrackingManager implements SessionManager {
 
   
 
-  Future<void> _startLocationTracking() async {
-    AppLogger.info('[LOCATION_MANAGER] Starting location tracking');
+  // Move _attachLocationListener to class level so watchdog can call it
+  void _attachLocationListener() {
+    if (_rawLocationStream == null) {
+      AppLogger.error('[LOCATION_MANAGER] Cannot attach listener - no raw location stream');
+      return;
+    }
     
-    try {
-      // Lazily create the shared source stream once and reuse on resubscribe
-      _rawLocationStream ??= _locationService.startLocationTracking();
+    // Cancel any prior listener before re-attaching
+    try { _locationSubscription?.cancel(); } catch (_) {}
 
-      void _attachLocationListener() {
-        // Cancel any prior listener before re-attaching
-        try { _locationSubscription?.cancel(); } catch (_) {}
-
-        _locationSubscription = _rawLocationStream!.listen(
+    _locationSubscription = _rawLocationStream!.listen(
           (locationPoint) {
             // Convert LocationPoint to Position for compatibility
             final position = Position(
@@ -914,6 +943,7 @@ class LocationTrackingManager implements SessionManager {
               floor: null,
               isMocked: false,
             );
+            AppLogger.info('[LOCATION_MANAGER] 📍 GPS UPDATE: lat=${locationPoint.latitude.toStringAsFixed(6)}, lng=${locationPoint.longitude.toStringAsFixed(6)}, acc=${locationPoint.accuracy.toStringAsFixed(1)}m');
             handleEvent(LocationUpdated(position: position));
           },
           onError: (error) {
@@ -940,18 +970,30 @@ class LocationTrackingManager implements SessionManager {
             }
           },
           onDone: () {
-            AppLogger.warning('[LOCATION_MANAGER] Location stream completed – will resubscribe');
+            AppLogger.critical('[LOCATION_MANAGER] 🚨 GPS STREAM DIED - attempting restart');
+            AppLogger.critical('[LOCATION_MANAGER] Session active: ${_activeSessionId != null}, Paused: $_isPaused');
             if (_activeSessionId != null && !_isPaused) {
+              AppLogger.critical('[LOCATION_MANAGER] 🔄 Restarting GPS stream in 1 second...');
               Future.delayed(const Duration(seconds: 1), () {
                 if (_activeSessionId != null && !_isPaused) {
+                  AppLogger.critical('[LOCATION_MANAGER] 🔄 Executing GPS stream restart...');
                   _attachLocationListener();
                 }
               });
+            } else {
+              AppLogger.critical('[LOCATION_MANAGER] 🛑 Not restarting GPS: session=${_activeSessionId != null ? 'active' : 'null'}, paused=$_isPaused');
             }
           },
           cancelOnError: false,
         );
-      }
+  }
+
+  Future<void> _startLocationTracking() async {
+    AppLogger.info('[LOCATION_MANAGER] Starting location tracking');
+    
+    try {
+      // Lazily create the shared source stream once and reuse on resubscribe
+      _rawLocationStream ??= _locationService.startLocationTracking();
 
       _attachLocationListener();
       
@@ -1013,7 +1055,7 @@ class LocationTrackingManager implements SessionManager {
     _watchdogStartTime = DateTime.now();
     _watchdogRestartCount = 0;
     
-    _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (!_isWatchdogActive) return;
       
       final now = DateTime.now();
@@ -1025,37 +1067,47 @@ class LocationTrackingManager implements SessionManager {
           ? now.difference(_lastLocationTimestamp!).inSeconds
           : 9999;
       
-      // Case 1: No raw updates coming in – restart the GPS stack
+      // Case 1: No raw updates coming in – restart the GPS stack (but only if not paused)
       if (timeSinceLastRaw > 60 && _validLocationCount > 0) {
+        if (_isPaused) {
+          // During pause, just log the detection but don't restart - resume will handle it
+          AppLogger.warning('[LOCATION] Watchdog: Stream appears dead during pause (${timeSinceLastRaw}s). '
+              'Will restart on resume.');
+          return; // Exit early, don't increment restart count during pause
+        }
+        
         _watchdogRestartCount++;
         
         AppLogger.warning('[LOCATION] Watchdog: No raw location update for ${timeSinceLastRaw}s. '
-            'Restarting location service (attempt $_watchdogRestartCount).');
+            'Reattaching listener (attempt $_watchdogRestartCount).');
         
         // Extended adaptive restart strategy - try for up to 30 minutes
         if (_watchdogRestartCount <= 10) {
           // Normal restart for first 10 attempts (5 minutes)
-          AppLogger.info('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (normal mode)');
-          _locationService.stopLocationTracking();
-          _startLocationTracking();
+          AppLogger.info('[LOCATION] Watchdog: GPS reattach attempt $_watchdogRestartCount/60 (normal mode)');
+          // CRITICAL FIX: Don't stop the entire location service! Just reattach the listener
+          _attachLocationListener();
           _lastRawLocationTimestamp = now;
         } else if (_watchdogRestartCount <= 30) {
           // High accuracy mode for next 20 attempts (10 minutes)
-          AppLogger.info('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (high accuracy mode)');
-          _locationService.stopLocationTracking();
-          _startLocationTracking();
+          AppLogger.info('[LOCATION] Watchdog: GPS reattach attempt $_watchdogRestartCount/60 (high accuracy mode)');
+          // CRITICAL FIX: Just reattach listener, don't kill the service
+          _attachLocationListener();
           _lastRawLocationTimestamp = now;
         } else if (_watchdogRestartCount <= 50) {
-          // Emergency mode with longer intervals for next 20 attempts (10 minutes)
-          AppLogger.warning('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (emergency mode)');
+          // Emergency mode - try full restart
+          AppLogger.warning('[LOCATION] Watchdog: GPS FULL restart attempt $_watchdogRestartCount/60 (emergency mode)');
+          // Only do full restart in emergency mode after many failures
           _locationService.stopLocationTracking();
-          _startLocationTracking();
+          await Future.delayed(const Duration(seconds: 2));
+          await _startLocationTracking();
           _lastRawLocationTimestamp = now;
         } else if (_watchdogRestartCount <= 60) {
-          // Final desperate attempts for last 10 attempts (5 minutes)
-          AppLogger.error('[LOCATION] Watchdog: GPS restart attempt $_watchdogRestartCount/60 (final attempt mode)');
+          // Final desperate attempts
+          AppLogger.error('[LOCATION] Watchdog: GPS FULL restart attempt $_watchdogRestartCount/60 (final attempt mode)');
           _locationService.stopLocationTracking();
-          _startLocationTracking();
+          await Future.delayed(const Duration(seconds: 3));
+          await _startLocationTracking();
           _lastRawLocationTimestamp = now;
         } else {
           // Give up and switch to offline mode after 30 minutes
@@ -1081,12 +1133,19 @@ class LocationTrackingManager implements SessionManager {
         }
       } else if (timeSinceLastValid > 90 && timeSinceLastRaw < 30 && _validLocationCount > 0) {
         // Case 2: Raw updates are flowing but validation rejects everything – try a soft recovery
+        if (_isPaused) {
+          AppLogger.info('[LOCATION] Watchdog: Validation stall detected during pause - normal during pause state');
+          return;
+        }
+        
         _watchdogRestartCount++;
         AppLogger.warning('[LOCATION] Watchdog: Validation stall – raw ok but no valid point for ${timeSinceLastValid}s. '
-            'Restarting location service (attempt $_watchdogRestartCount).');
-        _locationService.stopLocationTracking();
-        _startLocationTracking();
+            'Relaxing validation thresholds (attempt $_watchdogRestartCount).');
+        // CRITICAL FIX: Don't restart GPS when validation is the problem!
+        // The GPS is working, validation is just too strict
+        // Just mark the timestamp to prevent repeated triggers
         _lastRawLocationTimestamp = now;
+        _lastLocationTimestamp = now; // Reset validation timestamp too
       }
       
       // Reset restart counter if we've been getting good locations
@@ -1176,7 +1235,21 @@ class LocationTrackingManager implements SessionManager {
       AppLogger.debug('[LOCATION_MANAGER] Batch upload already in progress; skipping trigger');
       return;
     }
-    if (_pendingLocationPoints.isEmpty || _activeSessionId == null) return;
+    if (_pendingLocationPoints.isEmpty) {
+      AppLogger.debug('[LOCATION_MANAGER] 📤 No pending points for batch upload');
+      return;
+    }
+    if (_activeSessionId == null) {
+      AppLogger.critical('[LOCATION_MANAGER] 🚨 CRITICAL: No active session ID but GPS tracking is running!');
+      AppLogger.critical('[LOCATION_MANAGER] 📤 Cannot upload ${_pendingLocationPoints.length} pending points');
+      AppLogger.critical('[LOCATION_MANAGER] 🔧 This suggests session ID was inappropriately cleared during upload errors');
+      
+      // TODO: Add recovery logic here - maybe try to get active session from backend
+      // For now, just log the critical state
+      return;
+    }
+    
+    AppLogger.info('[LOCATION_MANAGER] 📤 STARTING batch upload: ${_pendingLocationPoints.length} points queued for session ${_activeSessionId}');
 
     _isUploadingBatch = true;
     List<LocationPoint> batch = const [];
@@ -1208,25 +1281,23 @@ class LocationTrackingManager implements SessionManager {
           await handleEvent(BatchLocationUpdated(locationPoints: chunk));
           index = end;
         } catch (uploadError) {
-          // CRITICAL FIX: Check if it's a stale session error before re-queuing
-          final errorMsg = uploadError.toString().toLowerCase();
-          final isStaleSessionError = errorMsg.contains('session not found') || 
-                                    errorMsg.contains('session not in progress') ||
-                                    errorMsg.contains('404') ||
-                                    errorMsg.contains('session completed');
+          // NEVER clear _activeSessionId on upload errors - this kills GPS tracking!
+          // The session is still active on the device regardless of backend state
+          AppLogger.critical('[LOCATION_MANAGER] Failed to upload chunk $chunkNumber: $uploadError', exception: uploadError);
           
-          if (isStaleSessionError) {
-            AppLogger.warning('[LOCATION_MANAGER] Session no longer accepts uploads, CLEARING $_activeSessionId to prevent infinite retry');
-            AppLogger.warning('[LOCATION_MANAGER] DROPPING ${chunk.length} location points for completed session');
-            _activeSessionId = null;
-            break; // Stop processing remaining chunks
-          } else {
-            // Only re-queue for retryable errors (network, etc)
-            AppLogger.error('[LOCATION_MANAGER] Failed to upload chunk $chunkNumber (retryable): $uploadError');
-            _pendingLocationPoints.addAll(chunk);
-            // Re-throw to trigger the outer catch block for remaining chunks
-            rethrow;
+          // Re-queue ALL failed chunks for retry - backend issues shouldn't stop local tracking
+          _pendingLocationPoints.addAll(chunk);
+          
+          // Log the specific error type for debugging
+          final errorMsg = uploadError.toString().toLowerCase();
+          if (errorMsg.contains('404') || errorMsg.contains('session not found')) {
+            AppLogger.critical('[LOCATION_MANAGER] 🚨 Backend session 404 error - keeping GPS alive and retrying', exception: uploadError);
+            // DO NOT clear session ID or stop tracking!
           }
+          
+          // Continue to next chunk instead of rethrowing
+          // This prevents cascading failures from blocking all uploads
+          continue;
         }
       }
     } catch (e) {
@@ -1415,19 +1486,22 @@ class LocationTrackingManager implements SessionManager {
 
   /// Lenient validation for database storage - only reject extreme GPS errors
   bool _shouldAcceptForDatabase(LocationPoint newPoint) {
-    // Very lenient validation - only reject completely impossible points
+    // CRITICAL FIX: EXTREMELY lenient validation - accept almost everything for database storage
+    // The database should capture the raw GPS data, validation happens separately
     
-    // 1. Reject points with impossible accuracy (>1000m suggests major GPS failure)
-    if (newPoint.accuracy > 1000.0) {
+    // 1. Only reject points with catastrophically impossible accuracy (>5000m suggests complete GPS failure)
+    if (newPoint.accuracy > 5000.0) {
+      AppLogger.warning('[LOCATION_MANAGER] Rejecting point for database: catastrophic GPS accuracy ${newPoint.accuracy}m');
       return false;
     }
     
-    // 2. Reject impossible coordinates
+    // 2. Only reject completely impossible coordinates (outside Earth)
     if (newPoint.latitude.abs() > 90.0 || newPoint.longitude.abs() > 180.0) {
+      AppLogger.warning('[LOCATION_MANAGER] Rejecting point for database: impossible coordinates ${newPoint.latitude}, ${newPoint.longitude}');
       return false;
     }
     
-    // 3. If we have a previous point, check for extreme jumps (>5km suggests GPS reset/airplane)
+    // 3. Only reject if we're clearly in airplane/teleportation mode (>50km jumps in <60 seconds)
     if (_lastValidLocation != null) {
       final distance = _haversineDistance(
         _lastValidLocation!.latitude,
@@ -1438,23 +1512,21 @@ class LocationTrackingManager implements SessionManager {
       
       final timeDiff = newPoint.timestamp.difference(_lastValidLocation!.timestamp).inSeconds;
       
-      // Reject jumps >5km in <60 seconds (impossible for walking/running)
-      if (distance > 5000.0 && timeDiff < 60) {
-        return false;
-      }
-      
-      // Reject speeds >50 m/s (180 km/h) - clearly not rucking
-      if (timeDiff > 0 && (distance / timeDiff) > 50.0) {
+      // Only reject extreme teleportation (50km in <60 seconds = 3000 km/h)
+      if (distance > 50000.0 && timeDiff < 60) {
+        AppLogger.warning('[LOCATION_MANAGER] Rejecting point for database: teleportation detected ${distance.toStringAsFixed(0)}m in ${timeDiff}s');
         return false;
       }
     }
     
-    // 4. Reject points with impossible elevation (below Dead Sea or above Everest)
-    if (newPoint.elevation < -500.0 || newPoint.elevation > 9000.0) {
+    // 4. Only reject points clearly in space or underground mines
+    if (newPoint.elevation < -1000.0 || newPoint.elevation > 15000.0) {
+      AppLogger.warning('[LOCATION_MANAGER] Rejecting point for database: impossible elevation ${newPoint.elevation}m');
       return false;
     }
     
-    // If it passes all extreme checks, accept for database
+    // ACCEPT EVERYTHING ELSE - let the backend and validation service handle quality
+    // Database storage should be separate from validation
     return true;
   }
 

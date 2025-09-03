@@ -347,7 +347,7 @@ class StravaExportResource(Resource):
         if str(session_id).startswith('offline_'):
             last_timestamp = None
             while True:
-                query = supabase.table('location_point').select('latitude, longitude, altitude, timestamp').eq('session_id', session_id).order('timestamp', desc=False)
+                query = supabase.table('location_point').select('id, latitude, longitude, altitude, timestamp, horizontal_accuracy_m, speed_mps, course_deg').eq('session_id', session_id).order('timestamp', desc=False)
                 if last_timestamp:
                     query = query.gt('timestamp', last_timestamp)
                 resp = query.execute()
@@ -359,7 +359,7 @@ class StravaExportResource(Resource):
             # Similar loop for regular, using gt('id', last_id) assuming auto-increment ID
             last_id = 0
             while True:
-                query = supabase.table('location_point').select('latitude, longitude, altitude, timestamp').eq('ruck_session_id', session_id).gt('id', last_id).order('timestamp', desc=False)
+                query = supabase.table('location_point').select('id, latitude, longitude, altitude, timestamp, horizontal_accuracy_m, speed_mps, course_deg').eq('session_id', session_id).gt('id', last_id).order('timestamp', desc=False)
                 resp = query.execute()
                 if not resp.data:
                     break
@@ -463,15 +463,39 @@ class StravaExportResource(Resource):
                     time_pt.text = timestamp.isoformat() + 'Z'
                     point_timestamp = timestamp.isoformat()
             
+            # Add extensions for heart rate, speed, and course if available
+            extensions = None
+            tpx_elem = None
+            
             # Add heart rate extension if available for this timestamp
             if point_timestamp and point_timestamp in hr_by_timestamp:
                 heart_rate = hr_by_timestamp[point_timestamp]
                 if heart_rate and heart_rate > 0:
-                    # Add Garmin TrackPoint Extension for heart rate
-                    extensions = ET.SubElement(trkpt, 'extensions')
-                    tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
+                    if extensions is None:
+                        extensions = ET.SubElement(trkpt, 'extensions')
+                        tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
                     hr_elem = ET.SubElement(tpx_elem, 'gpxtpx:hr')
                     hr_elem.text = str(int(heart_rate))
+            
+            # Add speed if available (convert m/s to m/s for GPX)
+            if point.get('speed_mps') is not None:
+                speed_mps = float(point['speed_mps'])
+                if speed_mps >= 0:  # Only add positive speeds
+                    if extensions is None:
+                        extensions = ET.SubElement(trkpt, 'extensions')
+                        tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
+                    speed_elem = ET.SubElement(tpx_elem, 'gpxtpx:speed')
+                    speed_elem.text = str(speed_mps)
+            
+            # Add course/bearing if available
+            if point.get('course_deg') is not None:
+                course_deg = float(point['course_deg'])
+                if 0 <= course_deg <= 360:  # Valid bearing range
+                    if extensions is None:
+                        extensions = ET.SubElement(trkpt, 'extensions')
+                        tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
+                    course_elem = ET.SubElement(tpx_elem, 'gpxtpx:course')
+                    course_elem.text = str(course_deg)
         
         # Convert to string
         return ET.tostring(gpx, encoding='unicode')

@@ -4,16 +4,16 @@ import 'package:rucking_app/core/models/location_point.dart';
 
 /// Provides validation logic for ruck sessions
 class LocationValidationService {
-  // Thresholds
+  // Thresholds - Based on Strava/Garmin industry standards
   static const double minInitialDistanceMeters = 50.0; // 50 meters threshold before starting distance tracking
-  static const double maxSpeedKmh = 15.0; // 15 km/h max speed for rucking (more realistic threshold)
-  static const Duration maxSpeedDuration = Duration(seconds: 10); // 10 seconds max over speed (strict)
-  static const double minMovingSpeedKmh = 0.3; // 0.3 km/h min speed to be considered moving (more lenient)
+  static const double maxSpeedKmh = 15.0; // 15 km/h max speed for rucking (reasonable threshold)
+  static const Duration maxSpeedDuration = Duration(seconds: 10); // 10 seconds max over speed
+  static const double minMovingSpeedKmh = 0.3; // 0.3 km/h min speed to be considered moving
   static const Duration idleDuration = Duration(minutes: 3); // 3 minutes without movement to auto-pause
   static const Duration longIdleDuration = Duration(minutes: 5); // 5 minutes idle to suggest ending session
-  static const double maxPositionJumpMeters = 100.0; // 100 meters max jump (industry standard like Nike)
-  static const Duration maxPositionJumpDuration = Duration(seconds: 2); // 2 seconds minimum between location points (prevent microsecond noise)
-  static const double minGpsAccuracyMeters = 100.0; // 100 meters minimum GPS accuracy (Nike/industry standard)
+  static const double maxPositionJumpMeters = 500.0; // 500 meters max jump (industry standard per MadDevs research)
+  static const Duration maxPositionJumpDuration = Duration(seconds: 3); // 3 seconds minimum between points (prevents microsecond noise)
+  static const double minGpsAccuracyMeters = 200.0; // 200 meters minimum GPS accuracy (Android background mode tolerance)
   static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour
   static const double maxCaloriesPerHour = 800.0; // 800 calories maximum per hour
   static const Duration lowGpsWarningDelay = Duration(seconds: 30); // 30 seconds delay before showing GPS warning
@@ -65,31 +65,45 @@ class LocationValidationService {
     final distance = distanceMeters ?? _calculateDistanceBetweenPoints(point, previousPoint);
     final duration = point.timestamp.difference(previousPoint.timestamp);
 
-    // 1. GPS accuracy check (more lenient for older phones)
+    // 1. GPS accuracy check (more lenient for older phones and stationary periods)
     if (point.accuracy > minGpsAccuracyMeters) {
       if (_lowGpsStartTime == null) {
         _lowGpsStartTime = point.timestamp;
       } else if (point.timestamp.difference(_lowGpsStartTime!) > lowGpsWarningDelay) {
-        // Only reject if accuracy is extremely bad (>150m) or has been bad for too long  
-        if (point.accuracy > 150.0) {
+        // CRITICAL FIX: Be more forgiving during likely stationary periods
+        // If we're getting very low speed readings, user might be stationary (dog potty break)
+        final bool likelyStationary = point.speed != null && point.speed! < 0.5; // < 0.5 m/s (~1.1 mph)
+        
+        // During stationary periods, only reject if accuracy is catastrophically bad (>200m)
+        // Otherwise, only reject if accuracy is extremely bad (>150m) and not stationary
+        final double rejectThreshold = likelyStationary ? 200.0 : 150.0;
+        
+        if (point.accuracy > rejectThreshold) {
           _validationErrorCount++;
           results['isValid'] = false;
           results['message'] = 'Extremely poor GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
           return results;
         }
-        // For moderate accuracy (50-100m), accept but warn
-        results['message'] = 'GPS accuracy reduced (${point.accuracy.toStringAsFixed(1)}m)';
+        // For moderate accuracy, accept but warn (be more lenient during stationary periods)
+        results['message'] = likelyStationary 
+          ? 'GPS accuracy reduced while stationary (${point.accuracy.toStringAsFixed(1)}m)'
+          : 'GPS accuracy reduced (${point.accuracy.toStringAsFixed(1)}m)';
       }
       // Don't return yet if we're still in the buffer period - continue processing the point
     } else {
       _lowGpsStartTime = null;
     }
 
-    // 2. Position jump check - reject any GPS jump over threshold
-    if (distance > maxPositionJumpMeters) {
+    // 2. Position jump check - be more forgiving during stationary periods
+    final bool likelyStationary = point.speed != null && point.speed! < 0.5; // < 0.5 m/s (~1.1 mph)
+    final double jumpThreshold = likelyStationary ? 150.0 : maxPositionJumpMeters; // 150m vs 100m
+    
+    if (distance > jumpThreshold) {
       _validationErrorCount++;
       results['isValid'] = false;
-      results['message'] = 'GPS jump detected: ${distance.toStringAsFixed(0)}m movement. Point rejected.';
+      results['message'] = likelyStationary 
+        ? 'Large GPS drift while stationary: ${distance.toStringAsFixed(0)}m. Point rejected.'
+        : 'GPS jump detected: ${distance.toStringAsFixed(0)}m movement. Point rejected.';
       return results;
     }
     

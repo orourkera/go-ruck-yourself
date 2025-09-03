@@ -198,7 +198,7 @@ class UserResource(Resource):
                 session_ids = [session['id'] for session in sessions_resp.data]
                 if session_ids:
                     # Delete location points associated with these sessions
-                    supabase.table('location_point').delete().in_('ruck_session_id', session_ids).execute()
+                    supabase.table('location_point').delete().in_('session_id', session_ids).execute()
                 # Delete the ruck sessions
                 supabase.table('ruck_session').delete().eq('user_id', user_id).execute()
             # Delete the user's profile from the user table

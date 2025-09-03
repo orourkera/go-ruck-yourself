@@ -192,7 +192,7 @@ class SessionGPXExportResource(Resource):
             # Get location points for the session
             location_result = supabase.table('location_point').select(
                 'latitude, longitude, altitude, recorded_at'
-            ).eq('ruck_session_id', session_id).order('recorded_at').execute()
+            ).eq('session_id', session_id).order('recorded_at').execute()
             
             # Get route data if it's a guided session
             route_data = None
@@ -385,7 +385,7 @@ class GPXExportBatchResource(Resource):
         # Get location points
         location_result = supabase.table('location_point').select(
             'latitude, longitude, altitude, recorded_at'
-        ).eq('ruck_session_id', session_id).order('recorded_at').execute()
+        ).eq('session_id', session_id).order('recorded_at').execute()
         
         if not location_result.data:
             return
