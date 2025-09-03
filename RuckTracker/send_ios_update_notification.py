@@ -25,14 +25,14 @@ def get_ios_device_tokens():
         
         # Query for iOS device tokens (where platform = 'ios')
         result = supabase.table('user_device_tokens') \
-            .select('token, user_id, platform, device_model') \
-            .eq('platform', 'ios') \
+            .select('fcm_token, user_id, device_type, device_id') \
+            .eq('device_type', 'ios') \
             .eq('is_active', True) \
             .execute()
         
         if result.data:
             logger.info(f"📱 Found {len(result.data)} active iOS device tokens")
-            tokens = [row['token'] for row in result.data]
+            tokens = [row['fcm_token'] for row in result.data if row.get('fcm_token')]
             return tokens
         else:
             logger.warning("No iOS device tokens found")
