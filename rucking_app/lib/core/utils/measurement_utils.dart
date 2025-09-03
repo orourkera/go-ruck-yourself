@@ -32,7 +32,7 @@ class MeasurementUtils {
 
   /// Converts seconds-per-km to seconds-per-unit depending on preference.
   static double paceSeconds(double secPerKm, {required bool metric}) =>
-      metric ? secPerKm : secPerKm / _kmToMi;
+      metric ? secPerKm : secPerKm * (1 / _kmToMi);
 
   // ===== Formatting helpers (strings for UI) =============================
 
@@ -57,8 +57,8 @@ class MeasurementUtils {
     if (!paceSeconds.isFinite || paceSeconds <= 0) return '--';
     
     // Convert from seconds/km to seconds/mile if not metric
-    // Correct conversion: seconds/mile = seconds/km × 1.609344 = seconds/km ÷ 0.621371
-    final pace = metric ? paceSeconds : paceSeconds / _kmToMi;
+    // Correct conversion: seconds/mile = seconds/km × 1.609344 (since 1 mile = 1.609344 km)
+    final pace = metric ? paceSeconds : paceSeconds * (1 / _kmToMi);
     
     // Cap extremely slow paces (>6 hours/km or mile) to avoid UI glitches
     // Increased from 90min to 6 hours to handle test sessions and very slow rucks

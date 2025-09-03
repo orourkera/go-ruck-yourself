@@ -1355,13 +1355,28 @@ def health():
 @app.route('/api/app/version-info')
 def app_version_info():
     """App version information for update checks"""
-    return jsonify({
-        'latest_version': '3.3.4',
-        'min_required_version': '3.2.0',
-        'force_update': False,
-        'update_url': 'https://apps.apple.com/app/ruck-app/id6738063624',
-        'release_notes': 'Latest version with improved performance, bug fixes, and enhanced stability.'
-    })
+    # Check if request is from iOS by examining User-Agent header
+    user_agent = request.headers.get('User-Agent', '').lower()
+    is_ios = 'ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
+    
+    if is_ios:
+        # Force iOS users to update to 3.5.1
+        return jsonify({
+            'latest_version': '3.5.1',
+            'min_required_version': '3.5.1',  # Force update for iOS
+            'force_update': True,
+            'update_url': 'https://apps.apple.com/app/ruck-app/id6738063624',
+            'release_notes': 'Critical iOS update: Fixed GPS tracking issues, AI cheerleader improvements, and enhanced stability. Update required.'
+        })
+    else:
+        # Android users stay on current version
+        return jsonify({
+            'latest_version': '3.3.4',
+            'min_required_version': '3.2.0',
+            'force_update': False,
+            'update_url': 'https://play.google.com/store/apps/details?id=com.getrucky.ruck',
+            'release_notes': 'Latest version with improved performance, bug fixes, and enhanced stability.'
+        })
 
 logger.info("Application initialized successfully! All API endpoints registered.")
 
