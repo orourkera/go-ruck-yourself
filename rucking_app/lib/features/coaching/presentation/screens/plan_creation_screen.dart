@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get_it/get_it.dart';
@@ -140,12 +141,34 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   }
 
   void _dismissKeyboard() {
-    // Multiple approaches to ensure keyboard is dismissed
-    FocusScope.of(context).unfocus();
-    FocusManager.instance.primaryFocus?.unfocus();
-    // Also try to remove focus from any text field
-    if (FocusScope.of(context).hasFocus) {
-      FocusScope.of(context).requestFocus(FocusNode());
+    // Multiple aggressive approaches to ensure keyboard is dismissed
+    try {
+      // Method 1: Platform-level keyboard dismissal
+      SystemChannels.textInput.invokeMethod('TextInput.hide');
+      
+      // Method 2: Focus-based dismissal
+      FocusScope.of(context).unfocus();
+      FocusManager.instance.primaryFocus?.unfocus();
+      
+      // Method 3: Clear all focus nodes
+      if (FocusScope.of(context).hasFocus) {
+        FocusScope.of(context).requestFocus(FocusNode());
+      }
+      
+      // Method 4: Widget tree level unfocus
+      WidgetsBinding.instance.focusManager.primaryFocus?.unfocus();
+      
+      // Method 5: Create a new unfocusable node and focus it
+      final FocusNode dummyNode = FocusNode();
+      FocusScope.of(context).requestFocus(dummyNode);
+      dummyNode.dispose();
+      
+    } catch (e) {
+      // If anything fails, at least try the basic approaches
+      try {
+        SystemChannels.textInput.invokeMethod('TextInput.hide');
+        FocusScope.of(context).unfocus();
+      } catch (_) {}
     }
   }
 
@@ -311,6 +334,13 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   void _onPersonalizationComplete(PlanPersonalization personalization) {
     // Dismiss keyboard when moving to next step
     _dismissKeyboard();
+    
+    // Add a small delay and dismiss again to ensure it works
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _dismissKeyboard();
+      }
+    });
     
     setState(() {
       _personalization = personalization;
@@ -490,9 +520,9 @@ Keep it under 200 words, motivational, and specific to their answers.
         personalization: _personalization!,
       );
       
-      // The planData is now the response data directly from success_response
-      final coachingPlan = planData['coaching_plan'];
-      AppLogger.info('Successfully created coaching plan: ${coachingPlan['id']}');
+      // The planData is the response data from backend: {plan_id, message, start_date, duration_weeks}
+      final planId = planData['plan_id'];
+      AppLogger.info('Successfully created coaching plan: $planId');
       
       if (mounted) {
         setState(() {

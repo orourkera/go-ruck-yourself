@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_plan_type.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
@@ -49,7 +50,37 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     super.dispose();
   }
 
+  void _dismissKeyboard() {
+    try {
+      // Multiple aggressive approaches to dismiss keyboard
+      SystemChannels.textInput.invokeMethod('TextInput.hide');
+      FocusScope.of(context).unfocus();
+      FocusManager.instance.primaryFocus?.unfocus();
+      
+      // Additional fallback methods
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(FocusNode());
+        }
+      });
+      
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted) {
+          SystemChannels.textInput.invokeMethod('TextInput.hide');
+        }
+      });
+    } catch (e) {
+      // Fallback if any method fails
+      try {
+        FocusScope.of(context).unfocus();
+      } catch (_) {}
+    }
+  }
+
   void _nextQuestion() {
+    // Dismiss keyboard before navigation
+    _dismissKeyboard();
+    
     if (_currentQuestionIndex < _questions.length - 1) {
       setState(() {
         _currentQuestionIndex++;
@@ -69,6 +100,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   }
 
   void _previousQuestion() {
+    // Dismiss keyboard before navigation
+    _dismissKeyboard();
+    
     if (_currentQuestionIndex > 0) {
       setState(() {
         _currentQuestionIndex--;
@@ -137,7 +171,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     return GestureDetector(
       onTap: () {
         // Dismiss keyboard when tapping outside
-        FocusScope.of(context).unfocus();
+        _dismissKeyboard();
       },
       child: Scaffold(
         backgroundColor: AppColors.backgroundLight,
@@ -239,6 +273,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                 label: Text(suggestion),
                 selected: isSelected,
                 onSelected: (selected) {
+                  _dismissKeyboard();
                   setState(() {
                     final currentWhy = _personalization.why ?? [];
                     List<String> newWhy;
@@ -577,6 +612,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                                  _personalization.streakTargetRucks == null;
               return GestureDetector(
                 onTap: () {
+                  _dismissKeyboard();
                   setState(() {
                     _personalization = _personalization.copyWith(
                       streakTargetDays: days,
@@ -635,6 +671,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                                  _personalization.streakTimeframeDays == option['days'];
               return GestureDetector(
                 onTap: () {
+                  _dismissKeyboard();
                   setState(() {
                     _personalization = _personalization.copyWith(
                       streakTargetDays: null,
@@ -764,6 +801,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             divisions: 4,
             activeColor: AppColors.primary,
             onChanged: (value) {
+              _dismissKeyboard();
               setState(() {
                 _personalization = _personalization.copyWith(
                   minimumSessionMinutes: value.round(),
@@ -780,6 +818,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                 value: _personalization.unloadedOk ?? false,
                 activeColor: AppColors.primary,
                 onChanged: (value) {
+                  _dismissKeyboard();
                   setState(() {
                     _personalization = _personalization.copyWith(
                       unloadedOk: value ?? false,
