@@ -32,7 +32,8 @@ def test_my_ios_push():
         
         # Send critical update notification with timestamp to bypass duplicate detection
         import time
-        version_with_timestamp = f"3.5.1.{int(time.time())}"
+        import random
+        version_with_timestamp = f"3.5.1.{int(time.time())}.{random.randint(1,999)}"
         
         success = push_service.send_app_update_notification(
             device_tokens=my_ios_tokens,
