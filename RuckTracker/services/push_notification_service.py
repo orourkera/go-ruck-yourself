@@ -821,7 +821,7 @@ class PushNotificationService:
         """Send app update notification to users"""
         if is_critical:
             title = "🚨 Critical App Update Available"
-            body = f"Update to v{version} now for important GPS tracking fixes and improvements. Tap to update."
+            body = f"Update to v{version} now for important GPS tracking fixes. Please go to the App Store to update."
             notification_data = {
                 'type': 'critical_app_update',
                 'version': version,
