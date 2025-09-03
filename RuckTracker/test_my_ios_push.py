@@ -30,10 +30,13 @@ def test_my_ios_push():
         
         logger.info(f"🚀 Testing push notification to my iOS device ({len(my_ios_tokens)} token)")
         
-        # Send critical update notification
+        # Send critical update notification with timestamp to bypass duplicate detection
+        import time
+        version_with_timestamp = f"3.5.1.{int(time.time())}"
+        
         success = push_service.send_app_update_notification(
             device_tokens=my_ios_tokens,
-            version="3.5.1",
+            version=version_with_timestamp,
             is_critical=True
         )
         
