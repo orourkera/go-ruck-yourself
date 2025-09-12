@@ -19,7 +19,7 @@ class ApiClient {
   // Prevent concurrent refresh attempts
   static Future<String?>? _refreshFuture;
   static DateTime? _lastRefreshAttempt;
-  static const Duration _refreshCooldown = Duration(seconds: 10);
+  static const Duration _refreshCooldown = Duration(seconds: 30);
   
   // Token refresh coordination
   Function()? _tokenRefreshCallback;
@@ -191,9 +191,9 @@ class ApiClient {
         
         // Create a new Dio instance to avoid interceptor loops
         final refreshDio = Dio(_dio.options);
-        // Add timeouts to avoid hanging on slow networks
-        refreshDio.options.connectTimeout = const Duration(seconds: 60);
-        refreshDio.options.receiveTimeout = const Duration(seconds: 60);
+        // Add extended timeouts for token refresh to handle poor network conditions
+        refreshDio.options.connectTimeout = const Duration(seconds: 120);
+        refreshDio.options.receiveTimeout = const Duration(seconds: 120);
         
         debugPrint('[API] Attempting token refresh via dedicated method (attempt $attempt/3)');
         final response = await refreshDio.post(

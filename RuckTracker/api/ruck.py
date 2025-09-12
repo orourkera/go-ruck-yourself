@@ -2162,10 +2162,24 @@ class RuckSessionLocationResource(Resource):
                 
             try:
                 logger.debug(f"[LOC_UPLOAD][DB_INSERT] session={ruck_id} user={g.user.id} inserting={len(location_rows)}")
-                insert_resp = supabase.table('location_point').insert(location_rows).execute()
-                if not insert_resp.data:
-                    logger.error(f"[LOC_UPLOAD][DB_NO_DATA] session={ruck_id} user={g.user.id} reason=no_data_returned")
-                    return {'message': 'Database insert failed - no data returned'}, 500
+                
+                # Retry logic for database insert (handles temporary connection issues)
+                max_retries = 2
+                for attempt in range(max_retries + 1):
+                    try:
+                        insert_resp = supabase.table('location_point').insert(location_rows).execute()
+                        if not insert_resp.data:
+                            if attempt < max_retries:
+                                logger.warning(f"[LOC_UPLOAD][DB_NO_DATA_RETRY] session={ruck_id} user={g.user.id} attempt={attempt + 1} reason=no_data_returned")
+                                continue
+                            logger.error(f"[LOC_UPLOAD][DB_NO_DATA] session={ruck_id} user={g.user.id} reason=no_data_returned")
+                            return {'message': 'Database insert failed - no data returned'}, 500
+                        break  # Success, exit retry loop
+                    except Exception as retry_error:
+                        if attempt < max_retries:
+                            logger.warning(f"[LOC_UPLOAD][DB_RETRY] session={ruck_id} user={g.user.id} attempt={attempt + 1} error={retry_error}")
+                            continue
+                        raise retry_error  # Final attempt failed, raise to outer handler
                 
                 inserted_count = len(insert_resp.data)
                 success_rate = (inserted_count / len(location_points)) * 100 if location_points else 0
@@ -2205,8 +2219,24 @@ class RuckSessionLocationResource(Resource):
                 return result, 201
                 
             except Exception as db_error:
-                logger.error(f"[LOC_UPLOAD][DB_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
-                return {'message': f'Database insert failed: {str(db_error)}'}, 500
+                error_str = str(db_error).lower()
+                
+                # Categorize common database errors for better debugging
+                if 'foreign key constraint' in error_str:
+                    logger.error(f"[LOC_UPLOAD][DB_FK_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
+                    return {'message': 'Session reference error - session may not exist', 'error_code': 'FOREIGN_KEY_VIOLATION'}, 400
+                elif 'row level security' in error_str or 'rls' in error_str or 'policy' in error_str:
+                    logger.error(f"[LOC_UPLOAD][DB_RLS_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
+                    return {'message': 'Access denied - permission error', 'error_code': 'RLS_VIOLATION'}, 403
+                elif 'duplicate' in error_str or 'unique constraint' in error_str:
+                    logger.warning(f"[LOC_UPLOAD][DB_DUPLICATE] session={ruck_id} user={g.user.id} error={db_error}")
+                    return {'message': 'Duplicate location data - points may have been previously uploaded', 'error_code': 'DUPLICATE_DATA'}, 409
+                elif 'timeout' in error_str or 'connection' in error_str:
+                    logger.error(f"[LOC_UPLOAD][DB_CONN_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
+                    return {'message': 'Database connection error - please retry', 'error_code': 'CONNECTION_ERROR'}, 503
+                else:
+                    logger.error(f"[LOC_UPLOAD][DB_ERROR] session={ruck_id} user={g.user.id} error={db_error}")
+                    return {'message': f'Database insert failed: {str(db_error)}', 'error_code': 'DATABASE_ERROR'}, 500
             
         except Exception as e:
             logger.error(f"[LOC_UPLOAD][UNEXPECTED] session={ruck_id} user={getattr(g,'user',None) and g.user.id} error={e}")

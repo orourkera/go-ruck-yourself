@@ -24,22 +24,40 @@ class UserCoachingPlansResource(Resource):
             if auth_response:
                 return auth_response
             
-            # Get active plan with template info (fixed to match actual database schema)
+            # Get active plan with template info (with defensive error handling)
             client = get_supabase_client()
-            plan_resp = client.table('user_coaching_plans').select(
-                'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
-                'coaching_plan_templates!coaching_plan_id(id, plan_id, name, duration_weeks, base_structure, progression_rules, non_negotiables, retests, personalization_knobs, expert_tips, is_active)'
-            ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+            try:
+                plan_resp = client.table('user_coaching_plans').select(
+                    'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
+                    'coaching_plan_templates!coaching_plan_id(id, plan_id, name, duration_weeks, base_structure, progression_rules, non_negotiables, retests, personalization_knobs, expert_tips, is_active)'
+                ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+            except Exception as join_error:
+                # Fallback to simple query without template join if foreign key fails
+                logger.warning(f"GET /user-coaching-plans join failed for user {user_id}, falling back: {join_error}")
+                try:
+                    plan_resp = client.table('user_coaching_plans').select(
+                        'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at'
+                    ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+                except Exception as fallback_error:
+                    logger.error(f"GET /user-coaching-plans fallback also failed for user {user_id}: {fallback_error}")
+                    return {"error": "Failed to fetch coaching plan"}, 500
             
             if not plan_resp.data:
                 return {"active_plan": None}, 200
                 
             plan = plan_resp.data[0]
             
-            # Calculate plan progress
+            # Calculate plan progress (with fallback if template missing)
             weeks_elapsed = _calculate_weeks_elapsed(plan['start_date'])
-            total_weeks = plan['coaching_plan_templates']['duration_weeks']
-            progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
+            template_data = plan.get('coaching_plan_templates')
+            if template_data:
+                total_weeks = template_data['duration_weeks']
+                progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
+            else:
+                # Fallback when template data is missing
+                total_weeks = 8  # Default duration
+                progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
+                logger.warning(f"GET /user-coaching-plans using fallback duration for user {user_id}")
             
             # Get recent plan sessions
             sessions_resp = client.table('plan_sessions').select(
@@ -53,7 +71,11 @@ class UserCoachingPlansResource(Resource):
             return {
                 "active_plan": {
                     "id": plan['id'],
-                    "template": plan['coaching_plan_templates'],
+                    "template": template_data or {
+                        "name": "Default Plan",
+                        "duration_weeks": total_weeks,
+                        "plan_id": plan.get('coaching_plan_id', 'unknown')
+                    },
                     "personality": plan['coaching_personality'],
                     "start_date": plan['start_date'],
                     "current_week": plan['current_week'],
@@ -151,7 +173,7 @@ class UserCoachingPlansResource(Resource):
 class UserCoachingPlanProgressResource(Resource):
     """Get detailed progress for user's active coaching plan"""
     
-    def get(self):
+    def get(self, plan_id=None):
         """Get detailed progress and next recommendations"""
         try:
             user_id = get_current_user_id()
@@ -161,10 +183,16 @@ class UserCoachingPlanProgressResource(Resource):
             
             # Get active plan (fixed to match actual database schema)
             client = get_supabase_client()
-            plan_resp = client.table('user_coaching_plans').select(
+            query = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, start_date, current_week, '
                 'coaching_plan_templates!coaching_plan_id(plan_id, name, duration_weeks, base_structure, retests)'
-            ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+            ).eq('user_id', user_id).eq('current_status', 'active')
+            
+            # If plan_id is provided, filter by it as well
+            if plan_id:
+                query = query.eq('id', plan_id)
+            
+            plan_resp = query.limit(1).execute()
             
             if not plan_resp.data:
                 return {"error": "No active coaching plan found"}, 404

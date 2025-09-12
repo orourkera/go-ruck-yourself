@@ -8,8 +8,8 @@ import 'package:rucking_app/core/services/image_cache_manager.dart';
 class MemoryMonitorService {
   static Timer? _monitoringTimer;
   static const Duration _monitoringInterval = Duration(minutes: 2);
-  static const double _warningThresholdMb = 450.0; // Increased from 400MB
-  static const double _criticalThresholdMb = 600.0; // Increased from 500MB for modern devices
+  static const double _warningThresholdMb = 700.0; // Appropriate for GPS tracking apps
+  static const double _criticalThresholdMb = 1000.0; // Realistic for modern devices with Flutter + GPS
   
   /// Start memory monitoring
   static void startMonitoring() {

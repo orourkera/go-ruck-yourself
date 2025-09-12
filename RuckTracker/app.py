@@ -902,7 +902,7 @@ api.add_resource(GoalNotificationSendResource, '/api/goals/<string:goal_id>/noti
 # User Coaching Plans Endpoints
 from .api.user_coaching_plans import UserCoachingPlansResource, UserCoachingPlanProgressResource, PlanSessionTrackingResource
 api.add_resource(UserCoachingPlansResource, '/api/user-coaching-plans', '/api/user-coaching-plans/active')
-api.add_resource(UserCoachingPlanProgressResource, '/api/user-coaching-plan-progress')
+api.add_resource(UserCoachingPlanProgressResource, '/api/user-coaching-plan-progress', '/api/user-coaching-plans/<string:plan_id>/progress')
 api.add_resource(PlanSessionTrackingResource, '/api/plan-session-tracking')
 
 # Event Deeplink Endpoints
