@@ -54,7 +54,16 @@ class AuthRegisterRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [username, email, password, weightKg, heightCm, dateOfBirth, preferMetric, gender];
+  List<Object?> get props => [
+        username,
+        email,
+        password,
+        weightKg,
+        heightCm,
+        dateOfBirth,
+        preferMetric,
+        gender
+      ];
 }
 
 /// Event to complete Google user registration
@@ -80,7 +89,16 @@ class AuthGoogleRegisterRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [username, email, displayName, weightKg, heightCm, dateOfBirth, preferMetric, gender];
+  List<Object?> get props => [
+        username,
+        email,
+        displayName,
+        weightKg,
+        heightCm,
+        dateOfBirth,
+        preferMetric,
+        gender
+      ];
 }
 
 /// Event to request user logout
@@ -117,7 +135,20 @@ class AuthUpdateProfileRequested extends AuthEvent {
   });
 
   @override
-  List<Object?> get props => [username, weightKg, heightCm, preferMetric, allowRuckSharing, gender, avatarUrl, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly];
+  List<Object?> get props => [
+        username,
+        weightKg,
+        heightCm,
+        preferMetric,
+        allowRuckSharing,
+        gender,
+        avatarUrl,
+        dateOfBirth,
+        restingHr,
+        maxHr,
+        calorieMethod,
+        calorieActiveOnly
+      ];
 }
 
 /// Event to update user notification preferences

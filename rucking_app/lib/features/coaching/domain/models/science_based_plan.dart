@@ -41,7 +41,8 @@ class ScienceBasedPlan {
       name: json['name'] as String,
       durationWeeks: json['durationWeeks'] as int,
       baseStructure: json['baseStructure'] as Map<String, dynamic>,
-      personalizationKnobs: json['personalizationKnobs'] as Map<String, dynamic>,
+      personalizationKnobs:
+          json['personalizationKnobs'] as Map<String, dynamic>,
       progressionRules: json['progressionRules'] as Map<String, dynamic>,
       nonNegotiables: json['nonNegotiables'] as Map<String, dynamic>,
       retests: json['retests'] as Map<String, dynamic>,
@@ -123,7 +124,6 @@ class ScienceBasedPlan {
         ]
       },
     ),
-
     ScienceBasedPlan(
       planId: 'get-faster',
       name: 'Get Faster at Rucking',
@@ -190,7 +190,6 @@ class ScienceBasedPlan {
         ]
       },
     ),
-
     ScienceBasedPlan(
       planId: 'event-prep',
       name: '12-mile under 3:00 (or custom event)',
@@ -204,12 +203,14 @@ class ScienceBasedPlan {
         'ruckTypes': {
           'intervals': '6-10 × 2:00 hard / 2:00 easy (fixed load)',
           'tempo': '40-55 min with 2×10-12 min surges @ RPE 6-7 (fixed load)',
-          'longRuck': 'build 90 → 150-165 min; practice fueling every 30-40 min',
+          'longRuck':
+              'build 90 → 150-165 min; practice fueling every 30-40 min',
         },
         'targetLoadRange': '≈14-20 kg (30-45 lb), personalized',
       },
       progressionRules: {
-        'loadRule': 'Only Long day may add +2 kg every 2-3 weeks if recovery green',
+        'loadRule':
+            'Only Long day may add +2 kg every 2-3 weeks if recovery green',
         'fixedLoadForIntervalstempo': true,
         'vert': '+100-150 m/wk on Tempo or Long as tolerated',
         'deload': {
@@ -271,7 +272,6 @@ class ScienceBasedPlan {
         ]
       },
     ),
-
     ScienceBasedPlan(
       planId: 'daily-discipline',
       name: 'Daily Discipline Streak',
@@ -284,10 +284,12 @@ class ScienceBasedPlan {
           'unloadedLong': '1 × 60-75 min',
           'optionalStrength': '30 min',
         },
-        'streakSaver': 'user-set "minimum viable session" (e.g., 10-15 min unloaded)',
+        'streakSaver':
+            'user-set "minimum viable session" (e.g., 10-15 min unloaded)',
       },
       progressionRules: {
-        'soreness': 'any soreness/hotspots → drop one vest day; substitute unloaded cardio',
+        'soreness':
+            'any soreness/hotspots → drop one vest day; substitute unloaded cardio',
         'graduation': '30 consecutive days + ≥200 Z2 min/wk, feeling fresh',
       },
       nonNegotiables: {
@@ -328,7 +330,6 @@ class ScienceBasedPlan {
         ]
       },
     ),
-
     ScienceBasedPlan(
       planId: 'age-strong',
       name: 'Posture/Balance & Age Strong',
@@ -336,7 +337,8 @@ class ScienceBasedPlan {
       baseStructure: {
         'sessionsPerWeek': {
           'lightRucks': '2-3 × 30-50 min @ 6-12% BW',
-          'strengthBalance': '2 × step-ups, sit-to-stand, suitcase carries, side planks',
+          'strengthBalance':
+              '2 × step-ups, sit-to-stand, suitcase carries, side planks',
           'mobility': '10 min',
         },
       },
@@ -355,7 +357,8 @@ class ScienceBasedPlan {
       },
       retests: {
         'balance': 'every 2 weeks',
-        'fullRetest': 'week 8 (plank total, single-leg balance, 10-rep sit-to-stand time)',
+        'fullRetest':
+            'week 8 (plank total, single-leg balance, 10-rep sit-to-stand time)',
       },
       personalizationKnobs: {
         'timeBudget': true,
@@ -385,13 +388,13 @@ class ScienceBasedPlan {
         ]
       },
     ),
-
     ScienceBasedPlan(
       planId: 'load-capacity',
       name: 'Load Capacity Builder',
       durationWeeks: 8,
       baseStructure: {
-        'whoWhy': 'time-capped users or load-specific goals; build carrying capacity safely',
+        'whoWhy':
+            'time-capped users or load-specific goals; build carrying capacity safely',
         'sessionsPerWeek': {
           'rucks': '2-3',
           'unloadedCardio': '1-2',
@@ -408,7 +411,8 @@ class ScienceBasedPlan {
         },
       },
       progressionRules: {
-        'loadRule': 'Only Long day progresses load (+1-2% BW every 2-3 weeks if green). Other days hold.',
+        'loadRule':
+            'Only Long day progresses load (+1-2% BW every 2-3 weeks if green). Other days hold.',
         'deload': {
           'week': 4,
           'reduction': '≈-30% time; keep load',
@@ -420,7 +424,8 @@ class ScienceBasedPlan {
         'noRuckRunning': true,
       },
       retests: {
-        '60minRuck': 'week 8 at current Long-day load; compare pace/HR/RPE vs week 1',
+        '60minRuck':
+            'week 8 at current Long-day load; compare pace/HR/RPE vs week 1',
       },
       personalizationKnobs: {
         'timeBudget': true,

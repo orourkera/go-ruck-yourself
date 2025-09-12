@@ -29,7 +29,8 @@ class PlannedRuckDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<PlannedRuckDetailScreen> createState() => _PlannedRuckDetailScreenState();
+  State<PlannedRuckDetailScreen> createState() =>
+      _PlannedRuckDetailScreenState();
 }
 
 class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
@@ -50,17 +51,17 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     _scrollController = ScrollController();
     _weatherService = WeatherService();
     _routesRepository = RoutesRepository();
-    
+
     // Initialize route visibility state
     _isRoutePublic = widget.route.isPublic;
-    
+
     // Load the planned ruck using the ID if provided
     // if (widget.plannedRuckId != null) {
     //   context.read<PlannedRuckBloc>().add(
     //     LoadPlannedRuckById(plannedRuckId: widget.plannedRuckId!),
     //   );
     // }
-    
+
     _scrollController.addListener(() {
       final shouldShow = _scrollController.offset > 200;
       if (shouldShow != _showAppBarTitle) {
@@ -79,7 +80,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   /// Load weather data for the planned ruck
   Future<void> _loadWeatherData() async {
-    if (widget.route.startLatitude == null || widget.route.startLongitude == null) {
+    if (widget.route.startLatitude == null ||
+        widget.route.startLongitude == null) {
       return;
     }
 
@@ -116,7 +118,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     // If we have a route directly, create a mock planned ruck for display
     if (_plannedRuck == null) {
       _plannedRuck = PlannedRuck(
-        id: widget.route.id ?? 'route-preview', 
+        id: widget.route.id ?? 'route-preview',
         userId: 'current-user',
         routeId: widget.route.id ?? 'route-preview',
         route: widget.route,
@@ -128,7 +130,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
         updatedAt: DateTime.now(),
       );
       // Load weather data for the route if coordinates are available
-      if (widget.route.startLatitude != null && widget.route.startLongitude != null) {
+      if (widget.route.startLatitude != null &&
+          widget.route.startLongitude != null) {
         _loadWeatherData();
       }
     }
@@ -151,23 +154,25 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
           );
         } else if (state is PlannedRuckLoaded) {
           // Use the selectedRuck from the state (loaded by LoadPlannedRuckById)
-          final plannedRuck = state.selectedRuck ?? 
+          final plannedRuck = state.selectedRuck ??
               state.plannedRucks
                   .where((ruck) => ruck.id == widget.route.id)
                   .firstOrNull;
-          
+
           if (plannedRuck != null) {
             setState(() {
               _plannedRuck = plannedRuck;
             });
-            
+
             // Load weather data if we have route coordinates and planned date
             _loadWeatherData();
           }
-        } else if (state is PlannedRuckActionSuccess && state.action == PlannedRuckAction.start) {
+        } else if (state is PlannedRuckActionSuccess &&
+            state.action == PlannedRuckAction.start) {
           // Check location and navigate to active session when ruck is successfully started
           _checkLocationAndNavigate();
-        } else if (state is PlannedRuckActionError && state.action == PlannedRuckAction.start) {
+        } else if (state is PlannedRuckActionError &&
+            state.action == PlannedRuckAction.start) {
           // Show error message when ruck start fails
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -191,7 +196,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
         slivers: [
           // App bar with hero image
           _buildSliverAppBar(widget.route),
-          
+
           // Content
           SliverFillRemaining(
             child: _buildOverviewTab(),
@@ -207,7 +212,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       pinned: true,
       backgroundColor: AppColors.backgroundLight,
       iconTheme: IconThemeData(color: AppColors.secondary), // Orange back arrow
-      title: _showAppBarTitle 
+      title: _showAppBarTitle
           ? Text(
               route?.name ?? 'Planned Ruck',
               style: AppTextStyles.headlineMedium.copyWith(
@@ -233,7 +238,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
                 ),
               ),
             ),
-            
+
             // Route map preview (if available)
             if (route != null)
               Positioned.fill(
@@ -243,7 +248,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
                   showOverlay: false,
                 ),
               ),
-            
+
             // Title overlay positioned at bottom left
             Positioned(
               bottom: 16,
@@ -303,7 +308,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   Widget _buildOverviewTab() {
     final route = widget.route;
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -315,36 +320,40 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               'Route Overview',
               Icons.route,
               [
-                _buildInfoRow('Location', '${route.startLatitude.toStringAsFixed(4)}, ${route.startLongitude.toStringAsFixed(4)}'),
-                _buildInfoRow('Distance', '${route.distanceKm.toStringAsFixed(1)} km'),
+                _buildInfoRow('Location',
+                    '${route.startLatitude.toStringAsFixed(4)}, ${route.startLongitude.toStringAsFixed(4)}'),
+                _buildInfoRow(
+                    'Distance', '${route.distanceKm.toStringAsFixed(1)} km'),
                 if (route.elevationGainM != null && route.elevationGainM! > 0)
-                  _buildInfoRow('Elevation Gain', '${route.elevationGainM!.toStringAsFixed(0)} m'),
+                  _buildInfoRow('Elevation Gain',
+                      '${route.elevationGainM!.toStringAsFixed(0)} m'),
                 if (route.elevationLossM != null && route.elevationLossM! > 0)
-                  _buildInfoRow('Elevation Loss', '${route.elevationLossM!.toStringAsFixed(0)} m'),
+                  _buildInfoRow('Elevation Loss',
+                      '${route.elevationLossM!.toStringAsFixed(0)} m'),
                 if (route.estimatedDurationMinutes != null)
-                  _buildInfoRow('Est. Duration', route.formattedEstimatedDuration),
+                  _buildInfoRow(
+                      'Est. Duration', route.formattedEstimatedDuration),
                 if (route.routeType != null)
-                  _buildInfoRow('Route Type', _getRouteTypeLabel(route.routeType!)),
+                  _buildInfoRow(
+                      'Route Type', _getRouteTypeLabel(route.routeType!)),
               ],
             ),
-            
             const SizedBox(height: 16),
           ],
 
-          
           // Weather info (placeholder)
           _buildWeatherCard(),
-          
+
           const SizedBox(height: 16),
-          
+
           // Route visibility toggle
           _buildVisibilityToggle(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Bottom action buttons
           _buildBottomActions(),
-          
+
           const SizedBox(height: 8),
         ],
       ),
@@ -433,7 +442,6 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            
             ...route.pointsOfInterest.take(5).map((poi) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -452,16 +460,15 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
                       ),
                     ),
                     Text(
-                        '${poi.distanceFromStartKm.toStringAsFixed(1)} km',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textDarkSecondary,
-                        ),
+                      '${poi.distanceFromStartKm.toStringAsFixed(1)} km',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textDarkSecondary,
                       ),
+                    ),
                   ],
                 ),
               );
             }),
-            
             if (route.pointsOfInterest.length > 5)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -515,7 +522,9 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    widget.route.isPublic ? 'Public - visible to other users' : 'Private - only visible to you',
+                    widget.route.isPublic
+                        ? 'Public - visible to other users'
+                        : 'Private - only visible to you',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: AppColors.textDarkSecondary,
                     ),
@@ -552,7 +561,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             ),
           ),
         ),
-        
+
         // Delete route link
         const SizedBox(height: 16),
         TextButton(
@@ -599,10 +608,12 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   Color _getPrimaryActionColor() {
     if (_plannedRuck == null) return AppColors.textDarkSecondary;
-    
+
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
-        return _plannedRuck!.canStart ? AppColors.primary : AppColors.textDarkSecondary;
+        return _plannedRuck!.canStart
+            ? AppColors.primary
+            : AppColors.textDarkSecondary;
       case PlannedRuckStatus.inProgress:
         return AppColors.info;
       default:
@@ -612,7 +623,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   IconData _getPrimaryActionIcon() {
     if (_plannedRuck == null) return Icons.edit;
-    
+
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         return Icons.play_arrow;
@@ -625,7 +636,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   String _getPrimaryActionLabel() {
     if (_plannedRuck == null) return 'Edit';
-    
+
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         return _plannedRuck!.canStart ? 'Start Ruck' : 'Edit';
@@ -638,7 +649,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   void _performPrimaryAction() {
     if (_plannedRuck == null) return;
-    
+
     switch (_plannedRuck!.status) {
       case PlannedRuckStatus.planned:
         if (_plannedRuck!.canStart) {
@@ -652,7 +663,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
                 routeData: {
                   'route_polyline': widget.route.routePolyline,
                   'distance_km': widget.route.distanceKm,
-                  'estimated_duration_minutes': widget.route.estimatedDurationMinutes,
+                  'estimated_duration_minutes':
+                      widget.route.estimatedDurationMinutes,
                 },
                 // Don't pass plannedRuckId for route-only views since they use fake planned ruck objects
                 plannedRuckId: widget.route != null ? null : _plannedRuck!.id,
@@ -677,33 +689,32 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       if (routeId == null) {
         throw Exception('Route ID is required to update visibility');
       }
-      
+
       // Call API to update route visibility
       await _routesRepository.updateRouteVisibility(routeId, isPublic);
-      
+
       // Update local state first
       setState(() {
         _isRoutePublic = isPublic;
       });
-      
+
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isPublic 
+            isPublic
                 ? 'Route is now public and visible to other users'
                 : 'Route is now private and only visible to you',
           ),
           backgroundColor: AppColors.primary,
         ),
       );
-      
     } catch (e) {
       // Revert the switch state on error
       setState(() {
         _isRoutePublic = !isPublic;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update route visibility: $e'),
@@ -722,13 +733,15 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     double deltaLngRad = (point2.longitude - point1.longitude) * (pi / 180);
 
     double a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
-        cos(lat1Rad) * cos(lat2Rad) *
-        sin(deltaLngRad / 2) * sin(deltaLngRad / 2);
+        cos(lat1Rad) *
+            cos(lat2Rad) *
+            sin(deltaLngRad / 2) *
+            sin(deltaLngRad / 2);
     double c = 2 * atan2(sqrt(a), sqrt(1 - a));
 
     return earthRadius * c;
   }
-  
+
   /// Show confirmation dialog before deleting route
   void _showDeleteRouteConfirmation() {
     showDialog(
@@ -758,7 +771,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       ),
     );
   }
-  
+
   /// Delete the route
   void _deleteRoute() async {
     try {
@@ -766,7 +779,7 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
       if (routeId == null) {
         throw Exception('Route ID is required to delete route');
       }
-      
+
       // Show loading indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -776,10 +789,10 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
           ),
         );
       }
-      
+
       // Call API to delete route
       await _routesRepository.deleteRoute(routeId);
-      
+
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -788,11 +801,10 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             backgroundColor: AppColors.primary,
           ),
         );
-        
+
         // Navigate back to previous screen
         Navigator.of(context).pop();
       }
-      
     } catch (e) {
       // Show error message
       if (mounted) {
@@ -808,10 +820,11 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   /// Check distance to route start and potentially show warning
   Future<void> _checkLocationAndNavigate() async {
-    if (widget.route.startLatitude == null || widget.route.startLongitude == null) return;
+    if (widget.route.startLatitude == null ||
+        widget.route.startLongitude == null) return;
 
     final route = widget.route;
-    
+
     // Create initial center from route start coordinates
     latlong.LatLng? routeStart;
     if (route.startLatitude != null && route.startLongitude != null) {
@@ -827,10 +840,11 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
             timeLimit: Duration(seconds: 10),
           ),
         );
-        
-        final currentLocation = latlong.LatLng(position.latitude, position.longitude);
+
+        final currentLocation =
+            latlong.LatLng(position.latitude, position.longitude);
         final distanceToStart = _calculateDistance(currentLocation, routeStart);
-        
+
         // Show warning if more than 500m from route start
         if (distanceToStart > 500) {
           _showStartLocationWarning(distanceToStart);
@@ -848,10 +862,10 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
 
   /// Show warning when user is far from planned route start
   void _showStartLocationWarning(double distanceMeters) {
-    final distanceText = distanceMeters > 1000 
+    final distanceText = distanceMeters > 1000
         ? '${(distanceMeters / 1000).toStringAsFixed(1)} km'
         : '${distanceMeters.round()} m';
-        
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -881,14 +895,16 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
   }
 
   void _navigateToActiveSession() {
-    if (widget.route.startLatitude == null || widget.route.startLongitude == null) return;
+    if (widget.route.startLatitude == null ||
+        widget.route.startLongitude == null) return;
 
     final route = widget.route;
-    
+
     // Create initial center from route start coordinates
     latlong.LatLng? initialCenter;
     if (route.startLatitude != null && route.startLongitude != null) {
-      initialCenter = latlong.LatLng(route.startLatitude!, route.startLongitude!);
+      initialCenter =
+          latlong.LatLng(route.startLatitude!, route.startLongitude!);
     }
 
     // Parse planned route polyline for background reference
@@ -921,7 +937,8 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
         builder: (context) => ActiveSessionPage(
           args: ActiveSessionArgs(
             ruckWeight: _plannedRuck?.targetWeight ?? 0.0,
-            userWeightKg: 70.0, // TODO: Get actual user weight from user profile
+            userWeightKg:
+                70.0, // TODO: Get actual user weight from user profile
             notes: _plannedRuck?.notes,
             plannedDuration: route.estimatedDurationMinutes * 60,
             initialCenter: initialCenter,
@@ -935,4 +952,3 @@ class _PlannedRuckDetailScreenState extends State<PlannedRuckDetailScreen> {
     );
   }
 }
-

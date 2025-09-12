@@ -51,9 +51,9 @@ class EventProgress extends Equatable {
           json['total_time'] as int? ??
           0,
       sessionCount: json['session_count'] as int? ?? 1,
-      lastUpdated: DateTime.tryParse(
-            json['completed_at'] as String? ??
-                json['last_updated'] as String? ?? '') ??
+      lastUpdated: DateTime.tryParse(json['completed_at'] as String? ??
+              json['last_updated'] as String? ??
+              '') ??
           DateTime.now(),
       user: userData != null ? EventProgressUser.fromJson(userData) : null,
     );
@@ -74,15 +74,18 @@ class EventProgress extends Equatable {
   }
 
   // Computed properties
-  double get averageDistance => sessionCount > 0 ? totalDistance / sessionCount : 0.0;
-  double get averageTimeMinutes => sessionCount > 0 ? totalTime / sessionCount / 60.0 : 0.0;
-  double get averagePaceMinutesPerKm => totalDistance > 0 ? (totalTime / 60.0) / totalDistance : 0.0;
+  double get averageDistance =>
+      sessionCount > 0 ? totalDistance / sessionCount : 0.0;
+  double get averageTimeMinutes =>
+      sessionCount > 0 ? totalTime / sessionCount / 60.0 : 0.0;
+  double get averagePaceMinutesPerKm =>
+      totalDistance > 0 ? (totalTime / 60.0) / totalDistance : 0.0;
 
   String get formattedTotalTime {
     final hours = (totalTime / 3600).floor();
     final minutes = ((totalTime % 3600) / 60).floor();
     final seconds = totalTime % 60;
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m ${seconds}s';
     } else if (minutes > 0) {
@@ -160,9 +163,12 @@ class EventLeaderboard extends Equatable {
     return EventLeaderboard(
       eventId: json['event_id'] as String? ?? '',
       entries: (json['entries'] as List<dynamic>?)
-          ?.map((entry) => EventProgress.fromJson(entry as Map<String, dynamic>))
-          .toList() ?? [],
-      lastUpdated: DateTime.tryParse(json['last_updated'] as String? ?? '') ?? DateTime.now(),
+              ?.map((entry) =>
+                  EventProgress.fromJson(entry as Map<String, dynamic>))
+              .toList() ??
+          [],
+      lastUpdated: DateTime.tryParse(json['last_updated'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 

@@ -48,9 +48,11 @@ class UserDuelStatsModel extends DuelStats {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       duelsAbandoned: json['duels_abandoned'] as int,
-      totalDistanceChallenged: (json['total_distance_challenged'] as num).toDouble(),
+      totalDistanceChallenged:
+          (json['total_distance_challenged'] as num).toDouble(),
       totalTimeChallenged: json['total_time_challenged'] as int,
-      totalElevationChallenged: (json['total_elevation_challenged'] as num).toDouble(),
+      totalElevationChallenged:
+          (json['total_elevation_challenged'] as num).toDouble(),
       totalPowerPointsChallenged: json['total_power_points_challenged'] as int,
     );
   }
@@ -122,10 +124,13 @@ class UserDuelStatsModel extends DuelStats {
       email: email ?? this.email,
       rank: rank ?? this.rank,
       duelsAbandoned: duelsAbandoned ?? this.duelsAbandoned,
-      totalDistanceChallenged: totalDistanceChallenged ?? this.totalDistanceChallenged,
+      totalDistanceChallenged:
+          totalDistanceChallenged ?? this.totalDistanceChallenged,
       totalTimeChallenged: totalTimeChallenged ?? this.totalTimeChallenged,
-      totalElevationChallenged: totalElevationChallenged ?? this.totalElevationChallenged,
-      totalPowerPointsChallenged: totalPowerPointsChallenged ?? this.totalPowerPointsChallenged,
+      totalElevationChallenged:
+          totalElevationChallenged ?? this.totalElevationChallenged,
+      totalPowerPointsChallenged:
+          totalPowerPointsChallenged ?? this.totalPowerPointsChallenged,
     );
   }
 

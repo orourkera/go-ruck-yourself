@@ -12,10 +12,12 @@ class AdvancedCalorieSettingsScreen extends StatefulWidget {
   const AdvancedCalorieSettingsScreen({super.key});
 
   @override
-  State<AdvancedCalorieSettingsScreen> createState() => _AdvancedCalorieSettingsScreenState();
+  State<AdvancedCalorieSettingsScreen> createState() =>
+      _AdvancedCalorieSettingsScreenState();
 }
 
-class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsScreen> {
+class _AdvancedCalorieSettingsScreenState
+    extends State<AdvancedCalorieSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _birthdateController; // YYYY-MM-DD
   late TextEditingController _restingHrController;
@@ -32,8 +34,10 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
       user = authState.user;
     }
     _birthdateController = TextEditingController(text: user?.dateOfBirth ?? '');
-    _restingHrController = TextEditingController(text: user?.restingHr?.toString() ?? '');
-    _maxHrController = TextEditingController(text: user?.maxHr?.toString() ?? '');
+    _restingHrController =
+        TextEditingController(text: user?.restingHr?.toString() ?? '');
+    _maxHrController =
+        TextEditingController(text: user?.maxHr?.toString() ?? '');
     _method = user?.calorieMethod ?? 'fusion';
     // Convert deprecated 'hr' method to 'fusion' (HR-based not appropriate for rucking)
     if (_method == 'hr') {
@@ -53,7 +57,8 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final initial = _birthdateController.text.isNotEmpty
-        ? DateTime.tryParse(_birthdateController.text) ?? DateTime(now.year - 30)
+        ? DateTime.tryParse(_birthdateController.text) ??
+            DateTime(now.year - 30)
         : DateTime(now.year - 30);
     final picked = await showDatePicker(
       context: context,
@@ -70,16 +75,22 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
-    final resting = _restingHrController.text.isEmpty ? null : int.tryParse(_restingHrController.text);
-    final max = _maxHrController.text.isEmpty ? null : int.tryParse(_maxHrController.text);
+    final resting = _restingHrController.text.isEmpty
+        ? null
+        : int.tryParse(_restingHrController.text);
+    final max = _maxHrController.text.isEmpty
+        ? null
+        : int.tryParse(_maxHrController.text);
 
     context.read<AuthBloc>().add(AuthUpdateProfileRequested(
-      dateOfBirth: _birthdateController.text.isEmpty ? null : _birthdateController.text,
-      restingHr: resting,
-      maxHr: max,
-      calorieMethod: _method,
-      calorieActiveOnly: _activeOnly,
-    ));
+          dateOfBirth: _birthdateController.text.isEmpty
+              ? null
+              : _birthdateController.text,
+          restingHr: resting,
+          maxHr: max,
+          calorieMethod: _method,
+          calorieActiveOnly: _activeOnly,
+        ));
 
     Navigator.pop(context);
   }
@@ -99,7 +110,12 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Personalization', style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF728C69) : AppColors.textDark)),
+              Text('Personalization',
+                  style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? const Color(0xFF728C69)
+                          : AppColors.textDark)),
               const SizedBox(height: 12),
               GestureDetector(
                 onTap: _pickDate,
@@ -155,10 +171,17 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
                 ],
               ),
               const SizedBox(height: 24),
-              Text('Calorie Method', style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold, color: isDark ? const Color(0xFF728C69) : AppColors.textDark)),
+              Text('Calorie Method',
+                  style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? const Color(0xFF728C69)
+                          : AppColors.textDark)),
               const SizedBox(height: 12),
-              _methodTile('Fusion (Recommended)', 'fusion', 'Blends HR and mechanical with weather, terrain, and grade awareness. Adjusts for temperature, wind, humidity, and precipitation for maximum accuracy.'),
-              _methodTile('Mechanical (Load & Grade)', 'mechanical', 'Pure enhanced Pandolf equation exactly as used by GORUCK. Research-based load-ratio corrections for heavy loads, accounting for speed and grade only.'),
+              _methodTile('Fusion (Recommended)', 'fusion',
+                  'Blends HR and mechanical with weather, terrain, and grade awareness. Adjusts for temperature, wind, humidity, and precipitation for maximum accuracy.'),
+              _methodTile('Mechanical (Load & Grade)', 'mechanical',
+                  'Pure enhanced Pandolf equation exactly as used by GORUCK. Research-based load-ratio corrections for heavy loads, accounting for speed and grade only.'),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -170,7 +193,10 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
                   Expanded(
                     child: Text(
                       'Active calories only (subtract resting energy)',
-                      style: AppTextStyles.bodyMedium.copyWith(color: isDark ? const Color(0xFF728C69) : AppColors.textDark),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                          color: isDark
+                              ? const Color(0xFF728C69)
+                              : AppColors.textDark),
                     ),
                   ),
                 ],
@@ -199,19 +225,33 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? (isDark ? const Color(0xFF728C69) : AppColors.primary) : Colors.grey.shade300),
+          border: Border.all(
+              color: selected
+                  ? (isDark ? const Color(0xFF728C69) : AppColors.primary)
+                  : Colors.grey.shade300),
         ),
         child: Row(
           children: [
-            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: selected ? (isDark ? const Color(0xFF728C69) : AppColors.primary) : Colors.grey),
+            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color: selected
+                    ? (isDark ? const Color(0xFF728C69) : AppColors.primary)
+                    : Colors.grey),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTextStyles.bodyLarge.copyWith(color: isDark ? const Color(0xFF728C69) : AppColors.textDark)),
+                  Text(title,
+                      style: AppTextStyles.bodyLarge.copyWith(
+                          color: isDark
+                              ? const Color(0xFF728C69)
+                              : AppColors.textDark)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: AppTextStyles.bodySmall.copyWith(color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary)),
+                  Text(subtitle,
+                      style: AppTextStyles.bodySmall.copyWith(
+                          color: isDark
+                              ? const Color(0xFF728C69).withOpacity(0.8)
+                              : AppColors.textDarkSecondary)),
                 ],
               ),
             )
@@ -221,5 +261,3 @@ class _AdvancedCalorieSettingsScreenState extends State<AdvancedCalorieSettingsS
     );
   }
 }
-
-

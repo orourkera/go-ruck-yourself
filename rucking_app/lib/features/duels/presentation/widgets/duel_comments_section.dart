@@ -14,19 +14,19 @@ import '../../../../shared/widgets/user_avatar.dart';
 class DuelCommentsSection extends StatefulWidget {
   /// ID of the duel
   final String duelId;
-  
+
   /// Maximum number of comments to display at once
   final int? maxDisplayed;
-  
+
   /// Whether to show the "View All" button when there are more comments
   final bool showViewAllButton;
-  
+
   /// Callback when "View All" is tapped
   final VoidCallback? onViewAllTapped;
-  
+
   /// Whether to hide the comment input field
   final bool hideInput;
-  
+
   /// Callback when a comment edit button is pressed, allows parent to handle editing
   final Function(String commentId, String currentText)? onEditCommentRequest;
 
@@ -50,11 +50,12 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
   final FocusNode _commentFocusNode = FocusNode();
   bool _isAddingComment = false;
   String? _editingCommentId;
-  bool _commentsLoaded = false; // Track if comments have been loaded to prevent duplicate requests
-  
+  bool _commentsLoaded =
+      false; // Track if comments have been loaded to prevent duplicate requests
+
   // Store loaded comments locally to keep them across all state changes
   List<DuelComment> _currentComments = [];
-  
+
   // Get the current user ID from the AuthBloc
   String? _getCurrentUserId(BuildContext context) {
     try {
@@ -72,10 +73,12 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
   @override
   void initState() {
     super.initState();
-    
+
     // Always try to load comments - if user isn't a participant, we'll handle the error gracefully
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DuelDetailBloc>().add(LoadDuelComments(duelId: widget.duelId));
+      context
+          .read<DuelDetailBloc>()
+          .add(LoadDuelComments(duelId: widget.duelId));
     });
   }
 
@@ -90,29 +93,29 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
     if (_commentController.text.trim().isEmpty) {
       return;
     }
-    
+
     setState(() {
       _isAddingComment = true;
     });
-    
+
     if (_editingCommentId != null) {
       // Update existing comment
       context.read<DuelDetailBloc>().add(
-        UpdateDuelComment(
-          commentId: _editingCommentId!,
-          content: _commentController.text.trim(),
-        ),
-      );
+            UpdateDuelComment(
+              commentId: _editingCommentId!,
+              content: _commentController.text.trim(),
+            ),
+          );
     } else {
       // Add new comment
       context.read<DuelDetailBloc>().add(
-        AddDuelComment(
-          duelId: widget.duelId,
-          content: _commentController.text.trim(),
-        ),
-      );
+            AddDuelComment(
+              duelId: widget.duelId,
+              content: _commentController.text.trim(),
+            ),
+          );
     }
-    
+
     Future.microtask(() {
       if (mounted) {
         _commentController.clear();
@@ -135,7 +138,8 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Comment'),
-        content: const Text('Are you sure you want to delete this comment? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to delete this comment? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -144,7 +148,9 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              context.read<DuelDetailBloc>().add(DeleteDuelComment(commentId: comment.id));
+              context
+                  .read<DuelDetailBloc>()
+                  .add(DeleteDuelComment(commentId: comment.id));
             },
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
@@ -175,14 +181,15 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
             _commentsLoaded = true;
             _isAddingComment = false;
           });
-          
+
           // Cancel editing if we were editing
           if (_editingCommentId != null) {
             _cancelEditing();
           }
-        } else if (state is DuelDetailError && state.message.contains('comment')) {
+        } else if (state is DuelDetailError &&
+            state.message.contains('comment')) {
           // Handle specific "must be participant" error gracefully
-          if (state.message.contains('must be a participant') || 
+          if (state.message.contains('must be a participant') ||
               state.message.contains('participant to view comments')) {
             // Don't show error snackbar for participant restriction - handle it in UI
             setState(() {
@@ -210,7 +217,7 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
         builder: (context, state) {
           List<DuelComment> comments = _currentComments;
           bool canViewComments = false;
-          
+
           if (state is DuelDetailLoaded) {
             comments = state.comments;
             canViewComments = state.canViewComments;
@@ -243,7 +250,8 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (state is DuelDetailLoading) Center(child: CircularProgressIndicator()),
+              if (state is DuelDetailLoading)
+                Center(child: CircularProgressIndicator()),
               if (comments.isNotEmpty) _buildCommentsList(comments),
               // Message if not participant (after comments)
               if (!canViewComments) ...[
@@ -273,7 +281,8 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
               // Comment input only if participant and not hidden
               if (!widget.hideInput && canViewComments) ...[
                 Padding(
-                  padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 16.0),
+                  padding: const EdgeInsets.only(
+                      left: 16.0, top: 16.0, right: 16.0, bottom: 16.0),
                   child: Row(
                     children: [
                       Expanded(
@@ -283,9 +292,11 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                           decoration: const InputDecoration(
                             hintText: 'Add a comment...',
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(20.0)),
                             ),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16.0, vertical: 12.0),
                             isDense: true,
                           ),
                           textInputAction: TextInputAction.send,
@@ -300,18 +311,19 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                           shape: const CircleBorder(),
                         ),
                         child: _isAddingComment
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.arrow_right_alt,
+                                color: Colors.white,
                               ),
-                            )
-                          : const Icon(
-                              Icons.arrow_right_alt,
-                              color: Colors.white,
-                            ),
                       ),
                     ],
                   ),
@@ -336,10 +348,10 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
       child: Column(
         children: [
           ...displayedComments.map((comment) => _buildCommentItem(comment)),
-          
+
           // "View All" button if there are more comments
-          if (widget.maxDisplayed != null && 
-              comments.length > widget.maxDisplayed! && 
+          if (widget.maxDisplayed != null &&
+              comments.length > widget.maxDisplayed! &&
               widget.showViewAllButton)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -363,12 +375,12 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
     final currentUserId = _getCurrentUserId(context);
     final isCurrentUserComment = currentUserId == comment.userId;
     final isEditing = _editingCommentId == comment.id;
-    
+
     // Format date
     final now = DateTime.now();
     final difference = now.difference(comment.createdAt);
     String formattedDate;
-    
+
     if (difference.inDays > 7) {
       formattedDate = DateFormat('MMM d, y').format(comment.createdAt);
     } else if (difference.inDays > 0) {
@@ -396,9 +408,9 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                 username: comment.userDisplayName,
                 size: 32,
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // User name and time
               Expanded(
                 child: Column(
@@ -421,96 +433,99 @@ class _DuelCommentsSectionState extends State<DuelCommentsSection> {
                   ],
                 ),
               ),
-              
+
               // Edit/Delete buttons (only for current user's comments)
               if (isCurrentUserComment)
                 isEditing
-                  ? Row(
-                      children: [
-                        // Save button
-                        TextButton(
-                          onPressed: () {
-                            // Update the comment
-                            context.read<DuelDetailBloc>().add(
-                              UpdateDuelComment(
-                                commentId: comment.id,
-                                content: _commentController.text.trim(),
-                              ),
-                            );
-                            
-                            // Clear editing state
-                            setState(() {
-                              _editingCommentId = null;
-                            });
-                            _commentController.clear();
-                            _commentFocusNode.unfocus();
-                          },
-                          child: const Text('Save'),
-                        ),
-                        // Cancel button
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _editingCommentId = null;
-                            });
-                            _commentController.clear();
-                            _commentFocusNode.unfocus();
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        // Edit button
-                        IconButton(
-                          icon: Icon(Icons.edit, size: 18, color: Colors.green),
-                          onPressed: () => _handleEditComment(comment),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4.0),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        // Delete button
-                        IconButton(
-                          icon: Icon(Icons.delete, size: 18, color: Colors.green),
-                          onPressed: () => _handleDeleteComment(comment),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4.0),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
+                    ? Row(
+                        children: [
+                          // Save button
+                          TextButton(
+                            onPressed: () {
+                              // Update the comment
+                              context.read<DuelDetailBloc>().add(
+                                    UpdateDuelComment(
+                                      commentId: comment.id,
+                                      content: _commentController.text.trim(),
+                                    ),
+                                  );
+
+                              // Clear editing state
+                              setState(() {
+                                _editingCommentId = null;
+                              });
+                              _commentController.clear();
+                              _commentFocusNode.unfocus();
+                            },
+                            child: const Text('Save'),
+                          ),
+                          // Cancel button
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _editingCommentId = null;
+                              });
+                              _commentController.clear();
+                              _commentFocusNode.unfocus();
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          // Edit button
+                          IconButton(
+                            icon:
+                                Icon(Icons.edit, size: 18, color: Colors.green),
+                            onPressed: () => _handleEditComment(comment),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4.0),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          // Delete button
+                          IconButton(
+                            icon: Icon(Icons.delete,
+                                size: 18, color: Colors.green),
+                            onPressed: () => _handleDeleteComment(comment),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4.0),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                      ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Comment content - either show text or editing field
           Padding(
             padding: const EdgeInsets.only(left: 40.0),
             child: isEditing
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        focusNode: _commentFocusNode,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentController,
+                          focusNode: _commentFocusNode,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            isDense: true,
                           ),
-                          isDense: true,
+                          maxLines: null,
+                          textInputAction: TextInputAction.done,
                         ),
-                        maxLines: null,
-                        textInputAction: TextInputAction.done,
                       ),
-                    ),
-                  ],
-                )
-              : Text(comment.content),
+                    ],
+                  )
+                : Text(comment.content),
           ),
-          
+
           // Edited indicator
           if (comment.isEdited && !isEditing)
             Padding(

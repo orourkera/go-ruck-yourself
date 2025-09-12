@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 class RevenueCatService {
   bool _isInitialized = false;
   bool _forceDebugMode = false; // Fallback debug mode when dotenv fails
-  
+
   bool get _isDebugMode {
     if (_forceDebugMode) return true;
     try {
@@ -48,14 +48,15 @@ class RevenueCatService {
       _isInitialized = true;
       return;
     }
-    
+
     if (apiKey == null || apiKey.isEmpty) {
-      debugPrint('RevenueCat: API key is missing from .env file, using debug mode');
+      debugPrint(
+          'RevenueCat: API key is missing from .env file, using debug mode');
       _forceDebugMode = true;
       _isInitialized = true;
       return;
     }
-    
+
     try {
       // Disable RevenueCat debug logs for production
       Purchases.setDebugLogsEnabled(false);
@@ -87,14 +88,8 @@ class RevenueCatService {
   }
 
   Offering _createMockOffering() {
-    final mockStoreProduct = StoreProduct(
-      'mock_product',
-      'Mock monthly subscription',
-      'Monthly Premium',
-      4.99,
-      '\$4.99',
-      'USD'
-    );
+    final mockStoreProduct = StoreProduct('mock_product',
+        'Mock monthly subscription', 'Monthly Premium', 4.99, '\$4.99', 'USD');
     final mockPackage = Package(
       'mock_monthly',
       PackageType.monthly,
@@ -119,11 +114,12 @@ class RevenueCatService {
     try {
       if (!_isInitialized) await initialize();
       if (_isDebugMode) {
-        debugPrint('RevenueCatService: Simulating successful purchase in debug mode.');
+        debugPrint(
+            'RevenueCatService: Simulating successful purchase in debug mode.');
         _mockUserSubscribed = true; // Set mock subscription to true
         return true;
       }
-      
+
       final customerInfo = await Purchases.purchasePackage(package);
       final isPurchased = customerInfo.entitlements.active.isNotEmpty;
       debugPrint('Purchase completed successfully: $isPurchased');
@@ -131,10 +127,11 @@ class RevenueCatService {
     } on PlatformException catch (e) {
       debugPrint('Platform error during purchase: ${e.code} - ${e.message}');
       // Handle specific billing errors
-      if (e.code == 'BILLING_UNAVAILABLE' || 
+      if (e.code == 'BILLING_UNAVAILABLE' ||
           e.code == 'SERVICE_UNAVAILABLE' ||
           e.message?.contains('PendingIntent') == true) {
-        debugPrint('Billing service unavailable or corrupted - graceful fallback');
+        debugPrint(
+            'Billing service unavailable or corrupted - graceful fallback');
       }
       return false;
     } catch (e) {
@@ -146,7 +143,8 @@ class RevenueCatService {
   Future<bool> checkSubscriptionStatus() async {
     if (!_isInitialized) await initialize();
     if (_isDebugMode) {
-      debugPrint('RevenueCatService: Returning mock subscription status: $_mockUserSubscribed');
+      debugPrint(
+          'RevenueCatService: Returning mock subscription status: $_mockUserSubscribed');
       return _mockUserSubscribed; // Return the state of the mock subscription
     }
     try {
@@ -161,7 +159,8 @@ class RevenueCatService {
   Future<void> restorePurchases() async {
     if (!_isInitialized) await initialize();
     if (_isDebugMode) {
-      debugPrint('RevenueCatService: Simulating restore purchases in debug mode.');
+      debugPrint(
+          'RevenueCatService: Simulating restore purchases in debug mode.');
       _mockUserSubscribed = true; // Assume restore finds a subscription
       return;
     }

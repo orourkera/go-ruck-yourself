@@ -14,7 +14,8 @@ class DuelInvitationsScreen extends StatefulWidget {
   State<DuelInvitationsScreen> createState() => _DuelInvitationsScreenState();
 }
 
-class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with TickerProviderStateMixin {
+class _DuelInvitationsScreenState extends State<DuelInvitationsScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -42,7 +43,9 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<DuelInvitationsBloc>().add(RefreshDuelInvitations()),
+            onPressed: () => context
+                .read<DuelInvitationsBloc>()
+                .add(RefreshDuelInvitations()),
           ),
         ],
         bottom: TabBar(
@@ -58,8 +61,8 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
               3: 'declined',
             };
             context.read<DuelInvitationsBloc>().add(
-              FilterInvitationsByStatus(status: statusMap[index]),
-            );
+                  FilterInvitationsByStatus(status: statusMap[index]),
+                );
           },
           tabs: const [
             Tab(text: 'All'),
@@ -107,8 +110,8 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.read<DuelInvitationsBloc>().add(
-                      const LoadDuelInvitations(),
-                    ),
+                          const LoadDuelInvitations(),
+                        ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -117,12 +120,14 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
           } else if (state is DuelInvitationsLoaded) {
             return RefreshIndicator(
               onRefresh: () async {
-                context.read<DuelInvitationsBloc>().add(RefreshDuelInvitations());
+                context
+                    .read<DuelInvitationsBloc>()
+                    .add(RefreshDuelInvitations());
               },
               child: _buildInvitationsList(state),
             );
           }
-          
+
           return const SizedBox.shrink();
         },
       ),
@@ -142,12 +147,12 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
             ),
             const SizedBox(height: 16),
             Text(
-              state.hasFilters 
+              state.hasFilters
                   ? 'No invitations match your filter'
                   : 'No duel invitations',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.grey[600],
-              ),
+                    color: Colors.grey[600],
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -155,14 +160,16 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
                   ? 'Try changing the filter or check back later'
                   : 'You\'ll see duel invitations here when you receive them',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[500],
-              ),
+                    color: Colors.grey[500],
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             if (state.hasFilters)
               TextButton(
-                onPressed: () => context.read<DuelInvitationsBloc>().add(ClearInvitationFilters()),
+                onPressed: () => context
+                    .read<DuelInvitationsBloc>()
+                    .add(ClearInvitationFilters()),
                 child: const Text('Clear Filters'),
               ),
           ],
@@ -181,19 +188,19 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
             invitation: invitation,
             onAccept: invitation.status == 'pending'
                 ? () => context.read<DuelInvitationsBloc>().add(
-                    RespondToInvitation(
-                      invitationId: invitation.id,
-                      response: 'accept',
-                    ),
-                  )
+                      RespondToInvitation(
+                        invitationId: invitation.id,
+                        response: 'accept',
+                      ),
+                    )
                 : null,
             onDecline: invitation.status == 'pending'
                 ? () => context.read<DuelInvitationsBloc>().add(
-                    RespondToInvitation(
-                      invitationId: invitation.id,
-                      response: 'decline',
-                    ),
-                  )
+                      RespondToInvitation(
+                        invitationId: invitation.id,
+                        response: 'decline',
+                      ),
+                    )
                 : null,
             onViewDuel: () {
               // Navigate to duel detail - for now just show snackbar
@@ -202,8 +209,8 @@ class _DuelInvitationsScreenState extends State<DuelInvitationsScreen> with Tick
                 message: 'Navigate to duel ${invitation.duelId}',
               );
             },
-            isResponding: state is InvitationResponding && 
-                         (state as InvitationResponding).invitationId == invitation.id,
+            isResponding: state is InvitationResponding &&
+                (state as InvitationResponding).invitationId == invitation.id,
           ),
         );
       },

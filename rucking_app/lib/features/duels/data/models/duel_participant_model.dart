@@ -34,8 +34,8 @@ class DuelParticipantModel extends DuelParticipant {
         ),
         currentValue: (json['current_value'] as num).toDouble(),
         lastSessionId: json['_session_id'] as String?,
-        joinedAt: json['joined_at'] != null 
-            ? DateTime.parse(json['joined_at'] as String) 
+        joinedAt: json['joined_at'] != null
+            ? DateTime.parse(json['joined_at'] as String)
             : null,
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),

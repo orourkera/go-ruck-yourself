@@ -140,7 +140,8 @@ class EventActionSuccess extends EventsState {
   });
 
   @override
-  List<Object?> get props => [message, shouldRefresh, eventId, eventTitle, sessionId];
+  List<Object?> get props =>
+      [message, shouldRefresh, eventId, eventTitle, sessionId];
 }
 
 class EventActionError extends EventsState {

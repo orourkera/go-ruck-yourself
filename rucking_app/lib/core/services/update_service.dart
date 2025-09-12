@@ -30,7 +30,8 @@ class UpdateService {
       final updateUrlIos = rc.getString('update_url_ios');
       final updateUrlAndroid = rc.getString('update_url_android');
 
-      AppLogger.info('[UPDATE] build=$currentBuild, min=$minSupported, latest=$latest');
+      AppLogger.info(
+          '[UPDATE] build=$currentBuild, min=$minSupported, latest=$latest');
 
       if (currentBuild < minSupported) {
         _showBlockingDialog(context, notes, updateUrlIos, updateUrlAndroid);
@@ -42,7 +43,8 @@ class UpdateService {
     }
   }
 
-  static void _showBlockingDialog(BuildContext context, String notes, String iosUrl, String androidUrl) {
+  static void _showBlockingDialog(
+      BuildContext context, String notes, String iosUrl, String androidUrl) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -59,14 +61,17 @@ class UpdateService {
     );
   }
 
-  static void _showSoftDialog(BuildContext context, String notes, String iosUrl, String androidUrl) {
+  static void _showSoftDialog(
+      BuildContext context, String notes, String iosUrl, String androidUrl) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Update Available'),
         content: Text(notes.isEmpty ? 'A new version is available.' : notes),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Later')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Later')),
           TextButton(
             onPressed: () => _launchStore(iosUrl, androidUrl),
             child: const Text('Update'),
@@ -79,7 +84,9 @@ class UpdateService {
   static Future<void> _launchStore(String iosUrl, String androidUrl) async {
     try {
       // Use a simple launcher via GetIt if available; fallback no-op
-      final launcher = GetIt.I.isRegistered<Function(String)>() ? GetIt.I<Function(String)>() : null;
+      final launcher = GetIt.I.isRegistered<Function(String)>()
+          ? GetIt.I<Function(String)>()
+          : null;
       final uri = iosUrl.isNotEmpty ? iosUrl : androidUrl;
       if (launcher != null && uri.isNotEmpty) {
         await launcher(uri);
@@ -87,6 +94,3 @@ class UpdateService {
     } catch (_) {}
   }
 }
-
-
-

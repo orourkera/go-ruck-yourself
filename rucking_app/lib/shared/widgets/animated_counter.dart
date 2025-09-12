@@ -32,7 +32,7 @@ class _AnimatedCounterState extends State<AnimatedCounter>
   @override
   void initState() {
     super.initState();
-    
+
     _controller = AnimationController(
       duration: widget.duration,
       vsync: this,
@@ -85,7 +85,7 @@ class _AnimatedCounterState extends State<AnimatedCounter>
   @override
   void didUpdateWidget(AnimatedCounter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (oldWidget.targetValue != widget.targetValue) {
       _animation = Tween<double>(
         begin: _currentValue.toDouble(),
@@ -94,7 +94,7 @@ class _AnimatedCounterState extends State<AnimatedCounter>
         parent: _controller,
         curve: Curves.easeOutCubic,
       ));
-      
+
       _controller.reset();
       _scaleController.reset();
       if (widget.autoStart) {

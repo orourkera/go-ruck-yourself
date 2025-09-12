@@ -19,7 +19,7 @@ class CoachingMessageGenerator {
     try {
       // Build AI prompt based on context
       final prompt = _buildCoachingPrompt(type, tone, context);
-      
+
       final response = await _apiClient.post('/ai/coaching-message', {
         'prompt': prompt,
         'tone': tone.value,
@@ -27,12 +27,12 @@ class CoachingMessageGenerator {
         'context': context,
         'max_length': _getMaxLength(type),
       });
-      
+
       final message = response.data['message'] as String?;
       if (message != null && message.trim().isNotEmpty) {
         return _validateAndCleanMessage(message);
       }
-      
+
       return _getFallbackMessage(type, tone, context);
     } catch (e) {
       AppLogger.error('Error generating AI coaching message: $e');
@@ -47,19 +47,20 @@ class CoachingMessageGenerator {
     Map<String, dynamic> context,
   ) {
     final basePrompt = StringBuffer();
-    
+
     // Set coaching personality
-    basePrompt.writeln('You are a ${tone.description} AI fitness coach specializing in rucking.');
+    basePrompt.writeln(
+        'You are a ${tone.description} AI fitness coach specializing in rucking.');
     basePrompt.writeln('Your communication style: ${tone.sampleMessage}');
     basePrompt.writeln();
-    
+
     // Add user insights for personalized context
     final userInsights = context['user_insights'] as Map<String, dynamic>?;
     if (userInsights != null) {
       basePrompt.writeln(_buildUserInsightsContext(userInsights));
       basePrompt.writeln();
     }
-    
+
     // Add context-specific information
     switch (type) {
       case CoachingNotificationType.sessionReminder:
@@ -84,16 +85,17 @@ class CoachingMessageGenerator {
         basePrompt.writeln(_buildMilestoneContext(context));
         break;
     }
-    
+
     // Add general guidelines
     basePrompt.writeln();
     basePrompt.writeln('Guidelines:');
-    basePrompt.writeln('- Keep message under ${_getMaxLength(type)} characters');
+    basePrompt
+        .writeln('- Keep message under ${_getMaxLength(type)} characters');
     basePrompt.writeln('- Be motivating and actionable');
     basePrompt.writeln('- Reference specific user data when available');
     basePrompt.writeln('- Match the ${tone.displayName} personality exactly');
     basePrompt.writeln('- No emojis unless tone specifically calls for them');
-    
+
     return basePrompt.toString();
   }
 
@@ -101,11 +103,11 @@ class CoachingMessageGenerator {
   String _buildSessionReminderContext(Map<String, dynamic> context) {
     final session = context['session'] as Map<String, dynamic>? ?? {};
     final plan = context['plan'] as Map<String, dynamic>? ?? {};
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a session reminder message.');
     buffer.writeln();
-    
+
     if (session.isNotEmpty) {
       buffer.writeln('Upcoming Session:');
       buffer.writeln('- Type: ${session['type'] ?? 'Ruck Session'}');
@@ -113,24 +115,27 @@ class CoachingMessageGenerator {
         buffer.writeln('- Distance: ${session['distance_km']} km');
       }
       if (session['duration_minutes'] != null) {
-        buffer.writeln('- Target Duration: ${session['duration_minutes']} minutes');
+        buffer.writeln(
+            '- Target Duration: ${session['duration_minutes']} minutes');
       }
       if (session['weight_kg'] != null) {
         buffer.writeln('- Weight: ${session['weight_kg']} kg');
       }
-      if (session['notes'] != null && session['notes'].toString().trim().isNotEmpty) {
+      if (session['notes'] != null &&
+          session['notes'].toString().trim().isNotEmpty) {
         buffer.writeln('- Notes: ${session['notes']}');
       }
     }
-    
+
     if (plan.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Plan Context:');
       buffer.writeln('- Plan: ${plan['name'] ?? 'Current Plan'}');
-      buffer.writeln('- Week: ${plan['current_week'] ?? 1}/${plan['duration_weeks'] ?? 8}');
+      buffer.writeln(
+          '- Week: ${plan['current_week'] ?? 1}/${plan['duration_weeks'] ?? 8}');
       buffer.writeln('- Phase: ${plan['phase'] ?? 'Base Building'}');
     }
-    
+
     return buffer.toString();
   }
 
@@ -138,41 +143,44 @@ class CoachingMessageGenerator {
   String _buildMotivationalContext(Map<String, dynamic> context) {
     final plan = context['plan'] as Map<String, dynamic>? ?? {};
     final userStats = context['user_stats'] as Map<String, dynamic>? ?? {};
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a motivational message to inspire the user.');
     buffer.writeln();
-    
+
     if (plan.isNotEmpty) {
       buffer.writeln('Plan Progress:');
-      buffer.writeln('- Current Week: ${plan['current_week'] ?? 1}/${plan['duration_weeks'] ?? 8}');
+      buffer.writeln(
+          '- Current Week: ${plan['current_week'] ?? 1}/${plan['duration_weeks'] ?? 8}');
       buffer.writeln('- Phase: ${plan['phase'] ?? 'Base Building'}');
       if (plan['adherence_score'] != null) {
         buffer.writeln('- Adherence: ${plan['adherence_score']}%');
       }
     }
-    
+
     if (userStats.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Recent Performance:');
       if (userStats['total_distance_km'] != null) {
-        buffer.writeln('- Total Distance: ${userStats['total_distance_km']} km');
+        buffer
+            .writeln('- Total Distance: ${userStats['total_distance_km']} km');
       }
       if (userStats['current_streak'] != null) {
         buffer.writeln('- Current Streak: ${userStats['current_streak']} days');
       }
       if (userStats['sessions_this_week'] != null) {
-        buffer.writeln('- This Week: ${userStats['sessions_this_week']} sessions');
+        buffer.writeln(
+            '- This Week: ${userStats['sessions_this_week']} sessions');
       }
     }
-    
+
     // Include user insights for more context
     final userInsights = context['user_insights'] as Map<String, dynamic>?;
     if (userInsights != null) {
       buffer.writeln();
       buffer.writeln(_buildUserInsightsContext(userInsights));
     }
-    
+
     return buffer.toString();
   }
 
@@ -180,19 +188,20 @@ class CoachingMessageGenerator {
   String _buildMissedSessionContext(Map<String, dynamic> context) {
     final missedSessions = context['missed_sessions'] as List<dynamic>? ?? [];
     final plan = context['plan'] as Map<String, dynamic>? ?? {};
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a recovery message for missed sessions.');
     buffer.writeln();
-    
+
     buffer.writeln('Missed Sessions: ${missedSessions.length}');
     if (plan.isNotEmpty && plan['adherence_score'] != null) {
       buffer.writeln('Plan Adherence: ${plan['adherence_score']}%');
     }
-    
+
     buffer.writeln();
-    buffer.writeln('Focus on getting back on track rather than dwelling on missed sessions.');
-    
+    buffer.writeln(
+        'Focus on getting back on track rather than dwelling on missed sessions.');
+
     return buffer.toString();
   }
 
@@ -200,24 +209,24 @@ class CoachingMessageGenerator {
   String _buildProgressContext(Map<String, dynamic> context) {
     final milestone = context['milestone'] as Map<String, dynamic>? ?? {};
     final achievement = context['achievement'] as Map<String, dynamic>? ?? {};
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a progress celebration message.');
     buffer.writeln();
-    
+
     if (milestone.isNotEmpty) {
       buffer.writeln('Milestone Achieved:');
       buffer.writeln('- Name: ${milestone['name'] ?? 'Progress Milestone'}');
       buffer.writeln('- Description: ${milestone['description'] ?? ''}');
     }
-    
+
     if (achievement.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Achievement Details:');
       buffer.writeln('- Type: ${achievement['type'] ?? 'Progress'}');
       buffer.writeln('- Value: ${achievement['value'] ?? ''}');
     }
-    
+
     return buffer.toString();
   }
 
@@ -225,11 +234,11 @@ class CoachingMessageGenerator {
   String _buildWeatherContext(Map<String, dynamic> context) {
     final weather = context['weather'] as Map<String, dynamic>? ?? {};
     final suggestion = context['suggestion'] as String? ?? '';
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a weather-based ruck suggestion.');
     buffer.writeln();
-    
+
     if (weather.isNotEmpty) {
       buffer.writeln('Current Weather:');
       buffer.writeln('- Condition: ${weather['condition'] ?? 'Unknown'}');
@@ -241,12 +250,12 @@ class CoachingMessageGenerator {
         buffer.writeln('- Wind: ${weather['wind_speed']} km/h');
       }
     }
-    
+
     if (suggestion.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('Suggested Action: $suggestion');
     }
-    
+
     return buffer.toString();
   }
 
@@ -254,39 +263,39 @@ class CoachingMessageGenerator {
   String _buildStreakContext(Map<String, dynamic> context) {
     final streak = context['streak'] as Map<String, dynamic>? ?? {};
     final risk = context['risk_level'] as String? ?? 'medium';
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a streak protection message.');
     buffer.writeln();
-    
+
     if (streak.isNotEmpty) {
       buffer.writeln('Current Streak:');
       buffer.writeln('- Days: ${streak['current_days'] ?? 0}');
       buffer.writeln('- Best: ${streak['best_days'] ?? 0}');
       buffer.writeln('- Risk Level: $risk');
     }
-    
+
     buffer.writeln();
     buffer.writeln('Encourage maintaining consistency without being pushy.');
-    
+
     return buffer.toString();
   }
 
   /// Build milestone context
   String _buildMilestoneContext(Map<String, dynamic> context) {
     final milestone = context['milestone'] as Map<String, dynamic>? ?? {};
-    
+
     final buffer = StringBuffer();
     buffer.writeln('TASK: Create a plan milestone message.');
     buffer.writeln();
-    
+
     if (milestone.isNotEmpty) {
       buffer.writeln('Upcoming Milestone:');
       buffer.writeln('- Name: ${milestone['name'] ?? 'Plan Milestone'}');
       buffer.writeln('- Target Date: ${milestone['target_date'] ?? 'Soon'}');
       buffer.writeln('- Progress: ${milestone['progress'] ?? 0}%');
     }
-    
+
     return buffer.toString();
   }
 
@@ -294,21 +303,23 @@ class CoachingMessageGenerator {
   String _buildUserInsightsContext(Map<String, dynamic> userInsights) {
     final buffer = StringBuffer();
     buffer.writeln('USER INSIGHTS (for personalization):');
-    
+
     final facts = userInsights['facts'] as Map<String, dynamic>? ?? {};
-    
+
     // Recent performance summary
     final totals30d = facts['totals_30d'] as Map<String, dynamic>? ?? {};
     final sessions30d = totals30d['sessions'] as num? ?? 0;
     final distance30d = totals30d['distance_km'] as num? ?? 0;
-    
+
     if (sessions30d > 0) {
       final avgDistance = distance30d / sessions30d;
       final avgWeekly = sessions30d / 4.3;
-      buffer.writeln('- Recent Activity: ${sessions30d.toInt()} sessions in 30 days (${avgWeekly.toStringAsFixed(1)}/week)');
-      buffer.writeln('- Average Distance: ${avgDistance.toStringAsFixed(1)}km per session');
+      buffer.writeln(
+          '- Recent Activity: ${sessions30d.toInt()} sessions in 30 days (${avgWeekly.toStringAsFixed(1)}/week)');
+      buffer.writeln(
+          '- Average Distance: ${avgDistance.toStringAsFixed(1)}km per session');
     }
-    
+
     // Experience level
     final allTime = facts['all_time'] as Map<String, dynamic>? ?? {};
     final totalSessions = allTime['sessions'] as num? ?? 0;
@@ -318,14 +329,16 @@ class CoachingMessageGenerator {
     } else if (totalSessions >= 10) {
       experience = 'intermediate';
     }
-    buffer.writeln('- Experience Level: $experience ($totalSessions total sessions)');
-    
+    buffer.writeln(
+        '- Experience Level: $experience ($totalSessions total sessions)');
+
     // Recent performance trend
     final recentSplits = facts['recent_splits'] as List<dynamic>? ?? [];
     if (recentSplits.isNotEmpty && recentSplits.length >= 2) {
-      buffer.writeln('- Recent Sessions: ${recentSplits.length} sessions analyzed for pacing patterns');
+      buffer.writeln(
+          '- Recent Sessions: ${recentSplits.length} sessions analyzed for pacing patterns');
     }
-    
+
     // Last session info
     final recency = facts['recency'] as Map<String, dynamic>? ?? {};
     final daysSince = recency['days_since_last'] as num?;
@@ -338,12 +351,13 @@ class CoachingMessageGenerator {
         buffer.writeln('- Last Ruck: ${daysSince.toInt()} days ago');
       }
     }
-    
+
     // AI-generated insights if available
     final insights = userInsights['insights'] as Map<String, dynamic>? ?? {};
     final candidates = insights['candidates'] as List<dynamic>? ?? [];
     if (candidates.isNotEmpty) {
-      buffer.writeln('- AI Insights Available: ${candidates.length} behavioral patterns identified');
+      buffer.writeln(
+          '- AI Insights Available: ${candidates.length} behavioral patterns identified');
       // Include top insight for context
       final topInsight = candidates.first as Map<String, dynamic>? ?? {};
       final insightText = topInsight['text'] as String? ?? '';
@@ -351,7 +365,7 @@ class CoachingMessageGenerator {
         buffer.writeln('- Key Pattern: $insightText');
       }
     }
-    
+
     return buffer.toString();
   }
 
@@ -379,7 +393,7 @@ class CoachingMessageGenerator {
   String _validateAndCleanMessage(String message) {
     // Remove extra whitespace and newlines
     String cleaned = message.trim().replaceAll(RegExp(r'\s+'), ' ');
-    
+
     // Remove quotes if the entire message is wrapped in them
     if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
       cleaned = cleaned.substring(1, cleaned.length - 1);
@@ -387,12 +401,14 @@ class CoachingMessageGenerator {
     if (cleaned.startsWith("'") && cleaned.endsWith("'")) {
       cleaned = cleaned.substring(1, cleaned.length - 1);
     }
-    
+
     // Ensure it ends with proper punctuation
-    if (!cleaned.endsWith('.') && !cleaned.endsWith('!') && !cleaned.endsWith('?')) {
+    if (!cleaned.endsWith('.') &&
+        !cleaned.endsWith('!') &&
+        !cleaned.endsWith('?')) {
       cleaned += '.';
     }
-    
+
     return cleaned;
   }
 
@@ -404,12 +420,13 @@ class CoachingMessageGenerator {
   ) {
     final fallbackMessages = _getFallbackMessages(tone);
     final typeMessages = fallbackMessages[type] ?? [tone.sampleMessage];
-    
+
     return typeMessages[_random.nextInt(typeMessages.length)];
   }
 
   /// Get fallback message templates for each tone and type
-  Map<CoachingNotificationType, List<String>> _getFallbackMessages(CoachingTone tone) {
+  Map<CoachingNotificationType, List<String>> _getFallbackMessages(
+      CoachingTone tone) {
     switch (tone) {
       case CoachingTone.drillSergeant:
         return {
@@ -449,7 +466,7 @@ class CoachingMessageGenerator {
             'Mission progress on track! Maintain pace!',
           ],
         };
-        
+
       case CoachingTone.supportiveFriend:
         return {
           CoachingNotificationType.sessionReminder: [
@@ -488,7 +505,7 @@ class CoachingMessageGenerator {
             'Your dedication is showing! Next milestone coming up!',
           ],
         };
-        
+
       case CoachingTone.dataNerd:
         return {
           CoachingNotificationType.sessionReminder: [
@@ -527,7 +544,7 @@ class CoachingMessageGenerator {
             'Progress metrics indicate milestone achievement imminent.',
           ],
         };
-        
+
       case CoachingTone.minimalist:
         return {
           CoachingNotificationType.sessionReminder: [

@@ -8,7 +8,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
-  
+
   const OtpVerificationScreen({
     super.key,
     required this.email,
@@ -19,7 +19,8 @@ class OtpVerificationScreen extends StatefulWidget {
 }
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _controllers =
+      List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   String get _otpCode => _controllers.map((c) => c.text).join();
   bool _isResending = false;
@@ -38,11 +39,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   void _verifyOtp() {
     if (_otpCode.length == 6) {
       context.read<AuthBloc>().add(
-        AuthOtpVerified(
-          email: widget.email,
-          otpCode: _otpCode,
-        ),
-      );
+            AuthOtpVerified(
+              email: widget.email,
+              otpCode: _otpCode,
+            ),
+          );
     }
   }
 
@@ -50,20 +51,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     setState(() {
       _isResending = true;
     });
-    
+
     context.read<AuthBloc>().add(
-      AuthPasswordResetRequested(email: widget.email),
-    );
-    
+          AuthPasswordResetRequested(email: widget.email),
+        );
+
     // Clear current OTP
     for (final controller in _controllers) {
       controller.clear();
     }
-    
+
     setState(() {
       _isResending = false;
     });
-    
+
     _focusNodes[0].requestFocus();
   }
 
@@ -110,16 +111,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 Text(
                   'Enter Verification Code',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'We\'ve sent a 6-digit code to\n${widget.email}',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+                        color: Colors.grey[600],
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
@@ -133,8 +134,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   builder: (context, state) {
                     return CustomButton(
                       text: 'Verify Code',
-                      onPressed: state is AuthLoading || _otpCode.length != 6 
-                          ? null 
+                      onPressed: state is AuthLoading || _otpCode.length != 6
+                          ? null
                           : _verifyOtp,
                       isLoading: state is AuthLoading,
                     );
@@ -181,8 +182,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       height: 60,
       decoration: BoxDecoration(
         border: Border.all(
-          color: _controllers[index].text.isNotEmpty 
-              ? AppColors.primary 
+          color: _controllers[index].text.isNotEmpty
+              ? AppColors.primary
               : Colors.grey[300]!,
           width: 2,
         ),
@@ -206,13 +207,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         ),
         onChanged: (value) {
           setState(() {});
-          
+
           if (value.isNotEmpty && index < 5) {
             _focusNodes[index + 1].requestFocus();
           } else if (value.isEmpty && index > 0) {
             _focusNodes[index - 1].requestFocus();
           }
-          
+
           // Auto-verify when all fields are filled
           if (_otpCode.length == 6) {
             FocusScope.of(context).unfocus();

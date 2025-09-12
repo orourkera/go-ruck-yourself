@@ -29,13 +29,14 @@ class PremiumGate extends StatelessWidget {
           // Premium user - show content
           return child;
         }
-        
+
         // Free user - show gate
         return _PremiumLockedOverlay(
           child: child,
           feature: feature,
           description: description,
-          onUpgradePressed: onUpgradePressed ?? () => _showPremiumPaywall(context),
+          onUpgradePressed:
+              onUpgradePressed ?? () => _showPremiumPaywall(context),
         );
       },
     );
@@ -82,7 +83,7 @@ class _PremiumLockedOverlay extends StatelessWidget {
             child: child,
           ),
         ),
-        
+
         // Lock overlay
         Positioned.fill(
           child: Container(
@@ -109,9 +110,9 @@ class _PremiumLockedOverlay extends StatelessWidget {
                     color: AppColors.white,
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Feature title
                 Text(
                   'Premium Feature',
@@ -120,9 +121,9 @@ class _PremiumLockedOverlay extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Feature description
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -134,9 +135,9 @@ class _PremiumLockedOverlay extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Upgrade button
                 _buildUpgradeButton(),
               ],

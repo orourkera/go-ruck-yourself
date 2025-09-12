@@ -36,18 +36,25 @@ class LeaderboardHeader extends StatelessWidget {
           // Rank column
           SizedBox(
             width: 40,
-            child: Text('#', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey.shade600), textAlign: TextAlign.center),
+            child: Text('#',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                textAlign: TextAlign.center),
           ),
-          
+
           // User column (not sortable)
           SizedBox(
             width: 150,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text('USER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey.shade600)),
+              child: Text('USER',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.grey.shade600)),
             ),
           ),
-          
+
           // SCROLLABLE STATS
           Flexible(
             child: SingleChildScrollView(
@@ -57,10 +64,15 @@ class LeaderboardHeader extends StatelessWidget {
               child: Row(
                 children: [
                   _buildPowerPointsColumn(context),
-                  _buildSortableColumn(context, 'RUCKS', 'totalRucks', width: 80),
-                  _buildSortableColumn(context, 'DISTANCE', 'distanceKm', width: 100),
-                  _buildSortableColumn(context, 'ELEVATION', 'elevationGainMeters', width: 100),
-                  _buildSortableColumn(context, 'CALORIES', 'caloriesBurned', width: 100),
+                  _buildSortableColumn(context, 'RUCKS', 'totalRucks',
+                      width: 80),
+                  _buildSortableColumn(context, 'DISTANCE', 'distanceKm',
+                      width: 100),
+                  _buildSortableColumn(
+                      context, 'ELEVATION', 'elevationGainMeters',
+                      width: 100),
+                  _buildSortableColumn(context, 'CALORIES', 'caloriesBurned',
+                      width: 100),
                 ],
               ),
             ),
@@ -78,9 +90,8 @@ class LeaderboardHeader extends StatelessWidget {
     double width = 60.0,
   }) {
     final isActive = sortBy == field;
-    final textColor = isActive 
-        ? Theme.of(context).primaryColor 
-        : Colors.grey.shade600;
+    final textColor =
+        isActive ? Theme.of(context).primaryColor : Colors.grey.shade600;
 
     return SizedBox(
       width: width,
@@ -120,9 +131,8 @@ class LeaderboardHeader extends StatelessWidget {
   /// Build the special Power Points column with tap to explain
   Widget _buildPowerPointsColumn(BuildContext context) {
     final isActive = sortBy == 'powerPoints';
-    final textColor = isActive 
-        ? Theme.of(context).primaryColor 
-        : Colors.grey.shade600;
+    final textColor =
+        isActive ? Theme.of(context).primaryColor : Colors.grey.shade600;
 
     return SizedBox(
       width: 100,
@@ -157,12 +167,13 @@ class LeaderboardHeader extends StatelessWidget {
                   _buildSortIcon(context, isActive, ascending),
                 ],
               ),
-              
+
               // Second line with explanation tap
               GestureDetector(
                 onTap: onPowerPointsTap,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.amber.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),

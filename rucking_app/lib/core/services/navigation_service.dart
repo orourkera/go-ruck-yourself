@@ -28,7 +28,8 @@ class NavigationService {
   bool get isNavigationReady => _navigatorKey?.currentState != null;
 
   /// Navigate to a named route
-  Future<T?>? pushNamed<T extends Object?>(String routeName, {Object? arguments}) {
+  Future<T?>? pushNamed<T extends Object?>(String routeName,
+      {Object? arguments}) {
     if (!isNavigationReady) return null;
     return navigator?.pushNamed<T>(routeName, arguments: arguments);
   }

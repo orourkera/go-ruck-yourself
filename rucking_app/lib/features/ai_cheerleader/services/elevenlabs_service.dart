@@ -10,20 +10,23 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 class ElevenLabsService {
   static const String _baseUrl = 'https://api.elevenlabs.io/v1';
   static const Duration _timeout = Duration(seconds: 15);
-  
+
   // Voice ID mapping for each personality - using diverse ElevenLabs voices
   static const Map<String, String> _personalityVoices = {
     // Core personalities
     'Supportive Friend': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female
     'Drill Sergeant': 'DGzg6RaUqxGRTHSBjfgF', // Custom Drill Sergeant voice
     'Southern Redneck': 'yoZ06aMxZJJ28mfd3POQ', // Sam - character male
-    
+
     // Missing personalities that were causing failures
-    'Motivational Coach': 'AZnzlk1XvdvUeBnXmlld', // Domi - warm female (same as Supportive Friend)
-    'Zen Guide': 'XB0fDUnXU5powFXDhCwa', // Charlotte - soothing female (same as Yoga Instructor)
-    'Dwarven Warrior': 'VR6AewLTigWG4xSOukaG', // Josh - strong male (same as Drill Sergeant)
+    'Motivational Coach':
+        'AZnzlk1XvdvUeBnXmlld', // Domi - warm female (same as Supportive Friend)
+    'Zen Guide':
+        'XB0fDUnXU5powFXDhCwa', // Charlotte - soothing female (same as Yoga Instructor)
+    'Dwarven Warrior':
+        'VR6AewLTigWG4xSOukaG', // Josh - strong male (same as Drill Sergeant)
     'Cowboy/Cowgirl': 'ruirxsoakN0GWmGNIo04', // Custom Cowboy voice
-    
+
     // Character personalities with unique voices from ElevenLabs library
     'Yoga Instructor': 'XB0fDUnXU5powFXDhCwa', // Charlotte - soothing female
     'British Butler': '7p1Ofvcwsv7UBPoFNcpI', // Custom British Butler voice
@@ -31,9 +34,10 @@ class ElevenLabsService {
     'Cowgirl': 'ruirxsoakN0GWmGNIo04', // Custom Cowboy voice (legacy)
     'Nature Lover': '4tRn1lSkEn13EVTuqb0g', // Serafina - sensual female
     'Burt Reynolds': '4YYIPFl9wE5c4L2eu2Gb', // Burt Reynolds - charismatic male
-    'Tom Selleck': '8Txe4M8OANBrlZqYIBZv', // Tom Selleck - iconic mustache voice
+    'Tom Selleck':
+        '8Txe4M8OANBrlZqYIBZv', // Tom Selleck - iconic mustache voice
   };
-  
+
   final String _apiKey;
 
   ElevenLabsService(this._apiKey) {
@@ -48,41 +52,46 @@ class ElevenLabsService {
     try {
       final voiceId = _getVoiceId(personality);
       if (voiceId == null) {
-        AppLogger.error('[ELEVENLABS] No voice ID found for personality: $personality');
+        AppLogger.error(
+            '[ELEVENLABS] No voice ID found for personality: $personality');
         return null;
       }
 
-      AppLogger.info('[ELEVENLABS] Synthesizing speech for $personality: "${text.substring(0, text.length > 30 ? 30 : text.length)}..."');
+      AppLogger.info(
+          '[ELEVENLABS] Synthesizing speech for $personality: "${text.substring(0, text.length > 30 ? 30 : text.length)}..."');
 
       final url = '$_baseUrl/text-to-speech/$voiceId';
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': _apiKey,
-        },
-        body: jsonEncode({
-          'text': text,
-          'model_id': 'eleven_monolingual_v1',
-          'voice_settings': {
-            'stability': _getStabilityForPersonality(personality),
-            'similarity_boost': _getSimilarityForPersonality(personality),
-            'style': _getStyleForPersonality(personality),
-            'use_speaker_boost': true,
-          },
-        }),
-      ).timeout(_timeout);
+
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Accept': 'audio/mpeg',
+              'Content-Type': 'application/json',
+              'xi-api-key': _apiKey,
+            },
+            body: jsonEncode({
+              'text': text,
+              'model_id': 'eleven_monolingual_v1',
+              'voice_settings': {
+                'stability': _getStabilityForPersonality(personality),
+                'similarity_boost': _getSimilarityForPersonality(personality),
+                'style': _getStyleForPersonality(personality),
+                'use_speaker_boost': true,
+              },
+            }),
+          )
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        AppLogger.info('[ELEVENLABS] Successfully synthesized ${response.bodyBytes.length} bytes of audio');
+        AppLogger.info(
+            '[ELEVENLABS] Successfully synthesized ${response.bodyBytes.length} bytes of audio');
         return response.bodyBytes;
       } else {
-        AppLogger.error('[ELEVENLABS] API error: ${response.statusCode} - ${response.body}');
+        AppLogger.error(
+            '[ELEVENLABS] API error: ${response.statusCode} - ${response.body}');
         return null;
       }
-
     } on TimeoutException {
       AppLogger.error('[ELEVENLABS] Request timed out');
       return null;
@@ -97,7 +106,8 @@ class ElevenLabsService {
 
   /// Gets voice ID for personality, with fallback
   String? _getVoiceId(String personality) {
-    return _personalityVoices[personality] ?? _personalityVoices['Supportive Friend'];
+    return _personalityVoices[personality] ??
+        _personalityVoices['Supportive Friend'];
   }
 
   /// Gets stability setting based on personality (0.0 to 1.0)

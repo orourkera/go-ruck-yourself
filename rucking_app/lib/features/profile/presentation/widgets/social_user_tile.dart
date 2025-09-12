@@ -23,14 +23,15 @@ class SocialUserTile extends StatelessWidget {
     // Format the date to show only the date part
     final dateFormat = DateFormat('MMM dd, yyyy');
     final formattedDate = dateFormat.format(user.followedAt);
-    
+
     return ListTile(
       leading: CircleAvatar(
         backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
             ? NetworkImage(user.avatarUrl!)
             : null,
         child: user.avatarUrl == null || user.avatarUrl!.isEmpty
-            ? Text(user.username.isNotEmpty ? user.username[0].toUpperCase() : '?')
+            ? Text(
+                user.username.isNotEmpty ? user.username[0].toUpperCase() : '?')
             : null,
       ),
       title: Text(
@@ -41,11 +42,13 @@ class SocialUserTile extends StatelessWidget {
         ),
       ),
       subtitle: Text('Followed since $formattedDate'),
-      trailing: showFollowButton ? FollowButton(
-        isFollowing: user.isFollowing,
-        onPressed: onFollowPressed ?? () {},
-      ) : null,
+      trailing: showFollowButton
+          ? FollowButton(
+              isFollowing: user.isFollowing,
+              onPressed: onFollowPressed ?? () {},
+            )
+          : null,
       onTap: onTap,
     );
   }
-} 
+}

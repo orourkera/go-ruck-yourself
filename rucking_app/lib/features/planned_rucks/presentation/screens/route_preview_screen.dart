@@ -21,11 +21,11 @@ extension StringExtension on String {
 }
 
 /// 🗺️ **Route Preview Screen**
-/// 
+///
 /// Detailed preview of a route before importing or planning a ruck
 class RoutePreviewScreen extends StatefulWidget {
   final String routeId;
-  
+
   const RoutePreviewScreen({
     Key? key,
     required this.routeId,
@@ -37,19 +37,19 @@ class RoutePreviewScreen extends StatefulWidget {
 
 class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
   late TextEditingController _titleController;
-  
+
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController();
   }
-  
+
   @override
   void dispose() {
     _titleController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,16 +57,16 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
         title: Text(
           'Route Preview',
           style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark 
-                ? AppColors.textLight 
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.textLight
                 : Colors.white,
           ),
         ),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? AppColors.surfaceDark 
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceDark
             : AppColors.primary,
-        foregroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? AppColors.textLight 
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.textLight
             : Colors.white,
         elevation: 2,
         // No actions needed for import preview
@@ -80,7 +80,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
               child: Container(),
             );
           }
-          
+
           if (state is RouteImportError) {
             return Center(
               child: Column(
@@ -115,11 +115,11 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
               ),
             );
           }
-          
+
           // Get the actual route data from the BLoC state
           route_model.Route? route;
           List<String> warnings = [];
-          
+
           if (state is RouteImportPreview) {
             route = state.route;
             warnings = state.warnings;
@@ -129,23 +129,23 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
           } else if (state is RouteImportSuccess) {
             route = state.importedRoute;
           }
-          
+
           if (route == null) {
             return const Center(
               child: Text('No route data available'),
             );
           }
-          
+
           // Update the title controller when route data changes
           if (_titleController.text.isEmpty && route.name.isNotEmpty) {
             _titleController.text = route.name;
           }
-          
+
           // Update the title controller when route data changes
           if (_titleController.text.isEmpty && route.name.isNotEmpty) {
             _titleController.text = route.name;
           }
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -156,31 +156,31 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
                   _buildWarningsSection(warnings),
                   const SizedBox(height: 16),
                 ],
-                
+
                 // Route Header
                 _buildRouteHeader(context, route),
                 const SizedBox(height: 24),
-                
+
                 // Route Map
                 _buildRouteMap(context, route),
                 const SizedBox(height: 24),
-                
+
                 // Route Stats
                 _buildRouteStats(context, route),
                 const SizedBox(height: 24),
-                
+
                 // Elevation Profile - only show if elevation data exists
-                if (route.elevationPoints.isNotEmpty && 
-                    route.elevationGainM != null && 
+                if (route.elevationPoints.isNotEmpty &&
+                    route.elevationGainM != null &&
                     route.elevationGainM! > 0) ...[
                   _buildElevationProfile(context, route),
                   const SizedBox(height: 24),
                 ],
-                
+
                 // Route Details
                 _buildRouteDetails(context, route),
                 const SizedBox(height: 24),
-                
+
                 // Action Buttons
                 _buildActionButtons(context, route),
                 const SizedBox(height: 32),
@@ -191,7 +191,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ),
     );
   }
-  
+
   Widget _buildWarningsSection(List<String> warnings) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -225,36 +225,36 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
           ),
           const SizedBox(height: 8),
           ...warnings.map((warning) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '• ',
-                  style: TextStyle(color: AppColors.warning),
-                ),
-                Expanded(
-                  child: Text(
-                    warning,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textDark,
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '• ',
+                      style: TextStyle(color: AppColors.warning),
                     ),
-                  ),
+                    Expanded(
+                      child: Text(
+                        warning,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
   }
-  
+
   Widget _buildRouteHeader(BuildContext context, route_model.Route route) {
     // Initialize controller with route name if it's empty
     if (_titleController.text.isEmpty && route.name.isNotEmpty) {
       _titleController.text = route.name;
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -277,7 +277,8 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.primary, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
         ),
         const SizedBox(height: 8),
@@ -291,7 +292,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ],
     );
   }
-  
+
   Widget _buildRouteMap(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 4,
@@ -323,7 +324,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ),
     );
   }
-  
+
   Widget _buildRouteStats(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
@@ -363,7 +364,11 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
                   child: _buildStatItem(
                     context,
                     'Difficulty',
-                    route.trailDifficulty?.toString().replaceAll('TrailDifficulty.', '').capitalize() ?? 'Unknown',
+                    route.trailDifficulty
+                            ?.toString()
+                            .replaceAll('TrailDifficulty.', '')
+                            .capitalize() ??
+                        'Unknown',
                     Icons.bar_chart,
                   ),
                 ),
@@ -374,8 +379,9 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ),
     );
   }
-  
-  Widget _buildStatItem(BuildContext context, String label, String value, IconData icon) {
+
+  Widget _buildStatItem(
+      BuildContext context, String label, String value, IconData icon) {
     return Column(
       children: [
         Icon(icon, color: AppColors.primary),
@@ -395,7 +401,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ],
     );
   }
-  
+
   Widget _buildElevationProfile(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
@@ -453,7 +459,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ),
     );
   }
-  
+
   Widget _buildRouteDetails(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
@@ -472,13 +478,14 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
             _buildDetailRow(context, 'Source', route.source ?? 'GPX Import'),
             _buildDetailRow(context, 'Created', _formatTodaysDate()),
             if (route.pointsOfInterest.isNotEmpty)
-              _buildDetailRow(context, 'Points of Interest', '${route.pointsOfInterest.length} locations'),
+              _buildDetailRow(context, 'Points of Interest',
+                  '${route.pointsOfInterest.length} locations'),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -502,7 +509,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ),
     );
   }
-  
+
   Widget _buildActionButtons(BuildContext context, route_model.Route route) {
     return Column(
       children: [
@@ -524,73 +531,89 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       ],
     );
   }
-  
+
   String _formatDate(DateTime? date) {
     if (date == null) return 'Unknown';
     return '${date.day}/${date.month}/${date.year}';
   }
-  
+
   String _formatTodaysDate() {
     final now = DateTime.now();
     final months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
-    
+
     String getDayWithSuffix(int day) {
       if (day >= 11 && day <= 13) {
         return '${day}th';
       }
       switch (day % 10) {
-        case 1: return '${day}st';
-        case 2: return '${day}nd';
-        case 3: return '${day}rd';
-        default: return '${day}th';
+        case 1:
+          return '${day}st';
+        case 2:
+          return '${day}nd';
+        case 3:
+          return '${day}rd';
+        default:
+          return '${day}th';
       }
     }
-    
+
     return '${months[now.month - 1]} ${getDayWithSuffix(now.day)}, ${now.year}';
   }
-  
+
   void _shareRoute(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Route sharing coming soon!')),
     );
   }
-  
+
   void _saveRoute(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Route saved to favorites!')),
     );
   }
-  
+
   void _saveRouteWithCustomName(BuildContext context, route_model.Route route) {
     // Create updated route with custom name
     final updatedRoute = route.copyWith(
-      name: _titleController.text.trim().isNotEmpty ? _titleController.text.trim() : route.name,
+      name: _titleController.text.trim().isNotEmpty
+          ? _titleController.text.trim()
+          : route.name,
     );
-    
+
     // Trigger the import action in the bloc
     context.read<RouteImportBloc>().add(ConfirmImport(
-      route: updatedRoute,
-    ));
-    
+          route: updatedRoute,
+        ));
+
     // Navigate back to routes list
     Navigator.of(context).pop();
     Navigator.of(context).pop();
   }
-  
+
   void _importRoute(BuildContext context, route_model.Route route) {
     // Trigger the import action in the bloc
     context.read<RouteImportBloc>().add(ConfirmImport(
-      route: route,
-    ));
-    
+          route: route,
+        ));
+
     // Navigate back to routes list
     Navigator.of(context).pop();
     Navigator.of(context).pop();
   }
-  
+
   void _planRuckWithRoute(BuildContext context, route_model.Route route) {
     // Navigate to planned ruck creation with this route
     Navigator.of(context).pop(); // Go back with result
@@ -598,7 +621,7 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
       const SnackBar(content: Text('Planning ruck with this route...')),
     );
   }
-  
+
   void _downloadGPX(BuildContext context, route_model.Route route) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('GPX download starting...')),
@@ -608,14 +631,17 @@ class _RoutePreviewScreenState extends State<RoutePreviewScreen> {
   /// Format distance using user's metric preference
   String _formatDistance(double distanceKm) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   /// Format elevation using user's metric preference
   String _formatElevation(double elevationM) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM,
+        metric: preferMetric);
   }
 }

@@ -38,7 +38,8 @@ class ActiveSessionMapOverlay extends StatefulWidget {
   });
 
   @override
-  State<ActiveSessionMapOverlay> createState() => _ActiveSessionMapOverlayState();
+  State<ActiveSessionMapOverlay> createState() =>
+      _ActiveSessionMapOverlayState();
 }
 
 class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
@@ -46,7 +47,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
   late MapController _mapController;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   bool _isFollowingLocation = true;
   MapViewType _currentViewType = MapViewType.standard;
 
@@ -55,7 +56,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
     super.initState();
     _mapController = MapController();
     _isFollowingLocation = widget.followLocation;
-    
+
     // Setup pulse animation for current location
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -68,7 +69,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
-    
+
     _pulseController.repeat(reverse: true);
   }
 
@@ -81,9 +82,9 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
   @override
   void didUpdateWidget(ActiveSessionMapOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Auto-follow location if enabled and location changed
-    if (_isFollowingLocation && 
+    if (_isFollowingLocation &&
         widget.currentLocation != null &&
         widget.currentLocation != oldWidget.currentLocation) {
       _centerOnLocation(widget.currentLocation!);
@@ -110,25 +111,25 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
             SafeTileLayer(
               style: 'stamen_terrain',
             ),
-            
+
             // Planned route polyline (if available)
             if (widget.showPlannedRoute && widget.plannedRoute != null)
               PolylineLayer(
                 polylines: [_buildPlannedRoutePolyline()],
               ),
-            
+
             // Session track polyline
             if (widget.showSessionTrack && widget.sessionTrack.isNotEmpty)
               PolylineLayer(
                 polylines: [_buildSessionTrackPolyline()],
               ),
-            
+
             // Progress markers
-            if (widget.showProgressMarkers) 
+            if (widget.showProgressMarkers)
               MarkerLayer(
                 markers: _buildProgressMarkers(),
               ),
-            
+
             // Current location marker
             if (widget.showCurrentLocation && widget.currentLocation != null)
               MarkerLayer(
@@ -136,13 +137,13 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
               ),
           ],
         ),
-        
+
         // Map controls overlay
         _buildMapControls(),
-        
+
         // Progress overlay
         _buildProgressOverlay(),
-        
+
         // Quick stats overlay
         _buildQuickStatsOverlay(),
       ],
@@ -212,13 +213,13 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
               ],
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Follow location toggle
           Container(
             decoration: BoxDecoration(
-              color: _isFollowingLocation 
+              color: _isFollowingLocation
                   ? AppColors.primary.withOpacity(0.9)
                   : Colors.white.withOpacity(0.9),
               borderRadius: BorderRadius.circular(8),
@@ -236,12 +237,13 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
                 _isFollowingLocation ? Icons.gps_fixed : Icons.gps_not_fixed,
                 color: _isFollowingLocation ? Colors.white : AppColors.primary,
               ),
-              tooltip: _isFollowingLocation ? 'Stop following' : 'Follow location',
+              tooltip:
+                  _isFollowingLocation ? 'Stop following' : 'Follow location',
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Recenter button
           Container(
             decoration: BoxDecoration(
@@ -271,7 +273,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
 
   Widget _buildProgressOverlay() {
     final progress = _calculateRouteProgress();
-    
+
     return Positioned(
       top: 16,
       left: 16,
@@ -321,9 +323,9 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Progress details
             Row(
               children: [
@@ -372,14 +374,15 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
             Expanded(
               child: _buildStatItem(
                 'Duration',
-                _formatDuration(widget.activeSession.elapsedTime ?? Duration.zero),
+                _formatDuration(
+                    widget.activeSession.elapsedTime ?? Duration.zero),
                 Icons.access_time,
                 AppColors.primary,
               ),
             ),
-            
+
             Container(width: 1, height: 40, color: AppColors.divider),
-            
+
             // Distance
             Expanded(
               child: _buildStatItem(
@@ -389,9 +392,9 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
                 AppColors.success,
               ),
             ),
-            
+
             Container(width: 1, height: 40, color: AppColors.divider),
-            
+
             // Current pace
             Expanded(
               child: _buildStatItem(
@@ -401,10 +404,10 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
                 AppColors.info,
               ),
             ),
-            
+
             if (widget.activeSession.elevationGain != null) ...[
               Container(width: 1, height: 40, color: AppColors.divider),
-              
+
               // Elevation gain
               Expanded(
                 child: _buildStatItem(
@@ -421,7 +424,8 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -480,7 +484,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
 
   List<Marker> _buildProgressMarkers() {
     final markers = <Marker>[];
-    
+
     // Add start marker if we have session track
     if (widget.sessionTrack.isNotEmpty) {
       final startPoint = widget.sessionTrack.first;
@@ -495,12 +499,12 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
         ),
       );
     }
-    
+
     // Add milestone markers every mile
     if (widget.plannedRoute != null) {
       final route = widget.plannedRoute!;
       final totalDistance = route.distance;
-      
+
       for (int mile = 1; mile < totalDistance.floor(); mile++) {
         final waypoint = _findWaypointAtDistance(route, mile.toDouble());
         if (waypoint != null) {
@@ -518,7 +522,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
         }
       }
     }
-    
+
     return markers;
   }
 
@@ -542,7 +546,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
                   ),
                 ),
               ),
-              
+
               // Main location marker
               Container(
                 width: 24,
@@ -583,7 +587,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
   }) {
     final size = isSmall ? 24.0 : 32.0;
     final iconSize = isSmall ? 14.0 : 18.0;
-    
+
     return Container(
       width: size,
       height: size,
@@ -616,17 +620,17 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
     if (widget.currentLocation != null) {
       return widget.currentLocation!;
     }
-    
+
     if (widget.sessionTrack.isNotEmpty) {
       final lastPoint = widget.sessionTrack.last;
       return LatLng(lastPoint.latitude, lastPoint.longitude);
     }
-    
+
     if (widget.plannedRoute?.waypoints.isNotEmpty == true) {
       final firstWaypoint = widget.plannedRoute!.waypoints.first;
       return LatLng(firstWaypoint.latitude, firstWaypoint.longitude);
     }
-    
+
     return const LatLng(37.7749, -122.4194); // Default to SF
   }
 
@@ -661,16 +665,18 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
         remainingDistance: 0.0,
       );
     }
-    
+
     final totalDistance = widget.plannedRoute!.distance;
     final completedDistance = widget.activeSession.distance ?? 0.0;
-    final percentage = totalDistance > 0 ? completedDistance / totalDistance : 0.0;
-    
+    final percentage =
+        totalDistance > 0 ? completedDistance / totalDistance : 0.0;
+
     return RouteProgress(
       percentage: percentage.clamp(0.0, 1.0),
       completedDistance: completedDistance,
       totalDistance: totalDistance,
-      remainingDistance: (totalDistance - completedDistance).clamp(0.0, totalDistance),
+      remainingDistance:
+          (totalDistance - completedDistance).clamp(0.0, totalDistance),
     );
   }
 
@@ -684,7 +690,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     }
@@ -694,42 +700,42 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
   String _calculateCurrentPace() {
     final distance = widget.activeSession.distance ?? 0.0;
     final duration = widget.activeSession.elapsedTime ?? Duration.zero;
-    
+
     if (distance <= 0 || duration.inSeconds <= 0) {
       return '--:-- /mi';
     }
-    
+
     final paceSeconds = duration.inSeconds / distance;
     final paceMinutes = (paceSeconds / 60).floor();
     final remainSeconds = (paceSeconds % 60).floor();
-    
+
     return '${paceMinutes}:${remainSeconds.toString().padLeft(2, '0')} /mi';
   }
 
   RouteWaypoint? _findWaypointAtDistance(Route route, double targetDistance) {
     double accumulatedDistance = 0.0;
-    
+
     for (int i = 1; i < route.waypoints.length; i++) {
       final prevWaypoint = route.waypoints[i - 1];
       final currentWaypoint = route.waypoints[i];
-      
+
       final segmentDistance = _calculateDistance(
         prevWaypoint.latitude,
         prevWaypoint.longitude,
         currentWaypoint.latitude,
         currentWaypoint.longitude,
       );
-      
+
       if (accumulatedDistance + segmentDistance >= targetDistance) {
         // Interpolate position
         final remainingDistance = targetDistance - accumulatedDistance;
         final ratio = remainingDistance / segmentDistance;
-        
-        final lat = prevWaypoint.latitude + 
+
+        final lat = prevWaypoint.latitude +
             (currentWaypoint.latitude - prevWaypoint.latitude) * ratio;
         final lng = prevWaypoint.longitude +
             (currentWaypoint.longitude - prevWaypoint.longitude) * ratio;
-        
+
         return RouteWaypoint(
           latitude: lat,
           longitude: lng,
@@ -737,14 +743,15 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
           distance: targetDistance,
         );
       }
-      
+
       accumulatedDistance += segmentDistance;
     }
-    
+
     return null;
   }
 
-  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+  double _calculateDistance(
+      double lat1, double lng1, double lat2, double lng2) {
     // Haversine formula for distance calculation
     const distance = Distance();
     return distance.as(LengthUnit.Mile, LatLng(lat1, lng1), LatLng(lat2, lng2));
@@ -758,11 +765,11 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
     setState(() {
       _isFollowingLocation = !_isFollowingLocation;
     });
-    
+
     if (widget.onToggleFollowPressed != null) {
       widget.onToggleFollowPressed!();
     }
-    
+
     if (_isFollowingLocation && widget.currentLocation != null) {
       _centerOnLocation(widget.currentLocation!);
     }
@@ -775,7 +782,7 @@ class _ActiveSessionMapOverlayState extends State<ActiveSessionMapOverlay>
         _isFollowingLocation = true;
       });
     }
-    
+
     if (widget.onRecenterPressed != null) {
       widget.onRecenterPressed!();
     }

@@ -20,8 +20,8 @@ class StravaConnectionStatus {
     return StravaConnectionStatus(
       connected: json['connected'] ?? false,
       athleteId: json['athlete_id']?.toString(),
-      connectedAt: json['connected_at'] != null 
-          ? DateTime.tryParse(json['connected_at']) 
+      connectedAt: json['connected_at'] != null
+          ? DateTime.tryParse(json['connected_at'])
           : null,
     );
   }
@@ -37,14 +37,16 @@ class StravaService {
       return StravaConnectionStatus.fromJson(response);
     } catch (e) {
       AppLogger.error('[STRAVA] Failed to get connection status: $e');
-      
+
       // For authentication errors, let the API client handle token refresh
       // Don't mask 401 errors - they indicate auth issues that should be handled upstream
-      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
-        AppLogger.warning('[STRAVA] Authentication error - user may need to re-login');
+      if (e.toString().contains('401') ||
+          e.toString().contains('Unauthorized')) {
+        AppLogger.warning(
+            '[STRAVA] Authentication error - user may need to re-login');
         rethrow; // Let the calling code handle auth errors appropriately
       }
-      
+
       // For other errors (network, server), return disconnected status
       return StravaConnectionStatus(connected: false);
     }
@@ -54,18 +56,18 @@ class StravaService {
   Future<bool> connectToStrava() async {
     try {
       AppLogger.info('[STRAVA] Initiating connection...');
-      
+
       // Get OAuth URL from backend
       final response = await _apiClient.post('/auth/strava/connect', {});
       final oauthUrl = response['oauth_url'] as String?;
-      
+
       if (oauthUrl == null) {
         AppLogger.error('[STRAVA] No OAuth URL received');
         return false;
       }
 
       AppLogger.info('[STRAVA] Opening OAuth URL: $oauthUrl');
-      
+
       // Launch OAuth URL in browser
       final uri = Uri.parse(oauthUrl);
       if (await canLaunchUrl(uri)) {
@@ -88,9 +90,9 @@ class StravaService {
   Future<bool> disconnect() async {
     try {
       AppLogger.info('[STRAVA] Disconnecting...');
-      
+
       await _apiClient.post('/auth/strava/disconnect', {});
-      
+
       AppLogger.info('[STRAVA] Successfully disconnected');
       return true;
     } catch (e) {
@@ -110,7 +112,7 @@ class StravaService {
   }) async {
     try {
       AppLogger.info('[STRAVA] Exporting session $sessionId to Strava...');
-      
+
       // Check if connected first
       final status = await getConnectionStatus();
       if (!status.connected) {
@@ -119,14 +121,15 @@ class StravaService {
       }
 
       // Export session via backend
-      final response = await _apiClient.post('/rucks/$sessionId/export/strava', {
+      final response =
+          await _apiClient.post('/rucks/$sessionId/export/strava', {
         'session_name': sessionName,
         'ruck_weight_kg': ruckWeightKg,
         'duration_seconds': duration.inSeconds,
         'distance_meters': distanceMeters,
         'description': description,
       });
-      
+
       final success = response['success'] ?? false;
       if (success) {
         AppLogger.info('[STRAVA] Successfully exported session to Strava');
@@ -137,7 +140,7 @@ class StravaService {
       } else {
         AppLogger.warning('[STRAVA] Export failed: ${response['message']}');
       }
-      
+
       return success;
     } catch (e) {
       AppLogger.error('[STRAVA] Failed to export session: $e');
@@ -157,11 +160,13 @@ class StravaService {
     if (aiTitle != null && aiTitle.trim().isNotEmpty) {
       return aiTitle.trim();
     }
-    
-    final weightStr = MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric);
-    final distanceStr = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
+
+    final weightStr =
+        MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric);
+    final distanceStr =
+        MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
     final durationStr = _formatDuration(duration);
-    
+
     return 'Ruck - $weightStr • $distanceStr • $durationStr';
   }
 
@@ -175,41 +180,44 @@ class StravaService {
     String? aiInsight,
   }) {
     final buffer = StringBuffer();
-    
+
     // Add AI insight at the top if available
     if (aiInsight != null && aiInsight.trim().isNotEmpty) {
       buffer.writeln(aiInsight.trim());
       buffer.writeln();
     }
-    
+
     buffer.writeln('🎒 Ruck Session');
-    
+
     // Only show distance if it's greater than 0
     if (distanceKm > 0) {
-      buffer.writeln('📏 Distance: ${MeasurementUtils.formatDistance(distanceKm, metric: preferMetric)}');
+      buffer.writeln(
+          '📏 Distance: ${MeasurementUtils.formatDistance(distanceKm, metric: preferMetric)}');
     }
-    
+
     if (ruckWeightKg > 0) {
-      buffer.writeln('⚖️ Ruck Weight: ${MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric)}');
+      buffer.writeln(
+          '⚖️ Ruck Weight: ${MeasurementUtils.formatWeight(ruckWeightKg, metric: preferMetric)}');
     }
-    
+
     buffer.writeln('⏱️ Duration: ${_formatDuration(duration)}');
-    
+
     // Only show calories if they're greater than 0
     if (calories != null && calories > 0) {
       buffer.writeln('🔥 Estimated Calories: $calories');
     }
-    
+
     buffer.writeln();
-    buffer.writeln("Tracked with Ruck! The world's #1 rucking app for iOS and Android.");
-    
+    buffer.writeln(
+        "Tracked with Ruck! The world's #1 rucking app for iOS and Android.");
+
     return buffer.toString();
   }
 
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     } else {

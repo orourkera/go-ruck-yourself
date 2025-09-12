@@ -138,7 +138,8 @@ class _MyRucksAppBarState extends State<MyRucksAppBar>
 }
 
 /// Simple app bar version for when search functionality is not needed
-class SimpleMyRucksAppBar extends StatelessWidget implements PreferredSizeWidget {
+class SimpleMyRucksAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
 
@@ -173,7 +174,8 @@ class SimpleMyRucksAppBar extends StatelessWidget implements PreferredSizeWidget
 }
 
 /// App bar with statistics display
-class MyRucksStatsAppBar extends StatelessWidget implements PreferredSizeWidget {
+class MyRucksStatsAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   final String title;
   final int totalRucks;
   final int completedRucks;

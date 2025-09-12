@@ -46,7 +46,7 @@ class EmptyRucksState extends StatelessWidget {
                   color: AppColors.primary.withOpacity(0.6),
                 ),
               ),
-            
+
             const SizedBox(height: 24),
 
             // Title
@@ -135,7 +135,8 @@ class EmptyFilteredState extends StatelessWidget {
   Widget build(BuildContext context) {
     return EmptyRucksState(
       title: 'No rucks found',
-      subtitle: 'No rucks match your current filters ($filterDescription).\nTry adjusting your filters.',
+      subtitle:
+          'No rucks match your current filters ($filterDescription).\nTry adjusting your filters.',
       actionText: 'Clear Filters',
       onActionPressed: onClearFilters,
       icon: Icons.filter_list_off,
@@ -236,7 +237,7 @@ class _EmptyStateWithLoadingState extends State<EmptyStateWithLoading>
                 );
               },
             ),
-            
+
             const SizedBox(height: 24),
 
             // Title
@@ -264,7 +265,9 @@ class _EmptyStateWithLoadingState extends State<EmptyStateWithLoading>
             const SizedBox(height: 32),
 
             // Action button
-            if (!widget.isLoading && widget.actionText != null && widget.onActionPressed != null)
+            if (!widget.isLoading &&
+                widget.actionText != null &&
+                widget.onActionPressed != null)
               ElevatedButton.icon(
                 onPressed: widget.onActionPressed,
                 icon: const Icon(Icons.add),
@@ -336,7 +339,7 @@ class ContextualEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final config = _getContextConfig(this.context);
-    
+
     return EmptyRucksState(
       title: config.title,
       subtitle: config.subtitle,
@@ -351,39 +354,44 @@ class ContextualEmptyState extends StatelessWidget {
       case EmptyStateContext.todaysRucks:
         return _EmptyStateConfig(
           title: 'No rucks today',
-          subtitle: 'You have no rucks planned for today.\nEnjoy your free time or plan a new adventure!',
+          subtitle:
+              'You have no rucks planned for today.\nEnjoy your free time or plan a new adventure!',
           actionText: 'Plan a Ruck',
           icon: Icons.today,
         );
-      
+
       case EmptyStateContext.upcomingRucks:
         return _EmptyStateConfig(
           title: 'No upcoming rucks',
-          subtitle: 'You have no rucks planned for the coming days.\nPlan some adventures ahead!',
+          subtitle:
+              'You have no rucks planned for the coming days.\nPlan some adventures ahead!',
           actionText: 'Plan a Ruck',
           icon: Icons.calendar_month,
         );
-      
+
       case EmptyStateContext.completedRucks:
         return _EmptyStateConfig(
           title: 'No completed rucks',
-          subtitle: 'You haven\'t completed any rucks yet.\nStart your first ruck to see it here!',
+          subtitle:
+              'You haven\'t completed any rucks yet.\nStart your first ruck to see it here!',
           actionText: 'Start Rucking',
           icon: Icons.check_circle_outline,
         );
-      
+
       case EmptyStateContext.allRucks:
         return _EmptyStateConfig(
           title: 'No planned rucks',
-          subtitle: 'You haven\'t planned any rucks yet.\nImport a route or create your first planned ruck!',
+          subtitle:
+              'You haven\'t planned any rucks yet.\nImport a route or create your first planned ruck!',
           actionText: 'Plan Your First Ruck',
           icon: Icons.hiking_outlined,
         );
-      
+
       case EmptyStateContext.overdueRucks:
         return _EmptyStateConfig(
           title: 'No overdue rucks',
-          subtitle: 'Great job staying on track!\nAll your planned rucks are up to date.',
+          subtitle:
+              'Great job staying on track!\nAll your planned rucks are up to date.',
           actionText: null,
           icon: Icons.schedule,
         );

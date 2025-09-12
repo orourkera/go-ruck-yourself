@@ -23,7 +23,7 @@ class LocationValidator {
     if (latitude == 0.0 && longitude == 0.0) {
       return false;
     }
-    
+
     // Check if within valid bounds
     return isWithinBounds(latitude, longitude);
   }

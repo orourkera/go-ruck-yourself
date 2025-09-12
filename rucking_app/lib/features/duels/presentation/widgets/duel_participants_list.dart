@@ -25,12 +25,12 @@ class DuelParticipantsList extends StatelessWidget {
         // Sort by percentage achievement (highest first)
         final aProgress = (a.currentValue / duel.targetValue).clamp(0.0, 1.0);
         final bProgress = (b.currentValue / duel.targetValue).clamp(0.0, 1.0);
-        
+
         // If progress is equal, sort by current value (higher wins)
         if (aProgress == bProgress) {
           return b.currentValue.compareTo(a.currentValue);
         }
-        
+
         return bProgress.compareTo(aProgress); // Descending order
       });
 
@@ -51,15 +51,18 @@ class DuelParticipantsList extends StatelessWidget {
   }
 
   Widget _buildParticipantCard(DuelParticipant participant, int index) {
-    final progress = (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
+    final progress =
+        (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
     final isCompleted = progress >= 1.0;
     final isWinner = participant.id == duel.winnerId;
-    
+
     return Card(
       elevation: isWinner ? 4 : 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isWinner ? BorderSide(color: Colors.amber, width: 2) : BorderSide.none,
+        side: isWinner
+            ? BorderSide(color: Colors.amber, width: 2)
+            : BorderSide.none,
       ),
       child: Container(
         decoration: isWinner
@@ -135,13 +138,15 @@ class DuelParticipantsList extends StatelessWidget {
                       participant.username,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: isWinner ? FontWeight.bold : FontWeight.w600,
+                        fontWeight:
+                            isWinner ? FontWeight.bold : FontWeight.w600,
                       ),
                     ),
                   ),
                   if (isWinner)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         borderRadius: BorderRadius.circular(12),
@@ -171,7 +176,8 @@ class DuelParticipantsList extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressSection(DuelParticipant participant, double progress, bool isCompleted) {
+  Widget _buildProgressSection(
+      DuelParticipant participant, double progress, bool isCompleted) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -198,7 +204,8 @@ class DuelParticipantsList extends StatelessWidget {
                 const SizedBox(width: 8),
                 if (isCompleted)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.green,
                       borderRadius: BorderRadius.circular(10),
@@ -253,7 +260,7 @@ class DuelParticipantsList extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            participant.joinedAt != null 
+            participant.joinedAt != null
                 ? 'Joined ${_getJoinedTimeText(participant.joinedAt!)}'
                 : 'Joined recently',
             style: TextStyle(

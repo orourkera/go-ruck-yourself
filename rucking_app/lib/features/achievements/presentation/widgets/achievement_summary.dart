@@ -43,26 +43,30 @@ class _AchievementSummaryState extends State<AchievementSummary> {
     try {
       final authBloc = context.read<AuthBloc>();
       final achievementBloc = context.read<AchievementBloc>();
-      
+
       if (authBloc.state is Authenticated) {
         final userId = (authBloc.state as Authenticated).user.userId;
-        
+
         // Get user's unit preference
         final storageService = GetIt.I<StorageService>();
-        final storedUserData = await storageService.getObject(AppConfig.userProfileKey);
+        final storedUserData =
+            await storageService.getObject(AppConfig.userProfileKey);
         bool preferMetric = false; // Default to imperial (standard)
-        
-        if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
+
+        if (storedUserData != null &&
+            storedUserData.containsKey('preferMetric')) {
           preferMetric = storedUserData['preferMetric'] as bool;
         }
-        
+
         final unitPreference = preferMetric ? 'metric' : 'standard';
-        debugPrint('🏆 [AchievementSummary] Loading achievements with unit preference: $unitPreference');
-        
+        debugPrint(
+            '🏆 [AchievementSummary] Loading achievements with unit preference: $unitPreference');
+
         // Load achievements data with proper unit preference
         achievementBloc.add(LoadAchievements(unitPreference: unitPreference));
         achievementBloc.add(LoadUserAchievements(userId));
-        achievementBloc.add(LoadAchievementStats(userId, unitPreference: unitPreference));
+        achievementBloc
+            .add(LoadAchievementStats(userId, unitPreference: unitPreference));
         achievementBloc.add(const LoadRecentAchievements());
       }
     } catch (e) {
@@ -70,12 +74,13 @@ class _AchievementSummaryState extends State<AchievementSummary> {
       // Fallback to standard if error occurs
       final authBloc = context.read<AuthBloc>();
       final achievementBloc = context.read<AchievementBloc>();
-      
+
       if (authBloc.state is Authenticated) {
         final userId = (authBloc.state as Authenticated).user.userId;
         achievementBloc.add(const LoadAchievements(unitPreference: 'standard'));
         achievementBloc.add(LoadUserAchievements(userId));
-        achievementBloc.add(LoadAchievementStats(userId, unitPreference: 'standard'));
+        achievementBloc
+            .add(LoadAchievementStats(userId, unitPreference: 'standard'));
         achievementBloc.add(const LoadRecentAchievements());
       }
     }
@@ -89,12 +94,12 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         if (state is AchievementsLoading) {
           return const AchievementSummarySkeleton();
         }
-        
+
         // If we have a session checked state, use the previous state data
         if (state is AchievementsSessionChecked) {
           state = state.previousState;
         }
-        
+
         return Card(
           elevation: 4,
           shape: RoundedRectangleBorder(
@@ -105,7 +110,10 @@ class _AchievementSummaryState extends State<AchievementSummary> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.primary.withOpacity(0.8), AppColors.secondary.withOpacity(0.8)],
+                colors: [
+                  AppColors.primary.withOpacity(0.8),
+                  AppColors.secondary.withOpacity(0.8)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -148,12 +156,12 @@ class _AchievementSummaryState extends State<AchievementSummary> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
                 // Quick stats
                 _buildStatsRow(state),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Recent achievements
                 _buildRecentAchievements(state),
               ],
@@ -165,7 +173,8 @@ class _AchievementSummaryState extends State<AchievementSummary> {
   }
 
   Widget _buildStatsRow(AchievementState state) {
-    if (state is AchievementsLoading || (state is AchievementsLoaded && state.stats == null)) {
+    if (state is AchievementsLoading ||
+        (state is AchievementsLoaded && state.stats == null)) {
       return const AchievementStatsSkeleton();
     }
 
@@ -219,10 +228,10 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         ),
       );
     }
-    
+
     // Get locked achievements
     final lockedAchievements = state.getLockedAchievements();
-    
+
     // If no locked achievements, show a message
     if (lockedAchievements.isEmpty) {
       return Container(
@@ -254,41 +263,45 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         ),
       );
     }
-    
+
     // Get achievements with progress
     final achievementsWithProgress = lockedAchievements
-        .where((a) => state.userProgress.any((p) => p.achievementId == a.id && p.currentValue > 0))
+        .where((a) => state.userProgress
+            .any((p) => p.achievementId == a.id && p.currentValue > 0))
         .toList();
-    
+
     // Find a good next achievement to show
     Achievement? nextChallenge;
     String progressText = '';
     String achievementId = '';
-    
+
     // Determine user's elevation affinity (very low if essentially no elevation progress)
     final elevationProgress = state.userProgress
-        .where((p) => (p.achievement?.category.toLowerCase() ?? '') == 'elevation')
+        .where(
+            (p) => (p.achievement?.category.toLowerCase() ?? '') == 'elevation')
         .toList();
-    final hasAnyElevationProgress = elevationProgress.any((p) => p.currentValue > 0);
+    final hasAnyElevationProgress =
+        elevationProgress.any((p) => p.currentValue > 0);
     final avgElevationPercent = elevationProgress.isNotEmpty
         ? (elevationProgress
-                .map((p) => p.targetValue > 0 ? (p.currentValue / p.targetValue) : 0.0)
+                .map((p) =>
+                    p.targetValue > 0 ? (p.currentValue / p.targetValue) : 0.0)
                 .fold<double>(0.0, (a, b) => a + b) /
             elevationProgress.length)
         : 0.0;
-    
+
     // First try to find an achievement with progress using smart selection
     if (achievementsWithProgress.isNotEmpty) {
       // Calculate smart scores for each achievement
       final scoredAchievements = achievementsWithProgress.map((achievement) {
         final progress = state.getProgressForAchievement(achievement.id);
-        final percent = progress != null 
-            ? (progress.currentValue / progress.targetValue) 
+        final percent = progress != null
+            ? (progress.currentValue / progress.targetValue)
             : 0.0;
-        
+
         // Calculate smart score based on multiple factors
         double score = 0.0;
-        
+
         // Factor 1: Sweet spot progress (10-70% complete) - 40% weight
         if (percent >= 0.1 && percent <= 0.7) {
           score += 0.4;
@@ -299,18 +312,19 @@ class _AchievementSummaryState extends State<AchievementSummary> {
           // Some progress is better than none
           score += 0.2;
         }
-        
+
         // Factor 2: Category diversity - 30% weight
         // Avoid elevation-heavy achievements if user likely doesn't do elevation
         final category = achievement.category.toLowerCase();
-        final stronglyAvoidElevation = !hasAnyElevationProgress || avgElevationPercent < 0.05;
+        final stronglyAvoidElevation =
+            !hasAnyElevationProgress || avgElevationPercent < 0.05;
         if (category == 'elevation') {
           // Heavily deprioritize elevation when user's history suggests low elevation
           score += stronglyAvoidElevation ? -0.3 : 0.05;
         } else {
           score += 0.3;
         }
-        
+
         // Factor 3: Tier appropriateness - 20% weight
         final tier = achievement.tier.toLowerCase();
         if (tier == 'beginner' || tier == 'easy') {
@@ -320,111 +334,124 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         } else {
           score += 0.05;
         }
-        
+
         // Factor 4: Actual progress amount - 10% weight
         score += percent * 0.1;
-        
-        return {
-          'achievement': achievement, 
-          'percent': percent, 
-          'score': score
-        };
+
+        return {'achievement': achievement, 'percent': percent, 'score': score};
       }).toList();
-      
+
       // Sort by smart score (highest first)
-      scoredAchievements.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
-      
+      scoredAchievements.sort(
+          (a, b) => (b['score'] as double).compareTo(a['score'] as double));
+
       if (scoredAchievements.isNotEmpty) {
         // Enhanced variety logic - avoid repeating recent suggestions
         Achievement? selectedAchievement;
-        
+
         // Check if we should rotate to avoid repetition
         final now = DateTime.now();
-        final shouldRotate = _globalLastSuggestedId != null && 
+        final shouldRotate = _globalLastSuggestedId != null &&
             _lastSuggestionTime != null &&
-            now.difference(_lastSuggestionTime!).inMinutes < 30; // Rotate within 30 minutes
-        
+            now.difference(_lastSuggestionTime!).inMinutes <
+                30; // Rotate within 30 minutes
+
         if (shouldRotate) {
           // Find alternatives that aren't the last suggested achievement
           final alternatives = scoredAchievements
-              .where((item) => (item['achievement'] as Achievement).id != _globalLastSuggestedId)
+              .where((item) =>
+                  (item['achievement'] as Achievement).id !=
+                  _globalLastSuggestedId)
               .toList();
-          
+
           if (alternatives.isNotEmpty) {
             // Prefer non-elevation alternatives for better variety
             final nonElevationAlts = alternatives
-                .where((item) => (item['achievement'] as Achievement).category.toLowerCase() != 'elevation')
+                .where((item) =>
+                    (item['achievement'] as Achievement)
+                        .category
+                        .toLowerCase() !=
+                    'elevation')
                 .toList();
-            
+
             if (nonElevationAlts.isNotEmpty) {
               // Use time-based rotation for consistent variety
-              final rotationIndex = (now.hour + now.day) % nonElevationAlts.length;
-              selectedAchievement = nonElevationAlts[rotationIndex]['achievement'] as Achievement;
+              final rotationIndex =
+                  (now.hour + now.day) % nonElevationAlts.length;
+              selectedAchievement =
+                  nonElevationAlts[rotationIndex]['achievement'] as Achievement;
             } else {
               // Fallback to any alternative
               final rotationIndex = (now.hour + now.day) % alternatives.length;
-              selectedAchievement = alternatives[rotationIndex]['achievement'] as Achievement;
+              selectedAchievement =
+                  alternatives[rotationIndex]['achievement'] as Achievement;
             }
           }
         }
-        
+
         // If no rotation needed or no alternatives found, use top candidate
-        selectedAchievement ??= scoredAchievements.first['achievement'] as Achievement;
-        
+        selectedAchievement ??=
+            scoredAchievements.first['achievement'] as Achievement;
+
         nextChallenge = selectedAchievement;
         achievementId = selectedAchievement.id;
-        
+
         // Update global tracking
         _globalLastSuggestedId = achievementId;
         _lastSuggestionTime = now;
-        
-        final selectedScore = scoredAchievements
-            .firstWhere((item) => (item['achievement'] as Achievement).id == achievementId);
+
+        final selectedScore = scoredAchievements.firstWhere(
+            (item) => (item['achievement'] as Achievement).id == achievementId);
         final percent = selectedScore['percent'] as double;
         final progress = state.getProgressForAchievement(nextChallenge.id);
-        
+
         if (progress != null) {
           progressText = ' (${(percent * 100).toInt()}% complete)';
         }
       }
     }
-    
+
     // If no achievement with progress, pick a smart beginner one
     if (nextChallenge == null) {
       final beginnerAchievements = lockedAchievements
-          .where((a) => a.tier.toLowerCase() == 'beginner' || a.tier.toLowerCase() == 'easy')
+          .where((a) =>
+              a.tier.toLowerCase() == 'beginner' ||
+              a.tier.toLowerCase() == 'easy')
           .toList();
-      
+
       if (beginnerAchievements.isNotEmpty) {
         // First try to get non-elevation achievements for better variety
         final nonElevationBeginners = beginnerAchievements
             .where((a) => a.category.toLowerCase() != 'elevation')
             .toList();
-        
+
         if (nonElevationBeginners.isNotEmpty) {
           // Enhanced rotation logic - avoid recent suggestions even for beginners
           final now = DateTime.now();
           final availableBeginners = nonElevationBeginners
               .where((a) => a.id != _globalLastSuggestedId)
               .toList();
-          
+
           if (availableBeginners.isNotEmpty) {
             // Use time-based rotation for variety
-            final rotationIndex = (now.hour + now.day + now.month) % availableBeginners.length;
+            final rotationIndex =
+                (now.hour + now.day + now.month) % availableBeginners.length;
             nextChallenge = availableBeginners[rotationIndex];
           } else {
             // All filtered out, use time-based rotation on full list
-            final rotationIndex = (now.hour + now.day + now.month) % nonElevationBeginners.length;
+            final rotationIndex =
+                (now.hour + now.day + now.month) % nonElevationBeginners.length;
             nextChallenge = nonElevationBeginners[rotationIndex];
           }
         } else {
           // Fallback to any beginner achievement with rotation
           final now = DateTime.now();
-          final rotationIndex = (now.hour + now.day + now.month) % beginnerAchievements.length;
+          final rotationIndex =
+              (now.hour + now.day + now.month) % beginnerAchievements.length;
           nextChallenge = beginnerAchievements[rotationIndex];
         }
         achievementId = nextChallenge.id;
-        
+
         // Update global tracking for beginners too
         _globalLastSuggestedId = achievementId;
         _lastSuggestionTime = DateTime.now();
@@ -433,26 +460,28 @@ class _AchievementSummaryState extends State<AchievementSummary> {
         final nonElevationAchievements = lockedAchievements
             .where((a) => a.category.toLowerCase() != 'elevation')
             .toList();
-        
+
         if (nonElevationAchievements.isNotEmpty) {
           // Apply rotation even to fallback selections
           final now = DateTime.now();
-          final rotationIndex = (now.hour + now.day + now.month) % nonElevationAchievements.length;
+          final rotationIndex = (now.hour + now.day + now.month) %
+              nonElevationAchievements.length;
           nextChallenge = nonElevationAchievements[rotationIndex];
         } else {
           // Last resort - rotate through all locked achievements
           final now = DateTime.now();
-          final rotationIndex = (now.hour + now.day + now.month) % lockedAchievements.length;
+          final rotationIndex =
+              (now.hour + now.day + now.month) % lockedAchievements.length;
           nextChallenge = lockedAchievements[rotationIndex];
         }
         achievementId = nextChallenge.id;
-        
+
         // Update global tracking for fallback selections too
         _globalLastSuggestedId = achievementId;
         _lastSuggestionTime = DateTime.now();
       }
     }
-    
+
     // Remember what we suggested this build to avoid repeating next time
     _lastSuggestedId = achievementId;
 

@@ -78,10 +78,12 @@ class _GpxFilePickerState extends State<GpxFilePicker>
       height: 160,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _selectedFile != null ? AppColors.success.withOpacity(0.1) : AppColors.backgroundLight,
+        color: _selectedFile != null
+            ? AppColors.success.withOpacity(0.1)
+            : AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _selectedFile != null 
+          color: _selectedFile != null
               ? AppColors.success.withOpacity(0.3)
               : AppColors.primary.withOpacity(0.3),
           width: 2,
@@ -97,25 +99,21 @@ class _GpxFilePickerState extends State<GpxFilePicker>
             Icon(
               _selectedFile != null ? Icons.check_circle : Icons.file_upload,
               size: 48,
-              color: _selectedFile != null ? AppColors.success : AppColors.primary,
+              color:
+                  _selectedFile != null ? AppColors.success : AppColors.primary,
             ),
-          
           const SizedBox(height: 12),
-          
           Text(
-            _selectedFile != null 
-                ? 'GPX File Selected'
-                : 'Select GPX File',
+            _selectedFile != null ? 'GPX File Selected' : 'Select GPX File',
             style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
-              color: _selectedFile != null ? AppColors.success : AppColors.primary,
+              color:
+                  _selectedFile != null ? AppColors.success : AppColors.primary,
             ),
           ),
-          
           const SizedBox(height: 4),
-          
           Text(
-            _selectedFile != null 
+            _selectedFile != null
                 ? 'Tap to change file'
                 : 'Tap to browse files',
             style: AppTextStyles.bodyMedium.copyWith(
@@ -161,7 +159,7 @@ class _GpxFilePickerState extends State<GpxFilePicker>
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // File name
             Row(
               children: [
@@ -181,9 +179,9 @@ class _GpxFilePickerState extends State<GpxFilePicker>
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // File size
             Row(
               children: [
@@ -241,7 +239,7 @@ class _GpxFilePickerState extends State<GpxFilePicker>
   Future<void> _pickFile() async {
     try {
       FilePickerResult? result;
-      
+
       // First try with custom type and gpx extension
       try {
         result = await FilePicker.platform.pickFiles(
@@ -256,18 +254,21 @@ class _GpxFilePickerState extends State<GpxFilePicker>
           type: FileType.any,
           allowMultiple: false,
         );
-        
+
         // Validate that the selected file is a GPX file
-        if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+        if (result?.files.isNotEmpty == true &&
+            result!.files.single.path != null) {
           final fileName = result.files.single.name?.toLowerCase() ?? '';
           if (!fileName.endsWith('.gpx')) {
-            _showErrorSnackBar('Please select a GPX file (.gpx extension required)');
+            _showErrorSnackBar(
+                'Please select a GPX file (.gpx extension required)');
             return;
           }
         }
       }
 
-      if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+      if (result?.files.isNotEmpty == true &&
+          result!.files.single.path != null) {
         setState(() {
           _selectedFile = File(result!.files.single.path!);
         });
@@ -323,12 +324,12 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
       height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _isDragOver 
+        color: _isDragOver
             ? AppColors.primary.withOpacity(0.1)
             : AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _isDragOver 
+          color: _isDragOver
               ? AppColors.primary
               : AppColors.primary.withOpacity(0.3),
           width: 2,
@@ -349,11 +350,11 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
                 Icon(
                   Icons.cloud_upload,
                   size: 64,
-                  color: _isDragOver ? AppColors.primary : AppColors.textDarkSecondary,
+                  color: _isDragOver
+                      ? AppColors.primary
+                      : AppColors.textDarkSecondary,
                 ),
-              
               const SizedBox(height: 16),
-              
               Text(
                 'Drag & Drop GPX File',
                 style: AppTextStyles.titleMedium.copyWith(
@@ -361,9 +362,7 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
                   color: _isDragOver ? AppColors.primary : AppColors.textDark,
                 ),
               ),
-              
               const SizedBox(height: 8),
-              
               Text(
                 'or click to browse',
                 style: AppTextStyles.bodyMedium.copyWith(
@@ -380,7 +379,7 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
   Future<void> _pickFile() async {
     try {
       FilePickerResult? result;
-      
+
       // First try with custom type and gpx extension
       try {
         result = await FilePicker.platform.pickFiles(
@@ -395,18 +394,21 @@ class _DragDropGpxFilePickerState extends State<DragDropGpxFilePicker> {
           type: FileType.any,
           allowMultiple: false,
         );
-        
+
         // Validate that the selected file is a GPX file
-        if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+        if (result?.files.isNotEmpty == true &&
+            result!.files.single.path != null) {
           final fileName = result.files.single.name?.toLowerCase() ?? '';
           if (!fileName.endsWith('.gpx')) {
-            _showErrorSnackBar('Please select a GPX file (.gpx extension required)');
+            _showErrorSnackBar(
+                'Please select a GPX file (.gpx extension required)');
             return;
           }
         }
       }
 
-      if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+      if (result?.files.isNotEmpty == true &&
+          result!.files.single.path != null) {
         widget.onFileSelected(File(result!.files.single.path!));
       }
     } catch (e) {
@@ -456,7 +458,9 @@ class CompactGpxFilePicker extends StatelessWidget {
           Icon(
             selectedFileName != null ? Icons.check_circle : Icons.file_upload,
             size: 24,
-            color: selectedFileName != null ? AppColors.success : AppColors.primary,
+            color: selectedFileName != null
+                ? AppColors.success
+                : AppColors.primary,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -466,7 +470,9 @@ class CompactGpxFilePicker extends StatelessWidget {
                 Text(
                   selectedFileName ?? 'No file selected',
                   style: AppTextStyles.bodyLarge.copyWith(
-                    fontWeight: selectedFileName != null ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: selectedFileName != null
+                        ? FontWeight.w600
+                        : FontWeight.w400,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -488,7 +494,7 @@ class CompactGpxFilePicker extends StatelessWidget {
               foregroundColor: Colors.white,
               minimumSize: const Size(80, 36),
             ),
-            child: isLoading 
+            child: isLoading
                 ? const SizedBox(
                     width: 16,
                     height: 16,
@@ -507,7 +513,7 @@ class CompactGpxFilePicker extends StatelessWidget {
   Future<void> _pickFile() async {
     try {
       FilePickerResult? result;
-      
+
       // First try with custom type and gpx extension
       try {
         result = await FilePicker.platform.pickFiles(
@@ -522,9 +528,10 @@ class CompactGpxFilePicker extends StatelessWidget {
           type: FileType.any,
           allowMultiple: false,
         );
-        
+
         // Validate that the selected file is a GPX file
-        if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+        if (result?.files.isNotEmpty == true &&
+            result!.files.single.path != null) {
           final fileName = result.files.single.name?.toLowerCase() ?? '';
           if (!fileName.endsWith('.gpx')) {
             // For compact picker, we can't show snackbar, so just return
@@ -534,7 +541,8 @@ class CompactGpxFilePicker extends StatelessWidget {
         }
       }
 
-      if (result?.files.isNotEmpty == true && result!.files.single.path != null) {
+      if (result?.files.isNotEmpty == true &&
+          result!.files.single.path != null) {
         onFileSelected(File(result!.files.single.path!));
       }
     } catch (e) {

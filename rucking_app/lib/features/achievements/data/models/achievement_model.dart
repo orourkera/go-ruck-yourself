@@ -39,8 +39,12 @@ class Achievement {
       iconName: json['icon_name'] ?? '',
       isActive: json['is_active'] ?? true,
       unitPreference: json['unit_preference'],
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'])
+          : null,
     );
   }
 
@@ -152,8 +156,8 @@ class UserAchievement {
       sessionId: json['session_id'],
       earnedAt: DateTime.parse(json['earned_at']),
       metadata: json['metadata'] as Map<String, dynamic>?,
-      achievement: json['achievements'] != null 
-          ? Achievement.fromJson(json['achievements']) 
+      achievement: json['achievements'] != null
+          ? Achievement.fromJson(json['achievements'])
           : null,
     );
   }
@@ -253,8 +257,8 @@ class AchievementProgress {
       targetValue: (json['target_value'] ?? 0).toDouble(),
       lastUpdated: DateTime.parse(json['last_updated']),
       metadata: json['metadata'] as Map<String, dynamic>?,
-      achievement: json['achievements'] != null 
-          ? Achievement.fromJson(json['achievements']) 
+      achievement: json['achievements'] != null
+          ? Achievement.fromJson(json['achievements'])
           : null,
     );
   }
@@ -339,7 +343,7 @@ class AchievementStats {
 
   factory AchievementStats.fromJson(Map<String, dynamic> json) {
     final stats = json['stats'] as Map<String, dynamic>? ?? json;
-    
+
     return AchievementStats(
       totalEarned: stats['total_earned'] ?? 0,
       totalAvailable: stats['total_available'] ?? 0,

@@ -144,7 +144,8 @@ class LeaderboardUpdating extends LeaderboardState {
 /// Error state - something went cattywampus
 class LeaderboardError extends LeaderboardState {
   final String message;
-  final List<LeaderboardUserModel>? previousUsers; // Keep previous data if available
+  final List<LeaderboardUserModel>?
+      previousUsers; // Keep previous data if available
 
   const LeaderboardError({
     required this.message,

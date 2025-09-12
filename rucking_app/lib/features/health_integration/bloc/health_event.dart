@@ -25,9 +25,9 @@ class MarkHealthIntroSeen extends HealthEvent {
 
 class SetHasAppleWatch extends HealthEvent {
   final bool hasWatch;
-  
+
   const SetHasAppleWatch({required this.hasWatch});
-  
+
   @override
   List<Object?> get props => [hasWatch];
 }
@@ -46,7 +46,8 @@ class WriteHealthData extends HealthEvent {
   });
 
   @override
-  List<Object?> get props => [distanceMeters, caloriesBurned, startTime, endTime];
+  List<Object?> get props =>
+      [distanceMeters, caloriesBurned, startTime, endTime];
 }
 
 class SaveRuckWorkout extends HealthEvent {
@@ -72,13 +73,13 @@ class SaveRuckWorkout extends HealthEvent {
 
   @override
   List<Object?> get props => [
-    distanceMeters, 
-    caloriesBurned, 
-    startTime, 
-    endTime,
-    ruckWeightKg,
-    elevationGainMeters,
-    elevationLossMeters,
-    heartRate,
-  ];
+        distanceMeters,
+        caloriesBurned,
+        startTime,
+        endTime,
+        ruckWeightKg,
+        elevationGainMeters,
+        elevationLossMeters,
+        heartRate,
+      ];
 }

@@ -6,7 +6,7 @@ final getIt = GetIt.instance;
 
 /// Simple premium dependency setup
 void setupPremiumDependencies() {
-  // Service 
+  // Service
   getIt.registerLazySingleton<PremiumService>(
     () => PremiumService(getIt()),
   );

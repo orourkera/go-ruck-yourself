@@ -16,7 +16,7 @@ class LeaderboardResponseModel {
 
   factory LeaderboardResponseModel.fromJson(Map<String, dynamic> json) {
     final List<dynamic> usersJson = json['users'] ?? [];
-    
+
     return LeaderboardResponseModel(
       users: usersJson
           .map((userJson) => LeaderboardUserModel.fromJson(userJson))

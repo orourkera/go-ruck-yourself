@@ -10,7 +10,6 @@ import 'package:rucking_app/shared/widgets/loading_indicator.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
-
 /// Main screen for displaying and managing routes
 class MyRucksScreen extends StatefulWidget {
   const MyRucksScreen({super.key});
@@ -19,11 +18,12 @@ class MyRucksScreen extends StatefulWidget {
   State<MyRucksScreen> createState() => _MyRucksScreenState();
 }
 
-class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserver {
+class _MyRucksScreenState extends State<MyRucksScreen>
+    with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final RoutesRepository _routesRepository = GetIt.instance<RoutesRepository>();
-  
+
   List<route_model.Route>? _routes;
   List<route_model.Route> _filteredRoutes = [];
   bool _isLoading = true;
@@ -35,14 +35,14 @@ class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.addObserver(this);
     _loadRoutes();
   }
-  
+
   @override
   void didUpdateWidget(MyRucksScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Refresh routes when widget updates
     _loadRoutes();
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -51,7 +51,7 @@ class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserv
       _loadRoutes();
     }
   }
-  
+
   /// Refresh routes when returning from other screens
   void _onScreenResumed() {
     if (mounted) {
@@ -91,14 +91,15 @@ class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserv
 
   void _filterRoutes(String query) {
     if (_routes == null) return;
-    
+
     setState(() {
       if (query.isEmpty) {
         _filteredRoutes = _routes!;
       } else {
         _filteredRoutes = _routes!.where((route) {
           return route.name.toLowerCase().contains(query.toLowerCase()) ||
-                 (route.description?.toLowerCase().contains(query.toLowerCase()) ?? false);
+              (route.description?.toLowerCase().contains(query.toLowerCase()) ??
+                  false);
         }).toList();
       }
     });
@@ -185,59 +186,60 @@ class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserv
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              route.name,
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (route.description?.isNotEmpty == true) ...[
-              const SizedBox(height: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                route.description!,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: Colors.grey[600],
+                route.name,
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              ),
+              if (route.description?.isNotEmpty == true) ...[
+                const SizedBox(height: 4),
+                Text(
+                  route.description!,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildChip('${route.distanceKm.toStringAsFixed(1)} km'),
+                  const SizedBox(width: 8),
+                  // Only show elevation if it exists and is greater than 0
+                  if (route.elevationGainM != null &&
+                      route.elevationGainM! > 0) ...[
+                    _buildChip('${route.elevationGainM!.round()}m elevation'),
+                    const SizedBox(width: 8),
+                  ],
+                  if (route.trailDifficulty != null) ...[
+                    _buildChip(route.trailDifficulty!.toUpperCase()),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    onPressed: () => _navigateToRouteDetail(route),
+                    icon: const Icon(Icons.info_outline),
+                    label: const Text('Details'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                    ),
+                  ),
+                ],
               ),
             ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildChip('${route.distanceKm.toStringAsFixed(1)} km'),
-                const SizedBox(width: 8),
-                // Only show elevation if it exists and is greater than 0
-                if (route.elevationGainM != null && route.elevationGainM! > 0) ...[
-                  _buildChip('${route.elevationGainM!.round()}m elevation'),
-                  const SizedBox(width: 8),
-                ],
-                if (route.trailDifficulty != null) ...[
-                  _buildChip(route.trailDifficulty!.toUpperCase()),
-                ],
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Spacer(),
-                ElevatedButton.icon(
-                  onPressed: () => _navigateToRouteDetail(route),
-                  icon: const Icon(Icons.info_outline),
-                  label: const Text('Details'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 2,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -282,6 +284,4 @@ class _MyRucksScreenState extends State<MyRucksScreen> with WidgetsBindingObserv
       _loadRoutes();
     }
   }
-
-
 }

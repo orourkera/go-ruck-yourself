@@ -36,7 +36,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
     _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
-    
+
     if (widget.isLoading) {
       _controller.repeat();
     }
@@ -67,9 +67,9 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
     }
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = widget.baseColor ?? 
+    final baseColor = widget.baseColor ??
         (isDarkMode ? Colors.grey[700]! : Colors.grey[300]!);
-    final highlightColor = widget.highlightColor ?? 
+    final highlightColor = widget.highlightColor ??
         (isDarkMode ? Colors.grey[600]! : Colors.grey[100]!);
 
     return AnimatedBuilder(
@@ -115,7 +115,7 @@ class SkeletonBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       width: width,
       height: height,
@@ -138,7 +138,7 @@ class SkeletonCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       width: size,
       height: size,

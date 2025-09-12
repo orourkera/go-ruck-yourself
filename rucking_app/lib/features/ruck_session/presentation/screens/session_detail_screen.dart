@@ -52,31 +52,35 @@ import 'package:rucking_app/features/ai_cheerleader/services/location_context_se
 /// Screen that displays detailed information about a completed session
 class SessionDetailScreen extends StatefulWidget {
   final RuckSession session;
-  
+
   const SessionDetailScreen({
     Key? key,
     required this.session,
   }) : super(key: key);
-  
+
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
 }
-class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerProviderStateMixin {
+
+class _SessionDetailScreenState extends State<SessionDetailScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late ScrollController _scrollController;
   bool _isScrolledToTop = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _photosLoadAttemptedForThisSession = false; // Flag to prevent multiple fetches
+  bool _photosLoadAttemptedForThisSession =
+      false; // Flag to prevent multiple fetches
   RuckSession? _fullSession; // Store the complete session data
   Timer? _photoRefreshTimer;
-  Map<String, Color>? _zoneColorMap; // Cache of zone name -> color from HeartRateZoneService
+  Map<String, Color>?
+      _zoneColorMap; // Cache of zone name -> color from HeartRateZoneService
   UserInfo? _authorProfile; // Session author's profile
   bool _isLoadingAuthor = false;
   final _stravaService = GetIt.I<StravaService>();
   bool _isExportingToStrava = false;
   bool _stravaConnected = false;
   bool _loadingStravaStatus = true;
-  
+
   /// Get the session to use for display - prefers full session if available
   RuckSession get currentSession => _fullSession ?? widget.session;
   bool _uploadInProgress = false;
@@ -106,7 +110,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
       if (zones != null) {
         setState(() {
-          _zoneColorMap = {for (final z in zones) z.name.toUpperCase(): z.color};
+          _zoneColorMap = {
+            for (final z in zones) z.name.toUpperCase(): z.color
+          };
         });
       }
     } catch (e) {
@@ -145,7 +151,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         _loadingStravaStatus = false;
       });
     } catch (e, stackTrace) {
-      AppLogger.error('[STRAVA] Failed to refresh connection status: $e', exception: e, stackTrace: stackTrace);
+      AppLogger.error('[STRAVA] Failed to refresh connection status: $e',
+          exception: e, stackTrace: stackTrace);
       if (!mounted) return;
       setState(() {
         _stravaConnected = false;
@@ -168,9 +175,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         final opened = await _stravaService.connectToStrava();
         if (opened && mounted) {
           StyledSnackBar.show(
-            context: context,
-            message: 'Opening Strava authorization...'
-          );
+              context: context, message: 'Opening Strava authorization...');
         }
         // Give the app a moment, then refresh status once
         await Future.delayed(const Duration(seconds: 2));
@@ -187,14 +192,17 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       final sessionId = session.id;
       if (sessionId == null || sessionId.isEmpty) {
         if (mounted) {
-          StyledSnackBar.showError(context: context, message: 'Missing session ID for Strava export');
+          StyledSnackBar.showError(
+              context: context,
+              message: 'Missing session ID for Strava export');
         }
         return;
       }
 
       // User unit preference
       final authState = context.read<AuthBloc>().state;
-      final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+      final preferMetric =
+          authState is Authenticated ? authState.user.preferMetric : true;
 
       // Build name/description (try AI-generated title, fallback to formatter)
       String sessionName = _stravaService.formatSessionName(
@@ -206,14 +214,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
       try {
         final ai = GetIt.I<OpenAIService>();
-        
+
         // Try to get city from session location data
         String? cityName;
         try {
-          if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
+          if (session.locationPoints != null &&
+              session.locationPoints!.isNotEmpty) {
             final locationPoint = session.locationPoints!.first;
             final locationContextService = LocationContextService();
-            final locationContext = await locationContextService.getLocationContext(
+            final locationContext =
+                await locationContextService.getLocationContext(
               locationPoint.latitude,
               locationPoint.longitude,
             );
@@ -222,7 +232,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         } catch (e) {
           AppLogger.warning('[STRAVA][AI] Location extraction failed: $e');
         }
-        
+
         final aiTitle = await ai.generateStravaTitle(
           distanceKm: session.distance,
           duration: session.duration,
@@ -235,7 +245,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           sessionName = aiTitle;
         }
       } catch (e, st) {
-        AppLogger.warning('[STRAVA][AI] Title generation failed, using fallback: $e');
+        AppLogger.warning(
+            '[STRAVA][AI] Title generation failed, using fallback: $e');
       }
 
       final description = _stravaService.formatSessionDescription(
@@ -258,15 +269,19 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
       if (mounted) {
         if (success) {
-          StyledSnackBar.showSuccess(context: context, message: 'Successfully exported to Strava!');
+          StyledSnackBar.showSuccess(
+              context: context, message: 'Successfully exported to Strava!');
         } else {
-          StyledSnackBar.showError(context: context, message: 'Failed to export to Strava.');
+          StyledSnackBar.showError(
+              context: context, message: 'Failed to export to Strava.');
         }
       }
     } catch (e, stackTrace) {
-      AppLogger.error('[STRAVA] CTA failed: $e', exception: e, stackTrace: stackTrace);
+      AppLogger.error('[STRAVA] CTA failed: $e',
+          exception: e, stackTrace: stackTrace);
       if (mounted) {
-        StyledSnackBar.showError(context: context, message: 'Strava action failed: $e');
+        StyledSnackBar.showError(
+            context: context, message: 'Strava action failed: $e');
       }
     } finally {
       if (mounted) {
@@ -275,25 +290,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     }
   }
 
-
   @override
   void initState() {
     super.initState();
     AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
     _initZoneColors();
-    
+
     // Reset photo loading flag for fresh screen instance
     _photosLoadAttemptedForThisSession = false;
-    
+
     // Debug log heart rate data in the initial session
     AppLogger.debug('[HEARTRATE DEBUG] Initial session heart rate data:');
-    AppLogger.debug('[HEARTRATE DEBUG] Has heartRateSamples: ${widget.session.heartRateSamples != null}');
+    AppLogger.debug(
+        '[HEARTRATE DEBUG] Has heartRateSamples: ${widget.session.heartRateSamples != null}');
     if (widget.session.heartRateSamples != null) {
-      AppLogger.debug('[HEARTRATE DEBUG] Number of samples: ${widget.session.heartRateSamples!.length}');
+      AppLogger.debug(
+          '[HEARTRATE DEBUG] Number of samples: ${widget.session.heartRateSamples!.length}');
     }
-    AppLogger.debug('[HEARTRATE DEBUG] avgHeartRate: ${widget.session.avgHeartRate}');
-    AppLogger.debug('[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
-    AppLogger.debug('[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
+    AppLogger.debug(
+        '[HEARTRATE DEBUG] avgHeartRate: ${widget.session.avgHeartRate}');
+    AppLogger.debug(
+        '[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
+    AppLogger.debug(
+        '[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
 
     _tabController = TabController(length: 2, vsync: this);
     _scrollController = ScrollController()
@@ -302,25 +321,29 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           _isScrolledToTop = _scrollController.offset <= 0;
         });
       });
-      
+
     // Load session data and photos
     if (widget.session.id != null) {
-      AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState: Loading session ${widget.session.id}');
+      AppLogger.debug(
+          '[CASCADE_TRACE] SessionDetailScreen initState: Loading session ${widget.session.id}');
       // Always fetch full session to normalize data (repository cache keeps this cheap)
-      AppLogger.debug('[SESSION DETAIL] Normalizing session payload: fetching full session (cached if fresh)');
+      AppLogger.debug(
+          '[SESSION DETAIL] Normalizing session payload: fetching full session (cached if fresh)');
       _loadFullSessionData();
-      
+
       // 2. Load photos - use standard loading instead of force loading to leverage cache
-      AppLogger.debug('[PHOTO_DEBUG] Loading photos in initState for session: ${widget.session.id}');
+      AppLogger.debug(
+          '[PHOTO_DEBUG] Loading photos in initState for session: ${widget.session.id}');
       _loadPhotos();
-      
+
       // 3. Load social data
       _loadSocialData(widget.session.id!);
 
       // 4. Load session author profile (real data from backend)
       _loadAuthorProfile();
     } else {
-      AppLogger.error('[CASCADE_TRACE] SessionDetailScreen initState: Session ID is null, cannot load session data');
+      AppLogger.error(
+          '[CASCADE_TRACE] SessionDetailScreen initState: Session ID is null, cannot load session data');
     }
 
     // Load Strava connection status for CTA labelling
@@ -330,7 +353,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen didChangeDependencies called.');
+    AppLogger.debug(
+        '[CASCADE_TRACE] SessionDetailScreen didChangeDependencies called.');
   }
 
   // Load social data (likes and comments) for the session
@@ -338,16 +362,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     AppLogger.debug('[SOCIAL_DEBUG] Loading social data for session $ruckId');
     try {
       final socialBloc = getIt<SocialBloc>();
-      
+
       // Use CheckRuckLikeStatus for likes to ensure state is synchronized across screens
       final ruckIdInt = int.tryParse(ruckId);
       if (ruckIdInt != null) {
         // This will update all screens that display this ruck
         socialBloc.add(CheckRuckLikeStatus(ruckIdInt));
       }
-      
+
       // Also load the standard likes and comments
-      socialBloc.add(LoadRuckLikes(int.parse(ruckId))); 
+      socialBloc.add(LoadRuckLikes(int.parse(ruckId)));
       socialBloc.add(LoadRuckComments(ruckId));
     } catch (e) {
       AppLogger.error('[SOCIAL_DEBUG] Error loading social data: $e');
@@ -356,68 +380,80 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
   void _loadPhotos() {
     if (widget.session.id != null) {
-      AppLogger.info('[PHOTO_DEBUG] 📸 Loading photos for session ${widget.session.id}');
+      AppLogger.info(
+          '[PHOTO_DEBUG] 📸 Loading photos for session ${widget.session.id}');
       if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
-        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        AppLogger.error(
+            '[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
         return;
       }
       final activeSessionBloc = context.read<ActiveSessionBloc>();
       activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
     } else {
-      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
+      AppLogger.error(
+          '[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
     }
   }
 
   void _forceLoadPhotos() {
     if (widget.session.id != null) {
-      AppLogger.info('[PHOTO_DEBUG] 🔄 Force loading photos for session ${widget.session.id}');
+      AppLogger.info(
+          '[PHOTO_DEBUG] 🔄 Force loading photos for session ${widget.session.id}');
       if (!GetIt.I.isRegistered<ActiveSessionBloc>()) {
-        AppLogger.error('[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
+        AppLogger.error(
+            '[PHOTO_DEBUG] ❌ ActiveSessionBloc is not registered in GetIt. Cannot load photos.');
         return;
       }
       final activeSessionBloc = context.read<ActiveSessionBloc>();
       // Clear the current photos from the BLoC state before fetching new ones
-      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add ClearSessionPhotos for session ${widget.session.id}');
+      AppLogger.debug(
+          '[CASCADE_TRACE] _forceLoadPhotos: Attempting to add ClearSessionPhotos for session ${widget.session.id}');
       activeSessionBloc.add(ClearSessionPhotos(ruckId: widget.session.id!));
-      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added ClearSessionPhotos for session ${widget.session.id}');
+      AppLogger.debug(
+          '[CASCADE_TRACE] _forceLoadPhotos: Successfully added ClearSessionPhotos for session ${widget.session.id}');
       // Then fetch new photos
-      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Attempting to add FetchSessionPhotosRequested for session ${widget.session.id}');
+      AppLogger.debug(
+          '[CASCADE_TRACE] _forceLoadPhotos: Attempting to add FetchSessionPhotosRequested for session ${widget.session.id}');
       activeSessionBloc.add(FetchSessionPhotosRequested(widget.session.id!));
-      AppLogger.debug('[CASCADE_TRACE] _forceLoadPhotos: Successfully added FetchSessionPhotosRequested for session ${widget.session.id}');
+      AppLogger.debug(
+          '[CASCADE_TRACE] _forceLoadPhotos: Successfully added FetchSessionPhotosRequested for session ${widget.session.id}');
     } else {
-      AppLogger.error('[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
+      AppLogger.error(
+          '[PHOTO_DEBUG] ❌ Cannot load photos - session ID is null');
     }
   }
-  
+
   @override
   void dispose() {
     _photoRefreshTimer?.cancel();
     super.dispose();
   }
-  
+
   // Starts polling for photos after upload
   void _startPhotoRefreshPolling() {
     _refreshAttempts = 0;
     _uploadInProgress = true;
-    
+
     AppLogger.info('[SESSION_DETAIL] Starting photo refresh polling');
-    
+
     // Cancel existing timer if running
     _photoRefreshTimer?.cancel();
-    
+
     // Start a new timer to check every 2 seconds
     _photoRefreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _refreshAttempts++;
-      
-      AppLogger.info('[SESSION_DETAIL] Refresh attempt $_refreshAttempts of $_maxRefreshAttempts');
-      
+
+      AppLogger.info(
+          '[SESSION_DETAIL] Refresh attempt $_refreshAttempts of $_maxRefreshAttempts');
+
       if (_refreshAttempts > _maxRefreshAttempts) {
-        AppLogger.info('[SESSION_DETAIL] Max refresh attempts reached, stopping polling');
+        AppLogger.info(
+            '[SESSION_DETAIL] Max refresh attempts reached, stopping polling');
         timer.cancel();
         _uploadInProgress = false;
         return;
       }
-      
+
       // Request a fresh photo fetch
       if (mounted && widget.session.id != null) {
         // Get direct access to the bloc
@@ -437,7 +473,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       final authState = context.read<AuthBloc>().state;
       final userId = authState is Authenticated ? authState.user.userId : null;
       if (userId == null || userId.isEmpty) {
-        AppLogger.warning('[SESSION DETAIL] No userId on session; cannot load author profile');
+        AppLogger.warning(
+            '[SESSION DETAIL] No userId on session; cannot load author profile');
         return;
       }
       if (_isLoadingAuthor) return;
@@ -451,7 +488,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         _authorProfile = profile;
         _isLoadingAuthor = false;
       });
-      AppLogger.debug('[SESSION DETAIL] Loaded author profile: ${profile.username} (${profile.id})');
+      AppLogger.debug(
+          '[SESSION DETAIL] Loaded author profile: ${profile.username} (${profile.id})');
     } catch (e) {
       AppLogger.error('[SESSION DETAIL] Failed to load author profile: $e');
       if (mounted) {
@@ -471,13 +509,19 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
   int _calculateMaxHeartRate(List<HeartRateSample> samples) {
     if (samples.isEmpty) return 0;
-    return samples.map((e) => e.bpm).reduce((max, bpm) => bpm > max ? bpm : max);
+    return samples
+        .map((e) => e.bpm)
+        .reduce((max, bpm) => bpm > max ? bpm : max);
   }
 
   int? _getMinHeartRate(RuckSession session) {
-    if (session.minHeartRate != null && session.minHeartRate! > 0) return session.minHeartRate;
-    if (session.heartRateSamples != null && session.heartRateSamples!.isNotEmpty) {
-      return session.heartRateSamples!.map((e) => e.bpm).reduce((min, bpm) => bpm < min ? bpm : min);
+    if (session.minHeartRate != null && session.minHeartRate! > 0)
+      return session.minHeartRate;
+    if (session.heartRateSamples != null &&
+        session.heartRateSamples!.isNotEmpty) {
+      return session.heartRateSamples!
+          .map((e) => e.bpm)
+          .reduce((min, bpm) => bpm < min ? bpm : min);
     }
     return null;
   }
@@ -514,10 +558,16 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         ),
         child: Column(
           children: [
-            Text(label, style: AppTextStyles.bodyMedium.copyWith(color: Colors.grey[600])),
+            Text(label,
+                style:
+                    AppTextStyles.bodyMedium.copyWith(color: Colors.grey[600])),
             const SizedBox(height: 4),
-            Text(value, style: AppTextStyles.headlineMedium.copyWith(fontWeight: FontWeight.bold)),
-            Text(unit, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+            Text(value,
+                style: AppTextStyles.headlineMedium
+                    .copyWith(fontWeight: FontWeight.bold)),
+            Text(unit,
+                style:
+                    AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
           ],
         ),
       ),
@@ -528,26 +578,32 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final activeSessionBloc = context.read<ActiveSessionBloc>();
-    
+
     // Get user preferences for metric/imperial
     final authState = context.read<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final bool preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
 
     return MultiBlocListener(
       listeners: [
         BlocListener<ActiveSessionBloc, ActiveSessionState>(
           bloc: activeSessionBloc, // Provide the bloc instance
           listener: (context, state) {
-            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Received state: $state');
+            AppLogger.debug(
+                '[CASCADE_TRACE] SessionDetailScreen BlocListener: Received state: $state');
             final currentRuckId = widget.session.id;
             if (currentRuckId == null) return;
 
             bool sessionReadyForPhotoLoad = false;
-            if (state is ActiveSessionRunning && state.sessionId == currentRuckId) {
-              AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionRunning for current session.');
+            if (state is ActiveSessionRunning &&
+                state.sessionId == currentRuckId) {
+              AppLogger.debug(
+                  '[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionRunning for current session.');
               sessionReadyForPhotoLoad = true;
-            } else if (state is ActiveSessionInitial && state.viewedSession?.id == currentRuckId) {
-              AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
+            } else if (state is ActiveSessionInitial &&
+                state.viewedSession?.id == currentRuckId) {
+              AppLogger.debug(
+                  '[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
               sessionReadyForPhotoLoad = true;
             }
 
@@ -555,7 +611,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
               // Check if photos have already been fetched for this session ID in this screen instance to avoid loops.
               // This simple flag might need to be more robust depending on navigation patterns.
               if (!_photosLoadAttemptedForThisSession) {
-                AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen BlocListener: Session is ready, calling _forceLoadPhotos for $currentRuckId.');
+                AppLogger.debug(
+                    '[CASCADE_TRACE] SessionDetailScreen BlocListener: Session is ready, calling _forceLoadPhotos for $currentRuckId.');
                 _forceLoadPhotos();
                 if (mounted) {
                   setState(() {
@@ -568,8 +625,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         ),
         BlocListener<SessionBloc, SessionState>(
           listener: (context, state) {
-            AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen SessionBloc listener: $state');
-            
+            AppLogger.debug(
+                '[CASCADE_TRACE] SessionDetailScreen SessionBloc listener: $state');
+
             if (state is SessionDeleteSuccess) {
               // Show confirmation message using StyledSnackBar
               StyledSnackBar.showSuccess(
@@ -577,9 +635,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 message: error_msgs.sessionDeleteSuccess,
                 animationStyle: SnackBarAnimationStyle.slideUpBounce,
               );
-              
+
               // Navigate back with result to trigger refresh
-              Navigator.of(context).pop(true); // Pass true to indicate data change
+              Navigator.of(context)
+                  .pop(true); // Pass true to indicate data change
             } else if (state is SessionOperationFailure) {
               // Show error message using StyledSnackBar
               StyledSnackBar.showError(
@@ -646,7 +705,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     children: [
                       Icon(Icons.delete_outline, size: 20, color: Colors.red),
                       SizedBox(width: 12),
-                      Text('Delete session', style: TextStyle(color: Colors.red)),
+                      Text('Delete session',
+                          style: TextStyle(color: Colors.red)),
                     ],
                   ),
                 ),
@@ -675,7 +735,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  MeasurementUtils.formatDate(widget.session.startTime),
+                                  MeasurementUtils.formatDate(
+                                      widget.session.startTime),
                                   style: AppTextStyles.titleLarge,
                                 ),
                                 // Add the like button here
@@ -684,49 +745,65 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                     value: getIt<SocialBloc>(),
                                     child: BlocBuilder<SocialBloc, SocialState>(
                                       buildWhen: (previous, current) {
-                                        final ruckId = int.tryParse(widget.session.id!);
+                                        final ruckId =
+                                            int.tryParse(widget.session.id!);
                                         if (ruckId == null) return false;
-                                        
-                                        return (current is LikeActionCompleted && current.ruckId == ruckId) ||
-                                            (current is LikeStatusChecked && current.ruckId == ruckId) ||
-                                            (current is LikesLoaded && current.ruckId == ruckId);
+
+                                        return (current
+                                                    is LikeActionCompleted &&
+                                                current.ruckId == ruckId) ||
+                                            (current is LikeStatusChecked &&
+                                                current.ruckId == ruckId) ||
+                                            (current is LikesLoaded &&
+                                                current.ruckId == ruckId);
                                       },
                                       builder: (context, state) {
-                                        final ruckId = int.tryParse(widget.session.id!);
-                                        if (ruckId == null) return const SizedBox.shrink();
-                                        
+                                        final ruckId =
+                                            int.tryParse(widget.session.id!);
+                                        if (ruckId == null)
+                                          return const SizedBox.shrink();
+
                                         bool isLiked = false;
                                         int likeCount = 0;
-                                        
-                                        if (state is LikesLoaded && state.ruckId == ruckId) {
+
+                                        if (state is LikesLoaded &&
+                                            state.ruckId == ruckId) {
                                           isLiked = state.userHasLiked;
                                           likeCount = state.likes.length;
-                                        } else if (state is LikeActionCompleted && state.ruckId == ruckId) {
+                                        } else if (state
+                                                is LikeActionCompleted &&
+                                            state.ruckId == ruckId) {
                                           isLiked = state.isLiked;
                                           likeCount = state.likeCount;
-                                        } else if (state is LikeStatusChecked && state.ruckId == ruckId) {
+                                        } else if (state is LikeStatusChecked &&
+                                            state.ruckId == ruckId) {
                                           isLiked = state.isLiked;
                                           likeCount = state.likeCount;
                                         }
-                                        
+
                                         return InkWell(
                                           onTap: () {
                                             // Use haptic feedback for better UX
                                             HapticFeedback.heavyImpact();
-                                            
+
                                             // Ensure ruckId is not null before dispatching event
                                             if (ruckId != null) {
                                               // Important: Use the singleton instance from GetIt
-                                              final socialBloc = getIt<SocialBloc>();
-                                              socialBloc.add(ToggleRuckLike(ruckId));
-                                              
+                                              final socialBloc =
+                                                  getIt<SocialBloc>();
+                                              socialBloc
+                                                  .add(ToggleRuckLike(ruckId));
+
                                               // Log for debugging
-                                              AppLogger.debug('[SOCIAL_DEBUG] SessionDetailScreen: Like toggled for ruckId $ruckId');
+                                              AppLogger.debug(
+                                                  '[SOCIAL_DEBUG] SessionDetailScreen: Like toggled for ruckId $ruckId');
                                             } else {
-                                              AppLogger.warning('[SOCIAL_DEBUG] SessionDetailScreen: Cannot toggle like - ruckId is null');
+                                              AppLogger.warning(
+                                                  '[SOCIAL_DEBUG] SessionDetailScreen: Cannot toggle like - ruckId is null');
                                             }
                                           },
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                           child: Padding(
                                             padding: const EdgeInsets.all(8.0),
                                             child: Row(
@@ -742,7 +819,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                                 const SizedBox(width: 2),
                                                 Text(
                                                   '$likeCount',
-                                                  style: AppTextStyles.titleMedium.copyWith(
+                                                  style: AppTextStyles
+                                                      .titleMedium
+                                                      .copyWith(
                                                     color: Colors.grey[800],
                                                   ),
                                                 ),
@@ -767,8 +846,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           children: List.generate(
                             5, // Always generate 5 stars
                             (index) => Icon(
-                              index < (widget.session.rating ?? 0) 
-                                  ? Icons.star 
+                              index < (widget.session.rating ?? 0)
+                                  ? Icons.star
                                   : Icons.star_border,
                               color: Colors.amber,
                               size: 24,
@@ -786,7 +865,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           context,
                           Icons.straighten,
                           'Distance',
-                          MeasurementUtils.formatDistance(widget.session.distance, metric: preferMetric),
+                          MeasurementUtils.formatDistance(
+                              widget.session.distance,
+                              metric: preferMetric),
                         ),
                         _buildHeaderStat(
                           context,
@@ -801,7 +882,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                           context,
                           Icons.timer,
                           'Duration',
-                          MeasurementUtils.formatDuration(widget.session.duration),
+                          MeasurementUtils.formatDuration(
+                              widget.session.duration),
                         ),
                       ],
                     ),
@@ -814,23 +896,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 builder: (context, state) {
                   // Get the most up-to-date session data from BLoC state
                   RuckSession currentSession = widget.session;
-                  
+
                   // Check if we have updated session data in the BLoC state
-                  if (state is ActiveSessionInitial && state.viewedSession?.id == widget.session.id) {
+                  if (state is ActiveSessionInitial &&
+                      state.viewedSession?.id == widget.session.id) {
                     currentSession = state.viewedSession!;
-                    print('[ROUTE_DEBUG] Using updated session from BLoC state with ${state.viewedSession!.locationPoints?.length ?? 0} location points');
+                    print(
+                        '[ROUTE_DEBUG] Using updated session from BLoC state with ${state.viewedSession!.locationPoints?.length ?? 0} location points');
                   }
-                  
+
                   // Only show map if we have location data and it's not manual
-                  if (currentSession.locationPoints != null && 
-                      currentSession.locationPoints!.isNotEmpty && 
+                  if (currentSession.locationPoints != null &&
+                      currentSession.locationPoints!.isNotEmpty &&
                       !currentSession.isManual) {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 20),
                       child: _SessionRouteMap(session: currentSession),
                     );
                   }
-                  
+
                   return const SizedBox.shrink();
                 },
               ),
@@ -840,29 +925,33 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                 builder: (context, state) {
                   // Get the most up-to-date session data from BLoC state
                   RuckSession currentSession = widget.session;
-                  
+
                   // Check if we have updated session data in the BLoC state
-                  if (state is ActiveSessionInitial && state.viewedSession?.id == widget.session.id) {
+                  if (state is ActiveSessionInitial &&
+                      state.viewedSession?.id == widget.session.id) {
                     currentSession = state.viewedSession!;
                   }
-                  
+
                   // Only show location if we have location data
-                  if (currentSession.locationPoints == null || currentSession.locationPoints!.isEmpty) {
+                  if (currentSession.locationPoints == null ||
+                      currentSession.locationPoints!.isEmpty) {
                     return const SizedBox.shrink();
                   }
-                  
+
                   return FutureBuilder<String>(
-                    future: LocationUtils.getLocationName(currentSession.locationPoints),
+                    future: LocationUtils.getLocationName(
+                        currentSession.locationPoints),
                     builder: (context, snapshot) {
                       // Only show location if we have valid data and it's not "Unknown Location"
-                      if (snapshot.hasData && 
-                          snapshot.data != null && 
-                          snapshot.data!.trim().isNotEmpty && 
+                      if (snapshot.hasData &&
+                          snapshot.data != null &&
+                          snapshot.data!.trim().isNotEmpty &&
                           snapshot.data!.toLowerCase() != 'unknown location') {
                         return Column(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
                               child: Center(
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
@@ -902,32 +991,38 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                   } else if (state is SessionSummaryGenerated) {
                     photos = state.photos;
                     isPhotosLoading = state.isPhotosLoading;
-                  } else if (state is SessionPhotosLoadedForId && state.sessionId == widget.session.id.toString()) {
+                  } else if (state is SessionPhotosLoadedForId &&
+                      state.sessionId == widget.session.id.toString()) {
                     photos = state.photos;
                     isPhotosLoading = false;
                   }
-                  
+
                   // Improved URL extraction with better handling of potential nulls - works for both state types
-                  photoUrls = photos.map((p) {
-                    if (p is RuckPhoto) {
-                      // If it's already a RuckPhoto object
-                      final url = p.url;
-                      return url != null && url.isNotEmpty ? url : p.thumbnailUrl;
-                    } else if (p is Map<String, dynamic>) {
-                      // Handle raw map data
-                      final url = p['url'] ?? p['thumbnail_url'];
-                      return url is String && url.isNotEmpty ? url : null;
-                    }
-                    return null;
-                  })
-                  .where((url) => url != null && url.isNotEmpty)
-                  .cast<String>()
-                  .toList();
-                  
+                  photoUrls = photos
+                      .map((p) {
+                        if (p is RuckPhoto) {
+                          // If it's already a RuckPhoto object
+                          final url = p.url;
+                          return url != null && url.isNotEmpty
+                              ? url
+                              : p.thumbnailUrl;
+                        } else if (p is Map<String, dynamic>) {
+                          // Handle raw map data
+                          final url = p['url'] ?? p['thumbnail_url'];
+                          return url is String && url.isNotEmpty ? url : null;
+                        }
+                        return null;
+                      })
+                      .where((url) => url != null && url.isNotEmpty)
+                      .cast<String>()
+                      .toList();
+
                   // Process the URLs
                   final processedUrls = photoUrls.map((url) {
                     final cacheBuster = DateTime.now().millisecondsSinceEpoch;
-                    return url.contains('?') ? '$url&t=$cacheBuster' : '$url?t=$cacheBuster';
+                    return url.contains('?')
+                        ? '$url&t=$cacheBuster'
+                        : '$url?t=$cacheBuster';
                   }).toList();
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -937,7 +1032,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         Row(
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            Icon(Icons.photo_library, color: _getLadyModeColor(context)),
+                            Icon(Icons.photo_library,
+                                color: _getLadyModeColor(context)),
                             const SizedBox(width: 8),
                             Text(
                               'Ruck Shots',
@@ -986,19 +1082,23 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             child: PhotoUploadSection(
                               ruckId: widget.session.id!,
                               onPhotosSelected: (photos) {
-                                AppLogger.info('[PHOTO_DEBUG] Session Detail: Preparing to dispatch UploadSessionPhotosRequested event with ${photos.length} photos');
-                                AppLogger.info('[PHOTO_DEBUG] Session ID: ${widget.session.id!}');
-                                
+                                AppLogger.info(
+                                    '[PHOTO_DEBUG] Session Detail: Preparing to dispatch UploadSessionPhotosRequested event with ${photos.length} photos');
+                                AppLogger.info(
+                                    '[PHOTO_DEBUG] Session ID: ${widget.session.id!}');
+
                                 final bloc = activeSessionBloc;
-                                AppLogger.info('[PHOTO_DEBUG] ActiveSessionBloc instance: ${bloc.hashCode}, Current state: ${bloc.state.runtimeType}');
-                                
+                                AppLogger.info(
+                                    '[PHOTO_DEBUG] ActiveSessionBloc instance: ${bloc.hashCode}, Current state: ${bloc.state.runtimeType}');
+
                                 bloc.add(
                                   UploadSessionPhotosRequested(
                                     sessionId: widget.session.id!,
                                     photos: photos,
                                   ),
                                 );
-                                AppLogger.info('[PHOTO_DEBUG] Event dispatched to bloc');
+                                AppLogger.info(
+                                    '[PHOTO_DEBUG] Event dispatched to bloc');
                               },
                               isUploading: isUploading,
                             ),
@@ -1018,9 +1118,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     Text(
                       'STATS',
                       style: AppTextStyles.displaySmall.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.red
-                          : const Color(0xFF3E2723),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.red
+                            : const Color(0xFF3E2723),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1030,7 +1130,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       '${widget.session.caloriesBurned}',
                       Icons.local_fire_department,
                     ),
-                    if (widget.session.steps != null && widget.session.steps! > 0)
+                    if (widget.session.steps != null &&
+                        widget.session.steps! > 0)
                       _buildDetailRow(
                         context,
                         'Steps',
@@ -1040,7 +1141,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     _buildDetailRow(
                       context,
                       'Ruck Weight',
-                      widget.session.ruckWeightKg == 0.0 ? 'Hike' : MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: preferMetric),
+                      widget.session.ruckWeightKg == 0.0
+                          ? 'Hike'
+                          : MeasurementUtils.formatWeight(
+                              widget.session.ruckWeightKg,
+                              metric: preferMetric),
                       Icons.fitness_center,
                     ),
                     // Elevation Gain/Loss rows
@@ -1048,23 +1153,28 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                       _buildDetailRow(
                         context,
                         'Elevation Gain',
-                        MeasurementUtils.formatSingleElevation(widget.session.elevationGain, metric: preferMetric),
+                        MeasurementUtils.formatSingleElevation(
+                            widget.session.elevationGain,
+                            metric: preferMetric),
                         Icons.trending_up,
                       ),
                     if (widget.session.elevationLoss > 0)
                       _buildDetailRow(
                         context,
                         'Elevation Loss',
-                        MeasurementUtils.formatSingleElevation(-widget.session.elevationLoss, metric: preferMetric),
+                        MeasurementUtils.formatSingleElevation(
+                            -widget.session.elevationLoss,
+                            metric: preferMetric),
                         Icons.trending_down,
                       ),
-                    if (widget.session.elevationGain == 0.0 && widget.session.elevationLoss == 0.0)
+                    if (widget.session.elevationGain == 0.0 &&
+                        widget.session.elevationLoss == 0.0)
                       _buildDetailRow(
                         context,
                         'Elevation',
                         '--',
                         Icons.landscape,
-                      ),   
+                      ),
                     // Rating stars moved to the header
                     if (widget.session.notes?.isNotEmpty == true) ...[
                       const SizedBox(height: 24),
@@ -1086,25 +1196,30 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                         ),
                       ),
                     ],
-                    
+
                     // Splits Display Section - show above heart rate
-                    if (widget.session.splits != null && widget.session.splits!.isNotEmpty) ...[
+                    if (widget.session.splits != null &&
+                        widget.session.splits!.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       SplitsDisplay(
                         splits: widget.session.splits!,
                         isMetric: preferMetric,
                       ),
                     ],
-                    
+
                     Builder(builder: (context) {
                       // Heart rate debug logging
-                      AppLogger.debug('[HEARTRATE DEBUG] avgHeartRate: ${widget.session.avgHeartRate}');
-                      AppLogger.debug('[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
-                      AppLogger.debug('[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
+                      AppLogger.debug(
+                          '[HEARTRATE DEBUG] avgHeartRate: ${widget.session.avgHeartRate}');
+                      AppLogger.debug(
+                          '[HEARTRATE DEBUG] maxHeartRate: ${widget.session.maxHeartRate}');
+                      AppLogger.debug(
+                          '[HEARTRATE DEBUG] minHeartRate: ${widget.session.minHeartRate}');
                       if (widget.session.heartRateSamples != null) {
-                        AppLogger.debug('[HEARTRATE DEBUG] Sample count: ${widget.session.heartRateSamples!.length}');
+                        AppLogger.debug(
+                            '[HEARTRATE DEBUG] Sample count: ${widget.session.heartRateSamples!.length}');
                       }
-                      
+
                       // Heart rate section with Bangers font and no card container
                       return Padding(
                         padding: const EdgeInsets.only(top: 8, bottom: 8),
@@ -1115,100 +1230,136 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             Text(
                               'HEART RATE',
                               style: AppTextStyles.displaySmall.copyWith(
-                                color: Theme.of(context).brightness == Brightness.dark 
-                                  ? Colors.red
-                                  : const Color(0xFF3E2723),
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.red
+                                    : const Color(0xFF3E2723),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            
+
                             // Average HR stat item
-                            if ((widget.session.avgHeartRate != null && widget.session.avgHeartRate! > 0) ||
-                                (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
+                            if ((widget.session.avgHeartRate != null &&
+                                    widget.session.avgHeartRate! > 0) ||
+                                (widget.session.heartRateSamples != null &&
+                                    widget
+                                        .session.heartRateSamples!.isNotEmpty))
                               _buildStatItem(
-                                context,
-                                'Average HR',
-                                '${widget.session.avgHeartRate ?? _calculateAvgHeartRate(widget.session.heartRateSamples ?? [])} bpm',
-                                Icons.favorite,
-                                iconColor: Theme.of(context).primaryColor
-                              ),
-                              
+                                  context,
+                                  'Average HR',
+                                  '${widget.session.avgHeartRate ?? _calculateAvgHeartRate(widget.session.heartRateSamples ?? [])} bpm',
+                                  Icons.favorite,
+                                  iconColor: Theme.of(context).primaryColor),
+
                             // Max HR stat item
-                            if ((widget.session.maxHeartRate != null && widget.session.maxHeartRate! > 0) ||
-                                (widget.session.heartRateSamples != null && widget.session.heartRateSamples!.isNotEmpty))
+                            if ((widget.session.maxHeartRate != null &&
+                                    widget.session.maxHeartRate! > 0) ||
+                                (widget.session.heartRateSamples != null &&
+                                    widget
+                                        .session.heartRateSamples!.isNotEmpty))
                               _buildStatItem(
-                                context,
-                                'Max HR',
-                                '${widget.session.maxHeartRate ?? _calculateMaxHeartRate(widget.session.heartRateSamples ?? [])} bpm',
-                                Icons.whatshot,
-                                iconColor: Theme.of(context).primaryColor
-                              ),
-                              
+                                  context,
+                                  'Max HR',
+                                  '${widget.session.maxHeartRate ?? _calculateMaxHeartRate(widget.session.heartRateSamples ?? [])} bpm',
+                                  Icons.whatshot,
+                                  iconColor: Theme.of(context).primaryColor),
+
                             // Min HR stat item
                             if (_getMinHeartRate(widget.session) != null)
                               _buildStatItem(
-                                context,
-                                'Min HR',
-                                '${_getMinHeartRate(widget.session)} bpm',
-                                Icons.arrow_downward,
-                                iconColor: Colors.blueAccent
-                              ),
-                              
+                                  context,
+                                  'Min HR',
+                                  '${_getMinHeartRate(widget.session)} bpm',
+                                  Icons.arrow_downward,
+                                  iconColor: Colors.blueAccent),
+
                             // Heart rate graph
                             BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
-                              bloc: activeSessionBloc, // Provide the bloc instance
+                              bloc:
+                                  activeSessionBloc, // Provide the bloc instance
                               buildWhen: (previous, current) {
                                 // Rebuild when the viewed session is loaded into state OR when a summary is generated
                                 if (current is ActiveSessionInitial) {
-                                  return current.viewedSession?.id == widget.session.id &&
-                                      (current.viewedSession?.heartRateSamples?.isNotEmpty ?? false);
+                                  return current.viewedSession?.id ==
+                                          widget.session.id &&
+                                      (current.viewedSession?.heartRateSamples
+                                              ?.isNotEmpty ??
+                                          false);
                                 }
                                 if (current is SessionSummaryGenerated) {
-                                  return current.session.id == widget.session.id &&
-                                      (current.session.heartRateSamples?.isNotEmpty ?? false);
+                                  return current.session.id ==
+                                          widget.session.id &&
+                                      (current.session.heartRateSamples
+                                              ?.isNotEmpty ??
+                                          false);
                                 }
                                 return false;
                               },
                               builder: (context, state) {
                                 // Get heart rate data
-                                List<HeartRateSample>? heartRateSamples = widget.session.heartRateSamples;
+                                List<HeartRateSample>? heartRateSamples =
+                                    widget.session.heartRateSamples;
                                 int? avgHeartRate = widget.session.avgHeartRate;
                                 int? maxHeartRate = widget.session.maxHeartRate;
                                 int? minHeartRate = widget.session.minHeartRate;
-                                Map<String, int>? timeInZones = widget.session.timeInZones;
-                                List<Map<String, dynamic>>? zoneSnapshot = widget.session.hrZoneSnapshot;
+                                Map<String, int>? timeInZones =
+                                    widget.session.timeInZones;
+                                List<Map<String, dynamic>>? zoneSnapshot =
+                                    widget.session.hrZoneSnapshot;
 
                                 // Prefer heart rate data from viewedSession when available
-                                if (state is ActiveSessionInitial && state.viewedSession?.id == widget.session.id) {
+                                if (state is ActiveSessionInitial &&
+                                    state.viewedSession?.id ==
+                                        widget.session.id) {
                                   final vs = state.viewedSession!;
-                                  if (vs.heartRateSamples != null && vs.heartRateSamples!.isNotEmpty) {
+                                  if (vs.heartRateSamples != null &&
+                                      vs.heartRateSamples!.isNotEmpty) {
                                     heartRateSamples = vs.heartRateSamples;
                                     avgHeartRate = vs.avgHeartRate;
                                     maxHeartRate = vs.maxHeartRate;
                                     minHeartRate = vs.minHeartRate;
                                     timeInZones = vs.timeInZones ?? timeInZones;
-                                    zoneSnapshot = vs.hrZoneSnapshot ?? zoneSnapshot;
+                                    zoneSnapshot =
+                                        vs.hrZoneSnapshot ?? zoneSnapshot;
                                   }
-                                } else if (state is SessionSummaryGenerated && state.session.id == widget.session.id) {
-                                  if (state.session.heartRateSamples != null && state.session.heartRateSamples!.isNotEmpty) {
-                                    heartRateSamples = state.session.heartRateSamples;
+                                } else if (state is SessionSummaryGenerated &&
+                                    state.session.id == widget.session.id) {
+                                  if (state.session.heartRateSamples != null &&
+                                      state.session.heartRateSamples!
+                                          .isNotEmpty) {
+                                    heartRateSamples =
+                                        state.session.heartRateSamples;
                                     avgHeartRate = state.session.avgHeartRate;
                                     maxHeartRate = state.session.maxHeartRate;
                                     minHeartRate = state.session.minHeartRate;
-                                    timeInZones = state.session.timeInZones ?? timeInZones;
-                                    zoneSnapshot = state.session.hrZoneSnapshot ?? zoneSnapshot;
+                                    timeInZones = state.session.timeInZones ??
+                                        timeInZones;
+                                    zoneSnapshot =
+                                        state.session.hrZoneSnapshot ??
+                                            zoneSnapshot;
                                   }
                                 }
 
-                                final List<HeartRateSample> safeHeartRateSamples = heartRateSamples ?? [];
-                                final bool showHeartRateGraph = safeHeartRateSamples.isNotEmpty;
+                                final List<HeartRateSample>
+                                    safeHeartRateSamples =
+                                    heartRateSamples ?? [];
+                                final bool showHeartRateGraph =
+                                    safeHeartRateSamples.isNotEmpty;
 
                                 // Build zones for chart overlays
-                                List<({int min, int max, Color color, String name})>? zones;
+                                List<
+                                    ({
+                                      int min,
+                                      int max,
+                                      Color color,
+                                      String name
+                                    })>? zones;
                                 try {
-                                  if (zoneSnapshot != null && zoneSnapshot!.isNotEmpty) {
+                                  if (zoneSnapshot != null &&
+                                      zoneSnapshot!.isNotEmpty) {
                                     zones = zoneSnapshot!.map((z) {
-                                      final name = (z['name'] as String?) ?? 'Z';
+                                      final name =
+                                          (z['name'] as String?) ?? 'Z';
                                       final color = _getZoneColor(name);
                                       return (
                                         min: (z['min_bpm'] as num).toInt(),
@@ -1218,9 +1369,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                       );
                                     }).toList();
                                   } else {
-                                    final authState = context.read<AuthBloc>().state;
+                                    final authState =
+                                        context.read<AuthBloc>().state;
                                     if (authState is Authenticated) {
-                                      zones = HeartRateZoneService.zonesFromUserFields(
+                                      zones = HeartRateZoneService
+                                          .zonesFromUserFields(
                                         restingHr: authState.user.restingHr,
                                         maxHr: authState.user.maxHr,
                                         dateOfBirth: authState.user.dateOfBirth,
@@ -1229,44 +1382,74 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                     }
                                   }
                                 } catch (_) {}
-                                
+
                                 return Column(
                                   children: [
                                     // Heart rate stat cards
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
                                       children: [
-                                        _buildHeartRateStatCard('Avg', avgHeartRate?.toString() ?? '--', 'bpm'),
-                                        _buildHeartRateStatCard('Max', maxHeartRate?.toString() ?? '--', 'bpm'),
-                                        _buildHeartRateStatCard('Min', minHeartRate?.toString() ?? '--', 'bpm'),
+                                        _buildHeartRateStatCard(
+                                            'Avg',
+                                            avgHeartRate?.toString() ?? '--',
+                                            'bpm'),
+                                        _buildHeartRateStatCard(
+                                            'Max',
+                                            maxHeartRate?.toString() ?? '--',
+                                            'bpm'),
+                                        _buildHeartRateStatCard(
+                                            'Min',
+                                            minHeartRate?.toString() ?? '--',
+                                            'bpm'),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
-                                    
+
                                     // Heart rate graph - 50% taller with full width
                                     if (showHeartRateGraph)
                                       SizedBox(
                                         height: 270,
                                         width: double.infinity,
                                         child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8),
                                           child: Builder(
                                             builder: (context) {
                                               try {
-                                                final int count = safeHeartRateSamples.length;
-                                                final DateTime? first = count > 0 ? safeHeartRateSamples.first.timestamp : null;
-                                                final DateTime? last = count > 0 ? safeHeartRateSamples.last.timestamp : null;
-                                                final double durMin = (widget.session.duration?.inSeconds ?? 0) / 60.0;
-                                                print('[HR_UI] samples=$count dur=${durMin.toStringAsFixed(2)}m first=${first?.toIso8601String()} last=${last?.toIso8601String()}');
+                                                final int count =
+                                                    safeHeartRateSamples.length;
+                                                final DateTime? first =
+                                                    count > 0
+                                                        ? safeHeartRateSamples
+                                                            .first.timestamp
+                                                        : null;
+                                                final DateTime? last = count > 0
+                                                    ? safeHeartRateSamples
+                                                        .last.timestamp
+                                                    : null;
+                                                final double durMin = (widget
+                                                            .session
+                                                            .duration
+                                                            ?.inSeconds ??
+                                                        0) /
+                                                    60.0;
+                                                print(
+                                                    '[HR_UI] samples=$count dur=${durMin.toStringAsFixed(2)}m first=${first?.toIso8601String()} last=${last?.toIso8601String()}');
                                               } catch (_) {}
                                               return AnimatedHeartRateChart(
-                                                heartRateSamples: safeHeartRateSamples,
+                                                heartRateSamples:
+                                                    safeHeartRateSamples,
                                                 avgHeartRate: avgHeartRate,
                                                 maxHeartRate: maxHeartRate,
                                                 minHeartRate: minHeartRate,
-                                                totalDuration: widget.session.duration,
-                                                sessionStartTime: widget.session.startTime,
-                                                getLadyModeColor: (context) => Theme.of(context).primaryColor,
+                                                totalDuration:
+                                                    widget.session.duration,
+                                                sessionStartTime:
+                                                    widget.session.startTime,
+                                                getLadyModeColor: (context) =>
+                                                    Theme.of(context)
+                                                        .primaryColor,
                                                 zones: zones,
                                               );
                                             },
@@ -1280,16 +1463,21 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                         margin: EdgeInsets.zero,
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(12.0),
+                                          borderRadius:
+                                              BorderRadius.circular(12.0),
                                         ),
                                         child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
-                                            Icon(Icons.timeline_outlined, size: 48, color: Colors.grey.shade400),
+                                            Icon(Icons.timeline_outlined,
+                                                size: 48,
+                                                color: Colors.grey.shade400),
                                             const SizedBox(height: 16),
                                             Text(
                                               'No heart rate data available',
-                                              style: AppTextStyles.statValue.copyWith(
+                                              style: AppTextStyles.statValue
+                                                  .copyWith(
                                                 color: Colors.grey.shade600,
                                               ),
                                             ),
@@ -1304,11 +1492,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                             // Time-in-Zone distribution
                             Builder(builder: (context) {
                               // Build samples and zones in this scope
-                              final List<HeartRateSample> samples = widget.session.heartRateSamples ?? [];
-                              List<({int min, int max, Color color, String name})>? localZones;
+                              final List<HeartRateSample> samples =
+                                  widget.session.heartRateSamples ?? [];
+                              List<
+                                  ({
+                                    int min,
+                                    int max,
+                                    Color color,
+                                    String name
+                                  })>? localZones;
                               try {
-                                if (widget.session.hrZoneSnapshot != null && widget.session.hrZoneSnapshot!.isNotEmpty) {
-                                  localZones = widget.session.hrZoneSnapshot!.map((z) {
+                                if (widget.session.hrZoneSnapshot != null &&
+                                    widget.session.hrZoneSnapshot!.isNotEmpty) {
+                                  localZones =
+                                      widget.session.hrZoneSnapshot!.map((z) {
                                     final name = (z['name'] as String?) ?? 'Z';
                                     return (
                                       min: (z['min_bpm'] as num).toInt(),
@@ -1318,9 +1515,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                     );
                                   }).toList();
                                 } else {
-                                  final authState = context.read<AuthBloc>().state;
+                                  final authState =
+                                      context.read<AuthBloc>().state;
                                   if (authState is Authenticated) {
-                                    localZones = HeartRateZoneService.zonesFromUserFields(
+                                    localZones = HeartRateZoneService
+                                        .zonesFromUserFields(
                                       restingHr: authState.user.restingHr,
                                       maxHr: authState.user.maxHr,
                                       dateOfBirth: authState.user.dateOfBirth,
@@ -1330,38 +1529,66 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                 }
                               } catch (_) {}
 
-                              Map<String, int> distribution = widget.session.timeInZones ?? {};
-                              if (distribution.isEmpty && samples.isNotEmpty && localZones != null) {
-                                distribution = HeartRateZoneService.timeInZonesSeconds(samples: samples, zones: localZones!);
+                              Map<String, int> distribution =
+                                  widget.session.timeInZones ?? {};
+                              if (distribution.isEmpty &&
+                                  samples.isNotEmpty &&
+                                  localZones != null) {
+                                distribution =
+                                    HeartRateZoneService.timeInZonesSeconds(
+                                        samples: samples, zones: localZones!);
                               }
-                              if (distribution.isEmpty) return const SizedBox.shrink();
-                              final total = distribution.values.fold<int>(0, (sum, v) => sum + v);
+                              if (distribution.isEmpty)
+                                return const SizedBox.shrink();
+                              final total = distribution.values
+                                  .fold<int>(0, (sum, v) => sum + v);
                               if (total <= 0) return const SizedBox.shrink();
-                              final zoneOrder = ['Z1','Z2','Z3','Z4','Z5'];
-                              final zoneMap = {for (final z in (localZones ?? [])) z.name: z};
+                              final zoneOrder = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
+                              final zoneMap = {
+                                for (final z in (localZones ?? [])) z.name: z
+                              };
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     'TIME IN ZONES',
                                     style: AppTextStyles.displaySmall.copyWith(
-                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.red : const Color(0xFF3E2723),
+                                      color: Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.red
+                                          : const Color(0xFF3E2723),
                                     ),
                                   ),
                                   const SizedBox(height: 10),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: zoneOrder.map((name) {
                                       final seconds = distribution[name] ?? 0;
                                       final pct = seconds / total;
-                                      final color = zoneMap[name]?.color ?? Colors.grey;
+                                      final color =
+                                          zoneMap[name]?.color ?? Colors.grey;
                                       return Expanded(
                                         child: Column(
                                           children: [
-                                            Container(height: 8, margin: const EdgeInsets.symmetric(horizontal: 3), decoration: BoxDecoration(color: color.withOpacity(0.8), borderRadius: BorderRadius.circular(4))),
+                                            Container(
+                                                height: 8,
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 3),
+                                                decoration: BoxDecoration(
+                                                    color:
+                                                        color.withOpacity(0.8),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            4))),
                                             const SizedBox(height: 4),
-                                            Text('${(pct*100).round()}%', style: AppTextStyles.bodySmall),
-                                            Text(name, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey)),
+                                            Text('${(pct * 100).round()}%',
+                                                style: AppTextStyles.bodySmall),
+                                            Text(name,
+                                                style: AppTextStyles.bodySmall
+                                                    .copyWith(
+                                                        color: Colors.grey)),
                                           ],
                                         ),
                                       );
@@ -1405,7 +1632,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                                   height: 22,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
                                   ),
                                 ),
                               ),
@@ -1428,7 +1656,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.comment, color: AppColors.secondary, size: 20),
+                          Icon(Icons.comment,
+                              color: AppColors.secondary, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Comments',
@@ -1456,11 +1685,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       ),
     );
   }
-  
+
   Widget _buildHeaderStat(
-    BuildContext context, 
-    IconData icon, 
-    String label, 
+    BuildContext context,
+    IconData icon,
+    String label,
     String value,
   ) {
     return Column(
@@ -1485,7 +1714,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       ],
     );
   }
-  
+
   Widget _buildDetailRow(
     BuildContext context,
     String label,
@@ -1511,8 +1740,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           Text(
             value,
             style: AppTextStyles.titleMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -1547,15 +1776,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       ),
     );
   }
-  
+
   // Build an individual stat item row inside a stat card
   Widget _buildStatItem(
-    BuildContext context,
-    String label,
-    String value,
-    IconData? icon, {
-    Color? iconColor
-  }) {
+      BuildContext context, String label, String value, IconData? icon,
+      {Color? iconColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -1563,7 +1788,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         children: [
           Row(
             children: [
-              if (icon != null) ...[  
+              if (icon != null) ...[
                 Icon(icon, size: 16, color: iconColor ?? Colors.grey[600]),
                 const SizedBox(width: 8),
               ],
@@ -1580,29 +1805,34 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       ),
     );
   }
-  
+
   void _shareSession(BuildContext context) async {
     AppLogger.info('Sharing session ${widget.session.id}');
-    
+
     try {
       // Get user preferences for metric/imperial and lady mode
       final authState = context.read<AuthBloc>().state;
-      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-      final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
-      
+      final bool preferMetric =
+          authState is Authenticated ? authState.user.preferMetric : true;
+      final bool isLadyMode = authState is Authenticated
+          ? authState.user.gender == 'female'
+          : false;
+
       // Get session photos for potential background and photo selection
       String? backgroundImageUrl;
       List<String> sessionPhotos = [];
       final activeSessionState = context.read<ActiveSessionBloc>().state;
-      
+
       // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
       List<RuckPhoto> availablePhotos = [];
-      if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+      if (activeSessionState is SessionPhotosLoadedForId &&
+          activeSessionState.photos.isNotEmpty) {
         availablePhotos = activeSessionState.photos;
-      } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+      } else if (activeSessionState is SessionSummaryGenerated &&
+          activeSessionState.photos.isNotEmpty) {
         availablePhotos = activeSessionState.photos;
       }
-      
+
       if (availablePhotos.isNotEmpty) {
         // Use the first photo as default background
         backgroundImageUrl = availablePhotos.first.url;
@@ -1613,10 +1843,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
             .cast<String>()
             .toList();
       }
-      
+
       // TODO: Get achievements from session data when achievement system is implemented
       final List<String> achievements = [];
-      
+
       // Navigate to share preview screen with photo options
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -1626,7 +1856,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
             backgroundImageUrl: backgroundImageUrl,
             achievements: achievements,
             isLadyMode: isLadyMode,
-            sessionPhotos: sessionPhotos, // Pass session photos for background selection
+            sessionPhotos:
+                sessionPhotos, // Pass session photos for background selection
           ),
         ),
       );
@@ -1641,29 +1872,34 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
     try {
       // Get user preferences for metric/imperial and lady mode
       final authState = context.read<AuthBloc>().state;
-      final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-      final bool isLadyMode = authState is Authenticated ? authState.user.gender == 'female' : false;
-      
+      final bool preferMetric =
+          authState is Authenticated ? authState.user.preferMetric : true;
+      final bool isLadyMode = authState is Authenticated
+          ? authState.user.gender == 'female'
+          : false;
+
       // Get session photos for potential background
       String? backgroundImageUrl;
       final activeSessionState = context.read<ActiveSessionBloc>().state;
-      
+
       // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
       List<RuckPhoto> availablePhotos = [];
-      if (activeSessionState is SessionPhotosLoadedForId && activeSessionState.photos.isNotEmpty) {
+      if (activeSessionState is SessionPhotosLoadedForId &&
+          activeSessionState.photos.isNotEmpty) {
         availablePhotos = activeSessionState.photos;
-      } else if (activeSessionState is SessionSummaryGenerated && activeSessionState.photos.isNotEmpty) {
+      } else if (activeSessionState is SessionSummaryGenerated &&
+          activeSessionState.photos.isNotEmpty) {
         availablePhotos = activeSessionState.photos;
       }
-      
+
       if (availablePhotos.isNotEmpty) {
         // Use the first photo as background
         backgroundImageUrl = availablePhotos.first.url;
       }
-      
+
       // TODO: Get achievements from session data when achievement system is implemented
       final List<String> achievements = [];
-      
+
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1681,7 +1917,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       // Use ShareService to create and share the session
       await ShareService.shareSession(
         context: context,
@@ -1691,10 +1927,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         achievements: achievements,
         isLadyMode: isLadyMode,
       );
-      
     } catch (e) {
       AppLogger.error('Failed to share session: $e', exception: e);
-      
+
       // Show error message
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1715,8 +1950,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         return AlertDialog(
           title: const Text('Delete Session?'),
           content: const Text(
-            'Are you sure you want to delete this session? This action cannot be undone and all session data will be permanently removed.'
-          ),
+              'Are you sure you want to delete this session? This action cannot be undone and all session data will be permanently removed.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(), // Cancel
@@ -1726,7 +1960,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
               onPressed: () {
                 // Close the dialog
                 Navigator.of(dialogContext).pop();
-                
+
                 // Execute the delete operation
                 _deleteSession();
               },
@@ -1755,42 +1989,47 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
 
     // Directly dispatch the delete event to the injected SessionBloc
     AppLogger.info('DEBUGGING: Deleting session ${widget.session.id}');
-    context.read<SessionBloc>().add(DeleteSessionEvent(sessionId: widget.session.id!));
+    context
+        .read<SessionBloc>()
+        .add(DeleteSessionEvent(sessionId: widget.session.id!));
   }
-
-
 
   /// Load full session data from API including heart rate samples
   Future<void> _loadFullSessionData() async {
     if (widget.session.id == null) return;
-    
+
     try {
-      AppLogger.debug('[SESSION DETAIL] Fetching full session data from API for session ${widget.session.id}');
-      
+      AppLogger.debug(
+          '[SESSION DETAIL] Fetching full session data from API for session ${widget.session.id}');
+
       // Get the session repository from SessionBloc
       final sessionRepository = context.read<SessionBloc>().sessionRepository;
-      
+
       // Determine if we should bypass cache (when passed session is a summary without samples/points)
-      final bool needsForceRefresh =
-          (widget.session.heartRateSamples == null || widget.session.heartRateSamples!.isEmpty) ||
-          (widget.session.locationPoints == null || widget.session.locationPoints!.isEmpty);
-      AppLogger.debug('[SESSION DETAIL] Force refresh needed: $needsForceRefresh');
+      final bool needsForceRefresh = (widget.session.heartRateSamples == null ||
+              widget.session.heartRateSamples!.isEmpty) ||
+          (widget.session.locationPoints == null ||
+              widget.session.locationPoints!.isEmpty);
+      AppLogger.debug(
+          '[SESSION DETAIL] Force refresh needed: $needsForceRefresh');
 
       // Fetch the complete session data
       final fullSession = await sessionRepository.fetchSessionById(
         widget.session.id!,
         forceRefresh: needsForceRefresh,
       );
-      
+
       if (fullSession != null) {
         // Store the complete session data in state
         setState(() {
           _fullSession = fullSession;
         });
-        
-        AppLogger.debug('[SESSION DETAIL] Successfully loaded full session data - HR samples: ${fullSession.heartRateSamples?.length ?? 0}');
+
+        AppLogger.debug(
+            '[SESSION DETAIL] Successfully loaded full session data - HR samples: ${fullSession.heartRateSamples?.length ?? 0}');
       } else {
-        AppLogger.warning('[SESSION DETAIL] Failed to fetch full session data - session not found');
+        AppLogger.warning(
+            '[SESSION DETAIL] Failed to fetch full session data - session not found');
       }
     } catch (e) {
       AppLogger.error('[SESSION DETAIL] Error loading full session data: $e');
@@ -1828,55 +2067,60 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       },
     );
   }
-  
+
   Future<void> _getImageFromGallery(BuildContext context) async {
     final ImagePicker imagePicker = ImagePicker();
-    
+
     try {
-      AppLogger.info('[PHOTO_UPLOAD] Attempting to pick multiple images from gallery');
-      
+      AppLogger.info(
+          '[PHOTO_UPLOAD] Attempting to pick multiple images from gallery');
+
       // Select multiple photos
       final List<XFile> pickedFiles = await imagePicker.pickMultiImage(
         // Don't set imageQuality for PNG files as it's not supported
         // and causes issues on iOS
         imageQuality: 80,
       );
-      
-      AppLogger.info('[PHOTO_UPLOAD] Picked ${pickedFiles.length} images from gallery');
-      
+
+      AppLogger.info(
+          '[PHOTO_UPLOAD] Picked ${pickedFiles.length} images from gallery');
+
       if (pickedFiles.isNotEmpty && widget.session.id != null) {
         // Convert XFiles to File objects and log their info
         final List<File> photos = [];
-        
+
         for (var xFile in pickedFiles) {
           final file = File(xFile.path);
           photos.add(file);
-          
+
           // Log each photo's details
-          AppLogger.info('[PHOTO_UPLOAD] Photo details: path=${xFile.path}, size=${await file.length()} bytes, name=${xFile.name}');
+          AppLogger.info(
+              '[PHOTO_UPLOAD] Photo details: path=${xFile.path}, size=${await file.length()} bytes, name=${xFile.name}');
         }
-        
+
         // Check if context is still mounted before showing snackbar
         if (context.mounted) {
           // Show a loading indicator
           StyledSnackBar.show(
             context: context,
-            message: 'Uploading ${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}...',
+            message:
+                'Uploading ${photos.length} ${photos.length == 1 ? 'photo' : 'photos'}...',
             duration: const Duration(seconds: 2),
           );
         }
-        
-        AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for ${photos.length} photos');
-        
+
+        AppLogger.info(
+            '[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for ${photos.length} photos');
+
         // Store these variables for use after async operations
         final String sessionId = widget.session.id!;
-        
+
         // Don't use the context here - get the bloc directly from GetIt
         // This avoids any issues with context being disposed
         try {
           // Get the bloc directly from the service locator
           final activeSessionBloc = context.read<ActiveSessionBloc>();
-          
+
           // Upload the photos
           activeSessionBloc.add(
             UploadSessionPhotosRequested(
@@ -1884,24 +2128,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
               photos: photos,
             ),
           );
-          
+
           // Start polling for photo updates
           if (mounted) {
             AppLogger.info('[PHOTO_UPLOAD] Starting polling for photo updates');
             _startPhotoRefreshPolling();
           }
-          
-          AppLogger.info('[PHOTO_UPLOAD] Successfully added upload event to bloc using GetIt');
+
+          AppLogger.info(
+              '[PHOTO_UPLOAD] Successfully added upload event to bloc using GetIt');
         } catch (e) {
           AppLogger.error('[PHOTO_UPLOAD] Error uploading photos: $e');
         }
       } else {
-        AppLogger.info('[PHOTO_UPLOAD] No photos selected or session ID is null: sessionId=${widget.session.id}');
+        AppLogger.info(
+            '[PHOTO_UPLOAD] No photos selected or session ID is null: sessionId=${widget.session.id}');
       }
     } catch (e, stackTrace) {
       AppLogger.error('[PHOTO_UPLOAD] Error selecting images: $e');
       AppLogger.error('[PHOTO_UPLOAD] Stack trace: $stackTrace');
-      
+
       if (!context.mounted) return;
       StyledSnackBar.showError(
         context: context,
@@ -1910,29 +2156,30 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
       );
     }
   }
-  
+
   Future<void> _getImageFromCamera(BuildContext context) async {
     final ImagePicker imagePicker = ImagePicker();
-    
+
     try {
       AppLogger.info('[PHOTO_UPLOAD] Attempting to take photo from camera');
-      
+
       final XFile? pickedFile = await imagePicker.pickImage(
         source: ImageSource.camera,
         // Don't set imageQuality for PNG files as it's not supported
         // and causes issues on iOS
         imageQuality: 80,
       );
-      
+
       AppLogger.info('[PHOTO_UPLOAD] Photo captured: ${pickedFile != null}');
-      
+
       if (pickedFile != null && widget.session.id != null) {
         // Convert XFile to File
         final File photo = File(pickedFile.path);
-        
+
         // Log photo details
-        AppLogger.info('[PHOTO_UPLOAD] Camera photo details: path=${pickedFile.path}, size=${await photo.length()} bytes, name=${pickedFile.name}');
-        
+        AppLogger.info(
+            '[PHOTO_UPLOAD] Camera photo details: path=${pickedFile.path}, size=${await photo.length()} bytes, name=${pickedFile.name}');
+
         // Check if context is still mounted before showing snackbar
         if (context.mounted) {
           // Show a loading indicator
@@ -1942,19 +2189,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
             duration: const Duration(seconds: 2),
           );
         }
-        
-        AppLogger.info('[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for camera photo');
-        
+
+        AppLogger.info(
+            '[PHOTO_UPLOAD] Adding UploadSessionPhotosRequested event for camera photo');
+
         // Store these variables for use after async operations
         final String sessionId = widget.session.id!;
         final File capturedPhoto = photo;
-        
+
         // Don't use the context here - get the bloc directly from GetIt
         // This avoids any issues with context being disposed
         try {
           // Get the bloc directly from the service locator
           final activeSessionBloc = context.read<ActiveSessionBloc>();
-          
+
           // Upload the photo
           activeSessionBloc.add(
             UploadSessionPhotosRequested(
@@ -1962,24 +2210,27 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
               photos: [capturedPhoto],
             ),
           );
-          
+
           // Start polling for photo updates
           if (mounted) {
-            AppLogger.info('[PHOTO_UPLOAD] Starting polling for photo updates after camera upload');
+            AppLogger.info(
+                '[PHOTO_UPLOAD] Starting polling for photo updates after camera upload');
             _startPhotoRefreshPolling();
           }
-          
-          AppLogger.info('[PHOTO_UPLOAD] Successfully added camera photo upload event using GetIt');
+
+          AppLogger.info(
+              '[PHOTO_UPLOAD] Successfully added camera photo upload event using GetIt');
         } catch (e) {
           AppLogger.error('[PHOTO_UPLOAD] Error uploading camera photo: $e');
         }
       } else {
-        AppLogger.info('[PHOTO_UPLOAD] No photo taken or session ID is null: sessionId=${widget.session.id}');
+        AppLogger.info(
+            '[PHOTO_UPLOAD] No photo taken or session ID is null: sessionId=${widget.session.id}');
       }
     } catch (e, stackTrace) {
       AppLogger.error('[PHOTO_UPLOAD] Error taking photo: $e');
       AppLogger.error('[PHOTO_UPLOAD] Stack trace: $stackTrace');
-      
+
       if (!context.mounted) return;
       StyledSnackBar.showError(
         context: context,
@@ -1992,25 +2243,26 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
   /// Navigate to session editing screen
   void _editSession(BuildContext context) async {
     try {
-      AppLogger.info('[SESSION_DETAIL] Opening session editing screen for session ${widget.session.id}');
-      
+      AppLogger.info(
+          '[SESSION_DETAIL] Opening session editing screen for session ${widget.session.id}');
+
       // Navigate to session editing screen
       final result = await Navigator.of(context).pushNamed(
         '/session_edit',
         arguments: widget.session,
       );
-      
+
       // If the session was edited, update the UI
       if (result is RuckSession) {
         AppLogger.info('[SESSION_DETAIL] Session was edited, updating UI');
-        
+
         // Show success message
         StyledSnackBar.showSuccess(
           context: context,
           message: 'Session updated successfully!',
           animationStyle: SnackBarAnimationStyle.slideUpBounce,
         );
-        
+
         // Update the session data in the current screen
         if (mounted) {
           // Force a full refresh by navigating back to the same route
@@ -2021,8 +2273,9 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> with TickerPr
         }
       }
     } catch (e) {
-      AppLogger.error('[SESSION_DETAIL] Error opening session editing screen', exception: e);
-      
+      AppLogger.error('[SESSION_DETAIL] Error opening session editing screen',
+          exception: e);
+
       if (mounted) {
         StyledSnackBar.showError(
           context: context,
@@ -2039,9 +2292,9 @@ class _SessionRouteMap extends StatelessWidget {
   static const double _defaultZoom = 16.0;
   static const double _singlePointZoom = 17.5;
   final RuckSession session;
-  
+
   const _SessionRouteMap({required this.session});
-  
+
   double? _parseCoord(dynamic v) {
     if (v == null) return null;
     if (v is num) return v.toDouble();
@@ -2051,24 +2304,34 @@ class _SessionRouteMap extends StatelessWidget {
 
   List<LatLng> _getRoutePoints() {
     print('[ROUTE_DEBUG] Session ${session.id} - Starting _getRoutePoints()');
-    print('[ROUTE_DEBUG] Session ${session.id} - locationPoints type: ${session.locationPoints.runtimeType}');
-    print('[ROUTE_DEBUG] Session ${session.id} - locationPoints length: ${session.locationPoints?.length ?? 0}');
-    print('[ROUTE_DEBUG] Session ${session.id} - locationPoints raw data: ${session.locationPoints}');
-    
+    print(
+        '[ROUTE_DEBUG] Session ${session.id} - locationPoints type: ${session.locationPoints.runtimeType}');
+    print(
+        '[ROUTE_DEBUG] Session ${session.id} - locationPoints length: ${session.locationPoints?.length ?? 0}');
+    print(
+        '[ROUTE_DEBUG] Session ${session.id} - locationPoints raw data: ${session.locationPoints}');
+
     if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
-      print('[ROUTE_DEBUG] Session ${session.id} - First point: ${session.locationPoints!.first}');
-      print('[ROUTE_DEBUG] Session ${session.id} - First point type: ${session.locationPoints!.first.runtimeType}');
-      print('[ROUTE_DEBUG] Session ${session.id} - Last point: ${session.locationPoints!.last}');
+      print(
+          '[ROUTE_DEBUG] Session ${session.id} - First point: ${session.locationPoints!.first}');
+      print(
+          '[ROUTE_DEBUG] Session ${session.id} - First point type: ${session.locationPoints!.first.runtimeType}');
+      print(
+          '[ROUTE_DEBUG] Session ${session.id} - Last point: ${session.locationPoints!.last}');
     }
 
     final result = parseRoutePoints(session.locationPoints);
-    print('[ROUTE_DEBUG] Session ${session.id} - parseRoutePoints returned ${result.length} points');
-    
+    print(
+        '[ROUTE_DEBUG] Session ${session.id} - parseRoutePoints returned ${result.length} points');
+
     if (result.isNotEmpty) {
-      print('[ROUTE_DEBUG] Session ${session.id} - First parsed point: ${result.first}');
-      print('[ROUTE_DEBUG] Session ${session.id} - Last parsed point: ${result.last}');
+      print(
+          '[ROUTE_DEBUG] Session ${session.id} - First parsed point: ${result.first}');
+      print(
+          '[ROUTE_DEBUG] Session ${session.id} - Last parsed point: ${result.last}');
     } else {
-      print('[ROUTE_DEBUG] Session ${session.id} - No points parsed! Raw data analysis:');
+      print(
+          '[ROUTE_DEBUG] Session ${session.id} - No points parsed! Raw data analysis:');
       if (session.locationPoints != null) {
         for (int i = 0; i < session.locationPoints!.length && i < 3; i++) {
           final point = session.locationPoints![i];
@@ -2079,7 +2342,7 @@ class _SessionRouteMap extends StatelessWidget {
         }
       }
     }
-    
+
     return result;
   }
 
@@ -2087,10 +2350,14 @@ class _SessionRouteMap extends StatelessWidget {
     if (points.isEmpty) return 16.0;
     if (points.length == 1) return 17.5;
 
-    double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-    double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-    double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-    double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+    double minLat =
+        points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    double maxLat =
+        points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    double minLng =
+        points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    double maxLng =
+        points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
 
     // Add 20% padding around bounds
     const paddingFactor = 1.20;
@@ -2102,7 +2369,7 @@ class _SessionRouteMap extends StatelessWidget {
     if (lngDiff == 0) lngDiff = 0.00001;
 
     // Use widget dimensions for calculation (approximate full-width map)
-    const double mapWidth = 375.0;  // Typical mobile width
+    const double mapWidth = 375.0; // Typical mobile width
     const double mapHeight = 175.0; // Height from widget
     const tileSize = 256.0;
     const ln2 = 0.6931471805599453;
@@ -2119,11 +2386,14 @@ class _SessionRouteMap extends StatelessWidget {
   Widget build(BuildContext context) {
     print('[ROUTE_DEBUG] Session ${session.id} - Building map widget');
     final points = _getRoutePoints();
-    print('[ROUTE_DEBUG] Session ${session.id} - Map will render with ${points.length} points');
+    print(
+        '[ROUTE_DEBUG] Session ${session.id} - Map will render with ${points.length} points');
     final center = points.isNotEmpty
         ? LatLng(
-            points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
-            points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
+            points.map((p) => p.latitude).reduce((a, b) => a + b) /
+                points.length,
+            points.map((p) => p.longitude).reduce((a, b) => a + b) /
+                points.length,
           )
         : LatLng(40.421, -3.678); // Default center
     final zoom = _calculateFitZoom(points);
@@ -2161,7 +2431,8 @@ class _SessionRouteMap extends StatelessWidget {
                   }
                 } catch (e) {
                   // Default to metric if can't get preference
-                  AppLogger.warning('[PRIVACY] Could not get user preference, defaulting to metric: $e');
+                  AppLogger.warning(
+                      '[PRIVACY] Could not get user preference, defaulting to metric: $e');
                 }
 
                 // Split route into privacy segments for visual indication

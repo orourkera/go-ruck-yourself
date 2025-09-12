@@ -34,22 +34,26 @@ class _PaywallScreenState extends State<PaywallScreen> {
     {
       'title': 'Track Your Rucks',
       'screenshot': 'assets/images/paywall/session tracking.PNG',
-      'valueProp': 'Detailed metrics including distance, pace, elevation gain, and METs based calories burned.',
+      'valueProp':
+          'Detailed metrics including distance, pace, elevation gain, and METs based calories burned.',
     },
     {
       'title': 'Apple Watch Ready',
       'screenshot': 'assets/images/paywall/watch screenshot.png',
-      'valueProp': 'Apple Watch integration tracks real time heartrate, stats and splits.',
+      'valueProp':
+          'Apple Watch integration tracks real time heartrate, stats and splits.',
     },
     {
       'title': 'Ruck Buddies',
       'screenshot': 'assets/images/paywall/ruck_buddies.png',
-      'valueProp': 'Like, comment, and connect with fellow ruckers around the world.',
+      'valueProp':
+          'Like, comment, and connect with fellow ruckers around the world.',
     },
     {
       'title': 'Health Integration',
       'screenshot': 'assets/images/paywall/apple health.png',
-      'valueProp': 'Sync with Apple Health/Google Fit to keep your fitness data consolidated.',
+      'valueProp':
+          'Sync with Apple Health/Google Fit to keep your fitness data consolidated.',
     },
   ];
 
@@ -68,13 +72,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
       } else {
         _currentPage = 0;
       }
-      
+
       _pageController.animateToPage(
         _currentPage,
         duration: const Duration(milliseconds: 800),
         curve: Curves.easeInOut,
       );
-    });  
+    });
   }
 
   @override
@@ -89,7 +93,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final data = MediaQuery.of(context);
     return data.size.shortestSide >= 600;
   }
-  
+
   // Get the appropriate container width based on device
   double _getContainerWidth(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -109,14 +113,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
     if (index == 2) return r'$29.99 / year';
     return ''; // Default empty string or handle error
   }
-  
+
   // New method to build the full-bleed carousel
   Widget _buildFullBleedCarousel(bool isTablet) {
     return Stack(
       children: [
         // Main PageView carousel
         Container(
-          height: isTablet ? 520 : 430, // Reduced height to eliminate extra space
+          height:
+              isTablet ? 520 : 430, // Reduced height to eliminate extra space
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: PageView.builder(
             controller: _pageController,
@@ -136,7 +141,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             },
           ),
         ),
-        
+
         // Page indicators positioned at the bottom of the carousel
         Positioned(
           bottom: 16,
@@ -153,8 +158,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _currentPage == index
-                    ? Colors.white  // White dot for active page
-                    : Colors.white.withOpacity(0.5), // Translucent white for inactive
+                      ? Colors.white // White dot for active page
+                      : Colors.white
+                          .withOpacity(0.5), // Translucent white for inactive
                   border: Border.all(
                     color: Colors.white,
                     width: 1,
@@ -172,7 +178,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Widget build(BuildContext context) {
     final isTablet = _isTablet(context);
     final containerWidth = _getContainerWidth(context);
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
           ? AppColors.backgroundDark
@@ -198,7 +204,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ],
               ),
             ),
-            
+
             // Rest of content (subscription plans, etc.)
             Expanded(
               child: ListView(
@@ -212,14 +218,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       width: containerWidth,
                       // Main content column
                       child: Column(
-                        mainAxisSize: MainAxisSize.min, // No intrinsic height issues
+                        mainAxisSize:
+                            MainAxisSize.min, // No intrinsic height issues
                         children: [
                           // No need for extra spacing as the carousel is now separate
-                          
+
                           // Big Orange "Continue for Free" Button
                           Container(
                             width: double.infinity,
-                            margin: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 16),
+                            margin: EdgeInsets.symmetric(
+                                horizontal: isTablet ? 24 : 16),
                             child: ElevatedButton(
                               onPressed: () async {
                                 // Mark paywall as seen so user doesn't see it again
@@ -255,7 +263,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                           ),
                           SizedBox(height: isTablet ? 32 : 24),
-                          
+
                           // Subscription Plans heading
                           Text(
                             'SUBSCRIPTION PLANS',
@@ -265,7 +273,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 15),
-                          
+
                           // Plan options
                           GestureDetector(
                             onTap: () {
@@ -273,7 +281,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 _selectedPlanIndex = 0;
                               });
                             },
-                            child: _buildPlanCard('Weekly', getPlanPrice(0), _selectedPlanIndex == 0),
+                            child: _buildPlanCard('Weekly', getPlanPrice(0),
+                                _selectedPlanIndex == 0),
                           ),
                           SizedBox(height: isTablet ? 12 : 8),
                           GestureDetector(
@@ -282,7 +291,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 _selectedPlanIndex = 1;
                               });
                             },
-                            child: _buildPlanCard('Monthly', getPlanPrice(1), _selectedPlanIndex == 1),
+                            child: _buildPlanCard('Monthly', getPlanPrice(1),
+                                _selectedPlanIndex == 1),
                           ),
                           SizedBox(height: isTablet ? 12 : 8),
                           GestureDetector(
@@ -291,19 +301,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 _selectedPlanIndex = 2;
                               });
                             },
-                            child: _buildPlanCard('Annual', getPlanPrice(2), _selectedPlanIndex == 2),
+                            child: _buildPlanCard('Annual', getPlanPrice(2),
+                                _selectedPlanIndex == 2),
                           ),
-                          
+
                           // CTA button
                           SizedBox(height: isTablet ? 30 : 25),
                           SizedBox(
-                            width: isTablet ? containerWidth * 0.8 : double.infinity,
+                            width: isTablet
+                                ? containerWidth * 0.8
+                                : double.infinity,
                             child: ElevatedButton(
                               onPressed: () async {
                                 await _handleGetRuckyPressed(context);
                               },
                               style: ElevatedButton.styleFrom(
-                                minimumSize: Size(double.infinity, isTablet ? 60 : 50),
+                                minimumSize:
+                                    Size(double.infinity, isTablet ? 60 : 50),
                                 backgroundColor: AppColors.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -320,7 +334,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               ),
                             ),
                           ),
-                          
+
                           // Info text below CTA button
                           SizedBox(height: isTablet ? 16 : 12),
                           Text(
@@ -330,9 +344,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                             textAlign: TextAlign.center,
                           ),
- 
-                           // Legal text and links
-                           SizedBox(height: isTablet ? 20 : 15),
+
+                          // Legal text and links
+                          SizedBox(height: isTablet ? 20 : 15),
                           Text(
                             'Ruck! Premium\nAuto-renewing subscription',
                             style: AppTextStyles.bodySmall.copyWith(
@@ -355,9 +369,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             children: [
                               GestureDetector(
                                 onTap: () async {
-                                  final uri = Uri.parse('https://getrucky.com/privacy');
-                                  if (await canLaunchUrl(uri)) { 
-                                    await launchUrl(uri); 
+                                  final uri =
+                                      Uri.parse('https://getrucky.com/privacy');
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
                                   }
                                 },
                                 child: Text(
@@ -371,9 +386,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               SizedBox(width: isTablet ? 20 : 12),
                               GestureDetector(
                                 onTap: () async {
-                                  final uri = Uri.parse('https://getrucky.com/terms');
-                                  if (await canLaunchUrl(uri)) { 
-                                    await launchUrl(uri); 
+                                  final uri =
+                                      Uri.parse('https://getrucky.com/terms');
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
                                   }
                                 },
                                 child: Text(
@@ -386,7 +402,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               ),
                             ],
                           ),
-                          
+
                           // Extra bottom padding for safety
                           SizedBox(height: isTablet ? 60 : 45),
                         ],
@@ -407,25 +423,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
     try {
       final revenueCatService = GetIt.instance<RevenueCatService>();
       print('[Paywall] RevenueCatService obtained');
-      
+
       final offerings = await revenueCatService.getOfferings();
       print('[Paywall] Offerings received: ${offerings.length} offerings');
-      
+
       if (offerings.isNotEmpty) {
         final package = offerings.first.availablePackages.first;
         print('[Paywall] Making purchase for package: ${package.identifier}');
-        
+
         final isPurchased = await revenueCatService.makePurchase(package);
         print('[Paywall] Purchase result: $isPurchased');
-        
+
         if (isPurchased) {
           // Mark paywall as seen since user successfully purchased
           await FirstLaunchService.markPaywallSeen();
-          
+
           print('[Paywall] Purchase successful, navigating to next screen');
           final authBloc = BlocProvider.of<AuthBloc>(context);
           final authState = authBloc.state;
-          
+
           if (authState is Authenticated) {
             if (Platform.isIOS) {
               // Navigate to Apple Health integration screen on iOS
@@ -487,7 +503,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
     bool isTablet = false,
   }) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 30), // More horizontal padding
+      padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 40 : 30), // More horizontal padding
       // Use padding only at the top to eliminate space at the bottom
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start, // Move content up
@@ -496,31 +513,41 @@ class _PaywallScreenState extends State<PaywallScreen> {
         children: [
           // Reduced top padding to move content up
           SizedBox(height: isTablet ? 10 : 5),
-          
+
           // Title still centered
           Center(
             child: Text(
               title,
               style: TextStyle(
-                fontFamily: 'Bangers', 
+                fontFamily: 'Bangers',
                 fontSize: isTablet ? 42 : 32,
                 color: AppColors.secondary, // Orange color
                 letterSpacing: 1.2,
                 shadows: [
                   // White outline effect
-                  Shadow(color: Colors.white, offset: Offset(-1, -1), blurRadius: 1),
-                  Shadow(color: Colors.white, offset: Offset(1, -1), blurRadius: 1),
-                  Shadow(color: Colors.white, offset: Offset(-1, 1), blurRadius: 1),
-                  Shadow(color: Colors.white, offset: Offset(1, 1), blurRadius: 1),
+                  Shadow(
+                      color: Colors.white,
+                      offset: Offset(-1, -1),
+                      blurRadius: 1),
+                  Shadow(
+                      color: Colors.white,
+                      offset: Offset(1, -1),
+                      blurRadius: 1),
+                  Shadow(
+                      color: Colors.white,
+                      offset: Offset(-1, 1),
+                      blurRadius: 1),
+                  Shadow(
+                      color: Colors.white, offset: Offset(1, 1), blurRadius: 1),
                 ],
               ),
               textAlign: TextAlign.center,
             ),
           ),
-          
+
           // Reduced spacing to move content up
           SizedBox(height: isTablet ? 20 : 15),
-          
+
           // App Screenshot with no background or container effects - larger size
           Image.asset(
             screenshot,
@@ -530,14 +557,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
             errorBuilder: (context, error, stackTrace) {
               return SizedBox(
                 height: isTablet ? 300 : 220, // Match increased height
-                child: Icon(Icons.image_not_supported, size: 40, color: Colors.white.withOpacity(0.8)),
+                child: Icon(Icons.image_not_supported,
+                    size: 40, color: Colors.white.withOpacity(0.8)),
               );
             },
           ),
-          
+
           // Increased spacing between image and text
           SizedBox(height: isTablet ? 30 : 24),
-          
+
           // Value Proposition Text - now left-aligned with tightened spacing
           Text(
             valueProp,
@@ -556,7 +584,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Widget _buildPlanCard(String planName, String price, bool isSelected) {
     final isTablet = _isTablet(context);
-    
+
     // Determine free trial period based on plan name
     String trialPeriod = '';
     if (planName == 'Weekly') {
@@ -566,22 +594,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
     } else if (planName == 'Annual') {
       trialPeriod = '1 month free trial!';
     }
-    
+
     return Card(
       elevation: isSelected ? 6 : 2,
       color: isSelected ? AppColors.secondary : null,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isTablet ? 12 : 10)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isTablet ? 12 : 10)),
       child: Padding(
-        padding: EdgeInsets.all(isSelected ? (isTablet ? 20.0 : 16.0) : (isTablet ? 16.0 : 12.0)),
+        padding: EdgeInsets.all(
+            isSelected ? (isTablet ? 20.0 : 16.0) : (isTablet ? 16.0 : 12.0)),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               planName,
               style: TextStyle(
-                fontSize: isSelected 
-                  ? (isTablet ? 22 : 18) 
-                  : (isTablet ? 20 : 16), 
+                fontSize:
+                    isSelected ? (isTablet ? 22 : 18) : (isTablet ? 20 : 16),
                 fontWeight: FontWeight.bold,
                 color: isSelected ? Colors.white : null,
                 fontFamily: isSelected ? 'Bangers' : null,
@@ -594,9 +623,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 Text(
                   price,
                   style: TextStyle(
-                    fontSize: isSelected 
-                      ? (isTablet ? 22 : 18) 
-                      : (isTablet ? 20 : 16), 
+                    fontSize: isSelected
+                        ? (isTablet ? 22 : 18)
+                        : (isTablet ? 20 : 16),
                     fontWeight: FontWeight.w500,
                     color: isSelected ? Colors.white : null,
                     fontFamily: isSelected ? 'Bangers' : null,
@@ -607,13 +636,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 Text(
                   trialPeriod,
                   style: TextStyle(
-                    fontSize: isSelected 
-                      ? (isTablet ? 14 : 12) 
-                      : (isTablet ? 13 : 11),
+                    fontSize: isSelected
+                        ? (isTablet ? 14 : 12)
+                        : (isTablet ? 13 : 11),
                     fontWeight: FontWeight.w500,
-                    color: isSelected 
-                      ? Colors.white 
-                      : AppColors.primary, // Use app's green color
+                    color: isSelected
+                        ? Colors.white
+                        : AppColors.primary, // Use app's green color
                     fontStyle: FontStyle.italic,
                     inherit: false, // Fix TextStyle interpolation issue
                   ),

@@ -52,7 +52,7 @@ class WeatherCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Content
             if (isLoading && weather == null)
               _buildLoadingContent()
@@ -131,19 +131,19 @@ class WeatherCard extends StatelessWidget {
 
   Widget _buildWeatherContent() {
     final current = weather!.currentWeather!;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Current conditions
         _buildCurrentWeather(current),
-        
+
         // Hourly forecast if available
         if (weather!.hourlyForecast?.isNotEmpty == true) ...[
           const SizedBox(height: 20),
           _buildHourlyForecast(),
         ],
-        
+
         // Daily forecast if available
         if (weather!.dailyForecast?.isNotEmpty == true) ...[
           const SizedBox(height: 20),
@@ -157,7 +157,7 @@ class WeatherCard extends StatelessWidget {
     final conditionCode = current.conditionCode ?? 800;
     final temperature = current.temperature?.round() ?? 0;
     final feelsLike = current.temperatureApparent?.round() ?? 0;
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -204,7 +204,7 @@ class WeatherCard extends StatelessWidget {
             ],
           ),
         ),
-        
+
         // Weather details
         Expanded(
           flex: 3,
@@ -279,8 +279,9 @@ class WeatherCard extends StatelessWidget {
   }
 
   Widget _buildHourlyForecast() {
-    final hourly = weather!.hourlyForecast!.take(8).toList(); // Show next 8 hours
-    
+    final hourly =
+        weather!.hourlyForecast!.take(8).toList(); // Show next 8 hours
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -301,16 +302,14 @@ class WeatherCard extends StatelessWidget {
               final time = forecast.forecastStart;
               final temp = forecast.temperature?.round() ?? 0;
               final condition = forecast.conditionCode ?? 800;
-              
+
               return Container(
                 width: 60,
                 margin: const EdgeInsets.only(right: 12),
                 child: Column(
                   children: [
                     Text(
-                      time != null 
-                          ? '${time.hour}:00'
-                          : '--',
+                      time != null ? '${time.hour}:00' : '--',
                       style: AppTextStyles.bodySmall,
                     ),
                     const SizedBox(height: 4),
@@ -337,7 +336,7 @@ class WeatherCard extends StatelessWidget {
 
   Widget _buildDailyForecast() {
     final daily = weather!.dailyForecast!.take(5).toList(); // Show next 5 days
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -353,7 +352,7 @@ class WeatherCard extends StatelessWidget {
           final high = forecast.temperatureMax?.round() ?? 0;
           final low = forecast.temperatureMin?.round() ?? 0;
           final condition = forecast.conditionCode ?? 800;
-          
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
@@ -361,9 +360,7 @@ class WeatherCard extends StatelessWidget {
                 SizedBox(
                   width: 60,
                   child: Text(
-                    date != null 
-                        ? _getDayName(date)
-                        : '--',
+                    date != null ? _getDayName(date) : '--',
                     style: AppTextStyles.bodyMedium,
                   ),
                 ),
@@ -397,12 +394,12 @@ class WeatherCard extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final targetDay = DateTime(date.year, date.month, date.day);
-    
+
     final difference = targetDay.difference(today).inDays;
-    
+
     if (difference == 0) return 'Today';
     if (difference == 1) return 'Tomorrow';
-    
+
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return days[date.weekday - 1];
   }

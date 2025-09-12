@@ -35,11 +35,11 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
   int _consecutiveErrors = 0;
   bool _useOfflineMode = false;
   DateTime? _lastErrorTime;
-  
+
   // Error threshold before switching to offline mode
   static const int _maxConsecutiveErrors = 3;
   static const Duration _errorCooldown = Duration(minutes: 2);
-  
+
   @override
   Widget build(BuildContext context) {
     try {
@@ -49,7 +49,7 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
         retinaMode: widget.retinaMode,
         maxNativeZoom: 18,
         maxZoom: 20,
-        
+
         // Custom tile builder with error handling
         tileBuilder: (context, tileWidget, tile) {
           try {
@@ -68,20 +68,21 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
             );
           }
         },
-        
+
         // Enhanced error handling
         errorTileCallback: (tile, error, stackTrace) {
           _handleTileError(tile.coordinates, error, stackTrace);
         },
-        
+
         // Additional settings for stability with enhanced error handling
-        tileProvider: _useOfflineMode 
+        tileProvider: _useOfflineMode
             ? _createOfflineTileProvider()
             : _createResilientTileProvider(),
       );
     } catch (e, stackTrace) {
       // If entire tile layer fails, show a fallback
-      AppLogger.error('RobustTileLayer build failed: $e', exception: e, stackTrace: stackTrace);
+      AppLogger.error('RobustTileLayer build failed: $e',
+          exception: e, stackTrace: stackTrace);
       return Container(
         color: Colors.grey[300],
         child: const Center(
@@ -90,34 +91,36 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
       );
     }
   }
-  
+
   String _getTileUrlTemplate() {
     final apiKey = dotenv.env['STADIA_MAPS_API_KEY'];
     final style = widget.style ?? 'stamen_terrain';
-    
+
     if (_useOfflineMode) {
       // Use a simpler tile provider as fallback
       return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     }
-    
+
     return 'https://tiles.stadiamaps.com/tiles/$style/{z}/{x}/{y}{r}.png?api_key=$apiKey';
   }
-  
-  void _handleTileError(TileCoordinates tile, Object error, StackTrace? stackTrace) {
+
+  void _handleTileError(
+      TileCoordinates tile, Object error, StackTrace? stackTrace) {
     _consecutiveErrors++;
     _lastErrorTime = DateTime.now();
-    
+
     AppLogger.warning(
       'Map tile loading error (${_consecutiveErrors}/$_maxConsecutiveErrors): $error',
     );
-    
+
     // Switch to offline mode if too many consecutive errors
     if (_consecutiveErrors >= _maxConsecutiveErrors && !_useOfflineMode) {
-      AppLogger.info('Switching to offline tile mode due to consecutive errors');
+      AppLogger.info(
+          'Switching to offline tile mode due to consecutive errors');
       setState(() {
         _useOfflineMode = true;
       });
-      
+
       // Try to recover after cooldown period
       Future.delayed(_errorCooldown, () {
         if (mounted) {
@@ -129,17 +132,17 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
         }
       });
     }
-    
+
     widget.onTileError?.call();
   }
-  
+
   TileProvider _createOfflineTileProvider() {
     return NetworkTileProvider(
       // Use a more reliable tile provider with better error handling
       httpClient: http.Client(),
     );
   }
-  
+
   /// Creates a resilient tile provider with enhanced error handling
   TileProvider _createResilientTileProvider() {
     return NetworkTileProvider(
@@ -147,19 +150,20 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
       httpClient: _createResilientHttpClient(),
     );
   }
-  
+
   /// Creates HTTP client with better error handling for tile requests
   http.Client _createResilientHttpClient() {
     final baseClient = http.Client();
-    
+
     return RetryClient(
       baseClient,
       retries: 3,
-      when: (response) => response.statusCode >= 500 || response.statusCode == 429,
+      when: (response) =>
+          response.statusCode >= 500 || response.statusCode == 429,
       whenError: (error, stackTrace) {
-                 // Log error but don't crash - handle connection drops gracefully
-         AppLogger.warning('Tile request error (will retry): $error');
-        
+        // Log error but don't crash - handle connection drops gracefully
+        AppLogger.warning('Tile request error (will retry): $error');
+
         // Handle specific connection errors
         if (error.toString().contains('Connection closed') ||
             error.toString().contains('ClientException') ||
@@ -168,18 +172,18 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
             error.toString().contains('HttpException')) {
           return true; // Retry these network errors
         }
-        
+
         return true; // Retry all errors for now
       },
       delay: (retryCount) => Duration(milliseconds: 300 * retryCount),
     );
   }
-  
+
   /// Enhanced tile loading with comprehensive error catching
   Future<Uint8List?> _loadTileWithErrorHandling(String url) async {
     try {
       final client = http.Client();
-      
+
       final response = await client.get(
         Uri.parse(url),
         headers: {
@@ -187,22 +191,23 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
           'Accept': 'image/png,image/jpeg,image/*,*/*',
         },
       ).timeout(
-        const Duration(seconds: 15), // Increased from 10s for better tile loading
+        const Duration(
+            seconds: 15), // Increased from 10s for better tile loading
         onTimeout: () {
           client.close();
-          throw TimeoutException('Tile request timeout', const Duration(seconds: 15));
+          throw TimeoutException(
+              'Tile request timeout', const Duration(seconds: 15));
         },
       );
-      
+
       client.close();
-      
+
       if (response.statusCode == 200) {
         return response.bodyBytes;
       } else {
         AppLogger.warning('Tile HTTP error: ${response.statusCode} for $url');
         return null;
       }
-      
     } catch (e) {
       // Catch all network errors to prevent crashes
       AppLogger.warning('Tile loading error (handled): $e');
@@ -237,9 +242,10 @@ class SafeTileLayer extends StatelessWidget {
 
       final apiKey = dotenv.env['STADIA_MAPS_API_KEY'];
       final style = this.style ?? 'stamen_terrain';
-      
+
       return TileLayer(
-        urlTemplate: 'https://tiles.stadiamaps.com/tiles/$style/{z}/{x}/{y}{r}.png?api_key=$apiKey',
+        urlTemplate:
+            'https://tiles.stadiamaps.com/tiles/$style/{z}/{x}/{y}{r}.png?api_key=$apiKey',
         userAgentPackageName: 'com.ruckingapp',
         retinaMode: retinaMode,
         maxNativeZoom: 18,
@@ -274,7 +280,7 @@ class SafeTileLayer extends StatelessWidget {
         exception: e,
         stackTrace: stackTrace,
       );
-      
+
       return _buildFallbackTileLayer();
     }
   }
@@ -318,22 +324,25 @@ class _UltraResilientTileProvider extends TileProvider {
 }
 
 /// Ultra-resilient image provider that never crashes on network errors
-class _UltraResilientImageProvider extends ImageProvider<_UltraResilientImageProvider> {
+class _UltraResilientImageProvider
+    extends ImageProvider<_UltraResilientImageProvider> {
   final String url;
   final TileCoordinates coordinates;
-  
+
   const _UltraResilientImageProvider({
     required this.url,
     required this.coordinates,
   });
 
   @override
-  Future<_UltraResilientImageProvider> obtainKey(ImageConfiguration configuration) {
+  Future<_UltraResilientImageProvider> obtainKey(
+      ImageConfiguration configuration) {
     return SynchronousFuture<_UltraResilientImageProvider>(this);
   }
 
   @override
-  ImageStreamCompleter loadImage(_UltraResilientImageProvider key, ImageDecoderCallback decode) {
+  ImageStreamCompleter loadImage(
+      _UltraResilientImageProvider key, ImageDecoderCallback decode) {
     return _UltraResilientImageStreamCompleter(
       url: key.url,
       coordinates: key.coordinates,
@@ -370,28 +379,30 @@ class _UltraResilientImageStreamCompleter extends ImageStreamCompleter {
   void _loadImageSafely() async {
     try {
       // Set a hard timeout to prevent hanging
-      _timeoutTimer = Timer(const Duration(seconds: 15), () { // Increased from 10s for better reliability
+      _timeoutTimer = Timer(const Duration(seconds: 15), () {
+        // Increased from 10s for better reliability
         if (!_completed) {
           _completed = true;
-          AppLogger.debug('Tile load timeout for ${coordinates.z}/${coordinates.x}/${coordinates.y}');
+          AppLogger.debug(
+              'Tile load timeout for ${coordinates.z}/${coordinates.x}/${coordinates.y}');
           _completeWithError('Tile load timeout');
         }
       });
 
       // Try to load the image with aggressive timeout
       final httpClient = http.Client();
-      final response = await httpClient.get(Uri.parse(url))
-          .timeout(
-            const Duration(seconds: 8),
-            onTimeout: () {
-              throw TimeoutException('Tile request timeout', const Duration(seconds: 8));
-            },
-          );
-      
+      final response = await httpClient.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          throw TimeoutException(
+              'Tile request timeout', const Duration(seconds: 8));
+        },
+      );
+
       httpClient.close();
-      
+
       if (_completed) return; // Already timed out
-      
+
       if (response.statusCode != 200) {
         throw HttpException('HTTP ${response.statusCode}');
       }
@@ -399,18 +410,18 @@ class _UltraResilientImageStreamCompleter extends ImageStreamCompleter {
       final buffer = await ImmutableBuffer.fromUint8List(response.bodyBytes);
       final codec = await decode(buffer);
       final frame = await codec.getNextFrame();
-      
+
       if (!_completed) {
         _completed = true;
         _timeoutTimer?.cancel();
         setImage(ImageInfo(image: frame.image));
       }
-      
     } catch (e) {
       if (!_completed) {
         _completed = true;
         _timeoutTimer?.cancel();
-        AppLogger.debug('Tile load failed gracefully: ${e.runtimeType} for ${coordinates.z}/${coordinates.x}/${coordinates.y}');
+        AppLogger.debug(
+            'Tile load failed gracefully: ${e.runtimeType} for ${coordinates.z}/${coordinates.x}/${coordinates.y}');
         _completeWithError(e.toString());
       }
     }
@@ -426,7 +437,7 @@ class _UltraResilientImageStreamCompleter extends ImageStreamCompleter {
       final paint = Paint()..color = Colors.transparent;
       canvas.drawRect(const Rect.fromLTWH(0, 0, 256, 256), paint);
       final picture = recorder.endRecording();
-      
+
       picture.toImage(256, 256).then((image) {
         if (!_completed) {
           setImage(ImageInfo(image: image));

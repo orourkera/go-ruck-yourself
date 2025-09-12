@@ -35,7 +35,8 @@ class UserDuelStatsLoaded extends DuelStatsState {
       userStats: userStats ?? this.userStats,
       isLeaderboardLoading: isLeaderboardLoading ?? this.isLeaderboardLoading,
       leaderboard: leaderboard ?? this.leaderboard,
-      currentLeaderboardType: currentLeaderboardType ?? this.currentLeaderboardType,
+      currentLeaderboardType:
+          currentLeaderboardType ?? this.currentLeaderboardType,
     );
   }
 

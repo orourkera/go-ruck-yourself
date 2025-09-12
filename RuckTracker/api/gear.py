@@ -53,6 +53,112 @@ def search_gear():
     return jsonify({'items': list(rows)}), 200
 
 
+@gear_bp.route('/gear/items', methods=['GET'])
+def list_gear_items():
+    if not _gear_enabled():
+        return jsonify({'error': 'gear_disabled'}), 404
+    """List curated gear item summaries from view_gear_item_summary.
+
+    Query params: q, category, brand, sort, limit, offset
+    """
+    q = (request.args.get('q') or '').strip()
+    category = (request.args.get('category') or '').strip()
+    brand = (request.args.get('brand') or '').strip()
+    sort = (request.args.get('sort') or 'new').lower()
+    limit = min(int(request.args.get('limit', 20)), 50)
+    offset = int(request.args.get('offset', 0))
+
+    clauses = []
+    params = {'limit': limit, 'offset': offset}
+    if q:
+        clauses.append("(name ilike :q or coalesce(brand,'') ilike :q or coalesce(model,'') ilike :q)")
+        params['q'] = f"%{q}%"
+    if category:
+        clauses.append("category_slug = :cat")
+        params['cat'] = category
+    if brand:
+        clauses.append("brand ilike :brand")
+        params['brand'] = f"%{brand}%"
+
+    where = (" where " + " and ".join(clauses)) if clauses else ""
+    order_by = {
+        'price_low': 'price_min_minor asc nulls last',
+        'price_high': 'price_max_minor desc nulls last',
+        'rating': 'price_min_minor asc nulls last',  # placeholder without ratings agg
+        'new': 'gear_item_id desc',
+        'popularity': 'price_min_minor asc nulls last',  # placeholder
+    }.get(sort, 'gear_item_id desc')
+
+    sql = text(
+        f"""
+        select gear_item_id as id, name, brand, model, default_image_url, category_slug,
+               price_min_minor, price_avg_minor, price_max_minor
+        from view_gear_item_summary
+        {where}
+        order by {order_by}
+        limit :limit offset :offset
+        """
+    )
+    rows = db.session.execute(sql, params).mappings().all()
+    return jsonify({'items': list(rows)}), 200
+
+
+@gear_bp.route('/gear/items/<string:item_id>', methods=['GET'])
+def get_gear_item(item_id: str):
+    if not _gear_enabled():
+        return jsonify({'error': 'gear_disabled'}), 404
+
+    # Fetch main item
+    item = db.session.execute(text(
+        """
+        select gi.id, gi.name, gi.brand, gi.model, gi.description, gi.default_image_url,
+               gc.slug as category_slug
+        from gear_items gi
+        left join gear_categories gc on gi.category_id = gc.id
+        where gi.id = :id and gi.is_active = true
+        """
+    ), {'id': item_id}).mappings().first()
+    if not item:
+        return jsonify({'error': 'not_found'}), 404
+
+    # Images
+    images = db.session.execute(text(
+        "select image_url, sort_order from gear_images where gear_item_id = :id order by sort_order nulls last, created_at asc"
+    ), {'id': item_id}).mappings().all()
+
+    # Active SKUs with latest/effective prices and discount metadata
+    skus = db.session.execute(text(
+        """
+        select s.id as sku_id, s.retailer, s.sku, s.url,
+               e.base_minor, e.effective_minor, e.discount_id,
+               d.name as discount_name, d.percent as discount_percent,
+               d.fixed_minor as discount_fixed_minor, d.coupon_code,
+               r.referral_code
+        from gear_skus s
+        left join view_gear_effective_latest_prices e on e.sku_id = s.id
+        left join gear_discounts d on d.id = e.discount_id
+        left join gear_referrals r on r.sku_id = s.id and r.is_active = true
+        where s.gear_item_id = :id and s.is_active = true
+        order by s.created_at asc
+        """
+    ), {'id': item_id}).mappings().all()
+
+    # Comment summary
+    agg = db.session.execute(text(
+        "select avg(rating)::numeric(3,2) as avg_rating, count(*) as comment_count from gear_comments where gear_item_id = :id and rating is not null"
+    ), {'id': item_id}).mappings().first()
+
+    return jsonify({
+        'item': dict(item),
+        'images': list(images),
+        'skus': list(skus),
+        'rating': {
+            'avg': agg['avg_rating'] if agg and agg['avg_rating'] is not None else None,
+            'count': agg['comment_count'] if agg else 0,
+        }
+    }), 200
+
+
 @gear_bp.route('/gear/claim', methods=['POST'])
 def claim_gear():
     if not _gear_enabled():

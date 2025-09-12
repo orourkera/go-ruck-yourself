@@ -41,7 +41,7 @@ class _ErrorBoundaryWidgetState extends State<ErrorBoundaryWidget> {
         'ErrorBoundaryWidget caught an error: ${errorDetails.exception}',
         stackTrace: errorDetails.stack,
       );
-      
+
       // Update state to show the error UI
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -51,7 +51,7 @@ class _ErrorBoundaryWidgetState extends State<ErrorBoundaryWidget> {
           });
         }
       });
-      
+
       // Return an empty container as a placeholder until the setState takes effect
       return Container();
     };

@@ -28,7 +28,15 @@ class LoadEvents extends EventsEvent {
   });
 
   @override
-  List<Object?> get props => [search, clubId, status, includeParticipating, startDate, endDate, sortByDistance];
+  List<Object?> get props => [
+        search,
+        clubId,
+        status,
+        includeParticipating,
+        startDate,
+        endDate,
+        sortByDistance
+      ];
 }
 
 class RefreshEvents extends EventsEvent {}

@@ -109,7 +109,6 @@ class StatusFilterChips extends StatelessWidget {
         return 'Completed';
       case PlannedRuckStatus.cancelled:
         return 'Cancelled';
-
     }
   }
 
@@ -124,7 +123,6 @@ class StatusFilterChips extends StatelessWidget {
         return AppColors.success;
       case PlannedRuckStatus.cancelled:
         return AppColors.textDarkSecondary;
-
     }
   }
 
@@ -139,7 +137,6 @@ class StatusFilterChips extends StatelessWidget {
         return Icons.check_circle;
       case PlannedRuckStatus.cancelled:
         return Icons.cancel;
-
     }
   }
 }
@@ -162,7 +159,8 @@ class AdvancedStatusFilterChips extends StatefulWidget {
   });
 
   @override
-  State<AdvancedStatusFilterChips> createState() => _AdvancedStatusFilterChipsState();
+  State<AdvancedStatusFilterChips> createState() =>
+      _AdvancedStatusFilterChipsState();
 }
 
 class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
@@ -256,9 +254,10 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
     );
   }
 
-  Widget _buildDateTimeRangeChip(String label, DateTimeRange? range, {bool isCustom = false}) {
+  Widget _buildDateTimeRangeChip(String label, DateTimeRange? range,
+      {bool isCustom = false}) {
     final isSelected = widget.selectedDateTimeRange == range;
-    
+
     return GestureDetector(
       onTap: () {
         if (isCustom) {
@@ -310,7 +309,8 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
   }
 
   bool _hasActiveFilters() {
-    return widget.selectedStatus != null || widget.selectedDateTimeRange != null;
+    return widget.selectedStatus != null ||
+        widget.selectedDateTimeRange != null;
   }
 
   void _clearAllFilters() {
@@ -328,8 +328,8 @@ class _AdvancedStatusFilterChipsState extends State<AdvancedStatusFilterChips> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: AppColors.primary,
-            ),
+                  primary: AppColors.primary,
+                ),
           ),
           child: child!,
         );

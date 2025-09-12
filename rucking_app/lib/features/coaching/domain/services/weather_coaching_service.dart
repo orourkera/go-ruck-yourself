@@ -41,30 +41,32 @@ class WeatherCondition {
     if (temperature < -10 || temperature > 40) return false; // Too cold/hot
     if (precipitationChance > 80) return false; // Too much rain
     if (windSpeed > 50) return false; // Too windy
-    
+
     return true;
   }
 
   /// Get weather severity level
   WeatherSeverity get severity {
     if (!isRuckFriendly) return WeatherSeverity.extreme;
-    
+
     // High: challenging but manageable
-    if (temperature < 0 || temperature > 35 || 
-        precipitationChance > 60 || 
+    if (temperature < 0 ||
+        temperature > 35 ||
+        precipitationChance > 60 ||
         windSpeed > 30 ||
         uvIndex > 8) {
       return WeatherSeverity.challenging;
     }
-    
+
     // Ideal: perfect conditions
-    if (temperature >= 15 && temperature <= 25 && 
-        precipitationChance < 20 && 
+    if (temperature >= 15 &&
+        temperature <= 25 &&
+        precipitationChance < 20 &&
         windSpeed < 15 &&
         uvIndex < 6) {
       return WeatherSeverity.ideal;
     }
-    
+
     // Moderate: good enough
     return WeatherSeverity.moderate;
   }
@@ -105,7 +107,7 @@ class WeatherCoachingService {
         if (latitude != null) 'lat': latitude,
         if (longitude != null) 'lon': longitude,
       });
-      
+
       return WeatherCondition.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
       AppLogger.error('Error fetching weather data: $e');
@@ -125,10 +127,11 @@ class WeatherCoachingService {
         if (longitude != null) 'lon': longitude,
         'days': days,
       });
-      
+
       final forecastData = response.data['forecast'] as List<dynamic>? ?? [];
       return forecastData
-          .map((data) => WeatherCondition.fromJson(data as Map<String, dynamic>))
+          .map(
+              (data) => WeatherCondition.fromJson(data as Map<String, dynamic>))
           .toList();
     } catch (e) {
       AppLogger.error('Error fetching weather forecast: $e');
@@ -181,17 +184,22 @@ class WeatherCoachingService {
   ) {
     final suggestions = _getModerateWeatherSuggestions(tone);
     final tips = <String>[];
-    
+
     if (weather.temperature > 25) {
-      tips.addAll(['Bring extra water', 'Start early to avoid heat', 'Take shade breaks']);
+      tips.addAll([
+        'Bring extra water',
+        'Start early to avoid heat',
+        'Take shade breaks'
+      ]);
     }
     if (weather.precipitationChance > 30) {
-      tips.addAll(['Light rain gear recommended', 'Watch footing on wet surfaces']);
+      tips.addAll(
+          ['Light rain gear recommended', 'Watch footing on wet surfaces']);
     }
     if (weather.windSpeed > 20) {
       tips.add('Expect headwind resistance');
     }
-    
+
     if (tips.isEmpty) {
       tips.add('Standard session recommended');
     }
@@ -212,7 +220,7 @@ class WeatherCoachingService {
   ) {
     final suggestions = _getChallengingWeatherSuggestions(tone);
     final tips = <String>[];
-    
+
     if (weather.temperature < 5) {
       tips.addAll([
         'Layer clothing appropriately',
@@ -227,7 +235,7 @@ class WeatherCoachingService {
         'Consider shorter distance',
       ]);
     }
-    
+
     if (weather.precipitationChance > 50) {
       tips.addAll([
         'Waterproof gear essential',
@@ -235,7 +243,7 @@ class WeatherCoachingService {
         'Extra caution on slippery surfaces',
       ]);
     }
-    
+
     if (weather.uvIndex > 8) {
       tips.addAll([
         'Strong sunscreen required',
@@ -381,71 +389,71 @@ class WeatherCoachingService {
   /// Build reason for moderate weather
   String _buildModerateWeatherReason(WeatherCondition weather) {
     final reasons = <String>[];
-    
+
     if (weather.temperature > 25 && weather.temperature <= 30) {
       reasons.add('warm temperature');
     } else if (weather.temperature < 10 && weather.temperature >= 0) {
       reasons.add('cool temperature');
     }
-    
+
     if (weather.precipitationChance > 30 && weather.precipitationChance <= 50) {
       reasons.add('possible light rain');
     }
-    
+
     if (weather.windSpeed > 15 && weather.windSpeed <= 25) {
       reasons.add('moderate winds');
     }
-    
+
     if (reasons.isEmpty) {
       return 'Generally favorable conditions';
     }
-    
+
     return 'Manageable conditions with ${reasons.join(" and ")}';
   }
 
   /// Build reason for challenging weather
   String _buildChallengingWeatherReason(WeatherCondition weather) {
     final reasons = <String>[];
-    
+
     if (weather.temperature <= 0) {
       reasons.add('freezing temperature');
     } else if (weather.temperature > 30) {
       reasons.add('high temperature');
     }
-    
+
     if (weather.precipitationChance > 50) {
       reasons.add('likely precipitation');
     }
-    
+
     if (weather.windSpeed > 25) {
       reasons.add('strong winds');
     }
-    
+
     if (weather.uvIndex > 8) {
       reasons.add('high UV levels');
     }
-    
+
     return 'Challenging conditions due to ${reasons.join(" and ")}';
   }
 
   /// Build reason for extreme weather
   String _buildExtremeWeatherReason(WeatherCondition weather) {
     final reasons = <String>[];
-    
+
     if (weather.temperature < -10) {
       reasons.add('dangerously cold');
     } else if (weather.temperature > 40) {
       reasons.add('dangerously hot');
     }
-    
+
     if (weather.precipitationChance > 80) {
       reasons.add('heavy precipitation');
     }
-    
+
     if (weather.windSpeed > 50) {
       reasons.add('extreme winds');
     }
-    
+
     return 'Unsafe conditions: ${reasons.join(" and ")}';
   }
 
@@ -455,11 +463,11 @@ class WeatherCoachingService {
     CoachingNotificationPreferences preferences,
   ) {
     if (!preferences.enableWeatherSuggestions) return false;
-    
+
     // Send notification for ideal conditions or challenging/extreme conditions
     // Skip moderate conditions to avoid spam
-    return weather.severity == WeatherSeverity.ideal || 
-           weather.severity == WeatherSeverity.challenging ||
-           weather.severity == WeatherSeverity.extreme;
+    return weather.severity == WeatherSeverity.ideal ||
+        weather.severity == WeatherSeverity.challenging ||
+        weather.severity == WeatherSeverity.extreme;
   }
 }

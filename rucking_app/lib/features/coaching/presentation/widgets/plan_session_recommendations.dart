@@ -8,13 +8,13 @@ import 'package:rucking_app/core/config/app_config.dart';
 class PlanSessionRecommendations extends StatelessWidget {
   /// Current coaching plan data
   final Map<String, dynamic>? coachingPlan;
-  
+
   /// Next recommended session details
   final Map<String, dynamic>? nextSession;
-  
+
   /// Whether user prefers metric units
   final bool preferMetric;
-  
+
   /// Callback when user taps "Use Recommended" button
   final VoidCallback? onUseRecommended;
 
@@ -37,7 +37,7 @@ class PlanSessionRecommendations extends StatelessWidget {
     final weekNumber = coachingPlan!['current_week'] as int? ?? 1;
     final totalWeeks = coachingPlan!['duration_weeks'] as int? ?? 8;
     final phase = coachingPlan!['phase'] as String? ?? 'Base Building';
-    
+
     final sessionType = nextSession!['type'] as String? ?? 'Base Ruck';
     final distanceKm = nextSession!['distance_km'] as double?;
     final durationMinutes = nextSession!['duration_minutes'] as int?;
@@ -87,7 +87,7 @@ class PlanSessionRecommendations extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Session recommendation
           Text(
             'Recommended Session: $sessionType',
@@ -96,7 +96,7 @@ class PlanSessionRecommendations extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          
+
           // Session details
           _buildRecommendationDetails(
             distanceKm: distanceKm,
@@ -104,9 +104,9 @@ class PlanSessionRecommendations extends StatelessWidget {
             recommendedWeightKg: recommendedWeightKg,
             notes: notes,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Action button
           if (onUseRecommended != null)
             SizedBox(
@@ -140,7 +140,7 @@ class PlanSessionRecommendations extends StatelessWidget {
 
     // Distance
     if (distanceKm != null && distanceKm > 0) {
-      final distance = preferMetric 
+      final distance = preferMetric
           ? '${distanceKm.toStringAsFixed(1)} km'
           : '${MeasurementUtils.distance(distanceKm, metric: false).toStringAsFixed(1)} miles';
       details.add(_buildDetailChip(Icons.straighten, 'Distance: $distance'));
@@ -148,7 +148,7 @@ class PlanSessionRecommendations extends StatelessWidget {
 
     // Duration
     if (durationMinutes != null && durationMinutes > 0) {
-      final duration = durationMinutes >= 60 
+      final duration = durationMinutes >= 60
           ? '${(durationMinutes / 60).floor()}h ${durationMinutes % 60}m'
           : '${durationMinutes}m';
       details.add(_buildDetailChip(Icons.schedule, 'Target: $duration'));

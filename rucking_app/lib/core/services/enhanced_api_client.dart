@@ -103,8 +103,6 @@ class EnhancedApiClient {
     }
   }
 
-
-
   /// Centralized error handling
   Future<void> _handleError(
     String operation,

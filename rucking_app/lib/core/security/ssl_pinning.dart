@@ -18,30 +18,32 @@ class SslPinningService {
   static void setupSecureHttpClient(Dio dio) {
     // Only apply pinning in release mode and on real devices (not simulators)
     if (kReleaseMode && !Platform.isLinux && !Platform.isWindows) {
-      (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate = 
-        (HttpClient client) {
-          client.badCertificateCallback = (X509Certificate cert, String host, int port) {
-            // In debug mode, allow all connections for easier development
-            if (kDebugMode) return true;
-            
-            // In release mode, verify the certificate
-            return _validateCertificate(cert);
-          };
-          return client;
+      (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
+          (HttpClient client) {
+        client.badCertificateCallback =
+            (X509Certificate cert, String host, int port) {
+          // In debug mode, allow all connections for easier development
+          if (kDebugMode) return true;
+
+          // In release mode, verify the certificate
+          return _validateCertificate(cert);
         };
+        return client;
+      };
     }
   }
 
   /// Validate a certificate against our pinned certificates
   static bool _validateCertificate(X509Certificate cert) {
     // Get the certificate fingerprint (SHA-256)
-    final fingerprint = crypto.sha256.convert(cert.der).toString().toUpperCase();
-    
+    final fingerprint =
+        crypto.sha256.convert(cert.der).toString().toUpperCase();
+
     // Debug log for traceability during development
     if (kDebugMode) {
       debugPrint('Certificate fingerprint: $fingerprint');
     }
-    
+
     // Check if the fingerprint matches any of our trusted certificates
     return _trustedCertificates.contains(fingerprint);
   }

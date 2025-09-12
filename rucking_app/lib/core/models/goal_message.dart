@@ -24,7 +24,8 @@ class GoalMessage {
       id: json['id']?.toString() ?? '',
       goalId: json['goal_id']?.toString() ?? json['goalId']?.toString() ?? '',
       channel: json['channel']?.toString(),
-      messageType: json['message_type']?.toString() ?? json['messageType']?.toString(),
+      messageType:
+          json['message_type']?.toString() ?? json['messageType']?.toString(),
       content: json['content']?.toString(),
       metadata: _ensureMap(json['metadata_json'] ?? json['metadata']),
       sentAt: _parseDate(json['sent_at'] ?? json['sentAt']),

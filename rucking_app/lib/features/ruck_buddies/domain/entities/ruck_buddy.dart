@@ -91,10 +91,24 @@ class RuckBuddy extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, userId, ruckWeightKg, durationSeconds, 
-    distanceKm, caloriesBurned, elevationGainM, 
-    elevationLossM, startedAt, completedAt, createdAt, 
-    avgHeartRate, user, locationPoints, photos,
-    likeCount, commentCount, isLikedByCurrentUser, firstRuck
-  ];
+        id,
+        userId,
+        ruckWeightKg,
+        durationSeconds,
+        distanceKm,
+        caloriesBurned,
+        elevationGainM,
+        elevationLossM,
+        startedAt,
+        completedAt,
+        createdAt,
+        avgHeartRate,
+        user,
+        locationPoints,
+        photos,
+        likeCount,
+        commentCount,
+        isLikedByCurrentUser,
+        firstRuck
+      ];
 }

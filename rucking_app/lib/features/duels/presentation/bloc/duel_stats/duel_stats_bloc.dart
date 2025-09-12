@@ -19,21 +19,26 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
     on<RefreshDuelStatsLeaderboard>(_onRefreshDuelStatsLeaderboard);
   }
 
-  void _onLoadUserDuelStats(LoadUserDuelStats event, Emitter<DuelStatsState> emit) async {
-    AppLogger.info('[DUEL_STATS] Loading user duel stats - userId: ${event.userId}');
+  void _onLoadUserDuelStats(
+      LoadUserDuelStats event, Emitter<DuelStatsState> emit) async {
+    AppLogger.info(
+        '[DUEL_STATS] Loading user duel stats - userId: ${event.userId}');
     emit(DuelStatsLoading());
 
     try {
-      final result = await getUserDuelStats(GetUserDuelStatsParams(userId: event.userId));
+      final result =
+          await getUserDuelStats(GetUserDuelStatsParams(userId: event.userId));
       AppLogger.info('[DUEL_STATS] User duel stats API call completed');
 
       result.fold(
         (failure) {
-          AppLogger.error('[DUEL_STATS] Failed to load user duel stats: ${failure.message}');
+          AppLogger.error(
+              '[DUEL_STATS] Failed to load user duel stats: ${failure.message}');
           emit(DuelStatsError(message: failure.message));
         },
         (userStats) {
-          AppLogger.info('[DUEL_STATS] User duel stats loaded successfully: ${userStats.toString()}');
+          AppLogger.info(
+              '[DUEL_STATS] User duel stats loaded successfully: ${userStats.toString()}');
           emit(UserDuelStatsLoaded(userStats: userStats));
           // Auto-load default leaderboard
           AppLogger.info('[DUEL_STATS] Auto-loading default leaderboard');
@@ -41,30 +46,36 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
         },
       );
     } catch (e) {
-      AppLogger.error('[DUEL_STATS] Unexpected error loading user duel stats: $e');
+      AppLogger.error(
+          '[DUEL_STATS] Unexpected error loading user duel stats: $e');
       emit(DuelStatsError(message: 'Unexpected error: $e'));
     }
   }
 
-  void _onRefreshUserDuelStats(RefreshUserDuelStats event, Emitter<DuelStatsState> emit) async {
-    AppLogger.info('[DUEL_STATS] Refreshing user duel stats - userId: ${event.userId}');
-    
+  void _onRefreshUserDuelStats(
+      RefreshUserDuelStats event, Emitter<DuelStatsState> emit) async {
+    AppLogger.info(
+        '[DUEL_STATS] Refreshing user duel stats - userId: ${event.userId}');
+
     // If we're already loaded, just refresh the data without showing loading
     if (state is UserDuelStatsLoaded) {
       AppLogger.info('[DUEL_STATS] State is already loaded, refreshing data');
       final currentState = state as UserDuelStatsLoaded;
-      
+
       try {
-        final result = await getUserDuelStats(GetUserDuelStatsParams(userId: event.userId));
+        final result = await getUserDuelStats(
+            GetUserDuelStatsParams(userId: event.userId));
         AppLogger.info('[DUEL_STATS] Refresh API call completed');
 
         result.fold(
           (failure) {
-            AppLogger.error('[DUEL_STATS] Failed to refresh user duel stats: ${failure.message}');
+            AppLogger.error(
+                '[DUEL_STATS] Failed to refresh user duel stats: ${failure.message}');
             emit(DuelStatsError(message: failure.message));
           },
           (userStats) {
-            AppLogger.info('[DUEL_STATS] User duel stats refreshed successfully');
+            AppLogger.info(
+                '[DUEL_STATS] User duel stats refreshed successfully');
             emit(currentState.copyWith(userStats: userStats));
             // Refresh current leaderboard too
             add(RefreshDuelStatsLeaderboard(
@@ -73,7 +84,8 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
           },
         );
       } catch (e) {
-        AppLogger.error('[DUEL_STATS] Unexpected error refreshing user duel stats: $e');
+        AppLogger.error(
+            '[DUEL_STATS] Unexpected error refreshing user duel stats: $e');
         emit(DuelStatsError(message: 'Refresh failed: $e'));
       }
     } else {
@@ -82,11 +94,14 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
     }
   }
 
-  void _onLoadDuelStatsLeaderboard(LoadDuelStatsLeaderboard event, Emitter<DuelStatsState> emit) async {
-    AppLogger.info('[DUEL_STATS] Loading leaderboard - statType: ${event.statType}, limit: ${event.limit}');
-    
+  void _onLoadDuelStatsLeaderboard(
+      LoadDuelStatsLeaderboard event, Emitter<DuelStatsState> emit) async {
+    AppLogger.info(
+        '[DUEL_STATS] Loading leaderboard - statType: ${event.statType}, limit: ${event.limit}');
+
     if (state is UserDuelStatsLoaded) {
-      AppLogger.info('[DUEL_STATS] User stats loaded, loading leaderboard with context');
+      AppLogger.info(
+          '[DUEL_STATS] User stats loaded, loading leaderboard with context');
       final currentState = state as UserDuelStatsLoaded;
       emit(currentState.copyWith(
         isLeaderboardLoading: true,
@@ -94,7 +109,8 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
       ));
 
       try {
-        final result = await getDuelStatsLeaderboard(GetDuelStatsLeaderboardParams(
+        final result =
+            await getDuelStatsLeaderboard(GetDuelStatsLeaderboardParams(
           statType: event.statType,
           limit: event.limit,
         ));
@@ -102,14 +118,16 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
 
         result.fold(
           (failure) {
-            AppLogger.error('[DUEL_STATS] Failed to load leaderboard: ${failure.message}');
+            AppLogger.error(
+                '[DUEL_STATS] Failed to load leaderboard: ${failure.message}');
             emit(currentState.copyWith(
               isLeaderboardLoading: false,
               leaderboard: [],
             ));
           },
           (leaderboard) {
-            AppLogger.info('[DUEL_STATS] Leaderboard loaded successfully - ${leaderboard.length} entries');
+            AppLogger.info(
+                '[DUEL_STATS] Leaderboard loaded successfully - ${leaderboard.length} entries');
             emit(currentState.copyWith(
               isLeaderboardLoading: false,
               leaderboard: leaderboard,
@@ -118,34 +136,40 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
           },
         );
       } catch (e) {
-        AppLogger.error('[DUEL_STATS] Unexpected error loading leaderboard: $e');
+        AppLogger.error(
+            '[DUEL_STATS] Unexpected error loading leaderboard: $e');
         emit(currentState.copyWith(
           isLeaderboardLoading: false,
           leaderboard: [],
         ));
       }
     } else {
-      AppLogger.info('[DUEL_STATS] No user stats context, loading leaderboard independently');
+      AppLogger.info(
+          '[DUEL_STATS] No user stats context, loading leaderboard independently');
       // Load leaderboard independently
       emit(DuelStatsLoading());
 
       try {
-        final result = await getDuelStatsLeaderboard(GetDuelStatsLeaderboardParams(
+        final result =
+            await getDuelStatsLeaderboard(GetDuelStatsLeaderboardParams(
           statType: event.statType,
           limit: event.limit,
         ));
-        AppLogger.info('[DUEL_STATS] Independent leaderboard API call completed');
+        AppLogger.info(
+            '[DUEL_STATS] Independent leaderboard API call completed');
 
         result.fold(
           (failure) {
-            AppLogger.error('[DUEL_STATS] Failed to load independent leaderboard: ${failure.message}');
+            AppLogger.error(
+                '[DUEL_STATS] Failed to load independent leaderboard: ${failure.message}');
             emit(DuelStatsLeaderboardError(
               message: failure.message,
               statType: event.statType,
             ));
           },
           (leaderboard) {
-            AppLogger.info('[DUEL_STATS] Independent leaderboard loaded successfully - ${leaderboard.length} entries');
+            AppLogger.info(
+                '[DUEL_STATS] Independent leaderboard loaded successfully - ${leaderboard.length} entries');
             emit(DuelStatsLeaderboardLoaded(
               leaderboard: leaderboard,
               statType: event.statType,
@@ -153,7 +177,8 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
           },
         );
       } catch (e) {
-        AppLogger.error('[DUEL_STATS] Unexpected error loading independent leaderboard: $e');
+        AppLogger.error(
+            '[DUEL_STATS] Unexpected error loading independent leaderboard: $e');
         emit(DuelStatsLeaderboardError(
           message: 'Unexpected error: $e',
           statType: event.statType,
@@ -162,7 +187,8 @@ class DuelStatsBloc extends Bloc<DuelStatsEvent, DuelStatsState> {
     }
   }
 
-  void _onRefreshDuelStatsLeaderboard(RefreshDuelStatsLeaderboard event, Emitter<DuelStatsState> emit) async {
+  void _onRefreshDuelStatsLeaderboard(
+      RefreshDuelStatsLeaderboard event, Emitter<DuelStatsState> emit) async {
     add(LoadDuelStatsLeaderboard(
       statType: event.statType,
       limit: event.limit,

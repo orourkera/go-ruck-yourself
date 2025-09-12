@@ -21,4 +21,4 @@ class FollowButton extends StatelessWidget {
           : Text(isFollowing ? 'Unfollow' : 'Follow'),
     );
   }
-} 
+}

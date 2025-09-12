@@ -10,19 +10,19 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 class PhotoUploadSection extends StatefulWidget {
   /// The ID of the ruck this upload is for
   final String ruckId;
-  
+
   /// Callback when photos are selected and ready for upload
   final Function(List<File> photos)? onPhotosSelected;
-  
+
   /// Callback when upload is completed successfully
   final VoidCallback? onUploadSuccess;
-  
+
   /// Maximum number of photos that can be selected
   final int maxPhotos;
-  
+
   /// Whether photos are currently being uploaded
   final bool isUploading;
-  
+
   const PhotoUploadSection({
     Key? key,
     required this.ruckId,
@@ -40,16 +40,17 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
   final ImagePicker _imagePicker = ImagePicker();
   final List<File> _selectedPhotos = [];
   bool _showPhotoPreview = false;
-  
+
   // Helper method to show styled snackbar
-  void showStyledSnackBar(BuildContext context, String message, SnackBarType type) {
+  void showStyledSnackBar(
+      BuildContext context, String message, SnackBarType type) {
     StyledSnackBar.show(
       context: context,
       message: message,
       type: type,
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -58,18 +59,16 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
         // Removed duplicate header and subtitle. Only show the photo picker and add button below.
 
         const SizedBox(height: 16),
-        
+
         // Photo Upload Button
-        if (!_showPhotoPreview)
-          _buildUploadButton(context),
-        
+        if (!_showPhotoPreview) _buildUploadButton(context),
+
         // Photo Preview Grid (when photos are selected)
-        if (_showPhotoPreview)
-          _buildPhotoPreview(),
+        if (_showPhotoPreview) _buildPhotoPreview(),
       ],
     );
   }
-  
+
   Widget _buildUploadButton(BuildContext context) {
     return InkWell(
       onTap: _selectPhotos,
@@ -111,7 +110,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
       ),
     );
   }
-  
+
   Widget _buildPhotoPreview() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,23 +125,24 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
             mainAxisSpacing: 8,
             childAspectRatio: 1,
           ),
-          itemCount: _selectedPhotos.length + (_selectedPhotos.length < widget.maxPhotos ? 1 : 0),
+          itemCount: _selectedPhotos.length +
+              (_selectedPhotos.length < widget.maxPhotos ? 1 : 0),
           itemBuilder: (context, index) {
             // Add photo button at the end if we haven't reached max
             if (index == _selectedPhotos.length) {
               return _buildAddMorePhotosButton();
             }
-            
+
             // Photo preview with delete option
             return _buildPhotoPreviewItem(index);
           },
         ),
-        
+
         // No Upload/Cancel buttons here - photos will be uploaded when user hits Save and Continue
       ],
     );
   }
-  
+
   Widget _buildPhotoPreviewItem(int index) {
     return Stack(
       children: [
@@ -162,20 +162,22 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
             ),
           ),
         ),
-        
+
         // Remove button
         Positioned(
           top: 4,
           right: 4,
           child: GestureDetector(
-            onTap: widget.isUploading ? null : () {
-              setState(() {
-                _selectedPhotos.removeAt(index);
-                if (_selectedPhotos.isEmpty) {
-                  _showPhotoPreview = false;
-                }
-              });
-            },
+            onTap: widget.isUploading
+                ? null
+                : () {
+                    setState(() {
+                      _selectedPhotos.removeAt(index);
+                      if (_selectedPhotos.isEmpty) {
+                        _showPhotoPreview = false;
+                      }
+                    });
+                  },
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(
@@ -193,7 +195,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
       ],
     );
   }
-  
+
   Widget _buildAddMorePhotosButton() {
     return GestureDetector(
       onTap: widget.isUploading ? null : _selectPhotos,
@@ -215,7 +217,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
       ),
     );
   }
-  
+
   Future<void> _selectPhotos() async {
     if (_selectedPhotos.length >= widget.maxPhotos) {
       showStyledSnackBar(
@@ -260,43 +262,49 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
   Future<void> _getImageFrom(ImageSource source) async {
     try {
       final remainingSlots = widget.maxPhotos - _selectedPhotos.length;
-      AppLogger.info('[PHOTO_UPLOAD] Selecting photos from ${source.toString()}, remaining slots: $remainingSlots');
-      
+      AppLogger.info(
+          '[PHOTO_UPLOAD] Selecting photos from ${source.toString()}, remaining slots: $remainingSlots');
+
       if (source == ImageSource.gallery && remainingSlots > 1) {
         // For gallery, we can select multiple photos at once
         // Don't specify imageQuality for PNG images since it's not supported on iOS
         // and generates warnings/errors
         final List<XFile> pickedFiles = await _imagePicker.pickMultiImage(
-          imageQuality: 80,  // Only applies to JPG images
+          imageQuality: 80, // Only applies to JPG images
         );
-        
-        AppLogger.info('[PHOTO_UPLOAD] Picked ${pickedFiles.length} photos from gallery');
-        
+
+        AppLogger.info(
+            '[PHOTO_UPLOAD] Picked ${pickedFiles.length} photos from gallery');
+
         if (pickedFiles.isNotEmpty) {
           // Only add up to the max number of photos
           final toAdd = pickedFiles.take(remainingSlots).toList();
           final filesToAdd = <File>[];
-          
+
           // Log each photo's details
           for (var xFile in toAdd) {
             final file = File(xFile.path);
             filesToAdd.add(file);
-            
+
             final fileExists = await file.exists();
             final fileSize = fileExists ? await file.length() : 0;
-            AppLogger.info('[PHOTO_UPLOAD] Gallery photo: path=${xFile.path}, exists=$fileExists, size=$fileSize bytes, name=${xFile.name}');
+            AppLogger.info(
+                '[PHOTO_UPLOAD] Gallery photo: path=${xFile.path}, exists=$fileExists, size=$fileSize bytes, name=${xFile.name}');
           }
-          
+
           setState(() {
             _selectedPhotos.addAll(filesToAdd);
             _showPhotoPreview = true;
           });
-          
+
           // Notify callback of photos selected
           if (widget.onPhotosSelected != null) {
-            AppLogger.info('[PHOTO_DEBUG] Notifying listener of ${filesToAdd.length} photos selected');
-            AppLogger.info('[PHOTO_DEBUG] Selected photos paths: ${_selectedPhotos.map((f) => f.path).toList()}');
-            AppLogger.info('[PHOTO_DEBUG] About to call onPhotosSelected callback...');
+            AppLogger.info(
+                '[PHOTO_DEBUG] Notifying listener of ${filesToAdd.length} photos selected');
+            AppLogger.info(
+                '[PHOTO_DEBUG] Selected photos paths: ${_selectedPhotos.map((f) => f.path).toList()}');
+            AppLogger.info(
+                '[PHOTO_DEBUG] About to call onPhotosSelected callback...');
             widget.onPhotosSelected?.call(_selectedPhotos);
             AppLogger.info('[PHOTO_DEBUG] onPhotosSelected callback completed');
           }
@@ -306,25 +314,28 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
         AppLogger.info('[PHOTO_UPLOAD] Opening camera picker');
         final XFile? pickedFile = await _imagePicker.pickImage(
           source: source,
-          imageQuality: 80,  // Only applies to JPG images
+          imageQuality: 80, // Only applies to JPG images
         );
-        
-        AppLogger.info('[PHOTO_UPLOAD] Camera photo selected: ${pickedFile != null}');
-        
+
+        AppLogger.info(
+            '[PHOTO_UPLOAD] Camera photo selected: ${pickedFile != null}');
+
         if (pickedFile != null) {
           final file = File(pickedFile.path);
           final fileExists = await file.exists();
           final fileSize = fileExists ? await file.length() : 0;
-          AppLogger.info('[PHOTO_UPLOAD] Camera photo: path=${pickedFile.path}, exists=$fileExists, size=$fileSize bytes, name=${pickedFile.name}');
-          
+          AppLogger.info(
+              '[PHOTO_UPLOAD] Camera photo: path=${pickedFile.path}, exists=$fileExists, size=$fileSize bytes, name=${pickedFile.name}');
+
           setState(() {
             _selectedPhotos.add(file);
             _showPhotoPreview = true;
           });
-          
+
           // Notify callback of photos selected
           if (widget.onPhotosSelected != null) {
-            AppLogger.info('[PHOTO_UPLOAD] Notifying listener of camera photo selected');
+            AppLogger.info(
+                '[PHOTO_UPLOAD] Notifying listener of camera photo selected');
             widget.onPhotosSelected?.call(_selectedPhotos);
           }
         }
@@ -337,22 +348,22 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
       );
     }
   }
-  
+
   void _handleUpload() {
     if (_selectedPhotos.isEmpty) {
       showStyledSnackBar(
-        context, 
-        'Please select at least one photo', 
+        context,
+        'Please select at least one photo',
         SnackBarType.normal,
       );
       return;
     }
-    
+
     // Call the onPhotosSelected callback to initiate the upload
     if (widget.onPhotosSelected != null) {
       widget.onPhotosSelected!(_selectedPhotos);
     }
-    
+
     // If onUploadSuccess is provided, the parent widget will handle the reset
     // Otherwise, we'll handle it here after a delay for demo purposes
     if (widget.onUploadSuccess == null) {
@@ -363,7 +374,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
           _selectedPhotos.clear();
           _showPhotoPreview = false;
         });
-        
+
         // Show success message
         showStyledSnackBar(
           context,

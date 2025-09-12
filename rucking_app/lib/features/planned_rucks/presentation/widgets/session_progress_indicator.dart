@@ -27,7 +27,8 @@ class SessionProgressIndicator extends StatefulWidget {
   });
 
   @override
-  State<SessionProgressIndicator> createState() => _SessionProgressIndicatorState();
+  State<SessionProgressIndicator> createState() =>
+      _SessionProgressIndicatorState();
 }
 
 class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
@@ -36,7 +37,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
   late AnimationController _pulseController;
   late Animation<double> _progressAnimation;
   late Animation<double> _pulseAnimation;
-  
+
   double _previousProgress = 0.0;
   List<Milestone> _milestones = [];
   int _lastReachedMilestone = -1;
@@ -44,22 +45,22 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
   @override
   void initState() {
     super.initState();
-    
+
     _progressController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _progressAnimation = CurvedAnimation(
       parent: _progressController,
       curve: Curves.easeOutCubic,
     );
-    
+
     _pulseAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -67,11 +68,11 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
-    
+
     if (widget.showAnimation) {
       _pulseController.repeat(reverse: true);
     }
-    
+
     _initializeMilestones();
     _updateProgress();
   }
@@ -86,7 +87,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
   @override
   void didUpdateWidget(SessionProgressIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.activeSession != oldWidget.activeSession ||
         widget.plannedRoute != oldWidget.plannedRoute) {
       _updateProgress();
@@ -96,10 +97,10 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
 
   void _initializeMilestones() {
     _milestones.clear();
-    
+
     if (widget.plannedRoute != null) {
       final totalDistance = widget.plannedRoute!.distance;
-      
+
       // Add mile markers
       for (int i = 1; i < totalDistance.floor(); i++) {
         _milestones.add(Milestone(
@@ -110,7 +111,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
           isReached: false,
         ));
       }
-      
+
       // Add percentage milestones
       for (int i = 25; i <= 75; i += 25) {
         final distance = totalDistance * (i / 100);
@@ -122,7 +123,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
           isReached: false,
         ));
       }
-      
+
       // Add elevation milestones if available
       if (widget.plannedRoute!.elevationProfile.isNotEmpty) {
         final highPoint = _findHighestPoint();
@@ -137,7 +138,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
           ));
         }
       }
-      
+
       // Sort milestones by distance
       _milestones.sort((a, b) => a.distance.compareTo(b.distance));
     }
@@ -146,27 +147,29 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
   void _updateProgress() {
     final currentDistance = widget.activeSession.distance ?? 0.0;
     final totalDistance = widget.plannedRoute?.distance ?? currentDistance;
-    final newProgress = totalDistance > 0 ? currentDistance / totalDistance : 0.0;
-    
-    if (widget.showAnimation && (newProgress - _previousProgress).abs() > 0.01) {
+    final newProgress =
+        totalDistance > 0 ? currentDistance / totalDistance : 0.0;
+
+    if (widget.showAnimation &&
+        (newProgress - _previousProgress).abs() > 0.01) {
       _progressController.reset();
       _progressController.forward();
     }
-    
+
     _previousProgress = newProgress;
   }
 
   void _checkMilestones() {
     final currentDistance = widget.activeSession.distance ?? 0.0;
-    
+
     for (int i = 0; i < _milestones.length; i++) {
       final milestone = _milestones[i];
-      
+
       if (!milestone.isReached && currentDistance >= milestone.distance) {
         setState(() {
           _milestones[i] = milestone.copyWith(isReached: true);
         });
-        
+
         if (i > _lastReachedMilestone) {
           _lastReachedMilestone = i;
           if (widget.onMilestoneReached != null) {
@@ -204,7 +207,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
 
   Widget _buildLinearProgress() {
     final progress = _calculateProgress();
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -246,13 +249,14 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Progress bar with animation
           AnimatedBuilder(
-            animation: widget.showAnimation ? _progressAnimation : 
-                      const AlwaysStoppedAnimation(1.0),
+            animation: widget.showAnimation
+                ? _progressAnimation
+                : const AlwaysStoppedAnimation(1.0),
             builder: (context, child) {
               return Stack(
                 children: [
@@ -264,11 +268,12 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  
+
                   // Progress bar
                   FractionallySizedBox(
-                    widthFactor: (progress.percentage * _progressAnimation.value)
-                        .clamp(0.0, 1.0),
+                    widthFactor:
+                        (progress.percentage * _progressAnimation.value)
+                            .clamp(0.0, 1.0),
                     child: Container(
                       height: 8,
                       decoration: BoxDecoration(
@@ -289,16 +294,16 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                       ),
                     ),
                   ),
-                  
+
                   // Milestone markers
                   if (widget.showMilestones) _buildMilestoneMarkers(),
                 ],
               );
             },
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Progress details
           Row(
             children: [
@@ -326,7 +331,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
 
   Widget _buildCircularProgress() {
     final progress = _calculateProgress();
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -347,8 +352,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
             width: 120,
             height: 120,
             child: AnimatedBuilder(
-              animation: widget.showAnimation ? _progressAnimation : 
-                        const AlwaysStoppedAnimation(1.0),
+              animation: widget.showAnimation
+                  ? _progressAnimation
+                  : const AlwaysStoppedAnimation(1.0),
               builder: (context, child) {
                 return Stack(
                   alignment: Alignment.center,
@@ -362,7 +368,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                         AppColors.divider,
                       ),
                     ),
-                    
+
                     // Progress circle
                     CircularProgressIndicator(
                       value: (progress.percentage * _progressAnimation.value)
@@ -373,7 +379,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                         AppColors.primary,
                       ),
                     ),
-                    
+
                     // Pulse effect
                     if (widget.showAnimation)
                       AnimatedBuilder(
@@ -391,7 +397,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                           );
                         },
                       ),
-                    
+
                     // Center content
                     Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -416,9 +422,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               },
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Stats row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -444,7 +450,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
   Widget _buildSegmentedProgress() {
     final progress = _calculateProgress();
     final segments = _createSegments();
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -468,9 +474,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Segmented progress bar
           Row(
             children: segments.map((segment) {
@@ -479,7 +485,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                   height: 8,
                   margin: const EdgeInsets.symmetric(horizontal: 1),
                   decoration: BoxDecoration(
-                    color: segment.isCompleted 
+                    color: segment.isCompleted
                         ? _getSegmentColor(segment.type)
                         : AppColors.divider,
                     borderRadius: BorderRadius.circular(4),
@@ -488,9 +494,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               );
             }).toList(),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Segment breakdown
           if (widget.showSegmentBreakdown) _buildSegmentBreakdown(segments),
         ],
@@ -522,9 +528,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Milestone timeline
           SizedBox(
             height: 200,
@@ -544,22 +550,24 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
 
   Widget _buildMilestoneMarkers() {
     if (widget.plannedRoute == null) return const SizedBox.shrink();
-    
+
     final totalDistance = widget.plannedRoute!.distance;
-    
+
     return Positioned.fill(
       child: Stack(
         children: _milestones.map((milestone) {
           final position = milestone.distance / totalDistance;
-          
+
           return Positioned(
-            left: position * MediaQuery.of(context).size.width * 0.8, // Approximate width
+            left: position *
+                MediaQuery.of(context).size.width *
+                0.8, // Approximate width
             top: -4,
             child: Container(
               width: 16,
               height: 16,
               decoration: BoxDecoration(
-                color: milestone.isReached 
+                color: milestone.isReached
                     ? _getMilestoneColor(milestone.type)
                     : AppColors.divider,
                 shape: BoxShape.circle,
@@ -616,7 +624,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: segment.isCompleted 
+                  color: segment.isCompleted
                       ? _getSegmentColor(segment.type)
                       : AppColors.divider,
                   borderRadius: BorderRadius.circular(2),
@@ -627,7 +635,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
                 child: Text(
                   segment.label,
                   style: AppTextStyles.body2.copyWith(
-                    color: segment.isCompleted 
+                    color: segment.isCompleted
                         ? AppColors.textPrimary
                         : AppColors.textSecondary,
                   ),
@@ -657,7 +665,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: milestone.isReached 
+              color: milestone.isReached
                   ? _getMilestoneColor(milestone.type)
                   : AppColors.divider,
               shape: BoxShape.circle,
@@ -679,15 +687,15 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               size: 20,
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Milestone title
           Text(
             milestone.title,
             style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.bold,
-              color: milestone.isReached 
+              color: milestone.isReached
                   ? AppColors.textPrimary
                   : AppColors.textSecondary,
             ),
@@ -695,7 +703,7 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          
+
           if (milestone.subtitle != null) ...[
             const SizedBox(height: 2),
             Text(
@@ -706,9 +714,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
               textAlign: TextAlign.center,
             ),
           ],
-          
+
           const SizedBox(height: 8),
-          
+
           // Connection line
           if (index < _milestones.length - 1)
             Container(
@@ -728,13 +736,15 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
   ProgressData _calculateProgress() {
     final currentDistance = widget.activeSession.distance ?? 0.0;
     final totalDistance = widget.plannedRoute?.distance ?? currentDistance;
-    final percentage = totalDistance > 0 ? currentDistance / totalDistance : 0.0;
-    
+    final percentage =
+        totalDistance > 0 ? currentDistance / totalDistance : 0.0;
+
     return ProgressData(
       percentage: percentage.clamp(0.0, 1.0),
       completedDistance: currentDistance,
       totalDistance: totalDistance,
-      remainingDistance: (totalDistance - currentDistance).clamp(0.0, totalDistance),
+      remainingDistance:
+          (totalDistance - currentDistance).clamp(0.0, totalDistance),
     );
   }
 
@@ -743,11 +753,11 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
     final totalDistance = widget.plannedRoute?.distance ?? currentDistance;
     const segmentCount = 10;
     const segmentSize = 1.0 / segmentCount;
-    
+
     return List.generate(segmentCount, (index) {
       final segmentStart = index * segmentSize * totalDistance;
       final segmentEnd = (index + 1) * segmentSize * totalDistance;
-      
+
       return ProgressSegment(
         label: 'Segment ${index + 1}',
         startDistance: segmentStart,
@@ -760,10 +770,9 @@ class _SessionProgressIndicatorState extends State<SessionProgressIndicator>
 
   ElevationPoint? _findHighestPoint() {
     if (widget.plannedRoute?.elevationProfile.isEmpty != false) return null;
-    
-    return widget.plannedRoute!.elevationProfile.reduce((a, b) => 
-        a.elevation > b.elevation ? a : b
-    );
+
+    return widget.plannedRoute!.elevationProfile
+        .reduce((a, b) => a.elevation > b.elevation ? a : b);
   }
 
   Color _getMilestoneColor(MilestoneType type) {

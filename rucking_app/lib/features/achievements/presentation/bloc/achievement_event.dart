@@ -10,9 +10,9 @@ abstract class AchievementEvent extends Equatable {
 /// Event to load all achievements
 class LoadAchievements extends AchievementEvent {
   final String? unitPreference;
-  
+
   const LoadAchievements({this.unitPreference});
-  
+
   @override
   List<Object?> get props => [unitPreference];
 }

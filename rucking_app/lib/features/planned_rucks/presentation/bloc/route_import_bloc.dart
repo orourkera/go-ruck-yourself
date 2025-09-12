@@ -321,7 +321,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
   final PlannedRucksRepository _plannedRucksRepository;
   final GpxService _gpxService;
   final AuthService _authService;
-  
+
   File? _currentGpxFile; // Store GPX file for import
 
   RouteImportBloc({
@@ -334,7 +334,6 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         _gpxService = gpxService,
         _authService = authService,
         super(const RouteImportInitial()) {
-    
     on<ImportGpxFile>(_onImportGpxFile);
     on<ImportGpxFromUrl>(_onImportGpxFromUrl);
     on<ValidateGpxFile>(_onValidateGpxFile);
@@ -356,10 +355,12 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
 
       // First validate the file
       final validationResult = await _gpxService.validateGpxFile(event.gpxFile);
-      
+
       if (!validationResult.isValid) {
         emit(RouteImportError.validation(
-          message: validationResult.errors.isNotEmpty ? validationResult.errors.first : 'Invalid GPX file',
+          message: validationResult.errors.isNotEmpty
+              ? validationResult.errors.first
+              : 'Invalid GPX file',
         ));
         return;
       }
@@ -367,7 +368,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       // Parse the route from GPX
       final gpxContent = await event.gpxFile.readAsString();
       final parsedData = await _gpxService.parseGpxContent(gpxContent);
-      
+
       if (parsedData.trackPoints.isEmpty) {
         emit(RouteImportError.validation(
           message: 'Could not parse route from GPX file',
@@ -389,8 +390,10 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         distanceKm: parsedData.totalDistanceKm,
         elevationGainM: parsedData.elevationGainM,
         elevationLossM: parsedData.elevationLossM,
-        trailDifficulty: _calculateDifficulty(parsedData.totalDistanceKm, parsedData.elevationGainM),
-        elevationPoints: _createElevationPoints(parsedData.trackPoints, parsedData.totalDistanceKm),
+        trailDifficulty: _calculateDifficulty(
+            parsedData.totalDistanceKm, parsedData.elevationGainM),
+        elevationPoints: _createElevationPoints(
+            parsedData.trackPoints, parsedData.totalDistanceKm),
       );
 
       // Show preview
@@ -421,17 +424,17 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         emit(RouteImportError.network());
         return;
       }
-      
+
       // Parse GPX content
       final parsedData = await _gpxService.parseGpxContent(response.body);
-      
+
       if (parsedData.trackPoints.isEmpty) {
         emit(RouteImportError.validation(
           message: 'Could not parse route from URL',
         ));
         return;
       }
-      
+
       // Convert to Route object
       final route = Route(
         name: parsedData.name,
@@ -446,8 +449,10 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
         distanceKm: parsedData.totalDistanceKm,
         elevationGainM: parsedData.elevationGainM,
         elevationLossM: parsedData.elevationLossM,
-        trailDifficulty: _calculateDifficulty(parsedData.totalDistanceKm, parsedData.elevationGainM),
-        elevationPoints: _createElevationPoints(parsedData.trackPoints, parsedData.totalDistanceKm),
+        trailDifficulty: _calculateDifficulty(
+            parsedData.totalDistanceKm, parsedData.elevationGainM),
+        elevationPoints: _createElevationPoints(
+            parsedData.trackPoints, parsedData.totalDistanceKm),
       );
 
       // Show preview
@@ -459,7 +464,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       AppLogger.info('GPX imported from URL successfully: ${event.url}');
     } catch (e) {
       AppLogger.error('Error importing GPX from URL: $e');
-      if (e.toString().contains('network') || e.toString().contains('connection')) {
+      if (e.toString().contains('network') ||
+          e.toString().contains('connection')) {
         emit(RouteImportError.network());
       } else {
         emit(RouteImportError(message: 'Failed to import from URL: $e'));
@@ -476,10 +482,12 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       emit(RouteImportValidating(fileName: event.gpxFile.path.split('/').last));
 
       final validationResult = await _gpxService.validateGpxFile(event.gpxFile);
-      
+
       if (!validationResult.isValid) {
         emit(RouteImportError.validation(
-          message: validationResult.errors.isNotEmpty ? validationResult.errors.first : 'Invalid GPX file',
+          message: validationResult.errors.isNotEmpty
+              ? validationResult.errors.first
+              : 'Invalid GPX file',
         ));
         return;
       }
@@ -487,7 +495,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       // Parse the route for preview only - don't import yet
       final gpxContent = await event.gpxFile.readAsString();
       final parsedData = await _gpxService.parseGpxContent(gpxContent);
-      
+
       if (parsedData.trackPoints.isNotEmpty) {
         // Convert parsed data to Route object for preview
         final route = Route(
@@ -495,7 +503,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           description: parsedData.description,
           source: 'gpx_import',
           externalUrl: parsedData.externalUrl,
-          routePolyline: _encodePolyline(parsedData.trackPoints), // Use the same polyline encoding
+          routePolyline: _encodePolyline(
+              parsedData.trackPoints), // Use the same polyline encoding
           startLatitude: parsedData.trackPoints.first.latitude,
           startLongitude: parsedData.trackPoints.first.longitude,
           endLatitude: parsedData.trackPoints.last.latitude,
@@ -503,13 +512,15 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           distanceKm: parsedData.totalDistanceKm,
           elevationGainM: parsedData.elevationGainM,
           elevationLossM: parsedData.elevationLossM,
-          trailDifficulty: _calculateDifficulty(parsedData.totalDistanceKm, parsedData.elevationGainM),
-          elevationPoints: _createElevationPoints(parsedData.trackPoints, parsedData.totalDistanceKm),
+          trailDifficulty: _calculateDifficulty(
+              parsedData.totalDistanceKm, parsedData.elevationGainM),
+          elevationPoints: _createElevationPoints(
+              parsedData.trackPoints, parsedData.totalDistanceKm),
         );
-        
+
         // Store the GPX file path for later import
         _currentGpxFile = event.gpxFile;
-        
+
         emit(RouteImportValidated(
           route: route,
           warnings: validationResult.warnings,
@@ -554,7 +565,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       AppLogger.info('Found ${routes.length} routes for query: ${event.query}');
     } catch (e) {
       AppLogger.error('Error searching AllTrails routes: $e');
-      if (e.toString().contains('network') || e.toString().contains('connection')) {
+      if (e.toString().contains('network') ||
+          e.toString().contains('connection')) {
         emit(RouteImportError.network());
       } else {
         emit(RouteImportError(message: 'Failed to search routes: $e'));
@@ -592,7 +604,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       AppLogger.info('AllTrails route loaded: ${event.routeId}');
     } catch (e) {
       AppLogger.error('Error importing AllTrails route: $e');
-      if (e.toString().contains('network') || e.toString().contains('connection')) {
+      if (e.toString().contains('network') ||
+          e.toString().contains('connection')) {
         emit(RouteImportError.network());
       } else {
         emit(RouteImportError(message: 'Failed to import route: $e'));
@@ -625,23 +638,27 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
 
       // Import the route
       Route importedRoute;
-      
-      print('🔍 ConfirmImport: route.id=${event.route.id}, route.source=${event.route.source}, routePolyline.length=${event.route.routePolyline.length}');
+
+      print(
+          '🔍 ConfirmImport: route.id=${event.route.id}, route.source=${event.route.source}, routePolyline.length=${event.route.routePolyline.length}');
       print('🔍 ConfirmImport: _currentGpxFile=${_currentGpxFile?.path}');
-      
+
       if (event.route.id != null) {
         // Route already exists in backend, just reference it
         print('🔍 BRANCH 1: Using existing route with ID: ${event.route.id}');
         importedRoute = event.route;
-      } else if (event.route.source == 'gpx_import' && _currentGpxFile != null) {
+      } else if (event.route.source == 'gpx_import' &&
+          _currentGpxFile != null) {
         // This is a GPX import - import with the updated route data (including custom name)
-        print('🔍 BRANCH 2: Importing GPX file with custom name: ${event.route.name}');
+        print(
+            '🔍 BRANCH 2: Importing GPX file with custom name: ${event.route.name}');
         emit(const RouteImportInProgress(
           message: 'Importing GPX route...',
           progress: 0.3,
         ));
-        
-        importedRoute = await _gpxService.importGpxFileWithCustomData(_currentGpxFile!, event.route);
+
+        importedRoute = await _gpxService.importGpxFileWithCustomData(
+            _currentGpxFile!, event.route);
         print('🔍 GPX imported successfully with ID: ${importedRoute.id}');
       } else {
         // Create new route using the routes repository
@@ -650,13 +667,13 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
           message: 'Creating route...',
           progress: 0.3,
         ));
-        
+
         importedRoute = await _routesRepository.createRoute(event.route);
         print('🔍 Route created successfully with ID: ${importedRoute.id}');
       }
 
       PlannedRuck? plannedRuck;
-      
+
       // Create planned ruck if requested
       if (event.createPlannedRuck) {
         emit(const RouteImportInProgress(
@@ -677,7 +694,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
             userId: currentUser.userId,
             routeId: importedRoute.id!,
             route: importedRoute,
-            plannedDate: event.plannedDate ?? DateTime.now().add(const Duration(days: 1)),
+            plannedDate: event.plannedDate ??
+                DateTime.now().add(const Duration(days: 1)),
             status: PlannedRuckStatus.planned,
             notes: event.notes,
             createdAt: DateTime.now(),
@@ -693,7 +711,7 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       emit(RouteImportSuccess(
         importedRoute: importedRoute,
         plannedRuck: plannedRuck,
-        message: plannedRuck != null 
+        message: plannedRuck != null
             ? 'Route imported and planned ruck created'
             : 'Route imported successfully',
       ));
@@ -701,7 +719,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       AppLogger.info('Route import completed: ${importedRoute.id}');
     } catch (e) {
       AppLogger.error('Error confirming route import: $e');
-      if (e.toString().contains('network') || e.toString().contains('connection')) {
+      if (e.toString().contains('network') ||
+          e.toString().contains('connection')) {
         emit(RouteImportError.network());
       } else {
         emit(RouteImportError(message: 'Failed to import route: $e'));
@@ -735,24 +754,26 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
   /// Encode track points as a simple coordinate string polyline
   String _encodePolyline(List<GpxTrackPoint> trackPoints) {
     if (trackPoints.isEmpty) return '';
-    
+
     // Create a simple coordinate string format: "lat1,lng1;lat2,lng2;..."
     return trackPoints
-        .map((point) => '${point.latitude.toStringAsFixed(6)},${point.longitude.toStringAsFixed(6)}')
+        .map((point) =>
+            '${point.latitude.toStringAsFixed(6)},${point.longitude.toStringAsFixed(6)}')
         .join(';');
   }
 
   /// Calculate trail difficulty based on distance and elevation gain
   String _calculateDifficulty(double distanceKm, double? elevationGainM) {
     final elevation = elevationGainM ?? 0.0;
-    
+
     // Filter out obviously bad elevation data (negative values or extremely high values)
     // Reasonable elevation gain should be between 0 and 3000m for most routes
-    final cleanElevation = (elevation < 0 || elevation > 3000) ? 0.0 : elevation;
-    
+    final cleanElevation =
+        (elevation < 0 || elevation > 3000) ? 0.0 : elevation;
+
     // Calculate difficulty based on distance and elevation gain per km
     final elevationPerKm = distanceKm > 0 ? cleanElevation / distanceKm : 0.0;
-    
+
     // More reasonable difficulty thresholds
     if (distanceKm < 2.0 && cleanElevation < 50) {
       return 'easy';
@@ -760,7 +781,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       return 'easy';
     } else if (distanceKm < 10.0 && elevationPerKm < 100) {
       return 'moderate';
-    } else if (elevationPerKm < 150 || (distanceKm > 15 && elevationPerKm < 200)) {
+    } else if (elevationPerKm < 150 ||
+        (distanceKm > 15 && elevationPerKm < 200)) {
       return 'hard';
     } else {
       return 'extreme';
@@ -768,7 +790,8 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
   }
 
   /// Create elevation points from track points and total distance
-  List<RouteElevationPoint> _createElevationPoints(List<GpxTrackPoint> trackPoints, double totalDistanceKm) {
+  List<RouteElevationPoint> _createElevationPoints(
+      List<GpxTrackPoint> trackPoints, double totalDistanceKm) {
     if (trackPoints.isEmpty) return [];
 
     final List<RouteElevationPoint> elevationPoints = [];
@@ -778,11 +801,14 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
       final point1 = trackPoints[i];
       final point2 = trackPoints[i + 1];
 
-      final distanceBetweenPoints = _haversineDistance(point1.latitude, point1.longitude, point2.latitude, point2.longitude);
+      final distanceBetweenPoints = _haversineDistance(
+          point1.latitude, point1.longitude, point2.latitude, point2.longitude);
       currentDistance += distanceBetweenPoints;
 
       // Skip points with invalid elevation data
-      if (point1.elevation == null || point1.elevation! < -500 || point1.elevation! > 9000) {
+      if (point1.elevation == null ||
+          point1.elevation! < -500 ||
+          point1.elevation! > 9000) {
         continue;
       }
 
@@ -797,7 +823,9 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
 
     // Add the last point if it has valid elevation
     final lastPoint = trackPoints.last;
-    if (lastPoint.elevation != null && lastPoint.elevation! >= -500 && lastPoint.elevation! <= 9000) {
+    if (lastPoint.elevation != null &&
+        lastPoint.elevation! >= -500 &&
+        lastPoint.elevation! <= 9000) {
       elevationPoints.add(RouteElevationPoint(
         routeId: 'temp-route-id', // Temporary ID for preview
         distanceKm: totalDistanceKm,
@@ -811,13 +839,16 @@ class RouteImportBloc extends Bloc<RouteImportEvent, RouteImportState> {
   }
 
   /// Calculate distance between two GPS coordinates using the Haversine formula
-  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _haversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double R = 6371.0; // Radius of Earth in km
     final dLat = (lat2 - lat1) * math.pi / 180.0;
     final dLon = (lon2 - lon1) * math.pi / 180.0;
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1 * math.pi / 180.0) * math.cos(lat2 * math.pi / 180.0) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
+        math.cos(lat1 * math.pi / 180.0) *
+            math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     final distance = R * c; // Distance in km
     return distance;

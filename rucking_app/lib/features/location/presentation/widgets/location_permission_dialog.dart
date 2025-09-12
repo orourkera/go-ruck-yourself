@@ -55,16 +55,10 @@ class LocationPermissionDialog extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _buildPrecisionOption(
-              context,
-              true,
-              'Precise: For accurate tracking (recommended)'
-            ),
+                context, true, 'Precise: For accurate tracking (recommended)'),
             const SizedBox(height: 4),
             _buildPrecisionOption(
-              context,
-              false,
-              'Approximate: Less accurate but more private'
-            ),
+                context, false, 'Approximate: Less accurate but more private'),
             const SizedBox(height: 16),
             const Text(
               'Your privacy matters:',
@@ -133,18 +127,20 @@ class LocationPermissionDialog extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildPrecisionOption(
     BuildContext context,
     bool isPrecise,
     String description,
   ) {
     final bool isSelected = isPrecise == isPreciseLocationAvailable;
-    
+
     return Row(
       children: [
         Icon(
-          isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+          isSelected
+              ? Icons.radio_button_checked
+              : Icons.radio_button_unchecked,
           color: Theme.of(context).primaryColor,
           size: 20,
         ),
@@ -154,7 +150,9 @@ class LocationPermissionDialog extends StatelessWidget {
             description,
             style: TextStyle(
               fontSize: 14,
-              color: isSelected ? Theme.of(context).primaryColor : Colors.grey[700],
+              color: isSelected
+                  ? Theme.of(context).primaryColor
+                  : Colors.grey[700],
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),

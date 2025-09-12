@@ -15,16 +15,23 @@ class PublicProfileBloc extends Bloc<PublicProfileEvent, PublicProfileState> {
     on<ToggleFollow>(_onToggleFollow);
   }
 
-  Future<void> _onLoadPublicProfile(LoadPublicProfile event, Emitter<PublicProfileState> emit) async {
+  Future<void> _onLoadPublicProfile(
+      LoadPublicProfile event, Emitter<PublicProfileState> emit) async {
     emit(PublicProfileLoading());
     try {
       final profile = await repository.getPublicProfile(event.userId);
-      final stats = profile.isPrivateProfile ? null : await repository.getProfileStats(event.userId);
-      
+      final stats = profile.isPrivateProfile
+          ? null
+          : await repository.getProfileStats(event.userId);
+
       // Fetch clubs and recent rucks if profile is not private
-      final clubs = profile.isPrivateProfile ? null : await repository.getUserClubs(event.userId);
-      final recentRucks = profile.isPrivateProfile ? null : await repository.getRecentRucks(event.userId);
-      
+      final clubs = profile.isPrivateProfile
+          ? null
+          : await repository.getUserClubs(event.userId);
+      final recentRucks = profile.isPrivateProfile
+          ? null
+          : await repository.getRecentRucks(event.userId);
+
       emit(PublicProfileLoaded(
         profile: profile,
         stats: stats ?? UserProfileStats.empty(),
@@ -37,7 +44,8 @@ class PublicProfileBloc extends Bloc<PublicProfileEvent, PublicProfileState> {
     }
   }
 
-  Future<void> _onToggleFollow(ToggleFollow event, Emitter<PublicProfileState> emit) async {
+  Future<void> _onToggleFollow(
+      ToggleFollow event, Emitter<PublicProfileState> emit) async {
     if (state is PublicProfileLoaded) {
       final current = state as PublicProfileLoaded;
       emit(PublicProfileLoading());
@@ -46,7 +54,8 @@ class PublicProfileBloc extends Bloc<PublicProfileEvent, PublicProfileState> {
             ? await repository.unfollowUser(event.userId)
             : await repository.followUser(event.userId);
         if (success) {
-          final updatedProfile = current.profile.copyWith(isFollowing: !current.profile.isFollowing);
+          final updatedProfile = current.profile
+              .copyWith(isFollowing: !current.profile.isFollowing);
           emit(PublicProfileLoaded(
             profile: updatedProfile,
             stats: current.stats,
@@ -62,4 +71,4 @@ class PublicProfileBloc extends Bloc<PublicProfileEvent, PublicProfileState> {
       }
     }
   }
-} 
+}

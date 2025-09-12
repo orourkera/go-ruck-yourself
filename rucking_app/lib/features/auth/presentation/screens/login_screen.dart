@@ -42,11 +42,11 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() {
     if (_formKey.currentState!.validate()) {
       context.read<AuthBloc>().add(
-        AuthLoginRequested(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        ),
-      );
+            AuthLoginRequested(
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+            ),
+          );
     }
   }
 
@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 48),
-                  
+
                   // Title
                   Text(
                     'WELCOME BACK',
@@ -112,10 +112,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Google Sign-In Button
                   OutlinedButton.icon(
-                    onPressed: _handleGoogleLogin, 
+                    onPressed: _handleGoogleLogin,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       shape: RoundedRectangleBorder(
@@ -135,9 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Apple Sign-In Button (iOS only)
-                  if (Platform.isIOS) ...[  
+                  if (Platform.isIOS) ...[
                     OutlinedButton.icon(
                       onPressed: _handleAppleLogin,
                       style: OutlinedButton.styleFrom(
@@ -161,11 +161,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                   const SizedBox(height: 24),
-                  
+
                   // OR divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: AppColors.textDarkSecondary)),
+                      Expanded(
+                          child: Divider(color: AppColors.textDarkSecondary)),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -175,11 +176,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: AppColors.textDarkSecondary)),
+                      Expanded(
+                          child: Divider(color: AppColors.textDarkSecondary)),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Email field
                   CustomTextField(
                     controller: _emailController,
@@ -199,14 +201,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
                       }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(value)) {
                         return 'Please enter a valid email';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Password field
                   CustomTextField(
                     controller: _passwordController,
@@ -238,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Remember me and Forgot password
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -261,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      
+
                       // Forgot password
                       TextButton(
                         onPressed: () {
@@ -273,13 +276,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                         child: Text(
                           'Forgot password?',
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary),
+                          style: AppTextStyles.bodyMedium
+                              .copyWith(color: AppColors.primary),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Login button
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
@@ -291,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Register link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -328,4 +332,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-} 
+}

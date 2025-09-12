@@ -26,11 +26,13 @@ class DuelsRepositoryImpl implements DuelsRepository {
     int? limit,
     bool? userParticipating,
   }) async {
-    print('[DEBUG] DuelsRepositoryImpl.getDuels() - Starting with params: status=$status, challengeType=$challengeType, location=$location, limit=$limit, userParticipating=$userParticipating');
-    
+    print(
+        '[DEBUG] DuelsRepositoryImpl.getDuels() - Starting with params: status=$status, challengeType=$challengeType, location=$location, limit=$limit, userParticipating=$userParticipating');
+
     try {
-      print('[DEBUG] DuelsRepositoryImpl.getDuels() - Calling remoteDataSource.getDuels()');
-      
+      print(
+          '[DEBUG] DuelsRepositoryImpl.getDuels() - Calling remoteDataSource.getDuels()');
+
       final duelModels = await remoteDataSource.getDuels(
         status: status,
         challengeType: challengeType,
@@ -38,15 +40,19 @@ class DuelsRepositoryImpl implements DuelsRepository {
         limit: limit,
         userParticipating: userParticipating,
       );
-      
-      print('[DEBUG] DuelsRepositoryImpl.getDuels() - Successfully got ${duelModels.length} duels from data source');
+
+      print(
+          '[DEBUG] DuelsRepositoryImpl.getDuels() - Successfully got ${duelModels.length} duels from data source');
       return Right(duelModels);
     } on ServerException catch (e) {
-      print('[ERROR] DuelsRepositoryImpl.getDuels() - ServerException: ${e.message}');
+      print(
+          '[ERROR] DuelsRepositoryImpl.getDuels() - ServerException: ${e.message}');
       return Left(ServerFailure(message: e.message));
     } catch (e, stackTrace) {
-      print('[ERROR] DuelsRepositoryImpl.getDuels() - Unexpected exception: $e');
-      print('[ERROR] DuelsRepositoryImpl.getDuels() - Stack trace: $stackTrace');
+      print(
+          '[ERROR] DuelsRepositoryImpl.getDuels() - Unexpected exception: $e');
+      print(
+          '[ERROR] DuelsRepositoryImpl.getDuels() - Stack trace: $stackTrace');
       return Left(ServerFailure(message: 'Unexpected error occurred'));
     }
   }
@@ -148,12 +154,14 @@ class DuelsRepositoryImpl implements DuelsRepository {
     required String status,
   }) async {
     try {
-      await remoteDataSource.updateParticipantStatus(duelId, participantId, status);
+      await remoteDataSource.updateParticipantStatus(
+          duelId, participantId, status);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } catch (e) {
-      return Left(ServerFailure(message: 'Failed to update participant status'));
+      return Left(
+          ServerFailure(message: 'Failed to update participant status'));
     }
   }
 
@@ -185,19 +193,23 @@ class DuelsRepositoryImpl implements DuelsRepository {
     required String participantId,
   }) async {
     try {
-      final participantModel = await remoteDataSource.getParticipantProgress(duelId, participantId);
+      final participantModel =
+          await remoteDataSource.getParticipantProgress(duelId, participantId);
       return Right(participantModel);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
     } catch (e) {
-      return Left(ServerFailure(message: 'Failed to fetch participant progress'));
+      return Left(
+          ServerFailure(message: 'Failed to fetch participant progress'));
     }
   }
 
   @override
-  Future<Either<Failure, List<DuelParticipant>>> getDuelLeaderboard(String duelId) async {
+  Future<Either<Failure, List<DuelParticipant>>> getDuelLeaderboard(
+      String duelId) async {
     try {
-      final participantModels = await remoteDataSource.getDuelLeaderboard(duelId);
+      final participantModels =
+          await remoteDataSource.getDuelLeaderboard(duelId);
       return Right(participantModels);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
@@ -224,7 +236,8 @@ class DuelsRepositoryImpl implements DuelsRepository {
     int limit = 50,
   }) async {
     try {
-      final statsModels = await remoteDataSource.getDuelStatsLeaderboard(statType, limit);
+      final statsModels =
+          await remoteDataSource.getDuelStatsLeaderboard(statType, limit);
       return Right(statsModels);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
@@ -252,7 +265,8 @@ class DuelsRepositoryImpl implements DuelsRepository {
     String status = 'pending',
   }) async {
     try {
-      final invitationModels = await remoteDataSource.getDuelInvitations(status);
+      final invitationModels =
+          await remoteDataSource.getDuelInvitations(status);
       return Right(invitationModels);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
@@ -301,7 +315,8 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }
 
   @override
-  Future<Either<Failure, List<DuelComment>>> getDuelComments(String duelId) async {
+  Future<Either<Failure, List<DuelComment>>> getDuelComments(
+      String duelId) async {
     try {
       final commentModels = await remoteDataSource.getDuelComments(duelId);
       return Right(commentModels);
@@ -318,7 +333,8 @@ class DuelsRepositoryImpl implements DuelsRepository {
     required String content,
   }) async {
     try {
-      final commentModel = await remoteDataSource.createDuelComment(duelId, content);
+      final commentModel =
+          await remoteDataSource.createDuelComment(duelId, content);
       return Right(commentModel);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));
@@ -335,7 +351,7 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }) async {
     try {
       await remoteDataSource.updateDuelComment(duelId, commentId, content);
-      
+
       // Since the remote data source returns void, we need to return a placeholder comment
       // In a real implementation, you'd want to fetch the updated comment or modify the data source
       final updatedComment = DuelCommentModel(
@@ -398,11 +414,13 @@ class DuelsRepositoryImpl implements DuelsRepository {
   }
 
   @override
-  Future<Either<Failure, List<DuelSession>>> getDuelSessions(String duelId) async {
+  Future<Either<Failure, List<DuelSession>>> getDuelSessions(
+      String duelId) async {
     try {
       // TODO: Implement actual duel sessions functionality in remote data source
       // For now, return empty list - this would need to be implemented in the backend
-      await Future.delayed(const Duration(milliseconds: 300)); // Simulate network call
+      await Future.delayed(
+          const Duration(milliseconds: 300)); // Simulate network call
       return const Right([]);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message));

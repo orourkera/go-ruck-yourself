@@ -68,6 +68,8 @@ import 'package:rucking_app/features/profile/presentation/screens/followers_scre
 import 'package:rucking_app/features/profile/presentation/screens/advanced_calorie_settings_screen.dart';
 import 'package:rucking_app/features/goals/presentation/screens/goals_list_screen.dart';
 import 'package:rucking_app/features/goals/presentation/screens/goal_detail_screen.dart';
+import 'package:rucking_app/features/gear/presentation/screens/gear_home_screen.dart';
+import 'package:rucking_app/features/gear/presentation/screens/gear_detail_screen.dart';
 
 /// Main application widget
 class RuckingApp extends StatefulWidget {
@@ -81,24 +83,25 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
   late AppLifecycleService _lifecycleService;
   late AppLinks _appLinks;
   // Create a unique key with explicit identifier
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>(debugLabel: 'main_navigator');
+  final GlobalKey<NavigatorState> _navigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'main_navigator');
 
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize the lifecycle service
     _lifecycleService = getIt<AppLifecycleService>();
     _lifecycleService.initialize();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Initialize global navigation service
     NavigationService.instance.setNavigatorKey(_navigatorKey);
-    
+
     // Initialize deep links
     _appLinks = AppLinks();
     _initDeepLinks();
-    
+
     // Initialize DAU tracking service
     getIt<DauTrackingService>().initialize();
 
@@ -114,7 +117,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     }, onError: (err) {
       print('Deep link error: $err');
     });
-    
+
     // Handle initial URL when app is launched cold from a link
     _appLinks.getInitialLink().then((Uri? uri) {
       if (uri != null) {
@@ -132,14 +135,15 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     print('Deep link host: ${uri.host}');
     print('Deep link path: ${uri.path}');
     print('Deep link query: ${uri.query}');
-    
+
     // Clean up potentially duplicated URL
     String uriString = uri.toString();
     print('🔍 Original URL: $uriString');
-    
+
     // Handle extremely malformed URLs by extracting essential parts
-    if (uriString.contains('com.getrucky.app') && 
-        (uriString.contains('auth/callback') || uriString.contains('/callback'))) {
+    if (uriString.contains('com.getrucky.app') &&
+        (uriString.contains('auth/callback') ||
+            uriString.contains('/callback'))) {
       try {
         // Extract the essential parameters from the malformed URL
         String? accessToken;
@@ -148,7 +152,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         String? error;
         String? errorDescription;
         String? errorCode;
-        
+
         // Handle both query parameters (?) and hash fragments (#)
         String paramString = '';
         if (uriString.contains('?')) {
@@ -156,55 +160,66 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         } else if (uriString.contains('#')) {
           paramString = uriString.split('#').last;
         }
-        
+
         // Use regex to extract parameters from the mess
-        final accessTokenMatch = RegExp(r'access_token=([^&]+)').firstMatch(paramString);
-        final refreshTokenMatch = RegExp(r'refresh_token=([^&]+)').firstMatch(paramString);
-        final typeMatch = RegExp(r'(?<!token_)type=([^&]+)').firstMatch(paramString); // Exclude token_type
+        final accessTokenMatch =
+            RegExp(r'access_token=([^&]+)').firstMatch(paramString);
+        final refreshTokenMatch =
+            RegExp(r'refresh_token=([^&]+)').firstMatch(paramString);
+        final typeMatch = RegExp(r'(?<!token_)type=([^&]+)')
+            .firstMatch(paramString); // Exclude token_type
         final errorMatch = RegExp(r'error=([^&]+)').firstMatch(paramString);
-        final errorDescMatch = RegExp(r'error_description=([^&]+)').firstMatch(paramString);
-        final errorCodeMatch = RegExp(r'error_code=([^&]+)').firstMatch(paramString);
-        
-        if (accessTokenMatch != null) accessToken = Uri.decodeComponent(accessTokenMatch.group(1)!);
-        if (refreshTokenMatch != null) refreshToken = Uri.decodeComponent(refreshTokenMatch.group(1)!);
+        final errorDescMatch =
+            RegExp(r'error_description=([^&]+)').firstMatch(paramString);
+        final errorCodeMatch =
+            RegExp(r'error_code=([^&]+)').firstMatch(paramString);
+
+        if (accessTokenMatch != null)
+          accessToken = Uri.decodeComponent(accessTokenMatch.group(1)!);
+        if (refreshTokenMatch != null)
+          refreshToken = Uri.decodeComponent(refreshTokenMatch.group(1)!);
         if (typeMatch != null) type = Uri.decodeComponent(typeMatch.group(1)!);
-        if (errorMatch != null) error = Uri.decodeComponent(errorMatch.group(1)!);
-        if (errorDescMatch != null) errorDescription = Uri.decodeComponent(errorDescMatch.group(1)!);
-        if (errorCodeMatch != null) errorCode = Uri.decodeComponent(errorCodeMatch.group(1)!);
-        
+        if (errorMatch != null)
+          error = Uri.decodeComponent(errorMatch.group(1)!);
+        if (errorDescMatch != null)
+          errorDescription = Uri.decodeComponent(errorDescMatch.group(1)!);
+        if (errorCodeMatch != null)
+          errorCode = Uri.decodeComponent(errorCodeMatch.group(1)!);
+
         // Keep the original com.getrucky.app scheme since that's what Supabase is configured for
         String cleanUrl = 'com.getrucky.app://auth/callback';
         List<String> params = [];
-        
+
         if (accessToken != null) params.add('access_token=$accessToken');
         if (refreshToken != null) params.add('refresh_token=$refreshToken');
         if (type != null) params.add('type=$type');
         if (error != null) params.add('error=$error');
-        if (errorDescription != null) params.add('error_description=$errorDescription');
+        if (errorDescription != null)
+          params.add('error_description=$errorDescription');
         if (errorCode != null) params.add('error_code=$errorCode');
-        
+
         if (params.isNotEmpty) {
           cleanUrl += '?' + params.join('&');
         }
-        
+
         uriString = cleanUrl;
         uri = Uri.parse(uriString);
         print('🔧 Rebuilt clean URL: $uri');
-        
       } catch (e) {
         print('❌ Failed to clean malformed URL: $e');
         return; // Skip processing this malformed URL
       }
     }
-    
+
     // Handle various malformed URL patterns for both Android and iOS schemes
-    if (uriString.contains('com.ruck.app://auth/callbackcom.ruck.app://auth/callback') ||
+    if (uriString.contains(
+            'com.ruck.app://auth/callbackcom.ruck.app://auth/callback') ||
         uriString.contains('/callbackcom.ruck.app://auth/callback') ||
         uriString.contains('callbackcom.ruck.app://auth/callback') ||
-        uriString.contains('com.goruckyourself.app://auth/callbackcom.goruckyourself.app://auth/callback') ||
+        uriString.contains(
+            'com.goruckyourself.app://auth/callbackcom.goruckyourself.app://auth/callback') ||
         uriString.contains('/callbackcom.goruckyourself.app://auth/callback') ||
         uriString.contains('callbackcom.goruckyourself.app://auth/callback')) {
-      
       // Fix duplicated URL by finding the last valid occurrence
       String targetScheme = '';
       if (uriString.contains('com.ruck.app')) {
@@ -213,7 +228,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         targetScheme = 'com.goruckyourself.app://auth/callback';
       }
       final lastIndex = uriString.lastIndexOf(targetScheme);
-      
+
       if (lastIndex >= 0) {
         // Extract from the last valid occurrence
         uriString = uriString.substring(lastIndex);
@@ -221,24 +236,27 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         print('🔧 Fixed malformed URL: $uri');
       }
     }
-    
+
     // Check if this is an auth callback (custom scheme OR universal link)
     bool isAuthCallbackOld = false;
-    
+
     // Handle both URI parsing formats:
-  // Legacy: com.getrucky.app://auth/callback (path == '/auth/callback')
-  // Current: com.getrucky.app://auth/callback (host == 'auth', path == '/callback')
-  if ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app' || uri.scheme == 'com.getrucky.app') && 
-      (uri.path == '/auth/callback' || (uri.host == 'auth' && uri.path == '/callback'))) {
-    isAuthCallbackOld = true;
-    print('✅ Custom scheme auth callback detected for ${uri.scheme}');
-  } else if (uri.scheme == 'https' && 
-             uri.host == 'getrucky.com' && 
-             uri.path == '/auth/callback') {
-    isAuthCallbackOld = true;
-    print('✅ Universal Link auth callback detected');
-  }
-    
+    // Legacy: com.getrucky.app://auth/callback (path == '/auth/callback')
+    // Current: com.getrucky.app://auth/callback (host == 'auth', path == '/callback')
+    if ((uri.scheme == 'com.ruck.app' ||
+            uri.scheme == 'com.goruckyourself.app' ||
+            uri.scheme == 'com.getrucky.app') &&
+        (uri.path == '/auth/callback' ||
+            (uri.host == 'auth' && uri.path == '/callback'))) {
+      isAuthCallbackOld = true;
+      print('✅ Custom scheme auth callback detected for ${uri.scheme}');
+    } else if (uri.scheme == 'https' &&
+        uri.host == 'getrucky.com' &&
+        uri.path == '/auth/callback') {
+      isAuthCallbackOld = true;
+      print('✅ Universal Link auth callback detected');
+    }
+
     if (isAuthCallbackOld) {
       print('🔗 Processing auth callback with URI: $uri');
       // Navigate to auth callback screen
@@ -248,18 +266,24 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       );
       return; // Exit early after handling auth callback
     }
-    
+
     // Check if this is an event deeplink
     bool isEventDeeplink = false;
     String? eventId;
-    
+
     // Handle event deeplinks: https://getrucky.com/events/123 or com.ruck.app://event/123 or com.goruckyourself.app://event/123
-    if ((uri.scheme == 'https' && uri.host == 'getrucky.com' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'events') ||
-        ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app') && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'event')) {
+    if ((uri.scheme == 'https' &&
+            uri.host == 'getrucky.com' &&
+            uri.pathSegments.length >= 2 &&
+            uri.pathSegments[0] == 'events') ||
+        ((uri.scheme == 'com.ruck.app' ||
+                uri.scheme == 'com.goruckyourself.app') &&
+            uri.pathSegments.length >= 2 &&
+            uri.pathSegments[0] == 'event')) {
       isEventDeeplink = true;
       eventId = uri.pathSegments[1];
     }
-    
+
     if (isEventDeeplink && eventId != null) {
       print('🎯 Processing event deeplink for event ID: $eventId');
       // Navigate to event detail screen
@@ -269,18 +293,24 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       );
       return;
     }
-    
+
     // Check if this is a club deeplink
     bool isClubDeeplink = false;
     String? clubId;
-    
+
     // Handle club deeplinks: https://getrucky.com/clubs/123 or com.ruck.app://club/123 or com.goruckyourself.app://club/123
-    if ((uri.scheme == 'https' && uri.host == 'getrucky.com' && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'clubs') ||
-        ((uri.scheme == 'com.ruck.app' || uri.scheme == 'com.goruckyourself.app') && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'club')) {
+    if ((uri.scheme == 'https' &&
+            uri.host == 'getrucky.com' &&
+            uri.pathSegments.length >= 2 &&
+            uri.pathSegments[0] == 'clubs') ||
+        ((uri.scheme == 'com.ruck.app' ||
+                uri.scheme == 'com.goruckyourself.app') &&
+            uri.pathSegments.length >= 2 &&
+            uri.pathSegments[0] == 'club')) {
       isClubDeeplink = true;
       clubId = uri.pathSegments[1];
     }
-    
+
     if (isClubDeeplink && clubId != null) {
       print('🔗 Processing club deeplink for club ID: $clubId');
       // Navigate to club detail screen
@@ -290,52 +320,53 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       );
       return;
     }
-    
+
     // Check if this is a route/activity URL that should be imported
     bool isRouteUrl = false;
     String? platformName;
-    
+
     // Handle AllTrails URLs: https://www.alltrails.com/trail/...
-    if (uri.scheme == 'https' && 
+    if (uri.scheme == 'https' &&
         (uri.host == 'alltrails.com' || uri.host == 'www.alltrails.com') &&
         uri.path.contains('/trail/')) {
       isRouteUrl = true;
       platformName = 'AllTrails';
     }
-    
+
     // Handle Strava URLs: https://www.strava.com/routes/... or https://www.strava.com/activities/...
-    else if (uri.scheme == 'https' && 
+    else if (uri.scheme == 'https' &&
         (uri.host == 'strava.com' || uri.host == 'www.strava.com') &&
         (uri.path.contains('/routes/') || uri.path.contains('/activities/'))) {
       isRouteUrl = true;
       platformName = 'Strava';
     }
-    
+
     // Handle Garmin Connect URLs: https://connect.garmin.com/modern/course/...
-    else if (uri.scheme == 'https' && 
+    else if (uri.scheme == 'https' &&
         uri.host == 'connect.garmin.com' &&
         uri.path.contains('/course/')) {
       isRouteUrl = true;
       platformName = 'Garmin Connect';
     }
-    
+
     // Handle Komoot URLs: https://www.komoot.com/tour/...
-    else if (uri.scheme == 'https' && 
+    else if (uri.scheme == 'https' &&
         (uri.host == 'komoot.com' || uri.host == 'www.komoot.com') &&
         uri.path.contains('/tour/')) {
       isRouteUrl = true;
       platformName = 'Komoot';
     }
-    
+
     // Handle MapMyRun/MapMyRide URLs: https://www.mapmyrun.com/routes/...
-    else if (uri.scheme == 'https' && 
-        (uri.host?.contains('mapmyrun.com') == true || 
-         uri.host?.contains('mapmyride.com') == true) &&
+    else if (uri.scheme == 'https' &&
+        (uri.host?.contains('mapmyrun.com') == true ||
+            uri.host?.contains('mapmyride.com') == true) &&
         uri.path.contains('/routes/')) {
       isRouteUrl = true;
-      platformName = uri.host?.contains('mapmyrun.com') == true ? 'MapMyRun' : 'MapMyRide';
+      platformName =
+          uri.host?.contains('mapmyrun.com') == true ? 'MapMyRun' : 'MapMyRide';
     }
-    
+
     if (isRouteUrl && platformName != null) {
       print('🗺️ Processing $platformName URL: ${uri.toString()}');
       // Navigate to route import screen with the URL
@@ -349,7 +380,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       );
       return;
     }
-    
+
     // If we get here, it's an unknown deeplink format
     print('❌ Unknown deeplink format:');
     print('  URI: $uri');
@@ -363,10 +394,10 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
   void dispose() {
     _lifecycleService.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    
+
     // Clean up DAU tracking service
     getIt<DauTrackingService>().dispose();
-    
+
     super.dispose();
   }
 
@@ -375,35 +406,36 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
     // The AppLifecycleService automatically handles this via WidgetsBindingObserver
   }
-  
+
   @override
   void didHaveMemoryPressure() {
     super.didHaveMemoryPressure();
     _handleMemoryPressure();
   }
-  
+
   /// Handle memory pressure events (Flutter equivalent of Android's onTrimMemory)
   void _handleMemoryPressure() {
     try {
-      print('🚨 System memory pressure detected - triggering emergency cleanup');
-      
+      print(
+          '🚨 System memory pressure detected - triggering emergency cleanup');
+
       // Get the active session bloc if it exists
-      final activeSessionBloc = getIt.isRegistered<ActiveSessionBloc>() 
-          ? getIt<ActiveSessionBloc>() 
+      final activeSessionBloc = getIt.isRegistered<ActiveSessionBloc>()
+          ? getIt<ActiveSessionBloc>()
           : null;
-      
+
       if (activeSessionBloc != null) {
         // Trigger emergency upload to preserve data
         activeSessionBloc.add(const MemoryPressureDetected());
-        
+
         print('✅ Memory pressure event sent to ActiveSessionBloc');
       } else {
         print('ℹ️ No active session - memory pressure handled by system');
       }
-      
+
       // Log memory pressure event for monitoring
-      AppLogger.warning('System memory pressure detected - triggering cleanup - Platform: ${Platform.isAndroid ? 'android' : 'ios'}, Has active session: ${activeSessionBloc != null}, Timestamp: ${DateTime.now().toIso8601String()}');
-      
+      AppLogger.warning(
+          'System memory pressure detected - triggering cleanup - Platform: ${Platform.isAndroid ? 'android' : 'ios'}, Has active session: ${activeSessionBloc != null}, Timestamp: ${DateTime.now().toIso8601String()}');
     } catch (e) {
       print('❌ Error handling memory pressure: $e');
       AppLogger.error('Memory pressure handling failed: $e');
@@ -449,7 +481,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
           create: (context) {
             final bloc = getIt<NotificationBloc>()
               ..add(const NotificationsRequested())
-              ..startPolling(interval: const Duration(seconds: 30)); // More frequent polling
+              ..startPolling(
+                  interval:
+                      const Duration(seconds: 30)); // More frequent polling
             // Set bloc reference in lifecycle service
             _lifecycleService.setBlocReferences(notificationBloc: bloc);
             return bloc;
@@ -465,12 +499,14 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, authState) {
           // Get the current user from the auth state
-          final user = authState is Authenticated ? (authState as Authenticated).user : null;
-          
+          final user = authState is Authenticated
+              ? (authState as Authenticated).user
+              : null;
+
           // Get the current theme mode
           final brightness = MediaQuery.platformBrightnessOf(context);
           final isDarkMode = brightness == Brightness.dark;
-          
+
           return BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
               debugPrint('🔄 AuthBloc state changed: ${state.runtimeType}');
@@ -480,7 +516,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   final navigator = _navigatorKey.currentState;
                   if (navigator != null && navigator.mounted) {
                     // Clear any existing routes completely to prevent widget conflicts
-                    navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+                    navigator.pushNamedAndRemoveUntil(
+                        '/login', (route) => false);
                   }
                 });
               }
@@ -499,16 +536,36 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                   // Add builder to handle theme transitions more gracefully
                   builder: (context, child) {
                     return MediaQuery(
-                      data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+                      data:
+                          MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
                       child: child ?? const SizedBox.shrink(),
                     );
                   },
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
+                  onGenerateRoute: (settings) {
+                    switch (settings.name) {
+                      case '/gear':
+                        return MaterialPageRoute(
+                            builder: (_) => const GearHomeScreen());
+                      case '/gear/detail':
+                        final args = settings.arguments;
+                        if (args is Map<String, dynamic>) {
+                          return MaterialPageRoute(
+                            builder: (_) => GearDetailScreen(item: args),
+                          );
+                        }
+                        return MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(title: const Text('Error')),
+                            body: const Center(
+                                child: Text('Missing gear item data')),
+                          ),
+                        );
                       case '/home':
-                        return MaterialPageRoute(builder: (_) => const HomeScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const HomeScreen());
                       case '/goals':
-                        return MaterialPageRoute(builder: (_) => const GoalsListScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const GoalsListScreen());
                       case '/login':
                         return MaterialPageRoute(builder: (_) => LoginScreen());
                       case '/auth_callback':
@@ -524,7 +581,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         String? token;
                         String? accessToken;
                         String? refreshToken;
-                        
+
                         if (args is Map<String, dynamic>) {
                           // New format with both tokens
                           accessToken = args['access_token'] as String?;
@@ -535,7 +592,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           token = args;
                           accessToken = args;
                         }
-                        
+
                         return MaterialPageRoute(
                           builder: (_) => PasswordResetScreen(
                             token: token,
@@ -544,15 +601,18 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           ),
                         );
                       case '/paywall':
-                        return MaterialPageRoute(builder: (_) => const PaywallScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const PaywallScreen());
                       case '/ruck_buddies':
-                        return MaterialPageRoute(builder: (_) => const RuckBuddiesScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const RuckBuddiesScreen());
                       case '/achievements':
                         return MaterialPageRoute(
                           builder: (_) => const AchievementsHubScreen(),
                         );
                       case '/profile':
-                        return MaterialPageRoute(builder: (_) => const ProfileScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const ProfileScreen());
                       case '/notification_settings':
                         return MaterialPageRoute(
                           builder: (_) => const NotificationSettingsScreen(),
@@ -565,25 +625,33 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         final args = settings.arguments;
                         if (args is RuckSession) {
                           return MaterialPageRoute(
-                            builder: (_) => PostSessionUpsellScreen(session: args),
+                            builder: (_) =>
+                                PostSessionUpsellScreen(session: args),
                           );
                         }
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: const Text('Error')),
-                            body: const Center(child: Text('Missing session data for upsell.')),
+                            body: const Center(
+                                child:
+                                    Text('Missing session data for upsell.')),
                           ),
                         );
                       case '/session_complete':
-                        final args = settings.arguments as Map<String, dynamic>?;
+                        final args =
+                            settings.arguments as Map<String, dynamic>?;
                         if (args != null) {
                           return MaterialPageRoute(
                             builder: (context) => BlocProvider<HealthBloc>(
                               create: (context) => HealthBloc(
                                 healthService: getIt<HealthService>(),
-                                userId: context.read<AuthBloc>().state is Authenticated
-                                  ? (context.read<AuthBloc>().state as Authenticated).user.userId
-                                  : null,
+                                userId: context.read<AuthBloc>().state
+                                        is Authenticated
+                                    ? (context.read<AuthBloc>().state
+                                            as Authenticated)
+                                        .user
+                                        .userId
+                                    : null,
                               ),
                               child: SessionCompleteScreen(
                                 completedAt: args['completedAt'] as DateTime,
@@ -595,11 +663,14 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                                 elevationLoss: args['elevationLoss'] as double,
                                 ruckWeight: args['ruckWeight'] as double,
                                 initialNotes: args['initialNotes'] as String?,
-                                heartRateSamples: args['heartRateSamples'] as List<HeartRateSample>?,
+                                heartRateSamples: args['heartRateSamples']
+                                    as List<HeartRateSample>?,
                                 splits: args['splits'] as List<SessionSplit>?,
-                                terrainSegments: args['terrainSegments'] as List<TerrainSegment>?,
+                                terrainSegments: args['terrainSegments']
+                                    as List<TerrainSegment>?,
                                 isManual: args['isManual'] as bool? ?? false,
-                                aiCompletionInsight: args['aiCompletionInsight'] as String?,
+                                aiCompletionInsight:
+                                    args['aiCompletionInsight'] as String?,
                               ),
                             ),
                           );
@@ -608,17 +679,20 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           return MaterialPageRoute(
                             builder: (_) => Scaffold(
                               appBar: AppBar(title: const Text('Error')),
-                              body: const Center(child: Text('Missing session data.')),
+                              body: const Center(
+                                  child: Text('Missing session data.')),
                             ),
                           );
                         }
                       case '/active_session':
                         final args = settings.arguments;
                         // --- BEGIN EXTRA DIAGNOSTIC LOGGING (remove after bug fixed) ---
-                        debugPrint('[Route] /active_session args runtimeType: ${args.runtimeType}');
+                        debugPrint(
+                            '[Route] /active_session args runtimeType: ${args.runtimeType}');
                         // If this is not ActiveSessionArgs, log its content for inspection
                         if (args is Map) {
-                          (args as Map).forEach((k, v) => debugPrint('  $k => $v (type: ${v.runtimeType})'));
+                          (args as Map).forEach((k, v) => debugPrint(
+                              '  $k => $v (type: ${v.runtimeType})'));
                         }
                         // --- END EXTRA DIAGNOSTIC LOGGING ---
                         if (args is ActiveSessionArgs) {
@@ -629,10 +703,12 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: const Text('Error')),
-                            body: const Center(child: Text('Invalid arguments for active session')),
+                            body: const Center(
+                                child: Text(
+                                    'Invalid arguments for active session')),
                           ),
                         );
-                      
+
                       // Duels feature routes
                       case '/duels':
                         return MaterialPageRoute(
@@ -678,22 +754,25 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         );
                       case '/auth/callback':
                         // Parse the full URI from the route settings
-                        final uri = Uri.parse('https://getrucky.com${settings.name}?${settings.arguments ?? ''}');
+                        final uri = Uri.parse(
+                            'https://getrucky.com${settings.name}?${settings.arguments ?? ''}');
                         return MaterialPageRoute(
                           builder: (_) => AuthCallbackScreen(uri: uri),
                         );
                       case '/callback':
                         // Debug logging to see what we're receiving
-                        print('🔍 /callback route - settings.name: ${settings.name}');
-                        print('🔍 /callback route - settings.arguments: ${settings.arguments}');
-                        
+                        print(
+                            '🔍 /callback route - settings.name: ${settings.name}');
+                        print(
+                            '🔍 /callback route - settings.arguments: ${settings.arguments}');
+
                         String fullUrl = settings.name ?? '/callback';
                         if (settings.arguments != null) {
                           fullUrl += '?${settings.arguments}';
                         }
-                        
+
                         print('🔍 /callback route - fullUrl: $fullUrl');
-                        
+
                         // Handle Supabase redirects that come to /callback instead of /auth/callback
                         // Parse the URL properly, including fragment parameters
                         Uri uri;
@@ -719,12 +798,13 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           // Fallback if parsing fails
                           uri = Uri.parse('https://getrucky.com/auth/callback');
                         }
-                        
+
                         return MaterialPageRoute(
                           builder: (_) => AuthCallbackScreen(uri: uri),
                         );
                       case '/clubs':
-                        return MaterialPageRoute(builder: (_) => const ClubsScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const ClubsScreen());
                       case '/club_detail':
                         final clubId = settings.arguments as String?;
                         if (clubId != null) {
@@ -739,39 +819,43 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           ),
                         );
                       case '/create_club':
-                        return MaterialPageRoute(builder: (_) => const CreateClubScreen());
+                        return MaterialPageRoute(
+                            builder: (_) => const CreateClubScreen());
                       case '/edit_club':
                         final clubDetails = settings.arguments as ClubDetails?;
                         if (clubDetails != null) {
                           return MaterialPageRoute(
-                            builder: (_) => CreateClubScreen(clubToEdit: clubDetails),
+                            builder: (_) =>
+                                CreateClubScreen(clubToEdit: clubDetails),
                           );
                         }
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: const Text('Error')),
-                            body: const Center(child: Text('Missing club details')),
+                            body: const Center(
+                                child: Text('Missing club details')),
                           ),
                         );
-                      
+
                       // Ruck Session routes
                       case '/create_session':
-                        final args = settings.arguments as Map<String, dynamic>?;
+                        final args =
+                            settings.arguments as Map<String, dynamic>?;
                         String? eventId;
                         String? eventTitle;
-                        
+
                         if (args != null) {
                           eventId = args['event_id'] as String?;
                           eventTitle = args['event_title'] as String?;
                         }
-                        
+
                         return MaterialPageRoute(
                           builder: (_) => CreateSessionScreen(
                             eventId: eventId,
                             eventTitle: eventTitle,
                           ),
                         );
-                      
+
                       // Session editing route
                       case '/session_edit':
                         final session = settings.arguments as RuckSession?;
@@ -785,10 +869,11 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: const Text('Error')),
-                            body: const Center(child: Text('Missing session data')),
+                            body: const Center(
+                                child: Text('Missing session data')),
                           ),
                         );
-                      
+
                       // Events feature routes
                       case '/event_detail':
                         final eventId = settings.arguments as String?;
@@ -826,7 +911,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                           builder: (_) => const MyRucksScreen(),
                         );
                       case '/route_import':
-                        final args = settings.arguments as Map<String, dynamic>?;
+                        final args =
+                            settings.arguments as Map<String, dynamic>?;
                         return MaterialPageRoute(
                           builder: (_) => RouteImportScreen(
                             initialUrl: args?['source_url'] as String?,
@@ -851,50 +937,66 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         return MaterialPageRoute(
                           builder: (_) => const RouteSearchScreen(),
                         );
-                      
+
                       default:
                         // Handle dynamic routes
                         if (settings.name != null) {
                           final path = settings.name!;
-                          
+
                           // Handle followers route: /profile/<userId>/followers
-                          if (path.startsWith('/profile/') && path.endsWith('/followers')) {
+                          if (path.startsWith('/profile/') &&
+                              path.endsWith('/followers')) {
                             final parts = path.split('/');
                             final userId = parts.length > 2 ? parts[2] : '';
                             if (userId.isNotEmpty) {
-                              return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
-                                create: (_) => getIt<SocialListBloc>(),
-                                child: FollowersScreen(userId: userId, title: 'Followers', isFollowersPage: true),
-                              ));
+                              return MaterialPageRoute(
+                                  builder: (_) => BlocProvider<SocialListBloc>(
+                                        create: (_) => getIt<SocialListBloc>(),
+                                        child: FollowersScreen(
+                                            userId: userId,
+                                            title: 'Followers',
+                                            isFollowersPage: true),
+                                      ));
                             }
                           }
-                          
+
                           // Handle following route: /profile/<userId>/following
-                          if (path.startsWith('/profile/') && path.endsWith('/following')) {
+                          if (path.startsWith('/profile/') &&
+                              path.endsWith('/following')) {
                             final parts = path.split('/');
                             final userId = parts.length > 2 ? parts[2] : '';
                             if (userId.isNotEmpty) {
-                              return MaterialPageRoute(builder: (_) => BlocProvider<SocialListBloc>(
-                                create: (_) => getIt<SocialListBloc>(),
-                                child: FollowersScreen(userId: userId, title: 'Following', isFollowersPage: false),
-                              ));
+                              return MaterialPageRoute(
+                                  builder: (_) => BlocProvider<SocialListBloc>(
+                                        create: (_) => getIt<SocialListBloc>(),
+                                        child: FollowersScreen(
+                                            userId: userId,
+                                            title: 'Following',
+                                            isFollowersPage: false),
+                                      ));
                             }
                           }
-                          
+
                           // Handle public profile route: /profile/<userId>
-                          if (path.startsWith('/profile/') && !path.contains('/followers') && !path.contains('/following')) {
+                          if (path.startsWith('/profile/') &&
+                              !path.contains('/followers') &&
+                              !path.contains('/following')) {
                             final userId = path.substring('/profile/'.length);
                             if (userId.isNotEmpty) {
                               return MaterialPageRoute(builder: (_) {
-                                final authState = BlocProvider.of<AuthBloc>(context).state;
-                                final currentUserId = authState is Authenticated ? authState.user.userId : '';
+                                final authState =
+                                    BlocProvider.of<AuthBloc>(context).state;
+                                final currentUserId = authState is Authenticated
+                                    ? authState.user.userId
+                                    : '';
                                 if (userId == currentUserId) {
                                   return const ProfileScreen();
                                 }
                                 return BlocProvider<PublicProfileBloc>(
-                                    create: (_) => getIt<PublicProfileBloc>()..add(LoadPublicProfile(userId)),
-                                    child: PublicProfileScreen(userId: userId),
-                                  );
+                                  create: (_) => getIt<PublicProfileBloc>()
+                                    ..add(LoadPublicProfile(userId)),
+                                  child: PublicProfileScreen(userId: userId),
+                                );
                               });
                             }
                           }
@@ -903,17 +1005,19 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                         return MaterialPageRoute(
                           builder: (_) => Scaffold(
                             appBar: AppBar(title: const Text('Error')),
-                            body: Center(child: Text('Route not found: ${settings.name}')),
+                            body: Center(
+                                child:
+                                    Text('Route not found: ${settings.name}')),
                           ),
                         );
                     }
                   },
-                ); 
-              },          // ← closes AnimatedBuilder's builder function
-            ),           // ← closes AnimatedBuilder widget
-          );          // ← closes BlocListener
-        },          // ← closes BlocBuilder's builder function
-      ),             // ← closes BlocBuilder widget
-    );             // ← closes MultiBlocProvider
+                );
+              }, // ← closes AnimatedBuilder's builder function
+            ), // ← closes AnimatedBuilder widget
+          ); // ← closes BlocListener
+        }, // ← closes BlocBuilder's builder function
+      ), // ← closes BlocBuilder widget
+    ); // ← closes MultiBlocProvider
   }
 }

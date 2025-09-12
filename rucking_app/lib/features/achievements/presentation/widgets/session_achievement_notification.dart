@@ -59,8 +59,8 @@ class SessionAchievementNotification extends StatelessWidget {
                   const SizedBox(width: 8.0),
                   Expanded(
                     child: Text(
-                      hasMultiple 
-                          ? 'New Achievements Unlocked!' 
+                      hasMultiple
+                          ? 'New Achievements Unlocked!'
                           : 'Achievement Unlocked!',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -77,17 +77,17 @@ class SessionAchievementNotification extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16.0),
-              
+
               // Achievement display
               if (hasMultiple)
                 _buildMultipleAchievements(theme)
               else
                 _buildSingleAchievement(theme, achievement),
-              
+
               const SizedBox(height: 16.0),
-              
+
               // Action buttons
               Row(
                 children: [
@@ -105,9 +105,7 @@ class SessionAchievementNotification extends StatelessWidget {
                         child: const Text('View Details'),
                       ),
                     ),
-                  
                   const SizedBox(width: 12.0),
-                  
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showAllAchievements(context),
@@ -157,7 +155,8 @@ class SessionAchievementNotification extends StatelessWidget {
               ),
               const SizedBox(height: 8.0),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                 decoration: BoxDecoration(
                   color: _getTierColor(achievement),
                   borderRadius: BorderRadius.circular(12.0),
@@ -198,33 +197,33 @@ class SessionAchievementNotification extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: List.generate(newAchievements.length, (index) {
-              final achievement = newAchievements[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 12.0),
-                child: Column(
-                  children: [
-                    AchievementBadge(
-                      achievement: achievement,
-                      isEarned: true,
-                      size: 50,
-                    ),
-                    const SizedBox(height: 4.0),
-                    SizedBox(
-                      width: 60,
-                      child: Text(
-                        achievement.name,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 10,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                final achievement = newAchievements[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: Column(
+                    children: [
+                      AchievementBadge(
+                        achievement: achievement,
+                        isEarned: true,
+                        size: 50,
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                      const SizedBox(height: 4.0),
+                      SizedBox(
+                        width: 60,
+                        child: Text(
+                          achievement.name,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
             ),
           ),
         ),

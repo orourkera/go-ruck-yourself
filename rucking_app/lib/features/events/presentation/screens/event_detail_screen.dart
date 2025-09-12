@@ -44,7 +44,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   late EventCommentsBloc _commentsBloc;
   late EventProgressBloc _progressBloc;
   late TabController _tabController;
-  
+
   EventDetails? _eventDetails;
 
   @override
@@ -54,7 +54,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     _commentsBloc = getIt<EventCommentsBloc>();
     _progressBloc = getIt<EventProgressBloc>();
     _tabController = TabController(length: 3, vsync: this);
-    
+
     // Load event details first
     _eventsBloc.add(LoadEventDetails(widget.eventId));
     // Comments and leaderboard will be loaded after we get event details
@@ -74,12 +74,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     if (event.isCreator) {
       return true;
     }
-    
+
     // Participants (approved or pending) have access
     if (event.isUserParticipating) {
       return true;
     }
-    
+
     // All other users don't have access
     return false;
   }
@@ -87,7 +87,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   /// Build unauthorized access message for restricted tabs
   Widget _buildUnauthorizedTab(String message) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -132,13 +132,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       child: Scaffold(
         body: BlocConsumer<EventsBloc, EventsState>(
           listener: (context, state) {
-            print('🎯 EventDetail BlocListener triggered with state: ${state.runtimeType}');
-            
+            print(
+                '🎯 EventDetail BlocListener triggered with state: ${state.runtimeType}');
+
             if (state is EventDetailsLoaded) {
               setState(() {
                 _eventDetails = state.eventDetails;
               });
-              
+
               // Only load comments and leaderboard if user is authorized
               final event = state.eventDetails.event;
               if (_canAccessEventData(event)) {
@@ -146,21 +147,23 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 _progressBloc.add(LoadEventLeaderboard(widget.eventId));
               }
             } else if (state is EventActionSuccess) {
-              print('✅ EventActionSuccess received: sessionId=${state.sessionId}, eventId=${state.eventId}');
-              
+              print(
+                  '✅ EventActionSuccess received: sessionId=${state.sessionId}, eventId=${state.eventId}');
+
               StyledSnackBar.showSuccess(
                 context: context,
                 message: state.message,
               );
-              
+
               if (state.shouldRefresh) {
                 _eventsBloc.add(LoadEventDetails(widget.eventId));
                 // Only refresh leaderboard if user is authorized
-                if (_eventDetails != null && _canAccessEventData(_eventDetails!.event)) {
+                if (_eventDetails != null &&
+                    _canAccessEventData(_eventDetails!.event)) {
                   _progressBloc.add(LoadEventLeaderboard(widget.eventId));
                 }
               }
-              
+
               // Handle navigation after starting ruck session
               if (state.sessionId != null) {
                 Navigator.of(context).pushReplacementNamed(
@@ -168,10 +171,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                   arguments: state.sessionId,
                 );
               }
-              
+
               // Handle navigation to create session with event context
               if (state.eventId != null) {
-                print('🚀 Navigating to create session with event_id: ${state.eventId}, event_title: ${state.eventTitle}');
+                print(
+                    '🚀 Navigating to create session with event_id: ${state.eventId}, event_title: ${state.eventTitle}');
                 Navigator.of(context).pushNamed(
                   '/create_session',
                   arguments: {
@@ -200,7 +204,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             } else if (state is EventDetailsLoaded) {
               return _buildEventDetails(state.eventDetails);
             }
-            
+
             return _buildLoadingSkeleton();
           },
         ),
@@ -212,9 +216,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   List<Widget> _buildAppBarActions() {
     final event = _eventDetails?.event;
     if (event == null) return [];
-    
+
     List<Widget> actions = [];
-    
+
     // Add share button (always visible for all users)
     actions.add(
       IconButton(
@@ -223,9 +227,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         onPressed: () => _shareEvent(event),
       ),
     );
-    
+
     List<PopupMenuEntry<String>> menuItems = [];
-    
+
     // Add Edit option for event creators
     if (event.isCreator) {
       menuItems.add(
@@ -246,7 +250,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     // Add Leave option for participants who can leave
     if (event.canLeave) {
       menuItems.add(
@@ -268,7 +272,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     // Add Cancel option for event creators
     if (event.isCreator) {
       if (menuItems.isNotEmpty) {
@@ -293,7 +297,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     // Only show menu if there are items
     if (menuItems.isNotEmpty) {
       actions.add(
@@ -302,10 +306,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           onSelected: (value) {
             switch (value) {
               case 'edit':
-                Navigator.of(context).pushNamed(
+                Navigator.of(context)
+                    .pushNamed(
                   '/edit_event',
                   arguments: widget.eventId,
-                ).then((_) {
+                )
+                    .then((_) {
                   _eventsBloc.add(LoadEventDetails(widget.eventId));
                 });
                 break;
@@ -321,7 +327,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     return actions;
   }
 
@@ -334,19 +340,19 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           // Banner skeleton
           const SkeletonBox(height: 200, width: double.infinity),
           const SizedBox(height: 16),
-          
+
           // Title and info skeleton
           const SkeletonLine(width: 250),
           const SizedBox(height: 8),
           const SkeletonLine(width: 150),
           const SizedBox(height: 16),
-          
+
           // Description skeleton
           const SkeletonLine(width: double.infinity),
           const SizedBox(height: 4),
           const SkeletonLine(width: 200),
           const SizedBox(height: 16),
-          
+
           // Details skeleton
           Row(
             children: const [
@@ -363,16 +369,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   Widget _buildEventDetails(EventDetails eventDetails) {
     final event = eventDetails.event;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Get lady mode status
     bool isLadyMode = false;
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       isLadyMode = authState.user.gender == 'female';
     }
-    
+
     final primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
-    
+
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) {
         return [
@@ -410,14 +416,17 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           children: [
             // Event header
             _buildEventHeader(event, isDarkMode, isLadyMode),
-            
+
             // Tab bar for content sections
             Container(
-              color: isDarkMode ? AppColors.darkAppBarBackground : AppColors.lightAppBarBackground,
+              color: isDarkMode
+                  ? AppColors.darkAppBarBackground
+                  : AppColors.lightAppBarBackground,
               child: TabBar(
                 controller: _tabController,
                 labelColor: primaryColor,
-                unselectedLabelColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                unselectedLabelColor:
+                    isDarkMode ? Colors.grey[400] : Colors.grey[600],
                 indicatorColor: primaryColor,
                 tabs: const [
                   Tab(text: 'Details'),
@@ -426,7 +435,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 ],
               ),
             ),
-            
+
             // Tab content - Fixed height container
             Container(
               height: MediaQuery.of(context).size.height * 0.6,
@@ -434,12 +443,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 controller: _tabController,
                 children: [
                   _buildDetailsTab(event, eventDetails.participants),
-                  _canAccessEventData(event) 
-                    ? EventLeaderboardWidget(eventId: widget.eventId)
-                    : _buildUnauthorizedTab('You must be a participant to view the leaderboard'),
                   _canAccessEventData(event)
-                    ? EventCommentsSection(eventId: widget.eventId)
-                    : _buildUnauthorizedTab('You must be a participant to view comments'),
+                      ? EventLeaderboardWidget(eventId: widget.eventId)
+                      : _buildUnauthorizedTab(
+                          'You must be a participant to view the leaderboard'),
+                  _canAccessEventData(event)
+                      ? EventCommentsSection(eventId: widget.eventId)
+                      : _buildUnauthorizedTab(
+                          'You must be a participant to view comments'),
                 ],
               ),
             ),
@@ -483,7 +494,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       return Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withOpacity(0.1),
+                          color:
+                              Theme.of(context).primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
@@ -499,9 +511,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 ),
               ),
             ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Title and club info
           Row(
             children: [
@@ -520,7 +532,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                 ),
                 const SizedBox(width: 12),
               ],
-              
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,7 +540,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Text(
                       event.title,
                       style: AppTextStyles.headlineMedium.copyWith(
-                        color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                        color: isDarkMode
+                            ? Colors.white
+                            : (isLadyMode
+                                ? AppColors.ladyPrimary
+                                : AppColors.primary),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -537,7 +553,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       Text(
                         event.hostingClub!.name,
                         style: AppTextStyles.bodyLarge.copyWith(
-                          color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                          color: (isLadyMode
+                              ? AppColors.ladyPrimary
+                              : AppColors.primary),
                           fontWeight: FontWeight.w500,
                         ),
                       )
@@ -545,20 +563,21 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                       Text(
                         'Organized by ${event.creator!.username}',
                         style: AppTextStyles.bodyLarge.copyWith(
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          color:
+                              isDarkMode ? Colors.grey[400] : Colors.grey[600],
                         ),
                       ),
                   ],
                 ),
               ),
-              
+
               // Status badge
               _buildStatusBadge(event),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Event timing
           Row(
             children: [
@@ -569,20 +588,22 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                _formatEventDateTime(event.scheduledStartTime, event.durationMinutes),
+                _formatEventDateTime(
+                    event.scheduledStartTime, event.durationMinutes),
                 style: AppTextStyles.bodyLarge.copyWith(
                   color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                 ),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Location if available
           if (event.locationName != null)
             InkWell(
-              onTap: () => _openLocation(event.locationName!, event.latitude, event.longitude),
+              onTap: () => _openLocation(
+                  event.locationName!, event.latitude, event.longitude),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -591,14 +612,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Icon(
                       Icons.location_on,
                       size: 20,
-                      color: AppColors.getLocationTextColor(context, isLadyMode: isLadyMode),
+                      color: AppColors.getLocationTextColor(context,
+                          isLadyMode: isLadyMode),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         event.locationName!,
                         style: AppTextStyles.bodyLarge.copyWith(
-                          color: AppColors.getLocationTextColor(context, isLadyMode: isLadyMode),
+                          color: AppColors.getLocationTextColor(context,
+                              isLadyMode: isLadyMode),
                           decoration: TextDecoration.underline,
                         ),
                       ),
@@ -607,15 +630,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     Icon(
                       Icons.open_in_new,
                       size: 16,
-                      color: AppColors.getLocationTextColor(context, isLadyMode: isLadyMode),
+                      color: AppColors.getLocationTextColor(context,
+                          isLadyMode: isLadyMode),
                     ),
                   ],
                 ),
               ),
             ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Participant count
           Row(
             children: [
@@ -628,7 +652,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
               Text(
                 '${event.participantCount} participant${event.participantCount != 1 ? 's' : ''}',
                 style: AppTextStyles.bodyLarge.copyWith(
-                  color: (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                  color:
+                      (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -653,7 +678,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     if (authState is Authenticated) {
       isLadyMode = authState.user.gender == 'female';
     }
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -664,7 +689,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             Text(
               'Description',
               style: AppTextStyles.titleMedium.copyWith(
-                color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                color: isDarkMode
+                    ? Colors.white
+                    : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -677,12 +704,12 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             ),
             const SizedBox(height: 24),
           ],
-          
+
           // Event details
           _buildEventDetailsSection(event, isDarkMode, isLadyMode),
-          
+
           const SizedBox(height: 24),
-          
+
           // Participants list
           _buildParticipantsSection(participants, isDarkMode),
         ],
@@ -690,26 +717,27 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
-  Widget _buildEventDetailsSection(Event event, bool isDarkMode, bool isLadyMode) {
+  Widget _buildEventDetailsSection(
+      Event event, bool isDarkMode, bool isLadyMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Event Details',
           style: AppTextStyles.titleMedium.copyWith(
-            color: isDarkMode ? Colors.white : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+            color: isDarkMode
+                ? Colors.white
+                : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 12),
-        
         _buildDetailRow(
           Icons.timer,
           'Duration',
           '${event.durationMinutes} minutes',
           isDarkMode,
         ),
-        
         if (event.difficultyLevel != null)
           _buildDetailRow(
             Icons.trending_up,
@@ -717,7 +745,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             'Level ${event.difficultyLevel}',
             isDarkMode,
           ),
-        
         if (event.ruckWeightKg != null)
           _buildDetailRow(
             Icons.fitness_center,
@@ -725,7 +752,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             '${event.ruckWeightKg}kg',
             isDarkMode,
           ),
-        
         if (event.minParticipants != null && event.minParticipants! > 1)
           _buildDetailRow(
             Icons.group,
@@ -733,7 +759,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             '${event.minParticipants}',
             isDarkMode,
           ),
-        
         if (event.approvalRequired)
           _buildDetailRow(
             Icons.check_circle,
@@ -745,7 +770,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value, bool isDarkMode) {
+  Widget _buildDetailRow(
+      IconData icon, String label, String value, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -775,9 +801,11 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     );
   }
 
-  Widget _buildParticipantsSection(List<EventParticipant> participants, bool isDarkMode) {
-    final approvedParticipants = participants.where((p) => p.isApproved).toList();
-    
+  Widget _buildParticipantsSection(
+      List<EventParticipant> participants, bool isDarkMode) {
+    final approvedParticipants =
+        participants.where((p) => p.isApproved).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -789,7 +817,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           ),
         ),
         const SizedBox(height: 12),
-        
         if (approvedParticipants.isEmpty)
           Text(
             'No participants yet',
@@ -798,7 +825,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             ),
           )
         else
-          ...approvedParticipants.map((participant) => _buildParticipantRow(participant, isDarkMode)),
+          ...approvedParticipants.map(
+              (participant) => _buildParticipantRow(participant, isDarkMode)),
       ],
     );
   }
@@ -811,12 +839,14 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           CircleAvatar(
             radius: 16,
             backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-            backgroundImage: participant.user?.avatarUrl != null && participant.user!.avatarUrl!.isNotEmpty
+            backgroundImage: participant.user?.avatarUrl != null &&
+                    participant.user!.avatarUrl!.isNotEmpty
                 ? NetworkImage(participant.user!.avatarUrl!)
                 : null,
-            child: participant.user?.avatarUrl == null || participant.user!.avatarUrl!.isEmpty
+            child: participant.user?.avatarUrl == null ||
+                    participant.user!.avatarUrl!.isEmpty
                 ? Text(
-                    (participant.user?.username.isNotEmpty == true 
+                    (participant.user?.username.isNotEmpty == true
                         ? participant.user!.username[0].toUpperCase()
                         : '?'),
                     style: AppTextStyles.bodySmall.copyWith(
@@ -831,7 +861,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             child: Text(
               participant.user?.username ?? 'Unknown User',
               style: AppTextStyles.bodyMedium.copyWith(
-                color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
+                color:
+                    isDarkMode ? Colors.white : Theme.of(context).primaryColor,
               ),
             ),
           ),
@@ -850,7 +881,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     if (event.userParticipationStatus != null) {
       Color badgeColor;
       String badgeText;
-      
+
       switch (event.userParticipationStatus) {
         case 'approved':
           badgeColor = Colors.green;
@@ -867,7 +898,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         default:
           return const SizedBox.shrink();
       }
-      
+
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -884,19 +915,19 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     return const SizedBox.shrink();
   }
 
   Widget? _buildBottomActionBar() {
     if (_eventDetails == null) return null;
-    
+
     final event = _eventDetails!.event;
-    
+
     if (event.isPast || event.isCancelled) {
       return null;
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -930,14 +961,16 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     if (event.canJoin) {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: event.isFull ? null : () {
-            _eventsBloc.add(JoinEvent(event.id));
-          },
+          onPressed: event.isFull
+              ? null
+              : () {
+                  _eventsBloc.add(JoinEvent(event.id));
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).primaryColor,
             foregroundColor: Colors.white,
@@ -947,7 +980,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     if (event.canLeave) {
       return SizedBox(
         width: double.infinity,
@@ -964,7 +997,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         ),
       );
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -973,7 +1006,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel Event'),
-        content: const Text('Are you sure you want to cancel this event? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to cancel this event? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -998,9 +1032,9 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   String _formatEventDateTime(DateTime startTime, int durationMinutes) {
     final now = DateTime.now();
     final endTime = startTime.add(Duration(minutes: durationMinutes));
-    
-    if (startTime.year == now.year && 
-        startTime.month == now.month && 
+
+    if (startTime.year == now.year &&
+        startTime.month == now.month &&
         startTime.day == now.day) {
       return 'Today ${DateFormat('h:mm a').format(startTime)} - ${DateFormat('h:mm a').format(endTime)}';
     } else {
@@ -1008,20 +1042,23 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
-  void _openLocation(String locationName, double? latitude, double? longitude) async {
+  void _openLocation(
+      String locationName, double? latitude, double? longitude) async {
     try {
       final encodedLocation = Uri.encodeComponent(locationName);
       String url;
-      
+
       // If we have coordinates, use them for more precise location
       if (latitude != null && longitude != null) {
         // Google Maps with coordinates
-        url = 'https://www.google.com/maps/search/?api=1&query=$encodedLocation&center=$latitude,$longitude';
+        url =
+            'https://www.google.com/maps/search/?api=1&query=$encodedLocation&center=$latitude,$longitude';
       } else {
         // Fallback to search by name only
-        url = 'https://www.google.com/maps/search/?api=1&query=$encodedLocation';
+        url =
+            'https://www.google.com/maps/search/?api=1&query=$encodedLocation';
       }
-      
+
       if (await canLaunchUrl(Uri.parse(url))) {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       } else {
@@ -1030,7 +1067,8 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         if (Theme.of(context).platform == TargetPlatform.iOS) {
           // Apple Maps
           if (latitude != null && longitude != null) {
-            fallbackUrl = 'http://maps.apple.com/?q=$encodedLocation&ll=$latitude,$longitude';
+            fallbackUrl =
+                'http://maps.apple.com/?q=$encodedLocation&ll=$latitude,$longitude';
           } else {
             fallbackUrl = 'http://maps.apple.com/?q=$encodedLocation';
           }
@@ -1038,15 +1076,17 @@ class _EventDetailScreenState extends State<EventDetailScreen>
           // Generic maps URL for Android
           fallbackUrl = 'geo:0,0?q=$encodedLocation';
         }
-        
+
         if (await canLaunchUrl(Uri.parse(fallbackUrl))) {
-          await launchUrl(Uri.parse(fallbackUrl), mode: LaunchMode.externalApplication);
+          await launchUrl(Uri.parse(fallbackUrl),
+              mode: LaunchMode.externalApplication);
         } else {
           // Show error to user
           if (mounted) {
             StyledSnackBar.showError(
               context: context,
-              message: 'Unable to open maps. Please check your location manually.',
+              message:
+                  'Unable to open maps. Please check your location manually.',
             );
           }
         }

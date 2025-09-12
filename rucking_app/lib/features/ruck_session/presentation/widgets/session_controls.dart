@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 
-
 /// Reusable widget showing Pause/Resume and End Session buttons.
 ///
 /// Delegates state changes to [ActiveSessionBloc] instead of handling
@@ -37,7 +36,8 @@ class SessionControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0), // Match the padding of stats widgets
+      padding: const EdgeInsets.symmetric(
+          horizontal: 24.0), // Match the padding of stats widgets
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: <Widget>[
@@ -54,7 +54,8 @@ class SessionControls extends StatelessWidget {
               ),
               onPressed: () {
                 HapticFeedback.heavyImpact();
-                debugPrint('[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
+                debugPrint(
+                    '[PAUSE_DEBUG] SessionControls: Pause/Resume button pressed on PHONE UI. Current isPaused state (on UI): $isPaused');
                 if (onTogglePause != null) onTogglePause!();
               },
               child: Icon(

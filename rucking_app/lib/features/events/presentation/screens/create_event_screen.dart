@@ -22,7 +22,7 @@ import 'package:rucking_app/shared/widgets/full_screen_image_viewer.dart';
 
 class CreateEventScreen extends StatefulWidget {
   final String? eventId; // For editing existing events
-  
+
   const CreateEventScreen({
     Key? key,
     this.eventId,
@@ -40,7 +40,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _maxParticipantsController = TextEditingController();
   final _minParticipantsController = TextEditingController();
   final _ruckWeightController = TextEditingController();
-  
+
   // Focus nodes for keyboard navigation
   final _titleFocusNode = FocusNode();
   final _descriptionFocusNode = FocusNode();
@@ -48,24 +48,25 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _minParticipantsFocusNode = FocusNode();
   final _maxParticipantsFocusNode = FocusNode();
   final _ruckWeightFocusNode = FocusNode();
-  
+
   bool _isLoading = false;
   File? _bannerImage;
-  bool _removeExistingBanner = false; // Flag to track if user wants to remove existing banner
+  bool _removeExistingBanner =
+      false; // Flag to track if user wants to remove existing banner
   DateTime? _selectedDateTime;
   int _duration = 60; // minutes
   int _difficultyLevel = 1;
   bool _isClubEvent = false;
   bool _approvalRequired = false;
   String? _selectedClubId;
-  
+
   late EventsBloc _eventsBloc;
   late ClubsBloc _clubsBloc;
   final _locationSearchService = getIt<GooglePlacesService>();
   LocationSearchResult? _selectedLocationResult;
   List<LocationSearchResult> _locationSuggestions = [];
   bool _showLocationSuggestions = false;
-  
+
   List<Club> _userClubs = [];
   Event? _eventToEdit; // Store the event being edited
 
@@ -74,10 +75,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     super.initState();
     _eventsBloc = getIt<EventsBloc>();
     _clubsBloc = getIt<ClubsBloc>();
-    
+
     // Load user's clubs for club event option
     _loadUserClubs();
-    
+
     if (widget.eventId != null) {
       // Load event details for editing
       _eventsBloc.add(LoadEventDetails(widget.eventId!));
@@ -113,7 +114,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isEditing = widget.eventId != null;
-    
+
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: _eventsBloc),
@@ -158,8 +159,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               listener: (context, state) {
                 if (state is ClubsLoaded) {
                   setState(() {
-                    _userClubs = state.clubs.where((club) => club.userRole == 'admin').toList();
-                    
+                    _userClubs = state.clubs
+                        .where((club) => club.userRole == 'admin')
+                        .toList();
+
                     // If user is admin of any clubs, default to true and select first club
                     if (_userClubs.isNotEmpty && widget.eventId == null) {
                       _isClubEvent = true;
@@ -197,38 +200,38 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           children: [
             // Banner image section
             _buildBannerImageSection(isDarkMode),
-            
+
             const SizedBox(height: 24),
-            
+
             // Basic info section
             _buildBasicInfoSection(isDarkMode),
-            
+
             const SizedBox(height: 24),
-            
+
             // Date and time section
             _buildDateTimeSection(isDarkMode),
-            
+
             const SizedBox(height: 24),
-            
+
             // Location section
             _buildLocationSection(isDarkMode),
-            
+
             const SizedBox(height: 24),
-            
+
             // Event settings section
             _buildEventSettingsSection(isDarkMode),
-            
+
             const SizedBox(height: 24),
-            
+
             // Club event section
             if (_userClubs.isNotEmpty) ...[
               _buildClubEventSection(isDarkMode),
               const SizedBox(height: 24),
             ],
-            
+
             // Create/Update button
             _buildSubmitButton(isDarkMode),
-            
+
             const SizedBox(height: 32),
           ],
         ),
@@ -248,7 +251,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        
         Container(
           height: 200, // Updated to match event card banner height
           width: double.infinity,
@@ -302,10 +304,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     ),
                   ],
                 )
-              : _eventToEdit != null && 
-                _eventToEdit!.bannerImageUrl != null && 
-                _eventToEdit!.bannerImageUrl!.isNotEmpty && 
-                !_removeExistingBanner
+              : _eventToEdit != null &&
+                      _eventToEdit!.bannerImageUrl != null &&
+                      _eventToEdit!.bannerImageUrl!.isNotEmpty &&
+                      !_removeExistingBanner
                   ? Stack(
                       children: [
                         ClipRRect(
@@ -320,13 +322,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                               tag: 'banner_image_existing',
                               child: Image.network(
                                 _eventToEdit!.bannerImageUrl!,
-                                height: 200, // Updated to match container height
+                                height:
+                                    200, // Updated to match container height
                                 width: double.infinity,
                                 fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
                                   if (loadingProgress == null) return child;
                                   return Container(
-                                    height: 200, // Updated to match container height
+                                    height:
+                                        200, // Updated to match container height
                                     width: double.infinity,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
@@ -339,7 +344,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                 },
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
-                                    height: 200, // Updated to match container height
+                                    height:
+                                        200, // Updated to match container height
                                     width: double.infinity,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
@@ -442,7 +448,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        
         TextFormField(
           controller: _titleController,
           focusNode: _titleFocusNode,
@@ -463,9 +468,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             return null;
           },
         ),
-        
         const SizedBox(height: 16),
-        
         TextFormField(
           controller: _descriptionController,
           focusNode: _descriptionFocusNode,
@@ -497,7 +500,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Date and time picker
         InkWell(
           onTap: _selectDateTime,
@@ -519,7 +522,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 Expanded(
                   child: Text(
                     _selectedDateTime != null
-                        ? DateFormat('MMM d, y \'at\' h:mm a').format(_selectedDateTime!)
+                        ? DateFormat('MMM d, y \'at\' h:mm a')
+                            .format(_selectedDateTime!)
                         : 'Select date and time *',
                     style: AppTextStyles.bodyLarge.copyWith(
                       color: _selectedDateTime != null
@@ -553,7 +557,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        
         TextFormField(
           controller: _locationController,
           focusNode: _locationFocusNode,
@@ -570,7 +573,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
           onChanged: _searchLocation,
         ),
-        
         if (_showLocationSuggestions && _locationSuggestions.isNotEmpty)
           Container(
             margin: const EdgeInsets.only(top: 8),
@@ -609,7 +611,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Difficulty level
         Row(
           children: [
@@ -638,9 +640,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ],
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Participant limits
         Row(
           children: [
@@ -649,7 +651,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 controller: _minParticipantsController,
                 focusNode: _minParticipantsFocusNode,
                 textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) => _maxParticipantsFocusNode.requestFocus(),
+                onFieldSubmitted: (_) =>
+                    _maxParticipantsFocusNode.requestFocus(),
                 decoration: InputDecoration(
                   labelText: 'Min Participants',
                   hintText: 'e.g. 1',
@@ -681,9 +684,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ],
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Recommended ruck weight
         TextFormField(
           controller: _ruckWeightController,
@@ -699,9 +702,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
           keyboardType: TextInputType.number,
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Duration
         Row(
           children: [
@@ -730,9 +733,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             ),
           ],
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Approval required toggle
         SwitchListTile(
           title: Text(
@@ -761,11 +764,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   Widget _buildClubEventSection(bool isDarkMode) {
     if (_userClubs.isEmpty) {
-      return const SizedBox.shrink(); // Don't show section if user has no admin clubs
+      return const SizedBox
+          .shrink(); // Don't show section if user has no admin clubs
     }
-    
+
     final primaryColor = _getLadyModeColor(context);
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -777,10 +781,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        
         Container(
           decoration: BoxDecoration(
-            color: _isClubEvent ? primaryColor.withOpacity(0.1) : Colors.transparent,
+            color: _isClubEvent
+                ? primaryColor.withOpacity(0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _isClubEvent ? primaryColor : Colors.grey.withOpacity(0.3),
@@ -796,7 +801,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ),
             subtitle: Text(
-              _isClubEvent 
+              _isClubEvent
                   ? 'Event will appear in club calendar and member feeds'
                   : 'Event will be personal only',
               style: AppTextStyles.bodySmall.copyWith(
@@ -817,7 +822,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             activeColor: primaryColor,
           ),
         ),
-        
         if (_isClubEvent && _userClubs.length > 1) ...[
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
@@ -839,25 +843,28 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 _selectedClubId = value;
               });
             },
-            validator: _isClubEvent ? (value) {
-              if (value == null) {
-                return 'Please select a club';
-              }
-              return null;
-            } : null,
+            validator: _isClubEvent
+                ? (value) {
+                    if (value == null) {
+                      return 'Please select a club';
+                    }
+                    return null;
+                  }
+                : null,
           ),
         ],
       ],
     );
   }
-  
+
   String _getClubEventTitle() {
     if (!_isClubEvent || _selectedClubId == null || _userClubs.isEmpty) {
       return 'Host as Club Event';
     }
-    
+
     try {
-      final selectedClub = _userClubs.firstWhere((club) => club.id == _selectedClubId);
+      final selectedClub =
+          _userClubs.firstWhere((club) => club.id == _selectedClubId);
       return 'This is a ${selectedClub.name} Event';
     } catch (e) {
       return 'Host as Club Event';
@@ -866,7 +873,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   Widget _buildSubmitButton(bool isDarkMode) {
     final isEditing = widget.eventId != null;
-    
+
     return SizedBox(
       width: double.infinity,
       child: CustomButton(
@@ -884,7 +891,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (selectedFile != null) {
       setState(() {
         _bannerImage = selectedFile;
-        _removeExistingBanner = true; // Mark existing banner for removal when selecting new one
+        _removeExistingBanner =
+            true; // Mark existing banner for removal when selecting new one
       });
     }
   }
@@ -899,11 +907,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _selectDateTime() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: _selectedDateTime ?? DateTime.now().add(const Duration(days: 1)),
+      initialDate:
+          _selectedDateTime ?? DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    
+
     if (date != null) {
       final time = await showTimePicker(
         context: context,
@@ -911,7 +920,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           _selectedDateTime ?? DateTime.now().add(const Duration(hours: 1)),
         ),
       );
-      
+
       if (time != null) {
         setState(() {
           _selectedDateTime = DateTime(
@@ -940,7 +949,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         query,
         const Duration(milliseconds: 500),
       );
-      
+
       setState(() {
         _locationSuggestions = results;
         _showLocationSuggestions = results.isNotEmpty;
@@ -966,7 +975,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   void _populateFormWithEventData(dynamic event) {
     // Store the event being edited
     _eventToEdit = event as Event;
-    
+
     // Populate form fields with existing event data
     _titleController.text = event.title ?? '';
     _descriptionController.text = event.description ?? '';
@@ -977,7 +986,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _approvalRequired = event.approvalRequired;
     _selectedClubId = event.clubId;
     _isClubEvent = event.clubId != null;
-    
+
     // Set controllers for other fields
     if (event.maxParticipants != null) {
       _maxParticipantsController.text = event.maxParticipants.toString();
@@ -988,9 +997,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (event.ruckWeightKg != null) {
       _ruckWeightController.text = event.ruckWeightKg.toString();
     }
-    
+
     // Set location result if available
-    if (event.locationName != null && event.latitude != null && event.longitude != null) {
+    if (event.locationName != null &&
+        event.latitude != null &&
+        event.longitude != null) {
       _selectedLocationResult = LocationSearchResult(
         displayName: event.locationName!,
         address: event.locationName!,
@@ -1004,7 +1015,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    
+
     if (_selectedDateTime == null) {
       StyledSnackBar.showError(
         context: context,
@@ -1012,11 +1023,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       );
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     final eventData = {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
@@ -1025,20 +1036,20 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       'location_latitude': _selectedLocationResult?.latitude,
       'location_longitude': _selectedLocationResult?.longitude,
       'difficulty_level': _difficultyLevel,
-      'min_participants': _minParticipantsController.text.isNotEmpty 
-          ? int.tryParse(_minParticipantsController.text) 
+      'min_participants': _minParticipantsController.text.isNotEmpty
+          ? int.tryParse(_minParticipantsController.text)
           : null,
-      'max_participants': _maxParticipantsController.text.isNotEmpty 
-          ? int.tryParse(_maxParticipantsController.text) 
+      'max_participants': _maxParticipantsController.text.isNotEmpty
+          ? int.tryParse(_maxParticipantsController.text)
           : null,
-      'ruck_weight_kg': _ruckWeightController.text.isNotEmpty 
-          ? double.tryParse(_ruckWeightController.text) 
+      'ruck_weight_kg': _ruckWeightController.text.isNotEmpty
+          ? double.tryParse(_ruckWeightController.text)
           : null,
       'duration_minutes': _duration,
       'approval_required': _approvalRequired,
       'hosting_club_id': _isClubEvent ? _selectedClubId : null,
     };
-    
+
     if (widget.eventId != null) {
       _eventsBloc.add(UpdateEvent(
         eventId: widget.eventId!,

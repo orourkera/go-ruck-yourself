@@ -33,7 +33,7 @@ class SharingService {
   }) async {
     // TODO: Implement direct invite functionality when service is available
     print('Direct invites sent to: $contactIds');
-    
+
     // Fallback to regular sharing
     await shareWithPreview(
       text: text,

@@ -37,7 +37,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  
+
   int? _selectedIndex;
   bool _showFullProfile = false;
 
@@ -52,7 +52,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
       parent: _animationController,
       curve: Curves.easeInOutCubic,
     );
-    
+
     // Start animation after a short delay
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
@@ -90,7 +90,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         children: [
           // Chart header with stats
           _buildChartHeader(),
-          
+
           // Main chart
           Expanded(
             child: Padding(
@@ -105,7 +105,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
               ),
             ),
           ),
-          
+
           // Chart footer with controls
           if (widget.isInteractive) _buildChartFooter(),
         ],
@@ -148,7 +148,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
 
   Widget _buildChartHeader() {
     final stats = _calculateElevationStats();
-    
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       child: Column(
@@ -175,7 +175,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
     return Column(
       children: [
         Icon(
@@ -222,7 +223,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
               ),
             ),
           ),
-          
+
           // View toggle
           TextButton.icon(
             onPressed: () {
@@ -243,7 +244,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
               padding: const EdgeInsets.symmetric(horizontal: 8),
             ),
           ),
-          
+
           // End distance marker
           Expanded(
             child: Text(
@@ -262,7 +263,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
   LineChartData _buildChartData() {
     final spots = _getChartSpots();
     final gradientColors = _getGradientColors();
-    
+
     return LineChartData(
       gridData: FlGridData(
         show: true,
@@ -407,22 +408,22 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         return FlSpot(point.distanceKm, point.elevationM);
       }).toList();
     }
-    
+
     // Simplify the profile for better performance
     final simplified = <FlSpot>[];
     final step = widget.elevationData.length / 50;
-    
+
     for (int i = 0; i < widget.elevationData.length; i += step.ceil()) {
       final point = widget.elevationData[i];
       simplified.add(FlSpot(point.distanceKm, point.elevationM));
     }
-    
+
     // Always include the last point
     if (simplified.last.x != widget.elevationData.last.distanceKm) {
       final lastPoint = widget.elevationData.last;
       simplified.add(FlSpot(lastPoint.distanceKm, lastPoint.elevationM));
     }
-    
+
     return simplified;
   }
 
@@ -444,11 +445,11 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         if (!widget.showDetailedTooltips || touchedSpots.isEmpty) {
           return [];
         }
-        
+
         final spot = touchedSpots.first;
         final distance = spot.x;
         final elevation = spot.y;
-        
+
         // Find the actual elevation point for more details
         RouteElevationPoint? elevationPoint;
         try {
@@ -458,7 +459,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         } catch (e) {
           // Point not found, use basic info
         }
-        
+
         return [
           LineTooltipItem(
             'Distance: ${distance.toStringAsFixed(1)} km\nElevation: ${elevation.toStringAsFixed(0)} m',
@@ -469,7 +470,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
             children: [
               if (elevationPoint?.gradePercent != null)
                 TextSpan(
-                  text: '\nGrade: ${elevationPoint!.gradePercent!.toStringAsFixed(1)}%',
+                  text:
+                      '\nGrade: ${elevationPoint!.gradePercent!.toStringAsFixed(1)}%',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: _getGradeColor(elevationPoint.gradePercent!),
                     fontWeight: FontWeight.w500,
@@ -492,7 +494,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         ),
       );
     }
-    
+
     if (value == widget.route.distanceKm) {
       return Text(
         value.toStringAsFixed(1),
@@ -502,7 +504,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         ),
       );
     }
-    
+
     // Show intermediate values at reasonable intervals
     final interval = _getVerticalInterval();
     if (value % interval == 0) {
@@ -514,7 +516,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
         ),
       );
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -538,17 +540,17 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
     double maxElevation = widget.elevationData.first.elevationM;
     double totalGain = 0.0;
     double previousElevation = widget.elevationData.first.elevationM;
-    
+
     for (final point in widget.elevationData) {
       if (point.elevationM < minElevation) minElevation = point.elevationM;
       if (point.elevationM > maxElevation) maxElevation = point.elevationM;
-      
+
       if (point.elevationM > previousElevation) {
         totalGain += point.elevationM - previousElevation;
       }
       previousElevation = point.elevationM;
     }
-    
+
     return ElevationStats(
       minElevation: minElevation,
       maxElevation: maxElevation,
@@ -593,19 +595,19 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
 
   void _handleTouch(FlTouchEvent event, LineTouchResponse? response) {
     if (!widget.isInteractive) return;
-    
+
     if (response?.lineBarSpots?.isNotEmpty == true) {
       final spot = response!.lineBarSpots!.first;
       final distance = spot.x;
-      
+
       // Find the closest elevation point
       RouteElevationPoint? closestPoint;
       double closestDistance = double.infinity;
-      
+
       for (int i = 0; i < widget.elevationData.length; i++) {
         final point = widget.elevationData[i];
         final diff = (point.distanceKm - distance).abs();
-        
+
         if (diff < closestDistance) {
           closestDistance = diff;
           closestPoint = point;
@@ -614,7 +616,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
           });
         }
       }
-      
+
       if (widget.onPointSelected != null && closestPoint != null) {
         widget.onPointSelected!(closestPoint);
       }
@@ -622,7 +624,7 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
       setState(() {
         _selectedIndex = null;
       });
-      
+
       if (widget.onPointSelected != null) {
         widget.onPointSelected!(null);
       }
@@ -632,7 +634,8 @@ class _ElevationProfileChartState extends State<ElevationProfileChart>
   /// Format distance using user's metric preference
   String _formatDistance(BuildContext context, double distanceKm) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 }

@@ -471,8 +471,10 @@ from RuckTracker.api.gear import gear_bp
 app.register_blueprint(gear_bp, url_prefix='/api')
 from RuckTracker.api.gear_referral import gear_referral_bp
 app.register_blueprint(gear_referral_bp, url_prefix='/api')
-from RuckTracker.api.amazon import amazon_bp
-app.register_blueprint(amazon_bp, url_prefix='/api')
+import os as _os
+if _os.environ.get('GEAR_AMAZON_ENABLED', 'false').lower() == 'true':
+    from RuckTracker.api.amazon import amazon_bp
+    app.register_blueprint(amazon_bp, url_prefix='/api')
 
 # Ensure higher rate limit for user public profile endpoint now that blueprint is registered
 try:

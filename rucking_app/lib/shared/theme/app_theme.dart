@@ -68,7 +68,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.labelLarge.copyWith( // Changed from button
+          textStyle: AppTextStyles.labelLarge.copyWith(
+            // Changed from button
             fontFamily: 'Bangers',
             fontSize: 16,
             letterSpacing: 1.0,
@@ -80,11 +81,13 @@ class AppTheme {
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.all(16),
         border: OutlineInputBorder(
-          borderSide: BorderSide(color: AppColors.secondary, width: 2), // Olive green
+          borderSide:
+              BorderSide(color: AppColors.secondary, width: 2), // Olive green
           borderRadius: BorderRadius.circular(12),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: AppColors.secondary, width: 2.5), // Olive green
+          borderSide:
+              BorderSide(color: AppColors.secondary, width: 2.5), // Olive green
           borderRadius: BorderRadius.circular(12),
         ),
         errorBorder: OutlineInputBorder(
@@ -106,7 +109,8 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         contentTextStyle: _getTextTheme(AppColors.textDark).bodySmall,
-        backgroundColor: AppColors.greyDark, // Darker background for light theme snackbar
+        backgroundColor:
+            AppColors.greyDark, // Darker background for light theme snackbar
         actionTextColor: AppColors.primaryLight, // Example, adjust as needed
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -160,10 +164,12 @@ class AppTheme {
       appBarTheme: base.appBarTheme.copyWith(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
-        iconTheme: IconThemeData(color: AppColors.secondary), // Orange back arrows
+        iconTheme:
+            IconThemeData(color: AppColors.secondary), // Orange back arrows
       ),
       cardTheme: base.cardTheme.copyWith(
-        color: AppColors.backgroundLight, // Use tan color for containers in dark mode
+        color: AppColors
+            .backgroundLight, // Use tan color for containers in dark mode
       ),
       bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
         backgroundColor: Colors.black,
@@ -172,10 +178,12 @@ class AppTheme {
         checkColor: MaterialStateProperty.all<Color>(Colors.white),
         fillColor: MaterialStateProperty.all<Color>(AppColors.secondary),
       ),
-      textTheme: _getTextTheme(Color(0xFF728C69)), // Olive green for body text in dark mode
+      textTheme: _getTextTheme(
+          Color(0xFF728C69)), // Olive green for body text in dark mode
       snackBarTheme: SnackBarThemeData(
         contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
-        backgroundColor: AppColors.greyLight, // Lighter background for dark theme snackbar
+        backgroundColor:
+            AppColors.greyLight, // Lighter background for dark theme snackbar
         actionTextColor: AppColors.primaryDark, // Example, adjust as needed
       ),
       textSelectionTheme: TextSelectionThemeData(
@@ -205,7 +213,8 @@ class AppTheme {
         elevation: 4,
         backgroundColor: AppColors.brown, // Darker brown for dark theme app bar
         foregroundColor: AppColors.textLight,
-        titleTextStyle: AppTextStyles.titleLarge.copyWith( // Changed from headline6
+        titleTextStyle: AppTextStyles.titleLarge.copyWith(
+          // Changed from headline6
           color: AppColors.textLight,
           fontSize: 20,
         ),
@@ -243,14 +252,16 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.secondaryLight, width: 2), // Light olive green
+          side: BorderSide(
+              color: AppColors.secondaryLight, width: 2), // Light olive green
           foregroundColor: AppColors.secondaryLight, // Light olive green
           backgroundColor: AppColors.surfaceDark,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: AppTextStyles.labelLarge.copyWith( // Changed from button
+          textStyle: AppTextStyles.labelLarge.copyWith(
+            // Changed from button
             fontFamily: 'Bangers',
             fontSize: 16,
             letterSpacing: 1.0,
@@ -288,8 +299,9 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         contentTextStyle: _getTextTheme(AppColors.textLight).bodySmall,
-        backgroundColor: AppColors.greyLight, // Lighter background for dark theme snackbar
-        actionTextColor: AppColors.primaryDark, 
+        backgroundColor:
+            AppColors.greyLight, // Lighter background for dark theme snackbar
+        actionTextColor: AppColors.primaryDark,
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primaryDark,
@@ -331,19 +343,34 @@ class AppTheme {
   /// Helper to get a text theme with rustic style
   static TextTheme _getTextTheme(Color textColor) {
     return TextTheme(
-      displayLarge: AppTextStyles.displayLarge.copyWith(color: AppColors.primary), // Was headline1
-      displayMedium: AppTextStyles.displayMedium.copyWith(color: textColor),      // Was headline2
-      displaySmall: AppTextStyles.displaySmall.copyWith(color: textColor),       // Was headline3
-      headlineMedium: AppTextStyles.headlineLarge.copyWith(color: textColor),    // Was headline4 (Note: Mapping MD3 headlineMedium to AppTextStyles.headlineLarge)
-      headlineSmall: AppTextStyles.headlineMedium.copyWith(color: textColor),     // Was headline5 (Note: Mapping MD3 headlineSmall to AppTextStyles.headlineMedium)
-      titleLarge: AppTextStyles.titleLarge.copyWith(color: AppColors.brown), // Was headline6
-      titleMedium: AppTextStyles.titleMedium.copyWith(color: textColor),      // Was subtitle1
-      titleSmall: AppTextStyles.titleSmall.copyWith(color: textColor),       // Was subtitle2
-      bodyLarge: AppTextStyles.bodyLarge.copyWith(color: textColor),          // Was body1
-      bodyMedium: AppTextStyles.bodyMedium.copyWith(color: textColor), // Was body2 (Added copyWith color)
-      labelLarge: AppTextStyles.labelLarge.copyWith(color: textColor),        // Was button
-      bodySmall: AppTextStyles.bodySmall.copyWith(color: textColor),        // Was caption
-      labelSmall: AppTextStyles.labelSmall.copyWith(color: textColor),      // Was overline
+      displayLarge: AppTextStyles.displayLarge
+          .copyWith(color: AppColors.primary), // Was headline1
+      displayMedium: AppTextStyles.displayMedium
+          .copyWith(color: textColor), // Was headline2
+      displaySmall: AppTextStyles.displaySmall
+          .copyWith(color: textColor), // Was headline3
+      headlineMedium: AppTextStyles.headlineLarge.copyWith(
+          color:
+              textColor), // Was headline4 (Note: Mapping MD3 headlineMedium to AppTextStyles.headlineLarge)
+      headlineSmall: AppTextStyles.headlineMedium.copyWith(
+          color:
+              textColor), // Was headline5 (Note: Mapping MD3 headlineSmall to AppTextStyles.headlineMedium)
+      titleLarge: AppTextStyles.titleLarge
+          .copyWith(color: AppColors.brown), // Was headline6
+      titleMedium:
+          AppTextStyles.titleMedium.copyWith(color: textColor), // Was subtitle1
+      titleSmall:
+          AppTextStyles.titleSmall.copyWith(color: textColor), // Was subtitle2
+      bodyLarge:
+          AppTextStyles.bodyLarge.copyWith(color: textColor), // Was body1
+      bodyMedium: AppTextStyles.bodyMedium
+          .copyWith(color: textColor), // Was body2 (Added copyWith color)
+      labelLarge:
+          AppTextStyles.labelLarge.copyWith(color: textColor), // Was button
+      bodySmall:
+          AppTextStyles.bodySmall.copyWith(color: textColor), // Was caption
+      labelSmall:
+          AppTextStyles.labelSmall.copyWith(color: textColor), // Was overline
     );
   }
-} 
+}

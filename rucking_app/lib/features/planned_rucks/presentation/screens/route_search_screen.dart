@@ -9,11 +9,11 @@ import 'package:rucking_app/shared/widgets/buttons/primary_button.dart';
 import 'package:rucking_app/shared/widgets/loading_states/loading_overlay.dart';
 
 /// 🔍 **Route Search Screen**
-/// 
+///
 /// Search through imported routes and saved routes
 class RouteSearchScreen extends StatefulWidget {
   const RouteSearchScreen({Key? key}) : super(key: key);
-  
+
   @override
   State<RouteSearchScreen> createState() => _RouteSearchScreenState();
 }
@@ -22,13 +22,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'all';
-  
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,16 +36,16 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         title: Text(
           'Search Routes',
           style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark 
-                ? AppColors.textLight 
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.textLight
                 : Colors.white,
           ),
         ),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? AppColors.surfaceDark 
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceDark
             : AppColors.primary,
-        foregroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? AppColors.textLight 
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.textLight
             : Colors.white,
         elevation: 2,
       ),
@@ -53,10 +53,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         children: [
           // Search Header
           _buildSearchHeader(context),
-          
+
           // Filter Chips
           _buildFilterChips(context),
-          
+
           // Search Results
           Expanded(
             child: _buildSearchResults(context),
@@ -65,7 +65,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildSearchHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -122,9 +122,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               });
             },
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Quick Actions
           Row(
             children: [
@@ -160,7 +160,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildQuickAction(
     BuildContext context, {
     required IconData icon,
@@ -190,7 +190,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildFilterChips(BuildContext context) {
     final filters = [
       {'key': 'all', 'label': 'All Routes', 'icon': Icons.all_inclusive},
@@ -199,7 +199,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       {'key': 'saved', 'label': 'Saved', 'icon': Icons.bookmark},
       {'key': 'recent', 'label': 'Recent', 'icon': Icons.history},
     ];
-    
+
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -209,7 +209,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
         itemBuilder: (context, index) {
           final filter = filters[index];
           final isSelected = _selectedFilter == filter['key'];
-          
+
           return Padding(
             padding: EdgeInsets.only(right: index < filters.length - 1 ? 8 : 0),
             child: FilterChip(
@@ -220,7 +220,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                   Icon(
                     filter['icon'] as IconData,
                     size: 16,
-                    color: isSelected ? Colors.white : AppColors.getSecondaryTextColor(context),
+                    color: isSelected
+                        ? Colors.white
+                        : AppColors.getSecondaryTextColor(context),
                   ),
                   const SizedBox(width: 4),
                   Text(filter['label'] as String),
@@ -235,7 +237,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
               selectedColor: AppColors.primary,
               checkmarkColor: Colors.white,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : AppColors.getSecondaryTextColor(context),
+                color: isSelected
+                    ? Colors.white
+                    : AppColors.getSecondaryTextColor(context),
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
@@ -244,14 +248,14 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildSearchResults(BuildContext context) {
     return BlocBuilder<RouteImportBloc, RouteImportState>(
       builder: (context, state) {
         if (_searchQuery.isEmpty) {
           return _buildEmptySearch(context);
         }
-        
+
         if (state is RouteImportSearching) {
           return const LoadingOverlay(
             child: Center(
@@ -259,38 +263,39 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
             ),
           );
         }
-        
+
         if (state is RouteImportError) {
           return _buildErrorState(context, state.message);
         }
-        
+
         // Handle search results from BLoC state
         if (state is RouteImportSearchResults) {
           final filteredResults = _filterResults(state.routes);
-          
+
           if (filteredResults.isEmpty) {
             return _buildNoResults(context);
           }
-          
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: filteredResults.length,
             itemBuilder: (context, index) {
               final route = filteredResults[index];
               return Padding(
-                padding: EdgeInsets.only(bottom: index < filteredResults.length - 1 ? 16 : 0),
+                padding: EdgeInsets.only(
+                    bottom: index < filteredResults.length - 1 ? 16 : 0),
                 child: _buildRouteSearchCard(context, route),
               );
             },
           );
         }
-        
+
         // No search results yet
         return _buildNoResults(context);
       },
     );
   }
-  
+
   Widget _buildEmptySearch(BuildContext context) {
     return Center(
       child: Column(
@@ -325,7 +330,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildNoResults(BuildContext context) {
     return Center(
       child: Column(
@@ -365,7 +370,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildErrorState(BuildContext context, String message) {
     return Center(
       child: Column(
@@ -402,7 +407,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildRouteSearchCard(BuildContext context, route_model.Route route) {
     return Card(
       elevation: 2,
@@ -449,9 +454,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Route Stats
               Row(
                 children: [
@@ -467,13 +472,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
                   const SizedBox(width: 8),
                   _buildStatChip(
                     Icons.bar_chart,
-                    'Easy', 
+                    'Easy',
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Tags
               // if (route.tags.isNotEmpty)
               //   Wrap(
@@ -489,7 +494,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
+
   Widget _buildStatChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -513,21 +518,19 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
       ),
     );
   }
-  
 
-  
   List<route_model.Route> _filterResults(List<route_model.Route> routes) {
     var filteredRoutes = routes;
-    
+
     // Apply search query filter
     if (_searchQuery.isNotEmpty) {
       filteredRoutes = filteredRoutes.where((route) {
         final query = _searchQuery.toLowerCase();
         return route.name.toLowerCase().contains(query) ||
-               (route.description?.toLowerCase().contains(query) ?? false);
+            (route.description?.toLowerCase().contains(query) ?? false);
       }).toList();
     }
-    
+
     // Apply category filter
     if (_selectedFilter != 'all') {
       filteredRoutes = filteredRoutes.where((route) {
@@ -539,38 +542,39 @@ class _RouteSearchScreenState extends State<RouteSearchScreen> {
           case 'saved':
             return route.source == 'saved';
           case 'recent':
-            return route.createdAt != null && DateTime.now().difference(route.createdAt!).inDays <= 7;
+            return route.createdAt != null &&
+                DateTime.now().difference(route.createdAt!).inDays <= 7;
           default:
             return true;
         }
       }).toList();
     }
-    
+
     return filteredRoutes;
   }
-  
+
   void _searchNearby(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Searching for nearby routes...')),
     );
   }
-  
+
   void _searchFavorites(BuildContext context) {
     setState(() {
       _selectedFilter = 'saved';
     });
   }
-  
+
   void _searchPopular(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Loading popular routes...')),
     );
   }
-  
+
   void _selectRoute(BuildContext context, route_model.Route route) {
     Navigator.of(context).pop(route);
   }
-  
+
   void _showRouteOptions(BuildContext context, route_model.Route route) {
     showModalBottomSheet(
       context: context,

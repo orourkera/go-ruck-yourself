@@ -14,7 +14,8 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
     on<ValidateCreateDuelForm>(_onValidateCreateDuelForm);
   }
 
-  void _onCreateDuelSubmitted(CreateDuelSubmitted event, Emitter<CreateDuelState> emit) async {
+  void _onCreateDuelSubmitted(
+      CreateDuelSubmitted event, Emitter<CreateDuelState> emit) async {
     emit(CreateDuelSubmitting());
 
     final result = await createDuel(CreateDuelParams(
@@ -38,11 +39,13 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
     );
   }
 
-  void _onResetCreateDuel(ResetCreateDuel event, Emitter<CreateDuelState> emit) {
+  void _onResetCreateDuel(
+      ResetCreateDuel event, Emitter<CreateDuelState> emit) {
     emit(CreateDuelInitial());
   }
 
-  void _onValidateCreateDuelForm(ValidateCreateDuelForm event, Emitter<CreateDuelState> emit) {
+  void _onValidateCreateDuelForm(
+      ValidateCreateDuelForm event, Emitter<CreateDuelState> emit) {
     emit(CreateDuelValidating());
 
     final errors = <String, String>{};
@@ -57,7 +60,12 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
     }
 
     // Validate challenge type
-    final validChallengeTypes = ['distance', 'time', 'elevation', 'power_points'];
+    final validChallengeTypes = [
+      'distance',
+      'time',
+      'elevation',
+      'power_points'
+    ];
     if (!validChallengeTypes.contains(event.challengeType)) {
       errors['challengeType'] = 'Invalid challenge type';
     }
@@ -82,14 +90,14 @@ class CreateDuelBloc extends Bloc<CreateDuelEvent, CreateDuelState> {
     } else if (event.maxParticipants > 50) {
       errors['maxParticipants'] = 'Maximum 50 participants allowed';
     }
-    
+
     // Validate min participants
     if (event.minParticipants < 2) {
       errors['minParticipants'] = 'At least 2 participants required';
     } else if (event.minParticipants > event.maxParticipants) {
       errors['minParticipants'] = 'Cannot exceed maximum participants';
     }
-    
+
     // Validate start mode
     final validStartModes = ['auto', 'manual'];
     if (!validStartModes.contains(event.startMode)) {

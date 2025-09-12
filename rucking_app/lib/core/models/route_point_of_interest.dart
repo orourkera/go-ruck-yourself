@@ -64,13 +64,13 @@ class RoutePointOfInterest extends Equatable {
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       poiType: json['poi_type'] as String,
-      distanceFromStartKm: json['distance_from_start_km'] != null 
-          ? (json['distance_from_start_km'] as num).toDouble() 
+      distanceFromStartKm: json['distance_from_start_km'] != null
+          ? (json['distance_from_start_km'] as num).toDouble()
           : 0.0,
       isUserGenerated: json['is_user_generated'] as bool? ?? false,
       isVerified: json['is_verified'] as bool? ?? false,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'] as String) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : null,
     );
   }
@@ -179,8 +179,8 @@ class RoutePointOfInterest extends Equatable {
 
   /// Get appropriate description with fallback
   String get displayDescription {
-    return description?.isNotEmpty == true 
-        ? description! 
+    return description?.isNotEmpty == true
+        ? description!
         : type.defaultDescription;
   }
 
@@ -200,20 +200,22 @@ class RoutePointOfInterest extends Equatable {
   }
 
   /// Haversine distance calculation (returns meters)
-  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _haversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // Earth's radius in meters
-    
+
     // Convert degrees to radians
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
-    
-    final double a = 
-        (dLat / 2).sin() * (dLat / 2).sin() +
-        lat1.toRadians().cos() * lat2.toRadians().cos() *
-        (dLon / 2).sin() * (dLon / 2).sin();
-    
+
+    final double a = (dLat / 2).sin() * (dLat / 2).sin() +
+        lat1.toRadians().cos() *
+            lat2.toRadians().cos() *
+            (dLon / 2).sin() *
+            (dLon / 2).sin();
+
     final double c = 2 * (a.sqrt()).asin();
-    
+
     return earthRadius * c;
   }
 
@@ -228,7 +230,6 @@ extension on double {
   double asin() => math.asin(this);
   double sqrt() => math.sqrt(this);
 }
-
 
 /// Point of Interest types with metadata
 enum PoiType {

@@ -9,14 +9,14 @@ import 'planned_ruck_state.dart';
 /// BLoC for managing planned ruck state and operations
 class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
   final PlannedRucksRepository _plannedRucksRepository;
-  
+
   // Internal state tracking
   final List<PlannedRuck> _allPlannedRucks = [];
   final List<PlannedRuck> _todaysRucks = [];
   final List<PlannedRuck> _upcomingRucks = [];
   final List<PlannedRuck> _overdueRucks = [];
   final List<PlannedRuck> _completedRucks = [];
-  
+
   PlannedRuck? _selectedRuck;
   PlannedRuckStatus? _statusFilter;
   String? _searchQuery;
@@ -28,7 +28,6 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     required PlannedRucksRepository plannedRucksRepository,
   })  : _plannedRucksRepository = plannedRucksRepository,
         super(const PlannedRuckInitial()) {
-    
     // Register event handlers
     on<LoadPlannedRucks>(_onLoadPlannedRucks);
     on<LoadTodaysPlannedRucks>(_onLoadTodaysPlannedRucks);
@@ -80,9 +79,9 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
       if (event.forceRefresh || event.offset == 0) {
         _allPlannedRucks.clear();
       }
-      
+
       _allPlannedRucks.addAll(plannedRucks);
-      
+
       // Check if we've reached the end
       if (plannedRucks.length < event.limit) {
         _hasReachedMax = true;
@@ -140,7 +139,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) async {
     try {
-      final upcomingRucks = await _plannedRucksRepository.getUpcomingPlannedRucks(
+      final upcomingRucks =
+          await _plannedRucksRepository.getUpcomingPlannedRucks(
         days: event.days,
       );
       _upcomingRucks.clear();
@@ -165,7 +165,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) async {
     try {
-      final overdueRucks = await _plannedRucksRepository.getOverduePlannedRucks();
+      final overdueRucks =
+          await _plannedRucksRepository.getOverduePlannedRucks();
       _overdueRucks.clear();
       _overdueRucks.addAll(overdueRucks);
 
@@ -188,11 +189,12 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) async {
     try {
-      final completedRucks = await _plannedRucksRepository.getCompletedPlannedRucks(
+      final completedRucks =
+          await _plannedRucksRepository.getCompletedPlannedRucks(
         limit: event.limit,
         offset: event.offset,
       );
-      
+
       if (event.offset == 0) {
         _completedRucks.clear();
       }
@@ -224,9 +226,10 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
 
       if (plannedRuck != null) {
         _selectedRuck = plannedRuck;
-        
+
         // Update in the main list if it exists
-        final index = _allPlannedRucks.indexWhere((r) => r.id == plannedRuck.id);
+        final index =
+            _allPlannedRucks.indexWhere((r) => r.id == plannedRuck.id);
         if (index != -1) {
           _allPlannedRucks[index] = plannedRuck;
         }
@@ -270,8 +273,9 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
         plannedRucks: List.from(_allPlannedRucks),
       ));
 
-      final createdRuck = await _plannedRucksRepository.createPlannedRuck(event.plannedRuck);
-      
+      final createdRuck =
+          await _plannedRucksRepository.createPlannedRuck(event.plannedRuck);
+
       _allPlannedRucks.insert(0, createdRuck);
       _selectedRuck = createdRuck;
 
@@ -359,7 +363,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
         plannedRucks: List.from(_allPlannedRucks),
       ));
 
-      final success = await _plannedRucksRepository.deletePlannedRuck(event.plannedRuckId);
+      final success =
+          await _plannedRucksRepository.deletePlannedRuck(event.plannedRuckId);
 
       if (success) {
         _removeRuckFromLists(event.plannedRuckId);
@@ -403,7 +408,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
         plannedRucks: List.from(_allPlannedRucks),
       ));
 
-      final updatedRuck = await _plannedRucksRepository.startPlannedRuck(event.plannedRuckId);
+      final updatedRuck =
+          await _plannedRucksRepository.startPlannedRuck(event.plannedRuckId);
 
       if (updatedRuck != null) {
         _updateRuckInLists(updatedRuck);
@@ -467,7 +473,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
         throw Exception('Complete operation failed');
       }
     } catch (e) {
-      AppLogger.error('Error completing planned ruck ${event.plannedRuckId}: $e');
+      AppLogger.error(
+          'Error completing planned ruck ${event.plannedRuckId}: $e');
       emit(PlannedRuckActionError(
         plannedRuckId: event.plannedRuckId,
         action: PlannedRuckAction.complete,
@@ -511,7 +518,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
         throw Exception('Cancel operation failed');
       }
     } catch (e) {
-      AppLogger.error('Error cancelling planned ruck ${event.plannedRuckId}: $e');
+      AppLogger.error(
+          'Error cancelling planned ruck ${event.plannedRuckId}: $e');
       emit(PlannedRuckActionError(
         plannedRuckId: event.plannedRuckId,
         action: PlannedRuckAction.cancel,
@@ -557,7 +565,7 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) {
     _statusFilter = event.status;
-    
+
     if (state is PlannedRuckLoaded) {
       emit((state as PlannedRuckLoaded).copyWith(
         statusFilter: _statusFilter,
@@ -572,7 +580,7 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) {
     _searchQuery = event.query.trim().isEmpty ? null : event.query.trim();
-    
+
     if (state is PlannedRuckLoaded) {
       emit((state as PlannedRuckLoaded).copyWith(
         searchQuery: _searchQuery,
@@ -601,7 +609,7 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) {
     _selectedRuck = event.plannedRuck;
-    
+
     if (state is PlannedRuckLoaded) {
       emit((state as PlannedRuckLoaded).copyWith(
         selectedRuck: _selectedRuck,
@@ -624,11 +632,11 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
     Emitter<PlannedRuckState> emit,
   ) {
     _removeRuckFromLists(event.plannedRuckId);
-    
+
     if (_selectedRuck?.id == event.plannedRuckId) {
       _selectedRuck = null;
     }
-    
+
     _emitLoadedState();
   }
 
@@ -656,7 +664,8 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
   /// Update a ruck in all relevant lists
   void _updateRuckInLists(PlannedRuck updatedRuck) {
     // Update in main list
-    final mainIndex = _allPlannedRucks.indexWhere((r) => r.id == updatedRuck.id);
+    final mainIndex =
+        _allPlannedRucks.indexWhere((r) => r.id == updatedRuck.id);
     if (mainIndex != -1) {
       _allPlannedRucks[mainIndex] = updatedRuck;
     }
@@ -717,13 +726,17 @@ class PlannedRuckBloc extends Bloc<PlannedRuckEvent, PlannedRuckState> {
 
   /// Handle errors and return appropriate error state
   PlannedRuckError _handleError(dynamic error, String defaultMessage) {
-    if (error.toString().contains('network') || error.toString().contains('connection')) {
+    if (error.toString().contains('network') ||
+        error.toString().contains('connection')) {
       return PlannedRuckError.network();
-    } else if (error.toString().contains('401') || error.toString().contains('unauthorized')) {
+    } else if (error.toString().contains('401') ||
+        error.toString().contains('unauthorized')) {
       return PlannedRuckError.authentication();
-    } else if (error.toString().contains('404') || error.toString().contains('not found')) {
+    } else if (error.toString().contains('404') ||
+        error.toString().contains('not found')) {
       return PlannedRuckError.notFound();
-    } else if (error.toString().contains('400') || error.toString().contains('validation')) {
+    } else if (error.toString().contains('400') ||
+        error.toString().contains('validation')) {
       return PlannedRuckError.validation(message: error.toString());
     } else {
       return PlannedRuckError(message: defaultMessage, originalError: error);

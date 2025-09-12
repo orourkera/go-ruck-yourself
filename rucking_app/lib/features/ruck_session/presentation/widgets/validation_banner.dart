@@ -30,7 +30,8 @@ class ValidationBanner extends StatelessWidget {
             ),
             child: Text(
               message,
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.black, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ),

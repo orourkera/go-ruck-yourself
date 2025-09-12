@@ -57,13 +57,15 @@ class LocationDisclosureDialog extends StatelessWidget {
           _buildFeatureItem(
             icon: Icons.mobile_friendly,
             title: 'Background Tracking',
-            description: 'Continue recording even when you switch apps or lock your phone',
+            description:
+                'Continue recording even when you switch apps or lock your phone',
           ),
           const SizedBox(height: 12),
           _buildFeatureItem(
             icon: Icons.analytics,
             title: 'Fitness Metrics',
-            description: 'Provide precise pace, elevation, and performance data',
+            description:
+                'Provide precise pace, elevation, and performance data',
           ),
           const SizedBox(height: 16),
           Container(

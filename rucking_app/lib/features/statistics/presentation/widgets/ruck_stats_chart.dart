@@ -12,7 +12,6 @@ enum StatsMetric {
   powerPoints,
 }
 
-
 class RuckStatsChart extends StatefulWidget {
   final List<dynamic> timeSeriesData;
   final String timeframe;
@@ -32,20 +31,20 @@ class RuckStatsChart extends StatefulWidget {
 class _RuckStatsChartState extends State<RuckStatsChart> {
   StatsMetric _selectedMetric = StatsMetric.distance;
   bool _isLineChart = false;
-  
+
   @override
   void initState() {
     super.initState();
     _loadChartTypePreference();
   }
-  
+
   Future<void> _loadChartTypePreference() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _isLineChart = prefs.getBool('chart_is_line') ?? false;
     });
   }
-  
+
   Future<void> _saveChartTypePreference() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('chart_is_line', _isLineChart);
@@ -55,7 +54,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -63,7 +62,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: isDark 
+            color: isDark
                 ? Colors.black.withValues(alpha: 0.3)
                 : Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
@@ -77,7 +76,7 @@ class _RuckStatsChartState extends State<RuckStatsChart> {
           const SizedBox(height: 16),
           _buildMetricSelector(),
           const SizedBox(height: 20),
-_buildChart(),
+          _buildChart(),
         ],
       ),
     );
@@ -105,10 +104,11 @@ _buildChart(),
                 _saveChartTypePreference();
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: !_isLineChart 
-                      ? AppColors.primary 
+                  color: !_isLineChart
+                      ? AppColors.primary
                       : AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(6),
@@ -147,10 +147,11 @@ _buildChart(),
                 _saveChartTypePreference();
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _isLineChart 
-                      ? AppColors.primary 
+                  color: _isLineChart
+                      ? AppColors.primary
                       : AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(
                     topRight: Radius.circular(6),
@@ -189,7 +190,7 @@ _buildChart(),
   Widget _buildMetricSelector() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -204,31 +205,33 @@ _buildChart(),
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected 
-                      ? AppColors.primary 
-                      : isDark 
-                          ? Colors.grey[800] 
+                  color: isSelected
+                      ? AppColors.primary
+                      : isDark
+                          ? Colors.grey[800]
                           : Colors.grey[100],
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected 
-                        ? AppColors.primary 
-                        : isDark 
-                            ? Colors.grey[600]! 
+                    color: isSelected
+                        ? AppColors.primary
+                        : isDark
+                            ? Colors.grey[600]!
                             : Colors.grey[300]!,
                   ),
                 ),
                 child: Text(
                   _getMetricDisplayName(metric),
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: isSelected 
-                        ? Colors.white 
-                        : isDark 
-                            ? Colors.grey[300] 
+                    color: isSelected
+                        ? Colors.white
+                        : isDark
+                            ? Colors.grey[300]
                             : AppColors.textDarkSecondary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ),
@@ -242,7 +245,7 @@ _buildChart(),
   Widget _buildChart() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     if (widget.timeSeriesData.isEmpty) {
       return SizedBox(
         height: 200,
@@ -251,7 +254,9 @@ _buildChart(),
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                _isLineChart ? Icons.show_chart_outlined : Icons.bar_chart_outlined,
+                _isLineChart
+                    ? Icons.show_chart_outlined
+                    : Icons.bar_chart_outlined,
                 size: 48,
                 color: isDark ? Colors.grey[400] : AppColors.grey,
               ),
@@ -259,7 +264,8 @@ _buildChart(),
               Text(
                 'No data available',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
+                  color:
+                      isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
                 ),
               ),
             ],
@@ -270,12 +276,10 @@ _buildChart(),
 
     return SizedBox(
       height: 200,
-      child: _isLineChart 
-          ? _buildLineChart(isDark)
-          : _buildBarChart(isDark),
+      child: _isLineChart ? _buildLineChart(isDark) : _buildBarChart(isDark),
     );
   }
-  
+
   Widget _buildBarChart(bool isDark) {
     return BarChart(
       BarChartData(
@@ -289,7 +293,7 @@ _buildChart(),
       ),
     );
   }
-  
+
   Widget _buildLineChart(bool isDark) {
     final spots = widget.timeSeriesData.asMap().entries.map((entry) {
       final index = entry.key;
@@ -297,7 +301,7 @@ _buildChart(),
       final value = _getMetricValue(data);
       return FlSpot(index.toDouble(), value);
     }).toList();
-    
+
     return LineChart(
       LineChartData(
         maxY: _getMaxY(),
@@ -335,12 +339,12 @@ _buildChart(),
               return touchedSpots.map((spot) {
                 final index = spot.x.toInt();
                 if (index >= widget.timeSeriesData.length) return null;
-                
+
                 final data = widget.timeSeriesData[index];
                 final period = data['period'] ?? 'Unknown';
                 final value = _getMetricValue(data);
                 final formattedValue = _formatMetricValue(value);
-                
+
                 return LineTooltipItem(
                   '$period\n$formattedValue',
                   AppTextStyles.bodySmall.copyWith(
@@ -355,7 +359,7 @@ _buildChart(),
       ),
     );
   }
-  
+
   FlGridData _buildGridData(bool isDark) {
     return FlGridData(
       show: true,
@@ -377,12 +381,12 @@ _buildChart(),
         tooltipRoundedRadius: 8,
         getTooltipItem: (group, groupIndex, rod, rodIndex) {
           if (groupIndex >= widget.timeSeriesData.length) return null;
-          
+
           final data = widget.timeSeriesData[groupIndex];
           final period = data['period'] ?? 'Unknown';
           final value = _getMetricValue(data);
           final formattedValue = _formatMetricValue(value);
-          
+
           return BarTooltipItem(
             '$period\n$formattedValue',
             AppTextStyles.bodySmall.copyWith(
@@ -398,7 +402,7 @@ _buildChart(),
   FlTitlesData _buildTitlesData() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return FlTitlesData(
       show: true,
       rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -411,16 +415,17 @@ _buildChart(),
             if (index < 0 || index >= widget.timeSeriesData.length) {
               return const SizedBox.shrink();
             }
-            
+
             final data = widget.timeSeriesData[index];
             String period = data['period'] ?? '';
-            
+
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 period,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
+                  color:
+                      isDark ? Colors.grey[400] : AppColors.textDarkSecondary,
                   fontSize: 10,
                 ),
               ),
@@ -449,12 +454,12 @@ _buildChart(),
   List<BarChartGroupData> _buildBarGroups() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return widget.timeSeriesData.asMap().entries.map((entry) {
       final index = entry.key;
       final data = entry.value;
       final value = _getMetricValue(data);
-      
+
       return BarChartGroupData(
         x: index,
         barRods: [
@@ -482,7 +487,8 @@ _buildChart(),
       case StatsMetric.distance:
         return (data['distance_km'] ?? 0.0).toDouble();
       case StatsMetric.time:
-        return ((data['duration_seconds'] ?? 0) / 3600).toDouble(); // Convert to hours
+        return ((data['duration_seconds'] ?? 0) / 3600)
+            .toDouble(); // Convert to hours
       case StatsMetric.calories:
         return (data['calories'] ?? 0).toDouble();
       case StatsMetric.powerPoints:
@@ -492,18 +498,18 @@ _buildChart(),
 
   double _getMaxY() {
     if (widget.timeSeriesData.isEmpty) return 100;
-    
+
     double maxValue = 0;
     for (final data in widget.timeSeriesData) {
       final value = _getMetricValue(data);
       if (value > maxValue) maxValue = value;
     }
-    
+
     // If maxValue is 0 or very small, return a minimum value to prevent chart errors
     if (maxValue <= 0) {
       return _getDefaultMaxForMetric();
     }
-    
+
     // Add 20% padding to the top
     return maxValue * 1.2;
   }
@@ -544,7 +550,8 @@ _buildChart(),
   String _formatMetricValue(double value) {
     switch (_selectedMetric) {
       case StatsMetric.distance:
-        return MeasurementUtils.formatDistance(value, metric: widget.preferMetric);
+        return MeasurementUtils.formatDistance(value,
+            metric: widget.preferMetric);
       case StatsMetric.time:
         final hours = value.floor();
         final minutes = ((value - hours) * 60).round();
@@ -588,13 +595,12 @@ _buildChart(),
   double _getSafeHorizontalInterval() {
     final maxY = _getMaxY();
     final interval = maxY / 4;
-    
+
     // Ensure interval is never zero or negative
     if (interval <= 0) {
       return _getDefaultMaxForMetric() / 4;
     }
-    
+
     return interval;
   }
-  
 }

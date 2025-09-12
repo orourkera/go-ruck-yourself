@@ -20,7 +20,7 @@ class Event extends Equatable {
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
-  
+
   // Additional fields from API response
   final int participantCount;
   final String? userParticipationStatus;
@@ -62,34 +62,41 @@ class Event extends Equatable {
       description: json['description'] as String?,
       creatorUserId: json['creator_user_id'] as String? ?? '',
       clubId: json['club_id'] as String?,
-      scheduledStartTime: json['scheduled_start_time'] != null 
+      scheduledStartTime: json['scheduled_start_time'] != null
           ? DateTime.parse(json['scheduled_start_time'] as String)
           : DateTime.now(),
       durationMinutes: json['duration_minutes'] as int,
       locationName: json['location_name'] as String?,
-      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
-      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
       maxParticipants: json['max_participants'] as int?,
       minParticipants: json['min_participants'] as int? ?? 1,
       approvalRequired: json['approval_required'] as bool? ?? false,
       difficultyLevel: json['difficulty_level'] as int?,
-      ruckWeightKg: json['ruck_weight_kg'] != null ? (json['ruck_weight_kg'] as num).toDouble() : null,
+      ruckWeightKg: json['ruck_weight_kg'] != null
+          ? (json['ruck_weight_kg'] as num).toDouble()
+          : null,
       bannerImageUrl: json['banner_image_url'] as String?,
       status: json['status'] as String? ?? 'active',
-      createdAt: json['created_at'] != null 
+      createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
-      updatedAt: json['updated_at'] != null 
+      updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : DateTime.now(),
       participantCount: json['participant_count'] as int? ?? 0,
       userParticipationStatus: json['user_participation_status'] as String?,
       isCreator: json['is_creator'] as bool? ?? false,
-      creator: json['creator'] != null 
+      creator: json['creator'] != null
           ? EventCreator.fromJson(json['creator'] as Map<String, dynamic>)
           : null,
-      hostingClub: json['hosting_club'] != null 
-          ? EventHostingClub.fromJson(json['hosting_club'] as Map<String, dynamic>)
+      hostingClub: json['hosting_club'] != null
+          ? EventHostingClub.fromJson(
+              json['hosting_club'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -126,21 +133,30 @@ class Event extends Equatable {
   // Computed properties
   bool get isActive => status == 'active';
   bool get isCancelled => status == 'cancelled';
-  bool get isCompleted => DateTime.now().isAfter(scheduledStartTime.add(Duration(hours: 4)));
-  bool get isPast => DateTime.now().isAfter(scheduledStartTime.add(Duration(hours: 4)));
+  bool get isCompleted =>
+      DateTime.now().isAfter(scheduledStartTime.add(Duration(hours: 4)));
+  bool get isPast =>
+      DateTime.now().isAfter(scheduledStartTime.add(Duration(hours: 4)));
   bool get isUpcoming => DateTime.now().isBefore(scheduledStartTime);
-  bool get isOngoing => DateTime.now().isAfter(scheduledStartTime) && !isCompleted;
-  bool get canStartRuck => (isUpcoming || isOngoing) && isActive && !isCancelled;
-  bool get isFull => maxParticipants != null && participantCount >= maxParticipants!;
+  bool get isOngoing =>
+      DateTime.now().isAfter(scheduledStartTime) && !isCompleted;
+  bool get canStartRuck =>
+      (isUpcoming || isOngoing) && isActive && !isCancelled;
+  bool get isFull =>
+      maxParticipants != null && participantCount >= maxParticipants!;
   bool get isClubEvent => clubId != null;
-  bool get canJoin => userParticipationStatus == null && !isPast && !isFull && isActive;
+  bool get canJoin =>
+      userParticipationStatus == null && !isPast && !isFull && isActive;
   bool get canLeave => userParticipationStatus != null && !isPast;
-  bool get isUserParticipating => userParticipationStatus == 'approved' || userParticipationStatus == 'pending';
+  bool get isUserParticipating =>
+      userParticipationStatus == 'approved' ||
+      userParticipationStatus == 'pending';
   bool get isUserApproved => userParticipationStatus == 'approved';
   bool get isUserPending => userParticipationStatus == 'pending';
   bool get needsApproval => approvalRequired;
 
-  DateTime get scheduledEndTime => scheduledStartTime.add(Duration(minutes: durationMinutes));
+  DateTime get scheduledEndTime =>
+      scheduledStartTime.add(Duration(minutes: durationMinutes));
 
   String get participantStatusText {
     switch (userParticipationStatus) {
@@ -277,20 +293,18 @@ class EventParticipant extends Equatable {
         'avatar_url': json['avatar_url'],
       };
     }
-    
+
     return EventParticipant(
       id: json['id'] as String? ?? '',
       eventId: json['event_id'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
-      joinedAt: json['registered_at'] != null 
+      joinedAt: json['registered_at'] != null
           ? DateTime.parse(json['registered_at'] as String)
-          : (json['joined_at'] != null 
+          : (json['joined_at'] != null
               ? DateTime.parse(json['joined_at'] as String)
               : DateTime.now()),
-      user: userData != null 
-          ? EventUser.fromJson(userData)
-          : null,
+      user: userData != null ? EventUser.fromJson(userData) : null,
     );
   }
 
@@ -357,7 +371,8 @@ class EventDetails extends Equatable {
     return EventDetails(
       event: Event.fromJson(json['event'] as Map<String, dynamic>),
       participants: (json['participants'] as List<dynamic>? ?? [])
-          .map((participant) => EventParticipant.fromJson(participant as Map<String, dynamic>))
+          .map((participant) =>
+              EventParticipant.fromJson(participant as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -369,10 +384,10 @@ class EventDetails extends Equatable {
     };
   }
 
-  List<EventParticipant> get approvedParticipants => 
+  List<EventParticipant> get approvedParticipants =>
       participants.where((p) => p.isApproved).toList();
-  
-  List<EventParticipant> get pendingParticipants => 
+
+  List<EventParticipant> get pendingParticipants =>
       participants.where((p) => p.isPending).toList();
 
   @override

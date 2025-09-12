@@ -27,7 +27,8 @@ class PublicProfileLoaded extends PublicProfileState {
   });
 
   @override
-  List<Object> get props => [profile, stats, isFollowing, clubs ?? [], recentRucks ?? []];
+  List<Object> get props =>
+      [profile, stats, isFollowing, clubs ?? [], recentRucks ?? []];
 }
 
 class PublicProfileError extends PublicProfileState {

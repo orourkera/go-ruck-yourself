@@ -22,15 +22,14 @@ class ActiveSessionDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final startedAt = activeSession['started_at'] as String?;
     final ruckWeight = activeSession['rucking_weight_kg'] as double?;
-    
-    final startedTime = startedAt != null 
+
+    final startedTime = startedAt != null
         ? DateTime.tryParse(startedAt.replaceAll('Z', '+00:00'))
         : null;
-    
-    final duration = startedTime != null 
-        ? DateTime.now().difference(startedTime)
-        : null;
-    
+
+    final duration =
+        startedTime != null ? DateTime.now().difference(startedTime) : null;
+
     final formattedWeight = ruckWeight != null && ruckWeight > 0
         ? MeasurementUtils.formatWeight(ruckWeight, metric: true)
         : 'Hike';
@@ -63,7 +62,7 @@ class ActiveSessionDialog extends StatelessWidget {
             style: AppTextStyles.bodyMedium,
           ),
           const SizedBox(height: 16),
-          
+
           // Session details card
           Container(
             padding: const EdgeInsets.all(16),
@@ -133,7 +132,7 @@ class ActiveSessionDialog extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
           Text(
             'You must complete or continue your existing session before starting a new one.',
@@ -172,7 +171,7 @@ class ActiveSessionDialog extends StatelessWidget {
 
   String _formatDuration(Duration? duration) {
     if (duration == null) return 'some time ago';
-    
+
     if (duration.inMinutes < 1) {
       return 'just now';
     } else if (duration.inHours < 1) {
@@ -180,7 +179,7 @@ class ActiveSessionDialog extends StatelessWidget {
     } else {
       final hours = duration.inHours;
       final minutes = duration.inMinutes % 60;
-      
+
       if (minutes == 0) {
         return '$hours hour${hours == 1 ? '' : 's'} ago';
       } else {

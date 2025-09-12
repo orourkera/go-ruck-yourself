@@ -47,7 +47,7 @@ class DuelStats extends Equatable {
 
   // Utility getters
   int get totalDuels => duelsCreated + duelsJoined;
-  
+
   double get winRate {
     if (duelsCompleted == 0) return 0.0;
     return duelsWon / duelsCompleted;
@@ -59,7 +59,8 @@ class DuelStats extends Equatable {
   }
 
   String get winRatePercentage => '${(winRate * 100).toStringAsFixed(1)}%';
-  String get completionRatePercentage => '${(completionRate * 100).toStringAsFixed(1)}%';
+  String get completionRatePercentage =>
+      '${(completionRate * 100).toStringAsFixed(1)}%';
 
   bool get hasParticipatedInDuels => totalDuels > 0;
   bool get hasWonDuels => duelsWon > 0;

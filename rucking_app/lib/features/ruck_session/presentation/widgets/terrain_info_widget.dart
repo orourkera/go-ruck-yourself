@@ -20,22 +20,29 @@ class TerrainInfoWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('[TERRAIN_WIDGET] BUILD METHOD CALLED - ${terrainSegments.length} segments');
-    AppLogger.debug('[TERRAIN_WIDGET] 🏗️ Building with ${terrainSegments.length} terrain segments');
-    
+    print(
+        '[TERRAIN_WIDGET] BUILD METHOD CALLED - ${terrainSegments.length} segments');
+    AppLogger.debug(
+        '[TERRAIN_WIDGET] 🏗️ Building with ${terrainSegments.length} terrain segments');
+
     // Debug log all segments
     for (int i = 0; i < terrainSegments.length; i++) {
       final segment = terrainSegments[i];
-      AppLogger.debug('[TERRAIN_WIDGET] Segment $i: ${segment.surfaceType} - ${(segment.distanceKm * 1000).toStringAsFixed(1)}m (${segment.energyMultiplier}x)');
+      AppLogger.debug(
+          '[TERRAIN_WIDGET] Segment $i: ${segment.surfaceType} - ${(segment.distanceKm * 1000).toStringAsFixed(1)}m (${segment.energyMultiplier}x)');
     }
 
     final stats = TerrainSegment.getTerrainStats(terrainSegments);
-    final terrainBreakdown = stats['surface_breakdown'] as Map<String, double>? ?? <String, double>{};
+    final terrainBreakdown =
+        stats['surface_breakdown'] as Map<String, double>? ??
+            <String, double>{};
     final weightedMultiplier = stats['weighted_multiplier'] as double? ?? 1.0;
     final totalDistance = stats['total_distance_km'] as double? ?? 0.0;
-    final mostCommonSurface = stats['most_common_surface'] as String? ?? 'paved';
-    
-    AppLogger.debug('[TERRAIN_WIDGET] Showing terrain data: ${terrainSegments.length} segments, ${totalDistance.toStringAsFixed(3)}km total');
+    final mostCommonSurface =
+        stats['most_common_surface'] as String? ?? 'paved';
+
+    AppLogger.debug(
+        '[TERRAIN_WIDGET] Showing terrain data: ${terrainSegments.length} segments, ${totalDistance.toStringAsFixed(3)}km total');
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -46,20 +53,26 @@ class TerrainInfoWidget extends StatelessWidget {
           ListTile(
             leading: Icon(
               Icons.terrain,
-              color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
+              color: terrainSegments.isEmpty
+                  ? Colors.grey
+                  : _getTerrainColor(weightedMultiplier),
             ),
             title: Text(
-              terrainSegments.isEmpty ? 'Terrain' : _formatSurfaceType(mostCommonSurface),
+              terrainSegments.isEmpty
+                  ? 'Terrain'
+                  : _formatSurfaceType(mostCommonSurface),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             subtitle: Text(
-              terrainSegments.isEmpty 
-                ? 'Tracking terrain - data will appear as you move'
-                : '${weightedMultiplier.toStringAsFixed(2)}x multiplier',
+              terrainSegments.isEmpty
+                  ? 'Tracking terrain - data will appear as you move'
+                  : '${weightedMultiplier.toStringAsFixed(2)}x multiplier',
               style: TextStyle(
-                color: terrainSegments.isEmpty ? Colors.grey : _getTerrainColor(weightedMultiplier),
+                color: terrainSegments.isEmpty
+                    ? Colors.grey
+                    : _getTerrainColor(weightedMultiplier),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -79,16 +92,17 @@ class TerrainInfoWidget extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (terrainSegments.isEmpty) 
+                  if (terrainSegments.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16.0),
                       child: Center(
                         child: Text(
                           'Terrain data will appear as you move',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
                         ),
                       ),
                     )
@@ -96,8 +110,8 @@ class TerrainInfoWidget extends StatelessWidget {
                     Text(
                       'Surface Breakdown',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 12),
                     ...terrainBreakdown.entries
@@ -149,15 +163,15 @@ class TerrainInfoWidget extends StatelessWidget {
           Text(
             MeasurementUtils.formatDistance(distance, metric: preferMetric),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(width: 8),
           Text(
             '(${percentage.toStringAsFixed(0)}%)',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.grey[600],
-            ),
+                  color: Colors.grey[600],
+                ),
           ),
           const SizedBox(width: 8),
           Container(

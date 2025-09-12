@@ -31,7 +31,7 @@ class PlannedRuckCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final route = plannedRuck.route;
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -114,7 +114,6 @@ class PlannedRuckCard extends StatelessWidget {
                         ),
                       ),
                     ],
-
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -177,7 +176,8 @@ class PlannedRuckCard extends StatelessWidget {
               // Overdue warning
               if (plannedRuck.isOverdue) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -304,15 +304,16 @@ class PlannedRuckCard extends StatelessWidget {
     if (plannedRuck.isOverdue) {
       return BorderSide(color: AppColors.error.withOpacity(0.3), width: 2);
     }
-    
-    if (plannedRuck.isToday && plannedRuck.status == PlannedRuckStatus.planned) {
+
+    if (plannedRuck.isToday &&
+        plannedRuck.status == PlannedRuckStatus.planned) {
       return BorderSide(color: AppColors.warning.withOpacity(0.3), width: 2);
     }
-    
+
     if (plannedRuck.status == PlannedRuckStatus.inProgress) {
       return BorderSide(color: AppColors.primary.withOpacity(0.3), width: 2);
     }
-    
+
     return BorderSide.none;
   }
 
@@ -321,11 +322,11 @@ class PlannedRuckCard extends StatelessWidget {
     if (plannedRuck.isOverdue) {
       return AppColors.error;
     }
-    
+
     if (plannedRuck.isToday) {
       return AppColors.warning;
     }
-    
+
     return AppColors.textDarkSecondary;
   }
 
@@ -348,25 +349,28 @@ class PlannedRuckCard extends StatelessWidget {
     if (plannedRuck.isOverdue) {
       return AppColors.error;
     }
-    
+
     if (plannedRuck.isToday) {
       return AppColors.warning;
     }
-    
+
     return AppColors.primary;
   }
 
   /// Format distance using user's metric preference
   String _formatDistance(BuildContext context, double distanceKm) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   /// Format elevation using user's metric preference
   String _formatElevation(BuildContext context, double elevationM) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM,
+        metric: preferMetric);
   }
 }

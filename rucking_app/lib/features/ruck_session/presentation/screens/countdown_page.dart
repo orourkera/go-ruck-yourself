@@ -32,19 +32,22 @@ class CountdownPage extends StatefulWidget {
   final ActiveSessionArgs args;
   final bool skipCountdown;
 
-  const CountdownPage({Key? key, required this.args, this.skipCountdown = false}) : super(key: key);
+  const CountdownPage(
+      {Key? key, required this.args, this.skipCountdown = false})
+      : super(key: key);
 
   @override
   State<CountdownPage> createState() => _CountdownPageState();
 }
 
-class _CountdownPageState extends State<CountdownPage> with SingleTickerProviderStateMixin {
+class _CountdownPageState extends State<CountdownPage>
+    with SingleTickerProviderStateMixin {
   int _count = 3;
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   Timer? _timer;
   bool _countdownComplete = false;
-  
+
   // Preload the bloc to start session initialization while countdown runs
   late ActiveSessionBloc _sessionBloc;
   StreamSubscription? _blocSubscription;
@@ -55,36 +58,45 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    
+
     // Debug: Log planned route data received from create_session_screen
     print('⏰⏰⏰ [COUNTDOWN_PAGE] Received args:');
     print('⏰⏰⏰   plannedRoute is null: ${widget.args.plannedRoute == null}');
-    print('⏰⏰⏰   plannedRoute length: ${widget.args.plannedRoute?.length ?? 0}');
+    print(
+        '⏰⏰⏰   plannedRoute length: ${widget.args.plannedRoute?.length ?? 0}');
     print('⏰⏰⏰   plannedRouteDistance: ${widget.args.plannedRouteDistance}');
     print('⏰⏰⏰   plannedRouteDuration: ${widget.args.plannedRouteDuration}');
-    if (widget.args.plannedRoute != null && widget.args.plannedRoute!.isNotEmpty) {
-      print('⏰⏰⏰   First planned route point: ${widget.args.plannedRoute!.first}');
+    if (widget.args.plannedRoute != null &&
+        widget.args.plannedRoute!.isNotEmpty) {
+      print(
+          '⏰⏰⏰   First planned route point: ${widget.args.plannedRoute!.first}');
     }
-    
+
     AppLogger.debug('[COUNTDOWN_PAGE] Received args:');
-    AppLogger.debug('  plannedRoute is null: ${widget.args.plannedRoute == null}');
-    AppLogger.debug('  plannedRoute length: ${widget.args.plannedRoute?.length ?? 0}');
-    AppLogger.debug('  plannedRouteDistance: ${widget.args.plannedRouteDistance}');
-    AppLogger.debug('  plannedRouteDuration: ${widget.args.plannedRouteDuration}');
-    if (widget.args.plannedRoute != null && widget.args.plannedRoute!.isNotEmpty) {
-      AppLogger.debug('  First planned route point: ${widget.args.plannedRoute!.first}');
+    AppLogger.debug(
+        '  plannedRoute is null: ${widget.args.plannedRoute == null}');
+    AppLogger.debug(
+        '  plannedRoute length: ${widget.args.plannedRoute?.length ?? 0}');
+    AppLogger.debug(
+        '  plannedRouteDistance: ${widget.args.plannedRouteDistance}');
+    AppLogger.debug(
+        '  plannedRouteDuration: ${widget.args.plannedRouteDuration}');
+    if (widget.args.plannedRoute != null &&
+        widget.args.plannedRoute!.isNotEmpty) {
+      AppLogger.debug(
+          '  First planned route point: ${widget.args.plannedRoute!.first}');
     }
-    
+
     // Animation setup
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 1.0, end: 3.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
-    
+
     // Start session initialization in background
     final locator = GetIt.instance;
     _sessionBloc = ActiveSessionBloc(
@@ -105,7 +117,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       locationContextService: locator<LocationContextService>(),
       audioService: locator<AIAudioService>(),
     );
-    
+
     // Start countdown after a brief delay to ensure screen is visible
     Future.delayed(const Duration(milliseconds: 50), () {
       _startCountdown();
@@ -116,9 +128,9 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
   bool _sessionInitiated = false;
   bool _isLoading = true;
   bool _preloadComplete = false;
-  
+
   void _startCountdown() {
-    // Start session with a small delay 
+    // Start session with a small delay
     if (!_sessionInitiated) {
       _sessionInitiated = true;
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -129,25 +141,36 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
             userWeightKg: widget.args.userWeightKg,
             notes: widget.args.notes ?? '',
             plannedDuration: widget.args.plannedDuration,
-            eventId: widget.args.eventId, // Pass event ID if creating session from event
-            plannedRoute: widget.args.plannedRoute, // Pass planned route for navigation
-            plannedRouteDistance: widget.args.plannedRouteDistance, // Pass route distance
-            plannedRouteDuration: widget.args.plannedRouteDuration, // Pass route duration
-            aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled, // AI Cheerleader toggle
-            aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality, // Selected personality
-            aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent, // Explicit language preference
-            sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
+            eventId: widget
+                .args.eventId, // Pass event ID if creating session from event
+            plannedRoute:
+                widget.args.plannedRoute, // Pass planned route for navigation
+            plannedRouteDistance:
+                widget.args.plannedRouteDistance, // Pass route distance
+            plannedRouteDuration:
+                widget.args.plannedRouteDuration, // Pass route duration
+            aiCheerleaderEnabled:
+                widget.args.aiCheerleaderEnabled, // AI Cheerleader toggle
+            aiCheerleaderPersonality:
+                widget.args.aiCheerleaderPersonality, // Selected personality
+            aiCheerleaderExplicitContent: widget.args
+                .aiCheerleaderExplicitContent, // Explicit language preference
+            sessionId: widget.args
+                .sessionId, // Pass existing session ID to prevent duplicate creation
           ));
-          
+
           // Listen for session state changes
           _blocSubscription = _sessionBloc.stream.listen((state) {
-            AppLogger.error('[COUNTDOWN] 🔥 Session state changed: ${state.runtimeType}');
-            
+            AppLogger.error(
+                '[COUNTDOWN] 🔥 Session state changed: ${state.runtimeType}');
+
             if (state is ActiveSessionRunning) {
               // Session is now running - mark as ready
-              AppLogger.error('[COUNTDOWN] 🔥 ActiveSessionRunning state received - setting isLoading=false');
+              AppLogger.error(
+                  '[COUNTDOWN] 🔥 ActiveSessionRunning state received - setting isLoading=false');
               if (state.errorMessage != null) {
-                AppLogger.error('[COUNTDOWN] 🔥 Session has error but running: ${state.errorMessage} - proceeding anyway');
+                AppLogger.error(
+                    '[COUNTDOWN] 🔥 Session has error but running: ${state.errorMessage} - proceeding anyway');
               }
               if (mounted) {
                 setState(() {
@@ -156,15 +179,18 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
                 _checkAndNavigateIfReady();
               }
             } else {
-              AppLogger.error('[COUNTDOWN] 🔥 Still waiting for ActiveSessionRunning, got: ${state.runtimeType}');
+              AppLogger.error(
+                  '[COUNTDOWN] 🔥 Still waiting for ActiveSessionRunning, got: ${state.runtimeType}');
             }
           });
-          
+
           // FAILSAFE: Force navigation after 5 seconds regardless of session state
           Future.delayed(const Duration(seconds: 5), () {
             if (mounted && _isLoading) {
-              AppLogger.error('[COUNTDOWN] 🔥 TIMEOUT reached - forcing navigation despite session not ready');
-              AppLogger.error('[COUNTDOWN] 🔥 Current bloc state: ${_sessionBloc.state.runtimeType}');
+              AppLogger.error(
+                  '[COUNTDOWN] 🔥 TIMEOUT reached - forcing navigation despite session not ready');
+              AppLogger.error(
+                  '[COUNTDOWN] 🔥 Current bloc state: ${_sessionBloc.state.runtimeType}');
               setState(() {
                 _isLoading = false;
               });
@@ -174,17 +200,17 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         }
       });
     }
-    
+
     // Start map and assets preloading
     _preloadResources();
-    
+
     // Start countdown timer
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      
+
       if (widget.skipCountdown) {
         // Immediately complete countdown when skipping
         AppLogger.debug('[COUNTDOWN] Skipping countdown by user preference');
@@ -207,29 +233,29 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         setState(() {
           _countdownComplete = true;
         });
-        
+
         _controller.forward(from: 0.0).then((_) {
           timer.cancel();
-          
+
           // Only navigate when both countdown complete AND preloading complete
           _checkAndNavigateIfReady();
         });
       }
     });
   }
-  
+
   void _preloadResources() async {
     // Preload map tiles for current location if available
     // This helps avoid the blue map flash
-    
+
     // Try to fetch the user's last known location quickly
     try {
       final locationService = GetIt.instance<LocationService>();
       // Add timeout to prevent hanging
       final last = await locationService.getCurrentLocation().timeout(
-        const Duration(seconds: 2),
-        onTimeout: () => null,
-      );
+            const Duration(seconds: 2),
+            onTimeout: () => null,
+          );
       if (last != null) {
         _initialCenter = latlong.LatLng(last.latitude, last.longitude);
       }
@@ -237,12 +263,12 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
       // Silent failure – fallback to default center in ActiveSessionPage
       AppLogger.debug('[COUNTDOWN] Location fetch failed: $e');
     }
-    
+
     // Simulate resource loading only when countdown is visible
     if (!widget.skipCountdown) {
       await Future.delayed(const Duration(seconds: 3));
     }
-    
+
     if (mounted) {
       setState(() {
         _preloadComplete = true;
@@ -251,17 +277,19 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     AppLogger.debug('[COUNTDOWN] Preload complete');
     _checkAndNavigateIfReady();
   }
-  
+
   void _checkAndNavigateIfReady() {
     // Only navigate when both conditions are met:
     // 1. Countdown is complete
     // 2. Preloading has finished
     // 3. Session state is ready
-    AppLogger.debug('[COUNTDOWN] Navigation check: countdownComplete=$_countdownComplete, preloadComplete=$_preloadComplete, isLoading=$_isLoading, mounted=$mounted');
-    
+    AppLogger.debug(
+        '[COUNTDOWN] Navigation check: countdownComplete=$_countdownComplete, preloadComplete=$_preloadComplete, isLoading=$_isLoading, mounted=$mounted');
+
     if (_countdownComplete && _preloadComplete && !_isLoading && mounted) {
-      AppLogger.debug('[COUNTDOWN] All conditions met - navigating to ActiveSessionPage');
-      
+      AppLogger.debug(
+          '[COUNTDOWN] All conditions met - navigating to ActiveSessionPage');
+
       // Start the session timer before navigating
       _sessionBloc.add(TimerStarted());
 
@@ -274,41 +302,55 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
         initialCenter: _initialCenter ?? widget.args.initialCenter,
         eventId: widget.args.eventId, // Include event ID
         plannedRoute: widget.args.plannedRoute, // Include planned route
-        plannedRouteDistance: widget.args.plannedRouteDistance, // Include route distance
-        plannedRouteDuration: widget.args.plannedRouteDuration, // Include route duration
-        aiCheerleaderEnabled: widget.args.aiCheerleaderEnabled, // Required AI Cheerleader toggle
-        aiCheerleaderPersonality: widget.args.aiCheerleaderPersonality, // Optional personality
-        aiCheerleaderExplicitContent: widget.args.aiCheerleaderExplicitContent, // Required explicit pref
-        sessionId: widget.args.sessionId, // Pass existing session ID to prevent duplicate creation
+        plannedRouteDistance:
+            widget.args.plannedRouteDistance, // Include route distance
+        plannedRouteDuration:
+            widget.args.plannedRouteDuration, // Include route duration
+        aiCheerleaderEnabled:
+            widget.args.aiCheerleaderEnabled, // Required AI Cheerleader toggle
+        aiCheerleaderPersonality:
+            widget.args.aiCheerleaderPersonality, // Optional personality
+        aiCheerleaderExplicitContent:
+            widget.args.aiCheerleaderExplicitContent, // Required explicit pref
+        sessionId: widget.args
+            .sessionId, // Pass existing session ID to prevent duplicate creation
       );
-      
+
       // Debug: Log the args being passed to ActiveSessionPage
       print('📼📼📼 [COUNTDOWN_PAGE] Passing args to ActiveSessionPage:');
-      print('📼📼📼   plannedRoute is null: ${argsWithCenter.plannedRoute == null}');
-      print('📼📼📼   plannedRoute length: ${argsWithCenter.plannedRoute?.length ?? 0}');
-      if (argsWithCenter.plannedRoute != null && argsWithCenter.plannedRoute!.isNotEmpty) {
-        print('📼📼📼   First planned route point: ${argsWithCenter.plannedRoute!.first}');
+      print(
+          '📼📼📼   plannedRoute is null: ${argsWithCenter.plannedRoute == null}');
+      print(
+          '📼📼📼   plannedRoute length: ${argsWithCenter.plannedRoute?.length ?? 0}');
+      if (argsWithCenter.plannedRoute != null &&
+          argsWithCenter.plannedRoute!.isNotEmpty) {
+        print(
+            '📼📼📼   First planned route point: ${argsWithCenter.plannedRoute!.first}');
       }
-      
+
       AppLogger.debug('[COUNTDOWN_PAGE] Passing args to ActiveSessionPage:');
-      AppLogger.debug('  plannedRoute is null: ${argsWithCenter.plannedRoute == null}');
-      AppLogger.debug('  plannedRoute length: ${argsWithCenter.plannedRoute?.length ?? 0}');
-      if (argsWithCenter.plannedRoute != null && argsWithCenter.plannedRoute!.isNotEmpty) {
-        AppLogger.debug('  First planned route point: ${argsWithCenter.plannedRoute!.first}');
+      AppLogger.debug(
+          '  plannedRoute is null: ${argsWithCenter.plannedRoute == null}');
+      AppLogger.debug(
+          '  plannedRoute length: ${argsWithCenter.plannedRoute?.length ?? 0}');
+      if (argsWithCenter.plannedRoute != null &&
+          argsWithCenter.plannedRoute!.isNotEmpty) {
+        AppLogger.debug(
+            '  First planned route point: ${argsWithCenter.plannedRoute!.first}');
       }
 
       // Navigate to the actual session with a brief fade transition
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (context, animation, secondaryAnimation) => 
-            FadeTransition(
-              opacity: animation,
-              child: BlocProvider.value(
-                value: _sessionBloc,
-                child: ActiveSessionPage(args: argsWithCenter),
-              ),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              FadeTransition(
+            opacity: animation,
+            child: BlocProvider.value(
+              value: _sessionBloc,
+              child: ActiveSessionPage(args: argsWithCenter),
             ),
+          ),
         ),
       );
     }
@@ -323,7 +365,7 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
     // Don't dispose the session bloc - it's being passed to the next screen
     super.dispose();
   }
-  
+
   // Helper method to get the appropriate background color based on user gender
   Color _getLadyModeColor(BuildContext context) {
     try {
@@ -347,8 +389,9 @@ class _CountdownPageState extends State<CountdownPage> with SingleTickerProvider
             animation: _controller,
             builder: (context, child) {
               // Show GO when countdown reaches 0
-              final displayText = _countdownComplete ? 'GO!' : _count.toString();
-              
+              final displayText =
+                  _countdownComplete ? 'GO!' : _count.toString();
+
               return Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Opacity(

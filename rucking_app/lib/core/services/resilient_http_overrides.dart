@@ -9,14 +9,14 @@ class ResilientHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    
+
     // Configure more resilient timeouts
     client.connectionTimeout = const Duration(seconds: 15);
     client.idleTimeout = const Duration(seconds: 5);
-    
+
     // Add user agent
     client.userAgent = 'RuckingApp/3.0.0 (Flutter)';
-    
+
     return _ResilientHttpClient(client);
   }
 }
@@ -24,7 +24,7 @@ class ResilientHttpOverrides extends HttpOverrides {
 /// Wrapper HTTP client that handles connection interruptions gracefully
 class _ResilientHttpClient implements HttpClient {
   final HttpClient _inner;
-  
+
   _ResilientHttpClient(this._inner);
 
   @override
@@ -58,27 +58,34 @@ class _ResilientHttpClient implements HttpClient {
   set userAgent(String? value) => _inner.userAgent = value;
 
   @override
-  void addCredentials(Uri url, String realm, HttpClientCredentials credentials) {
+  void addCredentials(
+      Uri url, String realm, HttpClientCredentials credentials) {
     _inner.addCredentials(url, realm, credentials);
   }
 
   @override
-  void addProxyCredentials(String host, int port, String realm, HttpClientCredentials credentials) {
+  void addProxyCredentials(
+      String host, int port, String realm, HttpClientCredentials credentials) {
     _inner.addProxyCredentials(host, port, realm, credentials);
   }
 
   @override
-  set authenticate(Future<bool> Function(Uri url, String scheme, String? realm)? f) {
+  set authenticate(
+      Future<bool> Function(Uri url, String scheme, String? realm)? f) {
     _inner.authenticate = f;
   }
 
   @override
-  set authenticateProxy(Future<bool> Function(String host, int port, String scheme, String? realm)? f) {
+  set authenticateProxy(
+      Future<bool> Function(
+              String host, int port, String scheme, String? realm)?
+          f) {
     _inner.authenticateProxy = f;
   }
 
   @override
-  set badCertificateCallback(bool Function(X509Certificate cert, String host, int port)? callback) {
+  set badCertificateCallback(
+      bool Function(X509Certificate cert, String host, int port)? callback) {
     _inner.badCertificateCallback = callback;
   }
 
@@ -88,7 +95,10 @@ class _ResilientHttpClient implements HttpClient {
   }
 
   @override
-  set connectionFactory(Future<ConnectionTask<Socket>> Function(Uri url, String? proxyHost, int? proxyPort)? f) {
+  set connectionFactory(
+      Future<ConnectionTask<Socket>> Function(
+              Uri url, String? proxyHost, int? proxyPort)?
+          f) {
     _inner.connectionFactory = f;
   }
 
@@ -100,7 +110,8 @@ class _ResilientHttpClient implements HttpClient {
   // Core methods with enhanced error handling
   @override
   Future<HttpClientRequest> delete(String host, int port, String path) =>
-      _withErrorHandling(() => _inner.delete(host, port, path), 'DELETE', '$host:$port$path');
+      _withErrorHandling(
+          () => _inner.delete(host, port, path), 'DELETE', '$host:$port$path');
 
   @override
   Future<HttpClientRequest> deleteUrl(Uri url) =>
@@ -108,7 +119,8 @@ class _ResilientHttpClient implements HttpClient {
 
   @override
   Future<HttpClientRequest> get(String host, int port, String path) =>
-      _withErrorHandling(() => _inner.get(host, port, path), 'GET', '$host:$port$path');
+      _withErrorHandling(
+          () => _inner.get(host, port, path), 'GET', '$host:$port$path');
 
   @override
   Future<HttpClientRequest> getUrl(Uri url) =>
@@ -116,23 +128,28 @@ class _ResilientHttpClient implements HttpClient {
 
   @override
   Future<HttpClientRequest> head(String host, int port, String path) =>
-      _withErrorHandling(() => _inner.head(host, port, path), 'HEAD', '$host:$port$path');
+      _withErrorHandling(
+          () => _inner.head(host, port, path), 'HEAD', '$host:$port$path');
 
   @override
   Future<HttpClientRequest> headUrl(Uri url) =>
       _withErrorHandling(() => _inner.headUrl(url), 'HEAD', url.toString());
 
   @override
-  Future<HttpClientRequest> open(String method, String host, int port, String path) =>
-      _withErrorHandling(() => _inner.open(method, host, port, path), method, '$host:$port$path');
+  Future<HttpClientRequest> open(
+          String method, String host, int port, String path) =>
+      _withErrorHandling(() => _inner.open(method, host, port, path), method,
+          '$host:$port$path');
 
   @override
   Future<HttpClientRequest> openUrl(String method, Uri url) =>
-      _withErrorHandling(() => _inner.openUrl(method, url), method, url.toString());
+      _withErrorHandling(
+          () => _inner.openUrl(method, url), method, url.toString());
 
   @override
   Future<HttpClientRequest> patch(String host, int port, String path) =>
-      _withErrorHandling(() => _inner.patch(host, port, path), 'PATCH', '$host:$port$path');
+      _withErrorHandling(
+          () => _inner.patch(host, port, path), 'PATCH', '$host:$port$path');
 
   @override
   Future<HttpClientRequest> patchUrl(Uri url) =>
@@ -140,7 +157,8 @@ class _ResilientHttpClient implements HttpClient {
 
   @override
   Future<HttpClientRequest> post(String host, int port, String path) =>
-      _withErrorHandling(() => _inner.post(host, port, path), 'POST', '$host:$port$path');
+      _withErrorHandling(
+          () => _inner.post(host, port, path), 'POST', '$host:$port$path');
 
   @override
   Future<HttpClientRequest> postUrl(Uri url) =>
@@ -148,7 +166,8 @@ class _ResilientHttpClient implements HttpClient {
 
   @override
   Future<HttpClientRequest> put(String host, int port, String path) =>
-      _withErrorHandling(() => _inner.put(host, port, path), 'PUT', '$host:$port$path');
+      _withErrorHandling(
+          () => _inner.put(host, port, path), 'PUT', '$host:$port$path');
 
   @override
   Future<HttpClientRequest> putUrl(Uri url) =>

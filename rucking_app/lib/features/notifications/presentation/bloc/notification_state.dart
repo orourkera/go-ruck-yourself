@@ -7,7 +7,7 @@ class NotificationState extends Equatable {
   final bool isLoading;
   final bool hasError;
   final String error;
-  
+
   const NotificationState({
     this.notifications = const [],
     this.unreadCount = 0,
@@ -15,10 +15,11 @@ class NotificationState extends Equatable {
     this.hasError = false,
     this.error = '',
   });
-  
+
   @override
-  List<Object> get props => [notifications, unreadCount, isLoading, hasError, error];
-  
+  List<Object> get props =>
+      [notifications, unreadCount, isLoading, hasError, error];
+
   NotificationState copyWith({
     List<AppNotification>? notifications,
     int? unreadCount,
@@ -53,6 +54,6 @@ class NotificationsLoaded extends NotificationState {
 }
 
 class NotificationsError extends NotificationState {
-  const NotificationsError({required String message}) 
-    : super(hasError: true, error: message);
+  const NotificationsError({required String message})
+      : super(hasError: true, error: message);
 }

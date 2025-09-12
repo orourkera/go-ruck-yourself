@@ -30,13 +30,13 @@ class DuelInvitationModel extends DuelInvitation {
       ),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      expiresAt: json['expires_at'] != null 
-          ? DateTime.parse(json['expires_at'] as String) 
+      expiresAt: json['expires_at'] != null
+          ? DateTime.parse(json['expires_at'] as String)
           : null,
       duelTitle: json['duel_title'] as String?,
       challengeType: json['challenge_type'] as String?,
-      targetValue: json['target_value'] != null 
-          ? (json['target_value'] as num).toDouble() 
+      targetValue: json['target_value'] != null
+          ? (json['target_value'] as num).toDouble()
           : null,
       timeframeHours: json['timeframe_hours'] as int?,
       creatorCity: json['creator_city'] as String?,

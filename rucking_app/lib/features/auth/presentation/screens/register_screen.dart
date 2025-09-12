@@ -21,7 +21,7 @@ import 'package:url_launcher/url_launcher.dart';
 class RegisterScreen extends StatefulWidget {
   final String? prefilledEmail;
   final String? prefilledDisplayName;
-  
+
   const RegisterScreen({
     Key? key,
     this.prefilledEmail,
@@ -49,21 +49,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _preferMetric = false; // Default to Standard (lbs)
   bool _acceptTerms = false;
   String _selectedGender = 'male'; // Default to male
-  
+
   // Dynamically get primary color based on selected gender
-  Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
-  
+  Color get _primaryColor =>
+      _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
+
   // Check if this is Google registration
   // A user might be coming from Google registration flow even if tokens are null
   // We should consider it a Google registration if any Google data is provided
-  bool get _isGoogleRegistration => 
-      widget.prefilledEmail != null || 
-      widget.prefilledDisplayName != null;
+  bool get _isGoogleRegistration =>
+      widget.prefilledEmail != null || widget.prefilledDisplayName != null;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Pre-fill controllers with Google data if available
     if (widget.prefilledEmail != null) {
       _emailController.text = widget.prefilledEmail!;
@@ -113,45 +113,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // If tokens are null, we'll still try to use the Google info we have
         AppLogger.info('Proceeding with Google registration');
         context.read<AuthBloc>().add(
-          AuthGoogleRegisterRequested(
-            username: _displayNameController.text.trim(),
-            email: _emailController.text.trim(),
-            displayName: widget.prefilledDisplayName ?? _displayNameController.text.trim(),
-            weightKg: weight,
-            preferMetric: _preferMetric,
-            heightCm: null,
-            dateOfBirth: null,
-            gender: _selectedGender,
-          ),
-        );
+              AuthGoogleRegisterRequested(
+                username: _displayNameController.text.trim(),
+                email: _emailController.text.trim(),
+                displayName: widget.prefilledDisplayName ??
+                    _displayNameController.text.trim(),
+                weightKg: weight,
+                preferMetric: _preferMetric,
+                heightCm: null,
+                dateOfBirth: null,
+                gender: _selectedGender,
+              ),
+            );
       } else {
         // Regular registration flow
         context.read<AuthBloc>().add(
-          AuthRegisterRequested(
-            username: _displayNameController.text.trim(),
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-            weightKg: weight,
-            preferMetric: _preferMetric,
-            heightCm: null,
-            dateOfBirth: null,
-            gender: _selectedGender,
-          ),
-        );
+              AuthRegisterRequested(
+                username: _displayNameController.text.trim(),
+                email: _emailController.text.trim(),
+                password: _passwordController.text.trim(),
+                weightKg: weight,
+                preferMetric: _preferMetric,
+                heightCm: null,
+                dateOfBirth: null,
+                gender: _selectedGender,
+              ),
+            );
       }
     }
   }
 
   String _friendlyErrorMessage(dynamic error) {
-  // Always convert error to a String safely, even if it's null or not a String
-  if (error == null) return 'An unknown error occurred.';
-  if (error is String) return mapFriendlyErrorMessage(error);
-  // If error has a message property, try to use it
-  if (error is Exception && error.toString().isNotEmpty) {
+    // Always convert error to a String safely, even if it's null or not a String
+    if (error == null) return 'An unknown error occurred.';
+    if (error is String) return mapFriendlyErrorMessage(error);
+    // If error has a message property, try to use it
+    if (error is Exception && error.toString().isNotEmpty) {
+      return mapFriendlyErrorMessage(error.toString());
+    }
     return mapFriendlyErrorMessage(error.toString());
   }
-  return mapFriendlyErrorMessage(error.toString());
-}
 
   @override
   Widget build(BuildContext context) {
@@ -169,10 +170,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   builder: (_) => BlocProvider(
                     create: (context) => HealthBloc(
                       healthService: HealthService(),
-                      userId: state.user.userId, // Pass the user ID from authenticated state
+                      userId: state.user
+                          .userId, // Pass the user ID from authenticated state
                     ),
                     child: HealthIntegrationIntroScreen(
-                      userId: state.user.userId, // Pass the user ID to the intro screen
+                      userId: state
+                          .user.userId, // Pass the user ID to the intro screen
                     ),
                   ),
                 ),
@@ -189,7 +192,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           final content = Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('EMAIL ALREADY IN USE. ', 
+              const Text(
+                'EMAIL ALREADY IN USE. ',
                 style: TextStyle(
                   fontFamily: 'Bangers',
                   fontSize: 20.0,
@@ -215,13 +219,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           );
-          
+
           // Show error with the custom widget
           StyledSnackBar.showError(
             context: context,
             message: '', // Empty because we're using a custom widget
           );
-          
+
           // Insert our custom widget into the overlay (similar to how StyledSnackBar does it)
           final overlayState = Overlay.of(context);
           final overlayEntry = OverlayEntry(
@@ -231,36 +235,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   bottom: MediaQuery.of(context).viewInsets.bottom + 32,
                   left: 20,
                   right: 20,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.circular(15.0),
-                    border: Border.all(
-                      color: AppColors.errorDark,
-                      width: 2.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.errorDark.withOpacity(0.5),
-                        offset: const Offset(0, 3),
-                        blurRadius: 6.0,
-                        spreadRadius: 1.0,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(15.0),
+                        border: Border.all(
+                          color: AppColors.errorDark,
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.errorDark.withOpacity(0.5),
+                            offset: const Offset(0, 3),
+                            blurRadius: 6.0,
+                            spreadRadius: 1.0,
+                          ),
+                        ],
                       ),
-                    ],
+                      child: content,
+                    ),
                   ),
-                  child: content,
-                ),
-              ),
                 ),
               ],
             ),
           );
-          
+
           overlayState.insert(overlayEntry);
-          
+
           // Remove after delay
           Future.delayed(const Duration(seconds: 4), () {
             overlayEntry.remove();
@@ -281,7 +286,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Form(
               key: _formKey,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 18.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 18.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -354,7 +360,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         obscureText: !_isPasswordVisible,
                         textInputAction: TextInputAction.next,
                         suffixIcon: IconButton(
-                          icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                          icon: Icon(_isPasswordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility),
                           onPressed: () {
                             setState(() {
                               _isPasswordVisible = !_isPasswordVisible;
@@ -372,7 +380,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         },
                         focusNode: _passwordFocusNode,
                         onFieldSubmitted: (_) {
-                          FocusScope.of(context).requestFocus(_confirmPasswordFocusNode);
+                          FocusScope.of(context)
+                              .requestFocus(_confirmPasswordFocusNode);
                         },
                       ),
                       const SizedBox(height: 16),
@@ -386,10 +395,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         textInputAction: TextInputAction.next,
                         focusNode: _confirmPasswordFocusNode,
                         suffixIcon: IconButton(
-                          icon: Icon(_isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility),
+                          icon: Icon(_isConfirmPasswordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility),
                           onPressed: () {
                             setState(() {
-                              _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                              _isConfirmPasswordVisible =
+                                  !_isConfirmPasswordVisible;
                             });
                           },
                         ),
@@ -415,11 +427,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         decoration: BoxDecoration(
                           color: _primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                          border:
+                              Border.all(color: _primaryColor.withOpacity(0.3)),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: _primaryColor, size: 20),
+                            Icon(Icons.info_outline,
+                                color: _primaryColor, size: 20),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -441,7 +455,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Text(
                           'Standard',
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: !_preferMetric ? _primaryColor : AppColors.grey,
+                            color:
+                                !_preferMetric ? _primaryColor : AppColors.grey,
                           ),
                         ),
                         Switch(
@@ -457,7 +472,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Text(
                           'Metric',
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: _preferMetric ? _primaryColor : AppColors.grey,
+                            color:
+                                _preferMetric ? _primaryColor : AppColors.grey,
                           ),
                         ),
                       ],
@@ -467,7 +483,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     CustomTextField(
                       controller: _weightController,
                       label: _preferMetric ? 'Weight (kg)' : 'Weight (lbs)',
-                      hint: _preferMetric ? 'Enter your weight in kg' : 'Enter your weight in lbs',
+                      hint: _preferMetric
+                          ? 'Enter your weight in kg'
+                          : 'Enter your weight in lbs',
                       keyboardType: TextInputType.number,
                       prefixIcon: Icons.monitor_weight_outlined,
                       textInputAction: TextInputAction.done,
@@ -476,7 +494,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         FocusScope.of(context).unfocus();
                       },
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*$')),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -485,7 +504,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                          padding:
+                              const EdgeInsets.only(left: 8.0, bottom: 8.0),
                           child: Row(
                             children: [
                               Icon(Icons.person_outline, color: AppColors.grey),
@@ -501,9 +521,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         Container(
                           decoration: BoxDecoration(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Colors.grey[800]
-                                : Colors.grey[200],
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey[800]
+                                    : Colors.grey[200],
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -517,7 +538,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     });
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
                                     decoration: BoxDecoration(
                                       color: _selectedGender == 'male'
                                           ? _primaryColor
@@ -546,7 +568,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     });
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
                                     decoration: BoxDecoration(
                                       color: _selectedGender == 'female'
                                           ? _primaryColor
@@ -577,7 +600,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(
                       'Gender and weight information helps calculate calories more accurately and personalize your experience.',
                       style: AppTextStyles.bodySmall.copyWith(
-                        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Color(0xFF728C69)
+                            : AppColors.textDarkSecondary,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -598,30 +623,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: RichText(
                             text: TextSpan(
                               style: AppTextStyles.bodyMedium.copyWith(
-                                color: Theme.of(context).textTheme.bodyMedium?.color,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.color,
                               ),
                               children: [
                                 const TextSpan(text: 'I accept the '),
                                 TextSpan(
                                   text: 'Terms of Service',
-                                  style: const TextStyle(decoration: TextDecoration.underline),
+                                  style: const TextStyle(
+                                      decoration: TextDecoration.underline),
                                   recognizer: (TapGestureRecognizer()
                                     ..onTap = () async {
-                                      final uri = Uri.parse('https://getrucky.com/terms');
+                                      final uri = Uri.parse(
+                                          'https://getrucky.com/terms');
                                       if (await canLaunchUrl(uri)) {
-                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        await launchUrl(uri,
+                                            mode:
+                                                LaunchMode.externalApplication);
                                       }
                                     }),
                                 ),
                                 const TextSpan(text: ' and '),
                                 TextSpan(
                                   text: 'Privacy Policy',
-                                  style: const TextStyle(decoration: TextDecoration.underline),
+                                  style: const TextStyle(
+                                      decoration: TextDecoration.underline),
                                   recognizer: (TapGestureRecognizer()
                                     ..onTap = () async {
-                                      final uri = Uri.parse('https://getrucky.com/privacy');
+                                      final uri = Uri.parse(
+                                          'https://getrucky.com/privacy');
                                       if (await canLaunchUrl(uri)) {
-                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        await launchUrl(uri,
+                                            mode:
+                                                LaunchMode.externalApplication);
                                       }
                                     }),
                                 ),
@@ -649,11 +685,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Center(
                       child: TextButton(
                         onPressed: () {
-                          Navigator.of(context).pop(); // Go back to login screen
+                          Navigator.of(context)
+                              .pop(); // Go back to login screen
                         },
                         child: Text(
                           'Already have an account? Sign In',
-                          style: AppTextStyles.bodyMedium.copyWith(color: _primaryColor),
+                          style: AppTextStyles.bodyMedium
+                              .copyWith(color: _primaryColor),
                         ),
                       ),
                     ),

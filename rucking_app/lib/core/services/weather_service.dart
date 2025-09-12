@@ -11,7 +11,7 @@ class WeatherService {
       : _apiClient = apiClient ?? getIt<ApiClient>();
 
   /// Get weather forecast for a location on a specific date
-  /// 
+  ///
   /// [latitude] and [longitude] specify the location
   /// [date] is the date for the forecast (defaults to now)
   /// [datasets] specifies which weather data to include
@@ -27,7 +27,7 @@ class WeatherService {
   }) async {
     try {
       final targetDate = date ?? DateTime.now();
-      
+
       // Create query parameters
       final queryParams = {
         'latitude': latitude.toString(),
@@ -40,9 +40,11 @@ class WeatherService {
         'Fetching weather for location: $latitude, $longitude on ${targetDate.toIso8601String()}',
       );
 
-      final responseData = await _apiClient.get('/weather', queryParams: queryParams);
-      
-      final weatherData = Weather.fromJson(responseData as Map<String, dynamic>);
+      final responseData =
+          await _apiClient.get('/weather', queryParams: queryParams);
+
+      final weatherData =
+          Weather.fromJson(responseData as Map<String, dynamic>);
       AppLogger.info('Successfully fetched weather data');
       return weatherData;
     } catch (e, stackTrace) {
@@ -66,7 +68,7 @@ class WeatherService {
         longitude: longitude,
         datasets: ['currentWeather'],
       );
-      
+
       return weather?.currentWeather;
     } catch (e) {
       AppLogger.error('Error fetching current weather: $e');
@@ -123,11 +125,12 @@ class WeatherService {
     // Precipitation factor based on condition code
     final conditionCode = weather.conditionCode ?? 800;
     if (_isStormyWeather(conditionCode)) {
-      score *= 0.2; // Very poor for outdoor activity (thunderstorms, heavy rain)
+      score *=
+          0.2; // Very poor for outdoor activity (thunderstorms, heavy rain)
     } else if (_isRainyWeather(conditionCode)) {
       score *= 0.5; // Poor but manageable (light rain, drizzle)
-         } else if (_isSnowyWeather(conditionCode)) {
-        score *= 0.4; // Challenging conditions
+    } else if (_isSnowyWeather(conditionCode)) {
+      score *= 0.4; // Challenging conditions
     }
 
     // Wind factor
@@ -151,9 +154,11 @@ class WeatherService {
     // Visibility factor
     if (weather.visibility != null) {
       final visibility = weather.visibility!;
-      if (visibility < 1.0) { // visibility is now in km, so < 1km is poor
+      if (visibility < 1.0) {
+        // visibility is now in km, so < 1km is poor
         score *= 0.5; // Poor visibility
-      } else if (visibility < 5.0) { // < 5km is reduced visibility
+      } else if (visibility < 5.0) {
+        // < 5km is reduced visibility
         score *= 0.8; // Reduced visibility
       }
     }
@@ -164,7 +169,7 @@ class WeatherService {
   /// Get activity recommendation based on weather conditions
   String getActivityRecommendation(CurrentWeather weather) {
     final score = getActivityFitnessScore(weather);
-    
+
     if (score >= 0.8) {
       return 'Perfect conditions for outdoor activity!';
     } else if (score >= 0.6) {
@@ -181,17 +186,18 @@ class WeatherService {
   /// Check if condition code represents stormy weather (thunderstorms, heavy rain)
   bool _isStormyWeather(int conditionCode) {
     return (conditionCode >= 200 && conditionCode <= 232) || // Thunderstorms
-           (conditionCode >= 520 && conditionCode <= 531);   // Heavy rain/showers
+        (conditionCode >= 520 && conditionCode <= 531); // Heavy rain/showers
   }
 
   /// Check if condition code represents rainy weather (light rain, drizzle)
   bool _isRainyWeather(int conditionCode) {
     return (conditionCode >= 300 && conditionCode <= 321) || // Drizzle
-           (conditionCode >= 500 && conditionCode <= 519);   // Light to moderate rain
+        (conditionCode >= 500 &&
+            conditionCode <= 519); // Light to moderate rain
   }
 
   /// Check if condition code represents snowy weather
   bool _isSnowyWeather(int conditionCode) {
-    return (conditionCode >= 600 && conditionCode <= 622);   // Snow and sleet
+    return (conditionCode >= 600 && conditionCode <= 622); // Snow and sleet
   }
 }

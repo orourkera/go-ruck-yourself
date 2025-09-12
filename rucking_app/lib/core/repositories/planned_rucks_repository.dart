@@ -7,12 +7,12 @@ import 'package:get_it/get_it.dart';
 /// Provides methods to create, manage, and track planned rucks
 class PlannedRucksRepository {
   final ApiClient _apiClient;
-  
-  PlannedRucksRepository({ApiClient? apiClient}) 
+
+  PlannedRucksRepository({ApiClient? apiClient})
       : _apiClient = apiClient ?? GetIt.instance<ApiClient>();
 
   /// Get all planned rucks for the current user
-  /// 
+  ///
   /// Parameters:
   /// - [limit]: Maximum number of planned rucks to return (default: 20)
   /// - [offset]: Number of planned rucks to skip for pagination (default: 0)
@@ -34,17 +34,20 @@ class PlannedRucksRepository {
         'offset': offset.toString(),
         'include_route': includeRoute.toString(),
       };
-      
+
       if (status?.isNotEmpty == true) queryParams['status'] = status!;
-      if (fromDate != null) queryParams['from_date'] = fromDate.toIso8601String();
+      if (fromDate != null)
+        queryParams['from_date'] = fromDate.toIso8601String();
       if (toDate != null) queryParams['to_date'] = toDate.toIso8601String();
 
-      final response = await _apiClient.get('/planned-rucks', queryParams: queryParams);
-      
+      final response =
+          await _apiClient.get('/planned-rucks', queryParams: queryParams);
+
       final plannedRucks = (response['data']['planned_rucks'] as List)
-          .map((plannedRuckJson) => PlannedRuck.fromJson(plannedRuckJson as Map<String, dynamic>))
+          .map((plannedRuckJson) =>
+              PlannedRuck.fromJson(plannedRuckJson as Map<String, dynamic>))
           .toList();
-      
+
       AppLogger.info('Retrieved ${plannedRucks.length} planned rucks');
       return plannedRucks;
     } catch (e) {
@@ -54,7 +57,7 @@ class PlannedRucksRepository {
   }
 
   /// Get a specific planned ruck by ID
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuckId]: ID of the planned ruck to retrieve
   /// - [includeRoute]: Include full route data (default: true)
@@ -67,9 +70,11 @@ class PlannedRucksRepository {
         'include_route': includeRoute.toString(),
       };
 
-      final response = await _apiClient.get('/planned-rucks/$plannedRuckId', queryParams: queryParams);
-      
-      final plannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      final response = await _apiClient.get('/planned-rucks/$plannedRuckId',
+          queryParams: queryParams);
+
+      final plannedRuck = PlannedRuck.fromJson(
+          response['data']['planned_ruck'] as Map<String, dynamic>);
       AppLogger.info('Retrieved planned ruck: ${plannedRuck.id}');
       return plannedRuck;
     } catch (e) {
@@ -79,14 +84,16 @@ class PlannedRucksRepository {
   }
 
   /// Create a new planned ruck
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuck]: Planned ruck data to create
   Future<PlannedRuck> createPlannedRuck(PlannedRuck plannedRuck) async {
     try {
-      final response = await _apiClient.post('/planned-rucks', plannedRuck.toJson());
-      
-      final createdPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      final response =
+          await _apiClient.post('/planned-rucks', plannedRuck.toJson());
+
+      final createdPlannedRuck = PlannedRuck.fromJson(
+          response['data']['planned_ruck'] as Map<String, dynamic>);
       AppLogger.info('Created planned ruck: ${createdPlannedRuck.id}');
       return createdPlannedRuck;
     } catch (e) {
@@ -96,15 +103,18 @@ class PlannedRucksRepository {
   }
 
   /// Update an existing planned ruck
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuckId]: ID of the planned ruck to update
   /// - [plannedRuck]: Updated planned ruck data
-  Future<PlannedRuck> updatePlannedRuck(String plannedRuckId, PlannedRuck plannedRuck) async {
+  Future<PlannedRuck> updatePlannedRuck(
+      String plannedRuckId, PlannedRuck plannedRuck) async {
     try {
-      final response = await _apiClient.put('/planned-rucks/$plannedRuckId', plannedRuck.toJson());
+      final response = await _apiClient.put(
+          '/planned-rucks/$plannedRuckId', plannedRuck.toJson());
 
-      final updatedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      final updatedPlannedRuck = PlannedRuck.fromJson(
+          response['data']['planned_ruck'] as Map<String, dynamic>);
       AppLogger.info('Updated planned ruck: ${updatedPlannedRuck.id}');
       return updatedPlannedRuck;
     } catch (e) {
@@ -114,13 +124,13 @@ class PlannedRucksRepository {
   }
 
   /// Delete a planned ruck
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuckId]: ID of the planned ruck to delete
   Future<bool> deletePlannedRuck(String plannedRuckId) async {
     try {
       await _apiClient.delete('/planned-rucks/$plannedRuckId');
-      
+
       AppLogger.info('Deleted planned ruck: $plannedRuckId');
       return true;
     } catch (e) {
@@ -130,14 +140,16 @@ class PlannedRucksRepository {
   }
 
   /// Start a planned ruck (change status to in_progress)
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuckId]: ID of the planned ruck to start
   Future<PlannedRuck?> startPlannedRuck(String plannedRuckId) async {
     try {
-      final response = await _apiClient.post('/planned-rucks/$plannedRuckId/start', {});
+      final response =
+          await _apiClient.post('/planned-rucks/$plannedRuckId/start', {});
 
-      final startedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      final startedPlannedRuck = PlannedRuck.fromJson(
+          response['data']['planned_ruck'] as Map<String, dynamic>);
       AppLogger.info('Started planned ruck: ${startedPlannedRuck.id}');
       return startedPlannedRuck;
     } catch (e) {
@@ -147,19 +159,22 @@ class PlannedRucksRepository {
   }
 
   /// Complete a planned ruck (change status to completed)
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuckId]: ID of the planned ruck to complete
   /// - [sessionId]: ID of the completed ruck session
-  Future<PlannedRuck?> completePlannedRuck(String plannedRuckId, String sessionId) async {
+  Future<PlannedRuck?> completePlannedRuck(
+      String plannedRuckId, String sessionId) async {
     try {
       final requestBody = {
         'session_id': sessionId,
       };
 
-      final response = await _apiClient.post('/planned-rucks/$plannedRuckId/complete', requestBody);
-      
-      final updatedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      final response = await _apiClient.post(
+          '/planned-rucks/$plannedRuckId/complete', requestBody);
+
+      final updatedPlannedRuck = PlannedRuck.fromJson(
+          response['data']['planned_ruck'] as Map<String, dynamic>);
       AppLogger.info('Completed planned ruck: $plannedRuckId');
       return updatedPlannedRuck;
     } catch (e) {
@@ -169,20 +184,23 @@ class PlannedRucksRepository {
   }
 
   /// Cancel a planned ruck
-  /// 
+  ///
   /// Parameters:
   /// - [plannedRuckId]: ID of the planned ruck to cancel
   /// - [reason]: Optional reason for cancellation
-  Future<PlannedRuck?> cancelPlannedRuck(String plannedRuckId, {String? reason}) async {
+  Future<PlannedRuck?> cancelPlannedRuck(String plannedRuckId,
+      {String? reason}) async {
     try {
       final requestBody = <String, dynamic>{};
       if (reason?.isNotEmpty == true) {
         requestBody['reason'] = reason;
       }
 
-      final response = await _apiClient.post('/planned-rucks/$plannedRuckId/cancel', requestBody);
-      
-      final updatedPlannedRuck = PlannedRuck.fromJson(response['data']['planned_ruck'] as Map<String, dynamic>);
+      final response = await _apiClient.post(
+          '/planned-rucks/$plannedRuckId/cancel', requestBody);
+
+      final updatedPlannedRuck = PlannedRuck.fromJson(
+          response['data']['planned_ruck'] as Map<String, dynamic>);
       AppLogger.info('Cancelled planned ruck: $plannedRuckId');
       return updatedPlannedRuck;
     } catch (e) {
@@ -192,7 +210,7 @@ class PlannedRucksRepository {
   }
 
   /// Get planned rucks for today
-  /// 
+  ///
   /// Parameters:
   /// - [includeRoute]: Include full route data (default: true)
   Future<List<PlannedRuck>> getTodaysPlannedRucks({
@@ -216,7 +234,7 @@ class PlannedRucksRepository {
   }
 
   /// Get upcoming planned rucks (next 7 days)
-  /// 
+  ///
   /// Parameters:
   /// - [includeRoute]: Include full route data (default: true)
   /// - [days]: Number of days to look ahead (default: 7)
@@ -242,7 +260,7 @@ class PlannedRucksRepository {
   }
 
   /// Get completed planned rucks with analytics data
-  /// 
+  ///
   /// Parameters:
   /// - [limit]: Maximum number of completed rucks to return (default: 20)
   /// - [offset]: Number of completed rucks to skip for pagination (default: 0)
@@ -266,7 +284,7 @@ class PlannedRucksRepository {
   }
 
   /// Get overdue planned rucks
-  /// 
+  ///
   /// Parameters:
   /// - [includeRoute]: Include full route data (default: true)
   Future<List<PlannedRuck>> getOverduePlannedRucks({
@@ -274,7 +292,8 @@ class PlannedRucksRepository {
   }) async {
     try {
       final now = DateTime.now();
-      final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+      final yesterday = DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 1));
 
       final plannedRucks = await getPlannedRucks(
         toDate: yesterday,
@@ -289,8 +308,6 @@ class PlannedRucksRepository {
       throw Exception('Error getting overdue planned rucks: $e');
     }
   }
-
-
 
   /// Dispose of resources
   void dispose() {

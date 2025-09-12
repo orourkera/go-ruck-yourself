@@ -27,7 +27,8 @@ class GoalDetails {
           ? GoalSchedule.fromJson(json['schedule'] as Map<String, dynamic>)
           : null,
       messages: (json['messages'] as List?)
-              ?.map((e) => GoalMessage.fromJson(Map<String, dynamic>.from(e as Map)))
+              ?.map((e) =>
+                  GoalMessage.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           const [],
     );

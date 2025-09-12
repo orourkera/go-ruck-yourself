@@ -31,8 +31,8 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBorderColor = borderColor ?? 
-        (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
+    final effectiveBorderColor =
+        borderColor ?? (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
     final effectiveTextColor = textColor ?? effectiveBorderColor;
     final isDisabled = onPressed == null && !isLoading;
 
@@ -43,10 +43,11 @@ class SecondaryButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: effectiveTextColor,
           disabledForegroundColor: AppColors.greyDark,
-          padding: padding ?? const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 16,
-          ),
+          padding: padding ??
+              const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
+              ),
           side: BorderSide(
             color: isDisabled ? AppColors.greyLight : effectiveBorderColor,
             width: 1.5,

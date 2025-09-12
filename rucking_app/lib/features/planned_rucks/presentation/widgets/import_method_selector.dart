@@ -52,12 +52,12 @@ class ImportMethodSelector extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ...methods.map((method) => _buildMethodOption(
-              context,
-              method['key'] as String,
-              method['title'] as String,
-              method['subtitle'] as String,
-              method['icon'] as IconData,
-            )),
+                  context,
+                  method['key'] as String,
+                  method['title'] as String,
+                  method['subtitle'] as String,
+                  method['icon'] as IconData,
+                )),
           ],
         ),
       ),
@@ -72,7 +72,7 @@ class ImportMethodSelector extends StatelessWidget {
     IconData icon,
   ) {
     final isSelected = selectedMethod == key;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -88,18 +88,16 @@ class ImportMethodSelector extends StatelessWidget {
                 width: isSelected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(8),
-              color: isSelected 
-                ? AppColors.primary.withOpacity(0.1) 
-                : Colors.transparent,
+              color: isSelected
+                  ? AppColors.primary.withOpacity(0.1)
+                  : Colors.transparent,
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isSelected 
-                      ? AppColors.primary 
-                      : AppColors.greyLight,
+                    color: isSelected ? AppColors.primary : AppColors.greyLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -117,7 +115,8 @@ class ImportMethodSelector extends StatelessWidget {
                         title,
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.textDark,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),

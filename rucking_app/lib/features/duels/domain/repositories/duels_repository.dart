@@ -14,7 +14,8 @@ abstract class DuelsRepository {
     String? challengeType,
     String? location,
     int? limit,
-    bool? userParticipating, // true for "My Duels", false for "Discover", null for all
+    bool?
+        userParticipating, // true for "My Duels", false for "Discover", null for all
   });
 
   Future<Either<Failure, Duel>> createDuel({
@@ -66,7 +67,8 @@ abstract class DuelsRepository {
     required String participantId,
   });
 
-  Future<Either<Failure, List<DuelParticipant>>> getDuelLeaderboard(String duelId);
+  Future<Either<Failure, List<DuelParticipant>>> getDuelLeaderboard(
+      String duelId);
 
   // Statistics
   Future<Either<Failure, DuelStats>> getUserDuelStats([String? userId]);
@@ -112,10 +114,10 @@ abstract class DuelsRepository {
     required String duelId,
     required String commentId,
   });
-  
+
   // Sessions
   Future<Either<Failure, List<DuelSession>>> getDuelSessions(String duelId);
-  
+
   // Manual duel start
   Future<Either<Failure, void>> startDuel({
     required String duelId,

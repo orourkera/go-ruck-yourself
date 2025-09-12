@@ -69,36 +69,36 @@ void initDuelsFeature(GetIt sl) {
 
   // BLoCs
   sl.registerFactory(() => DuelListBloc(
-    getDuels: sl(),
-    joinDuel: sl(),
-  ));
+        getDuels: sl(),
+        joinDuel: sl(),
+      ));
 
   sl.registerFactory(() => DuelDetailBloc(
-    getDuelDetails: sl(),
-    getDuelLeaderboard: sl(),
-    joinDuel: sl(),
-    updateDuelProgress: sl(),
-    getDuelComments: sl(),
-    addDuelComment: sl(),
-    updateDuelComment: sl(),
-    deleteDuelComment: sl(),
-    startDuel: sl(),
-    getDuelSessions: sl(),
-    withdrawFromDuel: sl(),
-    deleteDuel: sl(),
-  ));
+        getDuelDetails: sl(),
+        getDuelLeaderboard: sl(),
+        joinDuel: sl(),
+        updateDuelProgress: sl(),
+        getDuelComments: sl(),
+        addDuelComment: sl(),
+        updateDuelComment: sl(),
+        deleteDuelComment: sl(),
+        startDuel: sl(),
+        getDuelSessions: sl(),
+        withdrawFromDuel: sl(),
+        deleteDuel: sl(),
+      ));
 
   sl.registerFactory(() => CreateDuelBloc(
-    createDuel: sl(),
-  ));
+        createDuel: sl(),
+      ));
 
   sl.registerFactory(() => DuelStatsBloc(
-    getUserDuelStats: sl(),
-    getDuelStatsLeaderboard: sl(),
-  ));
+        getUserDuelStats: sl(),
+        getDuelStatsLeaderboard: sl(),
+      ));
 
   sl.registerFactory(() => DuelInvitationsBloc(
-    getDuelInvitations: sl(),
-    respondToInvitation: sl(),
-  ));
+        getDuelInvitations: sl(),
+        respondToInvitation: sl(),
+      ));
 }

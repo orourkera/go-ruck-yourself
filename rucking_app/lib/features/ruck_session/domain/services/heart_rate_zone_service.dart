@@ -27,7 +27,8 @@ class HeartRateZoneService {
   /// Infer zones using available user fields. If `restingHr` or `maxHr` are missing,
   /// they are inferred using age (from `dateOfBirth`) and gender defaults.
   /// Returns null if we still cannot compute sensible values.
-  static List<({int min, int max, Color color, String name})>? zonesFromUserFields({
+  static List<({int min, int max, Color color, String name})>?
+      zonesFromUserFields({
     int? restingHr,
     int? maxHr,
     String? dateOfBirth,
@@ -39,7 +40,12 @@ class HeartRateZoneService {
       try {
         final dob = DateTime.parse(dateOfBirth);
         final now = DateTime.now();
-        int age = now.year - dob.year - ((now.month < dob.month || (now.month == dob.month && now.day < dob.day)) ? 1 : 0);
+        int age = now.year -
+            dob.year -
+            ((now.month < dob.month ||
+                    (now.month == dob.month && now.day < dob.day))
+                ? 1
+                : 0);
         if (age.isFinite && age > 5 && age < 100) inferredAge = age;
       } catch (_) {
         // keep default age 40
@@ -84,7 +90,8 @@ class HeartRateZoneService {
     for (int i = 0; i < samples.length - 1; i++) {
       final s = samples[i];
       final sNext = samples[i + 1];
-      final dt = sNext.timestamp.difference(s.timestamp).inSeconds.clamp(0, 600);
+      final dt =
+          sNext.timestamp.difference(s.timestamp).inSeconds.clamp(0, 600);
       if (dt <= 0) continue;
       final bpm = s.bpm;
       final zone = _zoneForBpm(bpm, zones);
@@ -107,5 +114,3 @@ class HeartRateZoneService {
     return null;
   }
 }
-
-

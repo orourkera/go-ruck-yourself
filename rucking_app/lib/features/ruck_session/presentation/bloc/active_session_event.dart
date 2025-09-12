@@ -3,17 +3,17 @@ part of active_session_bloc;
 @immutable
 abstract class ActiveSessionEvent extends Equatable {
   const ActiveSessionEvent();
-  
+
   @override
   List<Object?> get props => [];
 }
 
 /// Enum to describe the origin of a session action (pause, resume, etc.)
 enum SessionActionSource {
-  ui,        // Action initiated by the user on the phone UI
-  watch,     // Action initiated by the user on the watch UI or by the watch system
-  system,    // Action initiated by the system (e.g., auto-pause, background process)
-  unknown,   // Source is unknown
+  ui, // Action initiated by the user on the phone UI
+  watch, // Action initiated by the user on the watch UI or by the watch system
+  system, // Action initiated by the system (e.g., auto-pause, background process)
+  unknown, // Source is unknown
 }
 
 class SessionStarted extends ActiveSessionEvent {
@@ -30,7 +30,7 @@ class SessionStarted extends ActiveSessionEvent {
   final String? aiCheerleaderPersonality; // Selected personality type
   final bool aiCheerleaderExplicitContent; // Explicit language preference
   final String? sessionId; // Optional session identifier for propagation
-  
+
   const SessionStarted({
     required this.ruckWeightKg,
     required this.userWeightKg,
@@ -46,14 +46,28 @@ class SessionStarted extends ActiveSessionEvent {
     required this.aiCheerleaderExplicitContent, // Required explicit content preference
     this.sessionId, // Optional sessionId for watch-initiated or recovered sessions
   });
-  
+
   @override
-  List<Object?> get props => [ruckWeightKg, notes, plannedDuration, initialLocation, userWeightKg, eventId, plannedRoute, plannedRouteDistance, plannedRouteDuration, aiCheerleaderEnabled, aiCheerleaderPersonality, aiCheerleaderExplicitContent, sessionId];
+  List<Object?> get props => [
+        ruckWeightKg,
+        notes,
+        plannedDuration,
+        initialLocation,
+        userWeightKg,
+        eventId,
+        plannedRoute,
+        plannedRouteDistance,
+        plannedRouteDuration,
+        aiCheerleaderEnabled,
+        aiCheerleaderPersonality,
+        aiCheerleaderExplicitContent,
+        sessionId
+      ];
 }
 
 class SessionRecoveryRequested extends ActiveSessionEvent {
   const SessionRecoveryRequested();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -62,25 +76,25 @@ class SessionRecoveryRequested extends ActiveSessionEvent {
 /// Does NOT delete the session from the database - safer than deletion
 class ClearOrphanedSessionRequested extends ActiveSessionEvent {
   const ClearOrphanedSessionRequested();
-  
+
   @override
   List<Object?> get props => [];
 }
 
 class LocationUpdated extends ActiveSessionEvent {
   final LocationPoint locationPoint;
-  
+
   const LocationUpdated(this.locationPoint);
-  
+
   @override
   List<Object?> get props => [locationPoint];
 }
 
 class BatchLocationUpdated extends ActiveSessionEvent {
   final List<LocationPoint> locationPoints;
-  
+
   const BatchLocationUpdated(this.locationPoints);
-  
+
   @override
   List<Object?> get props => [locationPoints];
 }
@@ -88,7 +102,8 @@ class BatchLocationUpdated extends ActiveSessionEvent {
 class SessionPaused extends ActiveSessionEvent {
   final SessionActionSource source;
   final String? sessionId; // Optional session identifier for propagation
-  const SessionPaused({this.source = SessionActionSource.unknown, this.sessionId});
+  const SessionPaused(
+      {this.source = SessionActionSource.unknown, this.sessionId});
 
   @override
   List<Object?> get props => [source, sessionId];
@@ -97,7 +112,8 @@ class SessionPaused extends ActiveSessionEvent {
 class SessionResumed extends ActiveSessionEvent {
   final SessionActionSource source;
   final String? sessionId; // Optional session identifier for propagation
-  const SessionResumed({this.source = SessionActionSource.unknown, this.sessionId});
+  const SessionResumed(
+      {this.source = SessionActionSource.unknown, this.sessionId});
 
   @override
   List<Object?> get props => [source, sessionId];
@@ -112,7 +128,7 @@ class SessionCompleted extends ActiveSessionEvent {
   final String? notes;
   final int? rating;
   final String? sessionId; // Optional session identifier for propagation
-  
+
   const SessionCompleted({
     this.notes,
     this.rating,
@@ -123,18 +139,18 @@ class SessionCompleted extends ActiveSessionEvent {
     this.pausedDurationSeconds,
     this.sessionId,
   });
-  
+
   @override
   List<Object?> get props => [
-    notes,
-    rating,
-    tags,
-    perceivedExertion,
-    weightKg,
-    plannedDurationMinutes,
-    pausedDurationSeconds,
-    sessionId,
-  ];
+        notes,
+        rating,
+        tags,
+        perceivedExertion,
+        weightKg,
+        plannedDurationMinutes,
+        pausedDurationSeconds,
+        sessionId,
+      ];
 }
 
 /// Event for live heart-rate samples
@@ -164,13 +180,13 @@ class SessionFailed extends ActiveSessionEvent {
   final String errorMessage;
   final String sessionId;
   final RuckSession? session;
-  
+
   const SessionFailed({
     required this.errorMessage,
     required this.sessionId,
     this.session,
   });
-  
+
   @override
   List<Object?> get props => [errorMessage, sessionId, session];
 }
@@ -222,7 +238,7 @@ class ClearSessionPhotos extends ActiveSessionEvent {
 
 class DeleteSessionPhotoRequested extends ActiveSessionEvent {
   final String sessionId;
-  final dynamic photo; 
+  final dynamic photo;
 
   DeleteSessionPhotoRequested({
     required this.sessionId,
@@ -305,9 +321,9 @@ class MemoryPressureDetected extends ActiveSessionEvent {
 /// Event to trigger batch upload of session data
 class SessionBatchUploadRequested extends ActiveSessionEvent {
   final String sessionId;
-  
+
   const SessionBatchUploadRequested({required this.sessionId});
-  
+
   @override
   List<Object?> get props => [sessionId];
 }
@@ -315,9 +331,9 @@ class SessionBatchUploadRequested extends ActiveSessionEvent {
 /// Event to start heart rate monitoring
 class HeartRateMonitoringStartRequested extends ActiveSessionEvent {
   final String sessionId;
-  
+
   const HeartRateMonitoringStartRequested({required this.sessionId});
-  
+
   @override
   List<Object?> get props => [sessionId];
 }
@@ -325,7 +341,7 @@ class HeartRateMonitoringStartRequested extends ActiveSessionEvent {
 /// Event to stop heart rate monitoring
 class HeartRateMonitoringStopRequested extends ActiveSessionEvent {
   const HeartRateMonitoringStopRequested();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -333,9 +349,9 @@ class HeartRateMonitoringStopRequested extends ActiveSessionEvent {
 /// Event to trigger batch upload of heart rate data
 class HeartRateBatchUploadRequested extends ActiveSessionEvent {
   final List<HeartRateSample> samples;
-  
+
   const HeartRateBatchUploadRequested({required this.samples});
-  
+
   @override
   List<Object?> get props => [samples];
 }
@@ -343,7 +359,7 @@ class HeartRateBatchUploadRequested extends ActiveSessionEvent {
 /// Event to trigger offline session sync
 class OfflineSessionSyncRequested extends ActiveSessionEvent {
   const OfflineSessionSyncRequested();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -354,24 +370,25 @@ class CompletionPayloadBuildRequested extends ActiveSessionEvent {
   final Map<String, dynamic> terrainStats;
   final List<LocationPoint> route;
   final List<HeartRateSample> heartRateSamples;
-  
+
   const CompletionPayloadBuildRequested({
     required this.currentState,
     required this.terrainStats,
     required this.route,
     required this.heartRateSamples,
   });
-  
+
   @override
-  List<Object?> get props => [currentState, terrainStats, route, heartRateSamples];
+  List<Object?> get props =>
+      [currentState, terrainStats, route, heartRateSamples];
 }
 
 /// Event to start connectivity monitoring
 class ConnectivityMonitoringStartRequested extends ActiveSessionEvent {
   final String sessionId;
-  
+
   const ConnectivityMonitoringStartRequested({required this.sessionId});
-  
+
   @override
   List<Object?> get props => [sessionId];
 }
@@ -379,9 +396,9 @@ class ConnectivityMonitoringStartRequested extends ActiveSessionEvent {
 /// Event to ensure location tracking is active
 class LocationTrackingEnsureActiveRequested extends ActiveSessionEvent {
   final String sessionId;
-  
+
   const LocationTrackingEnsureActiveRequested({required this.sessionId});
-  
+
   @override
   List<Object?> get props => [sessionId];
 }
@@ -389,9 +406,9 @@ class LocationTrackingEnsureActiveRequested extends ActiveSessionEvent {
 /// Event to attempt offline session sync
 class OfflineSessionSyncAttemptRequested extends ActiveSessionEvent {
   final String sessionId;
-  
+
   const OfflineSessionSyncAttemptRequested({required this.sessionId});
-  
+
   @override
   List<Object?> get props => [sessionId];
 }
@@ -399,7 +416,7 @@ class OfflineSessionSyncAttemptRequested extends ActiveSessionEvent {
 /// Internal event to trigger state aggregation
 class StateAggregationRequested extends ActiveSessionEvent {
   const StateAggregationRequested();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -407,7 +424,7 @@ class StateAggregationRequested extends ActiveSessionEvent {
 /// Event to check for crashed sessions on app startup
 class CheckForCrashedSession extends ActiveSessionEvent {
   const CheckForCrashedSession();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -420,7 +437,7 @@ class SessionRecovered extends ActiveSessionEvent {
 /// Event to manually trigger AI Cheerleader speech on demand
 class AICheerleaderManualTriggerRequested extends ActiveSessionEvent {
   const AICheerleaderManualTriggerRequested();
-  
+
   @override
   List<Object?> get props => [];
 }

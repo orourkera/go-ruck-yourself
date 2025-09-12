@@ -24,19 +24,24 @@ class HeartRateGraph extends StatelessWidget {
       AppLogger.info('DEBUGGING: HeartRateGraph: No samples to display');
       return SizedBox(height: height);
     }
-    
+
     // Detailed debug logging
-    AppLogger.info('DEBUGGING: HeartRateGraph: Building graph with ${samples.length} samples');
+    AppLogger.info(
+        'DEBUGGING: HeartRateGraph: Building graph with ${samples.length} samples');
     if (samples.isNotEmpty) {
       final minBpm = samples.map((s) => s.bpm).reduce((a, b) => a < b ? a : b);
       final maxBpm = samples.map((s) => s.bpm).reduce((a, b) => a > b ? a : b);
-      final avgBpm = (samples.map((s) => s.bpm).reduce((a, b) => a + b) / samples.length).round();
-      
-      AppLogger.info('DEBUGGING: Heart rate range - min: $minBpm, max: $maxBpm, avg: $avgBpm bpm');
-      AppLogger.info('DEBUGGING: First sample time: ${samples.first.timestamp}');
+      final avgBpm =
+          (samples.map((s) => s.bpm).reduce((a, b) => a + b) / samples.length)
+              .round();
+
+      AppLogger.info(
+          'DEBUGGING: Heart rate range - min: $minBpm, max: $maxBpm, avg: $avgBpm bpm');
+      AppLogger.info(
+          'DEBUGGING: First sample time: ${samples.first.timestamp}');
       AppLogger.info('DEBUGGING: Last sample time: ${samples.last.timestamp}');
     }
-    
+
     return SizedBox(
       height: height,
       child: LineChart(_buildHeartRateChartData()),
@@ -48,31 +53,32 @@ class HeartRateGraph extends StatelessWidget {
     final List<int> heartRates = samples.map((s) => s.bpm).toList();
     final int minHr = heartRates.reduce((a, b) => a < b ? a : b);
     final int maxHr = heartRates.reduce((a, b) => a > b ? a : b);
-    
+
     // Normalize timestamps to start from 0 for better x-axis display
-    final firstTimestamp = samples.isNotEmpty 
-        ? samples.first.timestamp.millisecondsSinceEpoch 
-        : 0;
-    
+    final firstTimestamp =
+        samples.isNotEmpty ? samples.first.timestamp.millisecondsSinceEpoch : 0;
+
     // Create chart spots
     final spots = samples.map((sample) {
       // Convert to minutes from start for x-axis
-      final minutesFromStart = (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) / (1000 * 60);
+      final minutesFromStart =
+          (sample.timestamp.millisecondsSinceEpoch - firstTimestamp) /
+              (1000 * 60);
       return FlSpot(minutesFromStart, sample.bpm.toDouble());
     }).toList();
-    
+
     // Define gradient colors for the line and fill
     final gradientColors = [
-      AppColors.error,            // Red for heart rate
+      AppColors.error, // Red for heart rate
       AppColors.error.withOpacity(0.7),
       AppColors.error.withOpacity(0.3),
     ];
-    
+
     return LineChartData(
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        horizontalInterval: 20,  // HR interval of 20 bpm
+        horizontalInterval: 20, // HR interval of 20 bpm
         getDrawingHorizontalLine: (value) {
           return FlLine(
             color: Colors.grey.withOpacity(0.15),
@@ -89,7 +95,7 @@ class HeartRateGraph extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: showLabels,
             reservedSize: 22,
-            interval: 5,  // Every 5 minutes
+            interval: 5, // Every 5 minutes
             getTitlesWidget: (value, meta) {
               if (value % 5 != 0) return const SizedBox.shrink();
               return Text(
@@ -131,7 +137,8 @@ class HeartRateGraph extends StatelessWidget {
               final seconds = ((barSpot.x - minutes) * 60).toInt();
               return LineTooltipItem(
                 '${barSpot.y.toInt()} bpm\n$minutes:${seconds.toString().padLeft(2, '0')}',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
               );
             }).toList();
           },
@@ -153,15 +160,17 @@ class HeartRateGraph extends StatelessWidget {
           belowBarData: BarAreaData(
             show: true,
             gradient: LinearGradient(
-              colors: gradientColors.map((color) => color.withOpacity(0.3)).toList(),
+              colors: gradientColors
+                  .map((color) => color.withOpacity(0.3))
+                  .toList(),
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
           ),
         ),
       ],
-      minY: (minHr - 10).toDouble(),  // Add some padding below
-      maxY: (maxHr + 10).toDouble(),  // Add some padding above
+      minY: (minHr - 10).toDouble(), // Add some padding below
+      maxY: (maxHr + 10).toDouble(), // Add some padding above
     );
   }
 }

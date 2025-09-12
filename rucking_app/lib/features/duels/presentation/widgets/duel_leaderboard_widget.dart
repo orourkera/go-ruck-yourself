@@ -25,8 +25,8 @@ class DuelLeaderboardWidget extends StatelessWidget {
     final sortedParticipants = List<DuelParticipant>.from(participants)
       ..sort((a, b) => b.currentValue.compareTo(a.currentValue));
 
-    final displayParticipants = showAllParticipants 
-        ? sortedParticipants 
+    final displayParticipants = showAllParticipants
+        ? sortedParticipants
         : sortedParticipants.take(10).toList();
 
     return Card(
@@ -152,17 +152,19 @@ class DuelLeaderboardWidget extends StatelessWidget {
       itemBuilder: (context, index) {
         final participant = participants[index];
         final rank = index + 1;
-        final progress = (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
-        
+        final progress =
+            (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
+
         return _buildParticipantTile(participant, rank, progress);
       },
     );
   }
 
-  Widget _buildParticipantTile(DuelParticipant participant, int rank, double progress) {
+  Widget _buildParticipantTile(
+      DuelParticipant participant, int rank, double progress) {
     final isTopThree = rank <= 3;
     final isCompleted = progress >= 1.0;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       color: isTopThree ? AppColors.accent.withOpacity(0.05) : null,
@@ -194,7 +196,7 @@ class DuelLeaderboardWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // Participant Avatar
           UserAvatar(
             avatarUrl: participant.avatarUrl,
@@ -202,7 +204,7 @@ class DuelLeaderboardWidget extends StatelessWidget {
             size: 40,
           ),
           const SizedBox(width: 12),
-          
+
           // Participant Info
           Expanded(
             child: Column(
@@ -215,13 +217,15 @@ class DuelLeaderboardWidget extends StatelessWidget {
                         participant.username,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isTopThree ? FontWeight.bold : FontWeight.w500,
+                          fontWeight:
+                              isTopThree ? FontWeight.bold : FontWeight.w500,
                         ),
                       ),
                     ),
                     if (isCompleted)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.green,
                           borderRadius: BorderRadius.circular(10),
@@ -265,7 +269,7 @@ class DuelLeaderboardWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // Progress Value
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,

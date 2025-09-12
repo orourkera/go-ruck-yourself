@@ -45,7 +45,8 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                     SizedBox(
                       width: 100,
                       height: 100,
-                      child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.contain),
+                      child: Image.asset('assets/icon/app_icon.png',
+                          fit: BoxFit.contain),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -53,7 +54,8 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 4),
-                    Text('Version $_version ($_buildNumber)', style: Theme.of(context).textTheme.bodySmall),
+                    Text('Version $_version ($_buildNumber)',
+                        style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -73,7 +75,8 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 12),
-              SelectableText('support@getrucky.com', style: TextStyle(fontSize: 16)),
+              SelectableText('support@getrucky.com',
+                  style: TextStyle(fontSize: 16)),
               const SizedBox(height: 24),
               const Text(
                 'Legal',

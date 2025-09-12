@@ -10,18 +10,30 @@ class SessionValidationService {
   // Thresholds
   static const double minSessionDistanceMeters = 100.0; // 100 meters
   static const Duration minSessionDuration = Duration(minutes: 2);
-  static const double minInitialDistanceMeters = 50.0; // 50 meters for faster stats display
-  static const double maxSpeedKmh = 10.0; // 10 km/h max speed (walking/light jogging)
-  static const Duration maxSpeedDuration = Duration(minutes: 1); // 1 minute max over speed
-  static const double minMovingSpeedKmh = 0.5; // 0.5 km/h min speed to be considered moving
-  static const Duration idleDuration = Duration(minutes: 1); // 1 minute without movement to auto-pause
-  static const Duration longIdleDuration = Duration(minutes: 2); // 2 minutes idle to suggest ending session
-  static const double maxPositionJumpMeters = 20.0; // 20 meters max jump in position
-  static const Duration maxPositionJumpDuration = Duration(seconds: 5); // 5 seconds between location points
-  static const double minGpsAccuracyMeters = 20.0; // 20 meters minimum GPS accuracy (was 50.0)
-  static const double minCaloriesPerHour = 300.0; // 300 calories minimum per hour
-  static const double maxCaloriesPerHour = 800.0; // 800 calories maximum per hour
-  static const Duration lowGpsWarningDelay = Duration(seconds: 30); // 30 seconds delay before showing GPS warning
+  static const double minInitialDistanceMeters =
+      50.0; // 50 meters for faster stats display
+  static const double maxSpeedKmh =
+      10.0; // 10 km/h max speed (walking/light jogging)
+  static const Duration maxSpeedDuration =
+      Duration(minutes: 1); // 1 minute max over speed
+  static const double minMovingSpeedKmh =
+      0.5; // 0.5 km/h min speed to be considered moving
+  static const Duration idleDuration =
+      Duration(minutes: 1); // 1 minute without movement to auto-pause
+  static const Duration longIdleDuration =
+      Duration(minutes: 2); // 2 minutes idle to suggest ending session
+  static const double maxPositionJumpMeters =
+      20.0; // 20 meters max jump in position
+  static const Duration maxPositionJumpDuration =
+      Duration(seconds: 5); // 5 seconds between location points
+  static const double minGpsAccuracyMeters =
+      20.0; // 20 meters minimum GPS accuracy (was 50.0)
+  static const double minCaloriesPerHour =
+      300.0; // 300 calories minimum per hour
+  static const double maxCaloriesPerHour =
+      800.0; // 800 calories maximum per hour
+  static const Duration lowGpsWarningDelay =
+      Duration(seconds: 30); // 30 seconds delay before showing GPS warning
 
   // State tracking
   double _cumulativeDistanceMeters = 0.0;
@@ -50,10 +62,8 @@ class SessionValidationService {
   /// Check if a new location point is valid and should be added to route
   /// Returns a map with validation results
   Map<String, dynamic> validateLocationPoint(
-    LocationPoint point, 
-    LocationPoint? previousPoint,
-    {double? distanceMeters}
-  ) {
+      LocationPoint point, LocationPoint? previousPoint,
+      {double? distanceMeters}) {
     final results = <String, dynamic>{
       'isValid': true,
       'shouldPause': false,
@@ -67,17 +77,20 @@ class SessionValidationService {
     }
 
     // Calculate distance if not provided
-    final distance = distanceMeters ?? _calculateDistanceBetweenPoints(point, previousPoint);
+    final distance =
+        distanceMeters ?? _calculateDistanceBetweenPoints(point, previousPoint);
     final duration = point.timestamp.difference(previousPoint.timestamp);
 
     // 1. GPS accuracy check
     if (point.accuracy > minGpsAccuracyMeters) {
       if (_lowGpsStartTime == null) {
         _lowGpsStartTime = point.timestamp;
-      } else if (point.timestamp.difference(_lowGpsStartTime!) > lowGpsWarningDelay) {
+      } else if (point.timestamp.difference(_lowGpsStartTime!) >
+          lowGpsWarningDelay) {
         _validationErrorCount++;
         results['isValid'] = false;
-        results['message'] = 'Low GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
+        results['message'] =
+            'Low GPS accuracy (${point.accuracy.toStringAsFixed(1)}m). Try moving to open space.';
         return results;
       }
       // Don't return yet if we're still in the buffer period - continue processing the point
@@ -86,10 +99,12 @@ class SessionValidationService {
     }
 
     // 2. Position jump check
-    if (distance > maxPositionJumpMeters && duration < maxPositionJumpDuration) {
+    if (distance > maxPositionJumpMeters &&
+        duration < maxPositionJumpDuration) {
       _validationErrorCount++;
       results['isValid'] = false;
-      results['message'] = 'Unrealistic movement detected. Position jumped too far.';
+      results['message'] =
+          'Unrealistic movement detected. Position jumped too far.';
       return results;
     }
 
@@ -143,7 +158,8 @@ class SessionValidationService {
           final idleTime = point.timestamp.difference(_idleStartTime!);
           if (idleTime > longIdleDuration) {
             results['shouldEnd'] = true;
-            results['message'] = 'Idle for 2+ minutes. Consider ending session?';
+            results['message'] =
+                'Idle for 2+ minutes. Consider ending session?';
           }
         }
       } else {
@@ -171,42 +187,39 @@ class SessionValidationService {
   /// Validates and returns elevation gain/loss for a segment
   /// Returns a map: { 'gain': double, 'loss': double }
   Map<String, double> validateElevationChange(
-    LocationPoint previousPoint,
-    LocationPoint newPoint,
-    {double? minChangeMeters}
-  ) {
+      LocationPoint previousPoint, LocationPoint newPoint,
+      {double? minChangeMeters}) {
     // Platform-specific elevation thresholds
-    final double threshold = minChangeMeters ?? _getPlatformElevationThreshold();
-    
+    final double threshold =
+        minChangeMeters ?? _getPlatformElevationThreshold();
+
     final elevationDifference = newPoint.elevation - previousPoint.elevation;
     double gain = 0.0;
     double loss = 0.0;
-    
+
     // Apply platform-specific elevation processing
     final processedElevationDiff = _processElevationDifference(
-      elevationDifference, 
-      previousPoint, 
-      newPoint
-    );
-    
-    AppLogger.debug('Elevation validation - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, RawDiff: ${elevationDifference}m, ProcessedDiff: ${processedElevationDiff}m, Threshold: ${threshold}m, PrevElev: ${previousPoint.elevation}m, NewElev: ${newPoint.elevation}m, Accuracy: ${newPoint.accuracy}m');
-    
+        elevationDifference, previousPoint, newPoint);
+
+    AppLogger.debug(
+        'Elevation validation - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, RawDiff: ${elevationDifference}m, ProcessedDiff: ${processedElevationDiff}m, Threshold: ${threshold}m, PrevElev: ${previousPoint.elevation}m, NewElev: ${newPoint.elevation}m, Accuracy: ${newPoint.accuracy}m');
+
     if (processedElevationDiff > threshold) {
       gain = processedElevationDiff;
     } else if (processedElevationDiff < -threshold) {
       loss = processedElevationDiff.abs();
     }
-    
+
     return {'gain': gain, 'loss': loss};
   }
-  
+
   /// Get platform-specific elevation change threshold
   double _getPlatformElevationThreshold() {
     // Use consistent 2-meter threshold across platforms to filter GPS noise
     // This prevents accumulation of small GPS fluctuations into large fake elevation gains
     return 2.0; // 2 meters = ~6.6 feet - conservative threshold for real elevation changes
   }
-  
+
   /// Process elevation difference with platform-specific logic
   double _processElevationDifference(
     double rawDifference,
@@ -216,10 +229,11 @@ class SessionValidationService {
     if (Platform.isIOS) {
       return _processIOSElevation(rawDifference, previousPoint, currentPoint);
     } else {
-      return _processAndroidElevation(rawDifference, previousPoint, currentPoint);
+      return _processAndroidElevation(
+          rawDifference, previousPoint, currentPoint);
     }
   }
-  
+
   /// iOS-specific elevation processing
   double _processIOSElevation(
     double rawDifference,
@@ -230,17 +244,19 @@ class SessionValidationService {
     // Check for poor GPS accuracy that might affect elevation
     if (currentPoint.accuracy > 20) {
       // Poor horizontal accuracy usually means poor altitude accuracy too
-      AppLogger.debug('iOS elevation: Poor GPS accuracy (${currentPoint.accuracy}m), applying 0.7x smoothing');
+      AppLogger.debug(
+          'iOS elevation: Poor GPS accuracy (${currentPoint.accuracy}m), applying 0.7x smoothing');
       // Apply more aggressive smoothing for poor accuracy readings
-      return rawDifference * 0.7; // Reduce impact of potentially inaccurate reading
+      return rawDifference *
+          0.7; // Reduce impact of potentially inaccurate reading
     }
-    
+
     // Remove elevation enhancement multipliers to prevent artificial inflation
     // Trust the raw GPS/barometric data without artificial amplification
     return rawDifference;
   }
-  
-  /// Android-specific elevation processing  
+
+  /// Android-specific elevation processing
   double _processAndroidElevation(
     double rawDifference,
     LocationPoint previousPoint,
@@ -249,14 +265,15 @@ class SessionValidationService {
     // Android GPS elevation can be noisier but more responsive
     // Apply noise filtering for very poor accuracy
     if (currentPoint.accuracy > 30) {
-      AppLogger.debug('Android elevation: Very poor GPS accuracy (${currentPoint.accuracy}m), applying 0.5x noise filtering');
+      AppLogger.debug(
+          'Android elevation: Very poor GPS accuracy (${currentPoint.accuracy}m), applying 0.5x noise filtering');
       // Strong noise filtering for poor readings
       return rawDifference * 0.5;
     } else if (currentPoint.accuracy > 15) {
       // Moderate filtering for moderate accuracy
       return rawDifference * 0.8;
     }
-    
+
     // For good accuracy, trust Android GPS elevation
     return rawDifference;
   }
@@ -284,7 +301,8 @@ class SessionValidationService {
     final durationHours = duration.inSeconds / 3600;
     if (durationHours > 0) {
       final caloriesPerHour = caloriesBurned / durationHours;
-      if (caloriesPerHour < minCaloriesPerHour || caloriesPerHour > maxCaloriesPerHour) {
+      if (caloriesPerHour < minCaloriesPerHour ||
+          caloriesPerHour > maxCaloriesPerHour) {
         //debugPrint('WARNING: Unusual calorie burn rate: $caloriesPerHour calories/hour');
         // We don't invalidate the session, just log a warning
       }
@@ -311,7 +329,8 @@ class SessionValidationService {
     // Build a working window (last up to 5 samples)
     final int n = recentPaces.length;
     final int window = n >= 5 ? 5 : n;
-    final List<double> windowPaces = recentPaces.sublist(n - window, n).map(clampPace).toList();
+    final List<double> windowPaces =
+        recentPaces.sublist(n - window, n).map(clampPace).toList();
     if (windowPaces.length == 1) return windowPaces.first;
 
     // Helper: median of a list
@@ -336,10 +355,12 @@ class SessionValidationService {
       }
       return s / w;
     }
+
     final wmaAll = _wma(windowPaces);
 
     // 4) Previous baseline: median of window excluding the newest value
-    final List<double> prevWindow = windowPaces.sublist(0, windowPaces.length - 1);
+    final List<double> prevWindow =
+        windowPaces.sublist(0, windowPaces.length - 1);
     final prevMedian = _median(prevWindow);
     final prevWma = _wma(prevWindow);
 
@@ -350,9 +371,11 @@ class SessionValidationService {
 
     // Count how many of the last 3 samples are slow/very-slow
     final int lastK = windowPaces.length >= 3 ? 3 : windowPaces.length;
-    final List<double> lastKVals = windowPaces.sublist(windowPaces.length - lastK);
+    final List<double> lastKVals =
+        windowPaces.sublist(windowPaces.length - lastK);
     final int slowCount = lastKVals.where((p) => p >= slowThreshold).length;
-    final int verySlowCount = lastKVals.where((p) => p >= verySlowThreshold).length;
+    final int verySlowCount =
+        lastKVals.where((p) => p >= verySlowThreshold).length;
 
     // Base smoothed candidate is a blend of WMA and median
     // Blend more towards median when newest looks like an outlier jump
@@ -376,7 +399,7 @@ class SessionValidationService {
     // More restrictive for slow-downs (to suppress brief-stop spikes)
     // and moderately permissive for speed-ups to keep responsiveness.
     double maxSlowdownStep; // maximum allowed increase in s/km
-    double maxSpeedupStep;  // maximum allowed decrease in s/km
+    double maxSpeedupStep; // maximum allowed decrease in s/km
 
     if (verySlowCount >= 2) {
       // Multiple consecutive very-slow readings: allow larger adjustment upward
@@ -410,26 +433,28 @@ class SessionValidationService {
       target = min(target, prevMedian + 20.0);
     }
 
-    AppLogger.debug('[PACE SMOOTH] window=${windowPaces.map((e)=>e.toStringAsFixed(0)).join(',')}, prevMed=${prevMedian.toStringAsFixed(0)}, base=${base.toStringAsFixed(0)}, target=${target.toStringAsFixed(0)}');
+    AppLogger.debug(
+        '[PACE SMOOTH] window=${windowPaces.map((e) => e.toStringAsFixed(0)).join(',')}, prevMed=${prevMedian.toStringAsFixed(0)}, base=${base.toStringAsFixed(0)}, target=${target.toStringAsFixed(0)}');
     return target;
   }
 
   /// Calculate distance between two points in meters
-  double _calculateDistanceBetweenPoints(LocationPoint point1, LocationPoint point2) {
+  double _calculateDistanceBetweenPoints(
+      LocationPoint point1, LocationPoint point2) {
     // Use Haversine formula for accurate earth distances
     const double earthRadius = 6371000; // meters
     final double lat1 = point1.latitude * (pi / 180);
     final double lat2 = point2.latitude * (pi / 180);
     final double lon1 = point1.longitude * (pi / 180);
     final double lon2 = point2.longitude * (pi / 180);
-    
+
     final double dLat = lat2 - lat1;
     final double dLon = lon2 - lon1;
-    
+
     final double a = sin(dLat / 2) * sin(dLat / 2) +
         cos(lat1) * cos(lat2) * sin(dLon / 2) * sin(dLon / 2);
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    
+
     return earthRadius * c;
   }
 }

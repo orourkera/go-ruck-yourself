@@ -14,19 +14,19 @@ import 'package:rucking_app/shared/widgets/user_avatar.dart';
 class CommentsSection extends StatefulWidget {
   /// ID of the ruck session
   final String ruckId;
-  
+
   /// Maximum number of comments to display at once
   final int? maxDisplayed;
-  
+
   /// Whether to show the "View All" button when there are more comments
   final bool showViewAllButton;
-  
+
   /// Callback when "View All" is tapped
   final VoidCallback? onViewAllTapped;
-  
+
   /// Whether to hide the comment input field
   final bool hideInput;
-  
+
   /// Callback when a comment edit button is pressed, allows parent to handle editing
   final Function(RuckComment)? onEditCommentRequest;
 
@@ -50,11 +50,12 @@ class _CommentsSectionState extends State<CommentsSection> {
   final FocusNode _commentFocusNode = FocusNode();
   bool _isAddingComment = false;
   String? _editingCommentId;
-  bool _commentsLoaded = false; // Track if comments have been loaded to prevent duplicate requests
-  
+  bool _commentsLoaded =
+      false; // Track if comments have been loaded to prevent duplicate requests
+
   // Store loaded comments locally to keep them across all state changes
   List<RuckComment> _currentComments = [];
-  
+
   // Get the current user ID from the AuthBloc
   String? _getCurrentUserId(BuildContext context) {
     try {
@@ -72,7 +73,7 @@ class _CommentsSectionState extends State<CommentsSection> {
   @override
   void initState() {
     super.initState();
-    
+
     // Load comments on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
@@ -90,29 +91,29 @@ class _CommentsSectionState extends State<CommentsSection> {
     if (_commentController.text.trim().isEmpty) {
       return;
     }
-    
+
     setState(() {
       _isAddingComment = true;
     });
-    
+
     if (_editingCommentId != null) {
       // Update existing comment
       context.read<SocialBloc>().add(
-        UpdateRuckComment(
-          commentId: _editingCommentId!,
-          content: _commentController.text.trim(),
-        ),
-      );
+            UpdateRuckComment(
+              commentId: _editingCommentId!,
+              content: _commentController.text.trim(),
+            ),
+          );
     } else {
       // Add new comment
       context.read<SocialBloc>().add(
-        AddRuckComment(
-          ruckId: widget.ruckId,
-          content: _commentController.text.trim(),
-        ),
-      );
+            AddRuckComment(
+              ruckId: widget.ruckId,
+              content: _commentController.text.trim(),
+            ),
+          );
     }
-    
+
     Future.microtask(() {
       if (mounted) {
         _commentController.clear();
@@ -145,11 +146,11 @@ class _CommentsSectionState extends State<CommentsSection> {
             onPressed: () {
               Navigator.pop(context);
               context.read<SocialBloc>().add(
-                DeleteRuckComment(
-                  commentId: comment.id,
-                  ruckId: widget.ruckId,
-                ),
-              );
+                    DeleteRuckComment(
+                      commentId: comment.id,
+                      ruckId: widget.ruckId,
+                    ),
+                  );
             },
             child: const Text('DELETE'),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -169,20 +170,19 @@ class _CommentsSectionState extends State<CommentsSection> {
 
   @override
   Widget build(BuildContext context) {
-    
     // Check authentication state
     bool isAuthenticated = false;
     try {
       final authState = context.read<AuthBloc>().state;
       isAuthenticated = authState is Authenticated;
-      
+
       if (!isAuthenticated) {
         debugPrint('User is not authenticated, disabling comment features');
       }
     } catch (e) {
       debugPrint('Error checking auth state: $e');
     }
-    
+
     // Manually trigger load if no comments are loaded yet and user is authenticated
     if (!_commentsLoaded && isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -190,36 +190,38 @@ class _CommentsSectionState extends State<CommentsSection> {
         _commentsLoaded = true;
       });
     }
-    
+
     return BlocConsumer<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
         // Improved listening for any comment-related states
-        final relevantState = current is CommentsLoaded || 
-                            current is CommentActionCompleted || 
-                            current is CommentActionError;
-        
+        final relevantState = current is CommentsLoaded ||
+            current is CommentActionCompleted ||
+            current is CommentActionError;
+
         // Check if this is for our specific ruck ID
         bool isForThisRuck = false;
         if (current is CommentsLoaded) {
           isForThisRuck = current.ruckId == widget.ruckId;
-        } else if (current is CommentActionCompleted && current.comment != null) {
+        } else if (current is CommentActionCompleted &&
+            current.comment != null) {
           isForThisRuck = current.comment!.ruckId == widget.ruckId;
         }
-        
-        return relevantState && (current is CommentActionError || isForThisRuck);
+
+        return relevantState &&
+            (current is CommentActionError || isForThisRuck);
       },
       listener: (context, state) {
-        
         if (state is CommentActionCompleted) {
           setState(() {
             _isAddingComment = false;
             _editingCommentId = null;
-            _commentController.clear(); // Clear the text field after successful submission
+            _commentController
+                .clear(); // Clear the text field after successful submission
           });
-          
+
           // Automatically refresh comments list after an action
           context.read<SocialBloc>().add(LoadRuckComments(widget.ruckId));
-          
+
           if (state.actionType == 'add') {
             StyledSnackBar.show(
               context: context,
@@ -243,7 +245,7 @@ class _CommentsSectionState extends State<CommentsSection> {
           setState(() {
             _isAddingComment = false;
           });
-          
+
           StyledSnackBar.show(
             context: context,
             message: 'Error: ${state.message}',
@@ -259,7 +261,6 @@ class _CommentsSectionState extends State<CommentsSection> {
         }
       },
       builder: (context, state) {
-        
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -278,7 +279,8 @@ class _CommentsSectionState extends State<CommentsSection> {
               _buildCommentsList(_currentComments)
             else if (state is CommentsError)
               Padding(
-                padding: const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
+                padding:
+                    const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
                 child: Text(
                   'Error loading comments: ${state.message}',
                   style: TextStyle(color: Colors.red[700]),
@@ -286,7 +288,7 @@ class _CommentsSectionState extends State<CommentsSection> {
               )
             else
               const SizedBox(), // Empty placeholder instead of 'Loading comments...'
-            
+
             // Add comment section - only show if hideInput is false and user is authenticated
             if (!widget.hideInput)
               Builder(builder: (context) {
@@ -298,13 +300,15 @@ class _CommentsSectionState extends State<CommentsSection> {
                 } catch (e) {
                   debugPrint('Error checking auth state in comment input: $e');
                 }
-                
+
                 // If not authenticated, show login prompt instead of comment field
                 if (!isAuthenticated) {
                   return Padding(
-                    padding: const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
+                    padding: const EdgeInsets.only(
+                        top: 16.0, right: 16.0, bottom: 16.0),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 10.0, horizontal: 16.0),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(16.0),
@@ -314,7 +318,8 @@ class _CommentsSectionState extends State<CommentsSection> {
                         children: [
                           const Icon(Icons.lock_outline, color: Colors.grey),
                           const SizedBox(width: 8.0),
-                          const Expanded(child: Text('Please log in to add comments')),
+                          const Expanded(
+                              child: Text('Please log in to add comments')),
                           TextButton(
                             onPressed: () {
                               // Navigate to login screen or show login dialog
@@ -327,60 +332,62 @@ class _CommentsSectionState extends State<CommentsSection> {
                     ),
                   );
                 }
-                
+
                 // Show normal comment input if authenticated
                 return Padding(
-                  padding: const EdgeInsets.only(top: 16.0, right: 16.0, bottom: 16.0),
+                  padding: const EdgeInsets.only(
+                      top: 16.0, right: 16.0, bottom: 16.0),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        focusNode: _commentFocusNode,
-                        maxLines: 3,
-                        minLines: 1,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: InputDecoration(
-                          hintText: _editingCommentId != null
-                              ? 'Edit your comment...'
-                              : 'Add a comment...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16.0),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
+                        child: TextField(
+                          controller: _commentController,
+                          focusNode: _commentFocusNode,
+                          maxLines: 3,
+                          minLines: 1,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            hintText: _editingCommentId != null
+                                ? 'Edit your comment...'
+                                : 'Add a comment...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16.0),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
                             ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 8.0,
+                            ),
+                            suffixIcon: _editingCommentId != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.close),
+                                    onPressed: _cancelEditing,
+                                  )
+                                : null,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 8.0,
-                          ),
-                          suffixIcon: _editingCommentId != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: _cancelEditing,
-                                )
-                              : null,
+                          enabled: !_isAddingComment,
                         ),
-                        enabled: !_isAddingComment,
                       ),
-                    ),
-                    const SizedBox(width: 8.0),
-                    _isAddingComment
-                        ? const SizedBox(
-                            width: 24.0,
-                            height: 24.0,
-                            child: CircularProgressIndicator(strokeWidth: 2.0),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.arrow_right_alt),
-                            color: AppColors.primary,
-                            onPressed: _handleAddComment,
-                          ),
-                  ],
-                ),
-              );
-            }),
+                      const SizedBox(width: 8.0),
+                      _isAddingComment
+                          ? const SizedBox(
+                              width: 24.0,
+                              height: 24.0,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2.0),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.arrow_right_alt),
+                              color: AppColors.primary,
+                              onPressed: _handleAddComment,
+                            ),
+                    ],
+                  ),
+                );
+              }),
           ],
         );
       },
@@ -391,27 +398,27 @@ class _CommentsSectionState extends State<CommentsSection> {
     // Sort comments by date (newest first)
     final sortedComments = List<RuckComment>.from(comments)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    
+
     // Limit displayed comments if maxDisplayed is set
-    final displayedComments = widget.maxDisplayed != null && 
-                              sortedComments.length > widget.maxDisplayed!
+    final displayedComments = widget.maxDisplayed != null &&
+            sortedComments.length > widget.maxDisplayed!
         ? sortedComments.take(widget.maxDisplayed!).toList()
         : sortedComments;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Comments
         ...displayedComments.map((comment) => _buildCommentItem(comment)),
-        
+
         // "View All" button if needed
-        if (widget.showViewAllButton && 
-            widget.maxDisplayed != null && 
+        if (widget.showViewAllButton &&
+            widget.maxDisplayed != null &&
             sortedComments.length > widget.maxDisplayed!)
           Padding(
             padding: const EdgeInsets.only(
-              left: 16.0, 
-              right: 16.0, 
+              left: 16.0,
+              right: 16.0,
               bottom: 8.0,
             ),
             child: TextButton(
@@ -422,7 +429,7 @@ class _CommentsSectionState extends State<CommentsSection> {
               ),
             ),
           ),
-        
+
         // No comments message
         if (comments.isEmpty)
           const Padding(
@@ -442,21 +449,23 @@ class _CommentsSectionState extends State<CommentsSection> {
       debugPrint('Error getting current user ID: $e');
       currentUserId = null;
     }
-    
+
     // Safe comparison that won't crash if userId is null or invalid
-    final isCurrentUserComment = currentUserId != null && comment.userId == currentUserId;
-    
+    final isCurrentUserComment =
+        currentUserId != null && comment.userId == currentUserId;
+
     // Safely format date
     String formattedDate;
     try {
-      formattedDate = DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt);
+      formattedDate =
+          DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt);
     } catch (e) {
       debugPrint('Error formatting date: $e');
       formattedDate = 'Date unavailable';
     }
-    
+
     final isEditing = _editingCommentId == comment.id;
-    
+
     // Create a controller for editing if this comment is being edited
     if (isEditing && _commentController.text != comment.content) {
       // Safely set text content
@@ -472,17 +481,18 @@ class _CommentsSectionState extends State<CommentsSection> {
         debugPrint('Error setting comment text: $e');
       }
     }
-    
+
     // Debug the avatar URL
-    print('[AVATAR_DEBUG] Comment ID: ${comment.id}, UserAvatarUrl: "${comment.userAvatarUrl}", UserDisplayName: "${comment.userDisplayName}"');
-    
+    print(
+        '[AVATAR_DEBUG] Comment ID: ${comment.id}, UserAvatarUrl: "${comment.userAvatarUrl}", UserDisplayName: "${comment.userDisplayName}"');
+
     // If avatar URL is null/empty, we need to handle this gracefully
     // The UserAvatar widget should fall back to initials automatically
     String? avatarUrl = comment.userAvatarUrl;
     if (avatarUrl != null && avatarUrl.isEmpty) {
       avatarUrl = null; // Convert empty string to null for UserAvatar widget
     }
-    
+
     // Safely create UI elements with defensive error handling
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -502,7 +512,9 @@ class _CommentsSectionState extends State<CommentsSection> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    comment.userDisplayName.isNotEmpty ? comment.userDisplayName : 'User',
+                    comment.userDisplayName.isNotEmpty
+                        ? comment.userDisplayName
+                        : 'User',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),
@@ -519,88 +531,91 @@ class _CommentsSectionState extends State<CommentsSection> {
               const Spacer(),
               if (isCurrentUserComment)
                 isEditing
-                  ? Row(
-                      children: [
-                        // Save button
-                        TextButton(
-                          onPressed: () {
-                            // Update the comment
-                            context.read<SocialBloc>().add(
-                              UpdateRuckComment(
-                                commentId: comment.id,
-                                content: _commentController.text.trim(),
-                              ),
-                            );
-                            
-                            // Clear editing state
-                            setState(() {
-                              _editingCommentId = null;
-                            });
-                            _commentController.clear();
-                            _commentFocusNode.unfocus();
-                          },
-                          child: const Text('Save'),
-                        ),
-                        // Cancel button
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _editingCommentId = null;
-                            });
-                            _commentController.clear();
-                            _commentFocusNode.unfocus();
-                          },
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        // Edit button
-                        IconButton(
-                          icon: Icon(Icons.edit, size: 18, color: Colors.green),
-                          onPressed: () => _handleEditComment(comment),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4.0),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        // Delete button
-                        IconButton(
-                          icon: Icon(Icons.delete, size: 18, color: Colors.green),
-                          onPressed: () => _handleDeleteComment(comment),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(4.0),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
+                    ? Row(
+                        children: [
+                          // Save button
+                          TextButton(
+                            onPressed: () {
+                              // Update the comment
+                              context.read<SocialBloc>().add(
+                                    UpdateRuckComment(
+                                      commentId: comment.id,
+                                      content: _commentController.text.trim(),
+                                    ),
+                                  );
+
+                              // Clear editing state
+                              setState(() {
+                                _editingCommentId = null;
+                              });
+                              _commentController.clear();
+                              _commentFocusNode.unfocus();
+                            },
+                            child: const Text('Save'),
+                          ),
+                          // Cancel button
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _editingCommentId = null;
+                              });
+                              _commentController.clear();
+                              _commentFocusNode.unfocus();
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          // Edit button
+                          IconButton(
+                            icon:
+                                Icon(Icons.edit, size: 18, color: Colors.green),
+                            onPressed: () => _handleEditComment(comment),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4.0),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          // Delete button
+                          IconButton(
+                            icon: Icon(Icons.delete,
+                                size: 18, color: Colors.green),
+                            onPressed: () => _handleDeleteComment(comment),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(4.0),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                      ),
             ],
           ),
           const SizedBox(height: 8.0),
           Padding(
             padding: const EdgeInsets.only(left: 40.0),
             child: isEditing
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        focusNode: _commentFocusNode,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentController,
+                          focusNode: _commentFocusNode,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            isDense: true,
                           ),
-                          isDense: true,
+                          maxLines: null,
+                          textInputAction: TextInputAction.done,
                         ),
-                        maxLines: null,
-                        textInputAction: TextInputAction.done,
                       ),
-                    ),
-                  ],
-                )
-              : Text(comment.content),
+                    ],
+                  )
+                : Text(comment.content),
           ),
           if (comment.isEdited && !isEditing)
             Padding(

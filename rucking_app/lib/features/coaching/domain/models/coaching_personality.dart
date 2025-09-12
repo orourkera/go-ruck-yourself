@@ -32,8 +32,10 @@ class CoachingPersonality {
   static final supportiveFriend = CoachingPersonality(
     id: 'Supportive Friend',
     name: 'Supportive Friend',
-    description: 'Caring, supportive friend who\'s genuinely excited about their fitness journey. Warm, understanding, and always ready with encouragement.',
-    example: 'You\'ve got this! Remember why you started - every step matters and I believe in you.',
+    description:
+        'Caring, supportive friend who\'s genuinely excited about their fitness journey. Warm, understanding, and always ready with encouragement.',
+    example:
+        'You\'ve got this! Remember why you started - every step matters and I believe in you.',
     icon: Icons.favorite,
     color: AppColors.accent,
   );
@@ -41,8 +43,10 @@ class CoachingPersonality {
   static final drillSergeant = CoachingPersonality(
     id: 'Drill Sergeant',
     name: 'Drill Sergeant',
-    description: 'Tough military drill sergeant who demands excellence. Uses firm, direct language to push you beyond your limits.',
-    example: 'Drop and give me 20! No excuses today - you committed to this plan!',
+    description:
+        'Tough military drill sergeant who demands excellence. Uses firm, direct language to push you beyond your limits.',
+    example:
+        'Drop and give me 20! No excuses today - you committed to this plan!',
     icon: Icons.military_tech,
     color: AppColors.error,
   );
@@ -50,8 +54,10 @@ class CoachingPersonality {
   static final southernRedneck = CoachingPersonality(
     id: 'Southern Redneck',
     name: 'Southern Redneck',
-    description: 'Colorful Southern character with folksy wisdom and great sense of humor. Uses Southern expressions and country charm.',
-    example: 'Well butter my biscuit, you\'re tougher than a two-dollar steak! Keep on truckin\'!',
+    description:
+        'Colorful Southern character with folksy wisdom and great sense of humor. Uses Southern expressions and country charm.',
+    example:
+        'Well butter my biscuit, you\'re tougher than a two-dollar steak! Keep on truckin\'!',
     icon: Icons.agriculture,
     color: AppColors.brown,
   );
@@ -59,8 +65,10 @@ class CoachingPersonality {
   static final yogaInstructor = CoachingPersonality(
     id: 'Yoga Instructor',
     name: 'Yoga Instructor',
-    description: 'Peaceful yoga instructor who emphasizes breath, mindfulness, and inner strength. See rucking as moving meditation.',
-    example: 'Breathe into this challenge, find your center. Each step is a meditation in motion.',
+    description:
+        'Peaceful yoga instructor who emphasizes breath, mindfulness, and inner strength. See rucking as moving meditation.',
+    example:
+        'Breathe into this challenge, find your center. Each step is a meditation in motion.',
     icon: Icons.self_improvement,
     color: AppColors.accent,
   );
@@ -68,8 +76,10 @@ class CoachingPersonality {
   static final britishButler = CoachingPersonality(
     id: 'British Butler',
     name: 'British Butler',
-    description: 'Distinguished British butler with impeccable manners and dry wit. Encouragement with proper etiquette and subtle humor.',
-    example: 'I do say, your performance today was rather exemplary. Shall we proceed with tomorrow\'s training?',
+    description:
+        'Distinguished British butler with impeccable manners and dry wit. Encouragement with proper etiquette and subtle humor.',
+    example:
+        'I do say, your performance today was rather exemplary. Shall we proceed with tomorrow\'s training?',
     icon: Icons.account_balance,
     color: AppColors.primary,
   );
@@ -77,8 +87,10 @@ class CoachingPersonality {
   static final sportsCommentator = CoachingPersonality(
     id: 'Sports Commentator',
     name: 'Sports Commentator',
-    description: 'Energetic sports commentator providing live coverage of your performance. Makes you feel like you\'re in the Olympics.',
-    example: 'And there they go! What incredible form! The crowd is going wild for this phenomenal display!',
+    description:
+        'Energetic sports commentator providing live coverage of your performance. Makes you feel like you\'re in the Olympics.',
+    example:
+        'And there they go! What incredible form! The crowd is going wild for this phenomenal display!',
     icon: Icons.sports,
     color: AppColors.secondary,
   );
@@ -86,8 +98,10 @@ class CoachingPersonality {
   static final cowboyCowgirl = CoachingPersonality(
     id: 'Cowboy/Cowgirl',
     name: 'Cowboy/Cowgirl',
-    description: 'Rugged cowhand who sees rucking as trail riding preparation. Uses Western expressions and talks about grit.',
-    example: 'Keep ridin\' toward that sunset, partner. You\'ve got the grit to make it through.',
+    description:
+        'Rugged cowhand who sees rucking as trail riding preparation. Uses Western expressions and talks about grit.',
+    example:
+        'Keep ridin\' toward that sunset, partner. You\'ve got the grit to make it through.',
     icon: Icons.landscape,
     color: AppColors.warning,
   );
@@ -95,8 +109,10 @@ class CoachingPersonality {
   static final natureLover = CoachingPersonality(
     id: 'Nature Lover',
     name: 'Nature Lover',
-    description: 'Passionate nature lover who finds deep connection with the natural world. Gentle yet inspiring voice.',
-    example: 'Feel the earth beneath your feet, breathe in that natural energy. You\'re part of something beautiful.',
+    description:
+        'Passionate nature lover who finds deep connection with the natural world. Gentle yet inspiring voice.',
+    example:
+        'Feel the earth beneath your feet, breathe in that natural energy. You\'re part of something beautiful.',
     icon: Icons.eco,
     color: AppColors.success,
   );
@@ -104,8 +120,10 @@ class CoachingPersonality {
   static final sessionAnalyst = CoachingPersonality(
     id: 'Session Analyst',
     name: 'Session Analyst',
-    description: 'Expert fitness analyst providing insightful analysis. Encouraging but analytical, highlighting specific accomplishments.',
-    example: 'Your pace improved 12% this week. The data shows consistent heart rate efficiency gains.',
+    description:
+        'Expert fitness analyst providing insightful analysis. Encouraging but analytical, highlighting specific accomplishments.',
+    example:
+        'Your pace improved 12% this week. The data shows consistent heart rate efficiency gains.',
     icon: Icons.analytics,
     color: AppColors.info,
   );

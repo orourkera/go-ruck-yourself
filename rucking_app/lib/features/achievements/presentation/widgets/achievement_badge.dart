@@ -56,7 +56,7 @@ class AchievementBadge extends StatelessWidget {
                   ),
                 ),
               ),
-            
+
             // Medal icon
             Center(
               child: Icon(
@@ -65,7 +65,7 @@ class AchievementBadge extends StatelessWidget {
                 color: isEarned ? Colors.white : Colors.grey.shade600,
               ),
             ),
-            
+
             // Tier indicator
             if (isEarned)
               Positioned(

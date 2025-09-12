@@ -27,14 +27,14 @@ class StatCard extends StatelessWidget {
     // Split value into numeric part and unit part
     String numericPart = value;
     String unitPart = '';
-    
+
     // Look for common patterns like '10 km', '5:30', '+10.5 m'
     final spaceIndex = value.indexOf(' ');
     if (spaceIndex > 0) {
       numericPart = value.substring(0, spaceIndex);
       unitPart = value.substring(spaceIndex);
     }
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -43,7 +43,9 @@ class StatCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
-          crossAxisAlignment: centerContent ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          crossAxisAlignment: centerContent
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
           children: [
             // Title and icon
             Row(
@@ -62,7 +64,7 @@ class StatCard extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // Main content area with value
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -78,7 +80,7 @@ class StatCard extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Unit part at the bottom
             if (unitPart.isNotEmpty)
               Padding(
@@ -93,7 +95,7 @@ class StatCard extends StatelessWidget {
                   ),
                 ),
               ),
-            
+
             // Secondary value (if provided)
             if (secondaryValue != null)
               Padding(
@@ -113,4 +115,4 @@ class StatCard extends StatelessWidget {
       ),
     );
   }
-} 
+}

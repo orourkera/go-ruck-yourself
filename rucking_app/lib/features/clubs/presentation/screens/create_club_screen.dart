@@ -18,7 +18,7 @@ import 'package:rucking_app/shared/utils/image_picker_utils.dart';
 /// Screen for creating a new club
 class CreateClubScreen extends StatefulWidget {
   final ClubDetails? clubToEdit;
-  
+
   const CreateClubScreen({Key? key, this.clubToEdit}) : super(key: key);
 
   @override
@@ -31,17 +31,18 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   final _descriptionController = TextEditingController();
   final _maxMembersController = TextEditingController();
   final _locationController = TextEditingController();
-  
+
   // Focus nodes for keyboard navigation
   final _nameFocusNode = FocusNode();
   final _descriptionFocusNode = FocusNode();
   final _locationFocusNode = FocusNode();
   final _maxMembersFocusNode = FocusNode();
-  
+
   bool _isLoading = false;
   File? _clubLogo;
-  bool _removeExistingLogo = false; // Flag to track if user wants to remove existing logo
-  
+  bool _removeExistingLogo =
+      false; // Flag to track if user wants to remove existing logo
+
   late ClubsBloc _clubsBloc;
   final _locationSearchService = getIt<GooglePlacesService>();
   LocationSearchResult? _selectedLocationResult;
@@ -52,20 +53,21 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   void initState() {
     super.initState();
     _clubsBloc = getIt<ClubsBloc>();
-    
+
     // Pre-fill form if editing existing club
     if (widget.clubToEdit != null) {
       final club = widget.clubToEdit!.club;
       _nameController.text = club.name;
       _descriptionController.text = club.description ?? '';
       _maxMembersController.text = club.maxMembers?.toString() ?? '';
-      
+
       // Set location if available
       if (club.latitude != null && club.longitude != null) {
         // Create a location result from the existing club data
         _selectedLocationResult = LocationSearchResult(
           displayName: club.location ?? 'Club Location',
-          address: club.location ?? 'Club Location', // Use location field as address
+          address:
+              club.location ?? 'Club Location', // Use location field as address
           latitude: club.latitude!,
           longitude: club.longitude!,
         );
@@ -88,7 +90,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
   }
 
   Future<void> _selectLogo() async {
-    final selectedFile = await ImagePickerUtils.pickImage(context, showCropModal: true);
+    final selectedFile =
+        await ImagePickerUtils.pickImage(context, showCropModal: true);
     if (selectedFile != null) {
       setState(() {
         _clubLogo = selectedFile;
@@ -121,7 +124,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
         query,
         const Duration(milliseconds: 500),
       );
-      
+
       if (mounted) {
         setState(() {
           _locationSuggestions = results;
@@ -159,10 +162,10 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
 
   void _createClub() {
     if (_formKey.currentState!.validate()) {
-      final maxMembers = _maxMembersController.text.isEmpty 
-          ? null 
+      final maxMembers = _maxMembersController.text.isEmpty
+          ? null
           : int.tryParse(_maxMembersController.text);
-      
+
       if (widget.clubToEdit != null) {
         // Update existing club
         _clubsBloc.add(UpdateClub(
@@ -171,7 +174,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
           description: _descriptionController.text.trim(),
           isPublic: true, // Keep existing setting for now
           maxMembers: maxMembers,
-          logo: _removeExistingLogo ? _clubLogo : null, // If removing/changing, pass new logo (or null), otherwise don't change
+          logo: _removeExistingLogo
+              ? _clubLogo
+              : null, // If removing/changing, pass new logo (or null), otherwise don't change
           location: _selectedLocationResult?.displayName,
           latitude: _selectedLocationResult?.latitude,
           longitude: _selectedLocationResult?.longitude,
@@ -221,7 +226,7 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
             } else {
               setState(() => _isLoading = false);
             }
-            
+
             if (state is ClubActionSuccess) {
               // Club created successfully, navigate back
               StyledSnackBar.showSuccess(
@@ -255,7 +260,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     controller: _nameController,
                     focusNode: _nameFocusNode,
                     textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => _descriptionFocusNode.requestFocus(),
+                    onFieldSubmitted: (_) =>
+                        _descriptionFocusNode.requestFocus(),
                     decoration: InputDecoration(
                       hintText: 'Enter club name',
                       border: OutlineInputBorder(
@@ -277,9 +283,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                       return null;
                     },
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Club Logo
                   Text(
                     'Club Logo (Optional)',
@@ -304,7 +310,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                             children: [
                               // New logo preview - circular (from file picker)
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(60), // Half of 120 for perfect circle
+                                borderRadius: BorderRadius.circular(
+                                    60), // Half of 120 for perfect circle
                                 child: Image.file(
                                   _clubLogo!,
                                   width: 116,
@@ -334,28 +341,31 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                               ),
                             ],
                           )
-                        : widget.clubToEdit != null && 
-                          widget.clubToEdit!.club.logoUrl != null && 
-                          widget.clubToEdit!.club.logoUrl!.isNotEmpty && 
-                          !_removeExistingLogo
+                        : widget.clubToEdit != null &&
+                                widget.clubToEdit!.club.logoUrl != null &&
+                                widget.clubToEdit!.club.logoUrl!.isNotEmpty &&
+                                !_removeExistingLogo
                             ? Stack(
                                 children: [
                                   // Existing logo preview - circular (from network)
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(60), // Half of 120 for perfect circle
+                                    borderRadius: BorderRadius.circular(
+                                        60), // Half of 120 for perfect circle
                                     child: Image.network(
                                       widget.clubToEdit!.club.logoUrl!,
                                       width: 116,
                                       height: 116,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         // Show placeholder if image fails to load
                                         return Container(
                                           width: 116,
                                           height: 116,
                                           decoration: BoxDecoration(
                                             color: Colors.grey[200],
-                                            borderRadius: BorderRadius.circular(60),
+                                            borderRadius:
+                                                BorderRadius.circular(60),
                                           ),
                                           child: Icon(
                                             Icons.error_outline,
@@ -364,20 +374,27 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                                           ),
                                         );
                                       },
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
+                                        if (loadingProgress == null)
+                                          return child;
                                         return Container(
                                           width: 116,
                                           height: 116,
                                           decoration: BoxDecoration(
                                             color: Colors.grey[100],
-                                            borderRadius: BorderRadius.circular(60),
+                                            borderRadius:
+                                                BorderRadius.circular(60),
                                           ),
                                           child: Center(
                                             child: CircularProgressIndicator(
-                                              value: loadingProgress.expectedTotalBytes != null
-                                                  ? loadingProgress.cumulativeBytesLoaded / 
-                                                    loadingProgress.expectedTotalBytes!
+                                              value: loadingProgress
+                                                          .expectedTotalBytes !=
+                                                      null
+                                                  ? loadingProgress
+                                                          .cumulativeBytesLoaded /
+                                                      loadingProgress
+                                                          .expectedTotalBytes!
                                                   : null,
                                             ),
                                           ),
@@ -448,9 +465,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                                 ),
                               ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Description
                   Text(
                     'Description *',
@@ -466,7 +483,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     onFieldSubmitted: (_) => _locationFocusNode.requestFocus(),
                     maxLines: 4,
                     decoration: InputDecoration(
-                      hintText: 'Describe your club, its purpose, and what members can expect...',
+                      hintText:
+                          'Describe your club, its purpose, and what members can expect...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -486,9 +504,9 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                       return null;
                     },
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Location
                   Text(
                     'Location (Optional)',
@@ -501,9 +519,11 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     controller: _locationController,
                     focusNode: _locationFocusNode,
                     textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => _maxMembersFocusNode.requestFocus(),
+                    onFieldSubmitted: (_) =>
+                        _maxMembersFocusNode.requestFocus(),
                     decoration: InputDecoration(
-                      hintText: 'Search for a location, business, or address...',
+                      hintText:
+                          'Search for a location, business, or address...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -517,19 +537,21 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                     ),
                     onChanged: _searchLocation,
                   ),
-                  if (_showLocationSuggestions && _locationSuggestions.isNotEmpty)
+                  if (_showLocationSuggestions &&
+                      _locationSuggestions.isNotEmpty)
                     Container(
                       margin: const EdgeInsets.only(top: 8),
                       decoration: BoxDecoration(
                         color: Theme.of(context).brightness == Brightness.dark
-                             ? Colors.grey[700] // Slightly lighter for contrast
-                             : Colors.white,
+                            ? Colors.grey[700] // Slightly lighter for contrast
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white24 // subtle white border in dark mode
-                                : Colors.grey.withOpacity(0.3),
-                          ),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors
+                                  .white24 // subtle white border in dark mode
+                              : Colors.grey.withOpacity(0.3),
+                        ),
                       ),
                       child: ListView.builder(
                         shrinkWrap: true,
@@ -538,30 +560,32 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                         itemBuilder: (context, index) {
                           final suggestion = _locationSuggestions[index];
                           return ListTile(
-                             title: Text(
-                               suggestion.displayName,
-                               style: TextStyle(
-                                 color: Theme.of(context).brightness == Brightness.dark
-                                     ? Colors.white
-                                     : Colors.black,
-                               ),
-                             ),
-                             subtitle: Text(
-                               suggestion.address,
-                               style: TextStyle(
-                                 color: Theme.of(context).brightness == Brightness.dark
-                                     ? Colors.white70
-                                     : Colors.grey[700],
-                               ),
-                             ),
-                             onTap: () => _selectLocation(suggestion),
-                           );
+                            title: Text(
+                              suggestion.displayName,
+                              style: TextStyle(
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black,
+                              ),
+                            ),
+                            subtitle: Text(
+                              suggestion.address,
+                              style: TextStyle(
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white70
+                                    : Colors.grey[700],
+                              ),
+                            ),
+                            onTap: () => _selectLocation(suggestion),
+                          );
                         },
                       ),
                     ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Max Members
                   Text(
                     'Member Limit (Optional)',
@@ -599,20 +623,22 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                       return null;
                     },
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Create/Update Button
                   CustomButton(
-                    text: widget.clubToEdit != null ? 'Update Club' : 'Create Club',
+                    text: widget.clubToEdit != null
+                        ? 'Update Club'
+                        : 'Create Club',
                     onPressed: _isLoading ? null : _createClub,
                     isLoading: _isLoading,
                     color: Theme.of(context).primaryColor,
                     width: double.infinity,
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Info Card - only show when creating new club
                   if (widget.clubToEdit == null)
                     Container(
@@ -620,7 +646,8 @@ class _CreateClubScreenState extends State<CreateClubScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.info.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                        border:
+                            Border.all(color: AppColors.info.withOpacity(0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

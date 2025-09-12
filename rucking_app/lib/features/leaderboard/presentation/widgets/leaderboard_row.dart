@@ -24,7 +24,7 @@ class LeaderboardRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: _getRowColor(context),
         borderRadius: BorderRadius.circular(8),
-        border: user.isCurrentUser 
+        border: user.isCurrentUser
             ? Border.all(
                 color: Theme.of(context).primaryColor,
                 width: 2,
@@ -67,15 +67,20 @@ class LeaderboardRow extends StatelessWidget {
                               width: 80,
                             ),
                             _buildStatColumn(
-                              MeasurementUtils.formatDistance(user.stats.distanceKm, metric: true),
+                              MeasurementUtils.formatDistance(
+                                  user.stats.distanceKm,
+                                  metric: true),
                               width: 100,
                             ),
                             _buildStatColumn(
-                              MeasurementUtils.formatElevation(user.stats.elevationGainMeters, 0.0, metric: true),
+                              MeasurementUtils.formatElevation(
+                                  user.stats.elevationGainMeters, 0.0,
+                                  metric: true),
                               width: 100,
                             ),
                             _buildStatColumn(
-                              MeasurementUtils.formatCalories(user.stats.caloriesBurned.round()),
+                              MeasurementUtils.formatCalories(
+                                  user.stats.caloriesBurned.round()),
                               width: 100,
                             ),
                             _buildStatColumn(
@@ -89,7 +94,7 @@ class LeaderboardRow extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 // Location row (if available)
                 if (user.lastRuckLocation != null) ...[
                   const SizedBox(height: 4),
@@ -198,7 +203,7 @@ class LeaderboardRow extends StatelessWidget {
                   ),
                 )
               : const SizedBox.shrink(),
-          ),
+        ),
       ],
     );
   }
@@ -214,7 +219,7 @@ class LeaderboardRow extends StatelessWidget {
             // Avatar
             _buildAvatar(),
             const SizedBox(width: 12),
-            
+
             // Username and live status
             Expanded(
               child: Column(

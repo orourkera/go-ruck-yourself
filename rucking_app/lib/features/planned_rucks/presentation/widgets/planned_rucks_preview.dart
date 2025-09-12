@@ -56,7 +56,7 @@ class PlannedRucksPreview extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                
+
                 // Content based on state
                 if (state is PlannedRuckLoading)
                   _buildLoadingState()
@@ -114,21 +114,21 @@ class PlannedRucksPreview extends StatelessWidget {
     );
   }
 
-  Widget _buildLoadedState(BuildContext context, List<PlannedRuck> plannedRucks) {
+  Widget _buildLoadedState(
+      BuildContext context, List<PlannedRuck> plannedRucks) {
     if (plannedRucks.isEmpty) {
       return _buildEmptyState(context);
     }
 
     // Show up to 2 planned rucks
     final previewRucks = plannedRucks.take(2).toList();
-    
+
     return Column(
       children: [
         ...previewRucks.map((ruck) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _buildPlannedRuckPreviewItem(context, ruck),
-        )),
-        
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildPlannedRuckPreviewItem(context, ruck),
+            )),
         if (plannedRucks.length > 2) ...[
           const SizedBox(height: 8),
           Text(
@@ -190,62 +190,62 @@ class PlannedRucksPreview extends StatelessWidget {
             width: 0.5,
           ),
         ),
-      child: Row(
-        children: [
-          // Status indicator
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: _getStatusColor(ruck.status),
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-          
-          // Ruck details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ruck.route?.name ?? ruck.notes ?? 'Planned Ruck',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                if (ruck.route != null) ...[
-                  Text(
-                    '${(ruck.route!.distanceKm).toStringAsFixed(1)} km',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textDarkSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          
-          // Status badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: _getStatusColor(ruck.status).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              _getStatusText(ruck.status),
-              style: AppTextStyles.bodySmall.copyWith(
+        child: Row(
+          children: [
+            // Status indicator
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
                 color: _getStatusColor(ruck.status),
-                fontWeight: FontWeight.w600,
+                shape: BoxShape.circle,
               ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 12),
+
+            // Ruck details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ruck.route?.name ?? ruck.notes ?? 'Planned Ruck',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  if (ruck.route != null) ...[
+                    Text(
+                      '${(ruck.route!.distanceKm).toStringAsFixed(1)} km',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textDarkSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Status badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getStatusColor(ruck.status).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _getStatusText(ruck.status),
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: _getStatusColor(ruck.status),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

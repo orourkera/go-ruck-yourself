@@ -45,7 +45,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget> {
 
     // Call the search callback with query and empty filters
     widget.onSearch(query, <String, dynamic>{});
-    
+
     // Reset search state - actual results will be provided via searchResults property
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -105,7 +105,8 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget> {
                   message: 'Searching routes...',
                 ),
               )
-            else if (_searchResults.isEmpty && _searchController.text.length >= 3)
+            else if (_searchResults.isEmpty &&
+                _searchController.text.length >= 3)
               _buildEmptyState()
             else if (_searchResults.isNotEmpty)
               _buildSearchResults(),
@@ -190,7 +191,8 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (route.startLatitude != null && route.startLongitude != null) ...[
+                      if (route.startLatitude != null &&
+                          route.startLongitude != null) ...[
                         const SizedBox(height: 2),
                         Text(
                           '${route.startLatitude?.toStringAsFixed(4) ?? 'N/A'}, ${route.startLongitude?.toStringAsFixed(4) ?? 'N/A'}',

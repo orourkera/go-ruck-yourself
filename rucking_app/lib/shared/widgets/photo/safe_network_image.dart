@@ -8,28 +8,29 @@ import 'package:rucking_app/core/services/image_cache_manager.dart';
 class SafeNetworkImage extends StatelessWidget {
   /// The URL of the image to display
   final String imageUrl;
-  
+
   /// How the image should be inscribed into the space allocated
   final BoxFit? fit;
-  
+
   /// The width to display the image
   final double? width;
-  
+
   /// The height to display the image
   final double? height;
-  
+
   /// Optional headers to send with the HTTP request
   final Map<String, String>? headers;
-  
+
   /// Optional placeholder widget to show while loading
   final Widget? placeholder;
-  
+
   /// Optional error widget builder to show when loading fails
-  final Widget Function(BuildContext context, String url, dynamic error)? errorWidget;
-  
+  final Widget Function(BuildContext context, String url, dynamic error)?
+      errorWidget;
+
   /// Optional border radius for the image
   final BorderRadius? borderRadius;
-  
+
   /// Whether to force the image to be reloaded (bypass cache)
   final bool forceReload;
 
@@ -50,34 +51,36 @@ class SafeNetworkImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Skip network images in debug mode if requested (helps with performance)
-    if (kDebugMode && false) { // Set to true to disable network images in debug
+    if (kDebugMode && false) {
+      // Set to true to disable network images in debug
       return _buildPlaceholder(context);
     }
-    
+
     // Validate URL - return error widget for invalid URLs
     if (imageUrl.isEmpty || !(Uri.tryParse(imageUrl)?.hasScheme ?? false)) {
       return _buildDefaultErrorWidget(context, 'Invalid image URL');
     }
-    
+
     // Add cache-busting parameter if forceReload is true
-    final String url = forceReload 
+    final String url = forceReload
         ? '${imageUrl.split('?')[0]}?t=${DateTime.now().millisecondsSinceEpoch}'
         : imageUrl;
-    
+
     // Default headers to help prevent caching issues
-    final Map<String, String> defaultHeaders = forceReload ? 
-      {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      } : {};
-    
+    final Map<String, String> defaultHeaders = forceReload
+        ? {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        : {};
+
     // Merge default headers with provided headers
     final Map<String, String> finalHeaders = {
       ...defaultHeaders,
       ...?headers,
     };
-    
+
     // Use CachedNetworkImage for better performance and error handling
     Widget image = CachedNetworkImage(
       imageUrl: url,
@@ -85,15 +88,15 @@ class SafeNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       httpHeaders: finalHeaders,
-      cacheManager: ImageCacheManager.instance, // Use ImageCacheManager instance
+      cacheManager:
+          ImageCacheManager.instance, // Use ImageCacheManager instance
       placeholder: (context, url) => _buildPlaceholder(context),
-      errorWidget: (context, url, error) => 
-          errorWidget != null 
-              ? errorWidget!(context, url, error)
-              : _buildDefaultErrorWidget(context, error.toString()),
+      errorWidget: (context, url, error) => errorWidget != null
+          ? errorWidget!(context, url, error)
+          : _buildDefaultErrorWidget(context, error.toString()),
       fadeInDuration: const Duration(milliseconds: 300),
     );
-    
+
     // Apply border radius if specified
     if (borderRadius != null) {
       image = ClipRRect(
@@ -101,17 +104,17 @@ class SafeNetworkImage extends StatelessWidget {
         child: image,
       );
     }
-    
+
     // Wrap in error boundary to catch any rendering errors
     return image;
   }
-  
+
   /// Build placeholder widget when image is loading
   Widget _buildPlaceholder(BuildContext context) {
     if (placeholder != null) {
       return placeholder!;
     }
-    
+
     return Container(
       width: width,
       height: height,
@@ -130,10 +133,9 @@ class SafeNetworkImage extends StatelessWidget {
       ),
     );
   }
-  
+
   /// Build default error widget when image loading fails
   Widget _buildDefaultErrorWidget(BuildContext context, String error) {
-    
     return Container(
       width: width,
       height: height,

@@ -41,9 +41,9 @@ class PremiumPaywallScreen extends StatelessWidget {
                   color: AppColors.primary,
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Feature title
               Text(
                 'Unlock $feature',
@@ -53,9 +53,9 @@ class PremiumPaywallScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Feature description
               Text(
                 description,
@@ -64,9 +64,9 @@ class PremiumPaywallScreen extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              
+
               const SizedBox(height: 48),
-              
+
               // Upgrade button
               CustomButton(
                 text: 'Upgrade to Premium',
@@ -76,9 +76,9 @@ class PremiumPaywallScreen extends StatelessWidget {
                 color: AppColors.primary,
                 textColor: AppColors.white,
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Cancel button
               TextButton(
                 onPressed: () {

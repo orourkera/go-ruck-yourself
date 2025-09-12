@@ -17,10 +17,13 @@ import 'package:rucking_app/shared/widgets/location_disclosure_dialog.dart';
 enum LocationTrackingMode {
   /// High accuracy mode - best for normal conditions
   high,
+
   /// Balanced mode - reduces battery usage
   balanced,
+
   /// Power save mode - minimal GPS usage during memory pressure
   powerSave,
+
   /// Emergency mode - bare minimum for data preservation
   emergency,
 }
@@ -31,14 +34,14 @@ class LocationTrackingConfig {
   final int batchInterval;
   final LocationAccuracy accuracy;
   final LocationTrackingMode mode;
-  
+
   const LocationTrackingConfig({
     required this.distanceFilter,
     required this.batchInterval,
     required this.accuracy,
     required this.mode,
   });
-  
+
   /// High accuracy configuration
   static const LocationTrackingConfig high = LocationTrackingConfig(
     distanceFilter: 3.0,
@@ -46,7 +49,7 @@ class LocationTrackingConfig {
     accuracy: LocationAccuracy.bestForNavigation,
     mode: LocationTrackingMode.high,
   );
-  
+
   /// Balanced configuration
   static const LocationTrackingConfig balanced = LocationTrackingConfig(
     distanceFilter: 5.0,
@@ -54,7 +57,7 @@ class LocationTrackingConfig {
     accuracy: LocationAccuracy.best,
     mode: LocationTrackingMode.balanced,
   );
-  
+
   /// Power save configuration
   static const LocationTrackingConfig powerSave = LocationTrackingConfig(
     distanceFilter: 10.0,
@@ -62,7 +65,7 @@ class LocationTrackingConfig {
     accuracy: LocationAccuracy.high,
     mode: LocationTrackingMode.powerSave,
   );
-  
+
   /// Emergency configuration
   static const LocationTrackingConfig emergency = LocationTrackingConfig(
     distanceFilter: 15.0,
@@ -74,32 +77,32 @@ class LocationTrackingConfig {
 
 /// Interface for location services
 abstract class LocationService {
-  /// Check if the app has location permission 
+  /// Check if the app has location permission
   Future<bool> hasLocationPermission();
-  
+
   /// Request location permission from the user
   /// For Android: Shows prominent disclosure dialog first (Google Play compliance)
   /// For iOS: Direct permission request
   Future<bool> requestLocationPermission({BuildContext? context});
-  
+
   /// Get the current location once
   Future<LocationPoint?> getCurrentLocation();
-  
+
   /// Start tracking location updates continuously
   Stream<LocationPoint> startLocationTracking();
-  
+
   /// Stream of batched location points for API upload
   Stream<List<LocationPoint>> get batchedLocationUpdates;
-  
+
   /// Stop tracking location updates
   Future<void> stopLocationTracking();
-  
+
   /// Calculate distance between two points in kilometers
   double calculateDistance(LocationPoint point1, LocationPoint point2);
-  
+
   /// Adjust location tracking frequency based on memory pressure
   void adjustTrackingFrequency(LocationTrackingMode mode);
-  
+
   /// Get current tracking configuration
   LocationTrackingConfig get currentTrackingConfig;
 }
@@ -109,102 +112,110 @@ class LocationServiceImpl implements LocationService {
   // Whether we have permission to start Android foreground location service
   bool _canStartForegroundService = false;
   static const int _locationTimeoutSeconds = 30; // Location timeout detection
-  static const int _stalenessCheckSeconds = 45; // Check for stale location updates
-  
+  static const int _stalenessCheckSeconds =
+      45; // Check for stale location updates
+
   // Dynamic configuration for adaptive tracking
   LocationTrackingConfig _currentConfig = LocationTrackingConfig.high;
-  
+
   final List<LocationPoint> _locationBatch = [];
   Timer? _batchTimer;
   Timer? _locationTimeoutTimer;
   Timer? _stalenessCheckTimer;
-  final StreamController<LocationPoint> _locationController = StreamController<LocationPoint>.broadcast();
-  final StreamController<List<LocationPoint>> _batchController = StreamController<List<LocationPoint>>.broadcast();
+  final StreamController<LocationPoint> _locationController =
+      StreamController<LocationPoint>.broadcast();
+  final StreamController<List<LocationPoint>> _batchController =
+      StreamController<List<LocationPoint>>.broadcast();
   StreamSubscription<Position>? _rawLocationSubscription;
   DateTime? _lastLocationUpdate;
   LocationPoint? _lastValidLocation;
   bool _isTracking = false;
   StreamSubscription<Position>? _significantSubscription;
   bool _usingSignificantFallback = false;
-  
+
   @override
-  Stream<List<LocationPoint>> get batchedLocationUpdates => _batchController.stream;
-  
+  Stream<List<LocationPoint>> get batchedLocationUpdates =>
+      _batchController.stream;
+
   @override
   LocationTrackingConfig get currentTrackingConfig => _currentConfig;
-  
+
   @override
   Future<bool> hasLocationPermission() async {
     final permission = await Geolocator.checkPermission();
-    final granted = permission == LocationPermission.always || 
-           permission == LocationPermission.whileInUse;
+    final granted = permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
     // Ensure we enable Geolocator foreground service path on Android when already granted
     if (granted && Platform.isAndroid) {
       _canStartForegroundService = true;
     }
     return granted;
   }
-  
+
   @override
   Future<bool> requestLocationPermission({BuildContext? context}) async {
     try {
       AppLogger.info('Requesting location permissions...');
-      
+
       // Check current permission status first
       final currentPermission = await Geolocator.checkPermission();
-      if (currentPermission == LocationPermission.always || 
+      if (currentPermission == LocationPermission.always ||
           currentPermission == LocationPermission.whileInUse) {
-        AppLogger.info('Location permission already granted: $currentPermission');
+        AppLogger.info(
+            'Location permission already granted: $currentPermission');
 
-         if (Platform.isAndroid) {
-           _canStartForegroundService = true;
-         }
-         return true;
+        if (Platform.isAndroid) {
+          _canStartForegroundService = true;
+        }
+        return true;
       }
-      
+
       // Show prominent disclosure dialog first (required for Google Play compliance)
       // Only show on Android - iOS has its own system permission flow
       if (context != null && Platform.isAndroid) {
         AppLogger.info('[REQUIRED] Showing location disclosure dialog...');
         final userConsent = await LocationDisclosureDialog.show(context);
-        
+
         if (!userConsent) {
           AppLogger.info('User declined location disclosure');
           return false;
         }
-        
-        AppLogger.info('User accepted location disclosure, proceeding with system permission...');
+
+        AppLogger.info(
+            'User accepted location disclosure, proceeding with system permission...');
       } else if (context == null && Platform.isAndroid) {
-        AppLogger.warning('No context provided for disclosure dialog, proceeding directly to system permission');
+        AppLogger.warning(
+            'No context provided for disclosure dialog, proceeding directly to system permission');
       }
-      
+
       // Request basic location permission using Geolocator (single dialog)
       final permission = await Geolocator.requestPermission();
-      
-      if (permission == LocationPermission.always || 
+
+      if (permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse) {
         AppLogger.info('Location permission granted: $permission');
 
-         if (Platform.isAndroid) {
-           _canStartForegroundService = true;
-         }
-        
+        if (Platform.isAndroid) {
+          _canStartForegroundService = true;
+        }
+
         // Only on Android, also request battery optimization exemption
         // Do this separately to avoid dialog conflicts
         if (Platform.isAndroid) {
           // Small delay to avoid dialog conflicts
           await Future.delayed(const Duration(milliseconds: 500));
-          
+
           if (await Permission.ignoreBatteryOptimizations.isDenied) {
             AppLogger.info('Requesting ignore battery optimizations...');
-            final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
+            final batteryStatus =
+                await Permission.ignoreBatteryOptimizations.request();
             AppLogger.info('Battery optimization exemption: $batteryStatus');
           }
         }
-        
+
         return true;
       }
-      
+
       AppLogger.info('Location permission denied: $permission');
       return false;
     } catch (e) {
@@ -219,39 +230,42 @@ class LocationServiceImpl implements LocationService {
           },
         );
       } catch (errorHandlerException) {
-        AppLogger.error('Error reporting failed during location permission request: $errorHandlerException');
+        AppLogger.error(
+            'Error reporting failed during location permission request: $errorHandlerException');
       }
       AppLogger.error('Error requesting location permissions', exception: e);
       return false;
     }
   }
-  
+
   @override
   Future<LocationPoint?> getCurrentLocation() async {
     try {
       AppLogger.info('📍 Requesting current location with timeout...');
-      
+
       // Check permissions first to prevent kCLErrorDomain error 1
       final hasPermission = await hasLocationPermission();
       if (!hasPermission) {
-        AppLogger.warning('Location permission not granted - cannot get current location');
+        AppLogger.warning(
+            'Location permission not granted - cannot get current location');
         throw PositionUpdateException(
-          'Location permission required. Please enable location services in Settings.'
-        );
+            'Location permission required. Please enable location services in Settings.');
       }
-      
+
       // 🔥 FIX: Add timeout to prevent app hangs
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15), // Increased from 10s - prevent infinite wait
+        timeLimit: const Duration(
+            seconds: 15), // Increased from 10s - prevent infinite wait
       ).timeout(
         const Duration(seconds: 20), // Increased timeout protection
         onTimeout: () {
           AppLogger.warning('⏰ Location request timed out after 20 seconds');
-          throw TimeoutException('Location request timed out', const Duration(seconds: 20));
+          throw TimeoutException(
+              'Location request timed out', const Duration(seconds: 20));
         },
       );
-      
+
       return LocationPoint(
         latitude: position.latitude,
         longitude: position.longitude,
@@ -266,12 +280,14 @@ class LocationServiceImpl implements LocationService {
       );
     } catch (e) {
       // Handle specific iOS location permission errors more gracefully
-      if (e is PositionUpdateException && e.toString().contains('kCLErrorDomain error 1')) {
-        AppLogger.warning('iOS location permission denied - user needs to enable location services');
+      if (e is PositionUpdateException &&
+          e.toString().contains('kCLErrorDomain error 1')) {
+        AppLogger.warning(
+            'iOS location permission denied - user needs to enable location services');
         // Don't report permission denials as critical errors
         return null;
       }
-      
+
       // Monitor location retrieval failures (critical for fitness tracking) - wrapped to prevent secondary errors
       try {
         await AppErrorHandler.handleError(
@@ -283,96 +299,103 @@ class LocationServiceImpl implements LocationService {
           },
         );
       } catch (errorHandlerException) {
-        AppLogger.error('Error reporting failed during location retrieval: $errorHandlerException');
+        AppLogger.error(
+            'Error reporting failed during location retrieval: $errorHandlerException');
       }
       AppLogger.error('Failed to get current location: $e');
       return null;
     }
   }
-  
+
   @override
   Stream<LocationPoint> startLocationTracking() {
-    
-    AppLogger.info('Starting location tracking with enhanced Android protection...');
-    
+    AppLogger.info(
+        'Starting location tracking with enhanced Android protection...');
+
     // Check permissions before starting tracking to prevent kCLErrorDomain error 1
     _checkPermissionsAndStartTracking();
-    
+
     return _locationController.stream;
   }
-  
+
   /// Checks permissions and starts tracking, handling permission errors gracefully
   Future<void> _checkPermissionsAndStartTracking() async {
     try {
       // Check if we have location permissions
       final hasPermission = await hasLocationPermission();
       if (!hasPermission) {
-        AppLogger.warning('Location permission not granted - cannot start tracking');
-        
+        AppLogger.warning(
+            'Location permission not granted - cannot start tracking');
+
         // Emit a user-friendly error to the stream
-        _locationController.addError(
-          PositionUpdateException(
-            'Location permission required. Please enable location services in Settings.'
-          )
-        );
+        _locationController.addError(PositionUpdateException(
+            'Location permission required. Please enable location services in Settings.'));
         return;
       }
-      
+
       // Check if location services are enabled
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         AppLogger.warning('Location services disabled - cannot start tracking');
-        
+
         // Emit a user-friendly error to the stream
-        _locationController.addError(
-          PositionUpdateException(
-            'Location services are disabled. Please enable location services in Settings.'
-          )
-        );
+        _locationController.addError(PositionUpdateException(
+            'Location services are disabled. Please enable location services in Settings.'));
         return;
       }
-      
-      AppLogger.info('Location permissions verified - starting position stream');
+
+      AppLogger.info(
+          'Location permissions verified - starting position stream');
       _startLocationStream();
     } catch (e) {
-      AppLogger.error('Error checking permissions before starting location tracking', exception: e);
+      AppLogger.error(
+          'Error checking permissions before starting location tracking',
+          exception: e);
       _locationController.addError(e);
     }
   }
-  
+
   /// Starts the actual location stream after permissions are verified
   void _startLocationStream() {
     _isTracking = true;
     _lastLocationUpdate = DateTime.now();
-    
+
     // Configure location settings based on platform
     late LocationSettings locationSettings;
-    
+
     if (Platform.isAndroid) {
       locationSettings = AndroidSettings(
         accuracy: _currentConfig.accuracy,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5), // Force frequent updates
-        forceLocationManager: false, // Use FusedLocationProvider for better battery
+        forceLocationManager:
+            false, // Use FusedLocationProvider for better battery
         useMSLAltitude: true, // Use MSL altitude if available
-        foregroundNotificationConfig: _canStartForegroundService ? const ForegroundNotificationConfig(
-          notificationTitle: 'Ruck in Progress',
-          notificationText: 'Tracking your ruck session - tap to return to app',
-          enableWakeLock: true, // Prevent CPU sleep
-          enableWifiLock: true, // Prevent WiFi sleep
-          notificationChannelName: 'Ruck Session Tracking',
-          notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
-          setOngoing: true, // Prevents dismissal during active sessions
-          color: Color.fromARGB(255, 255, 165, 0), // Orange color for high visibility
-        ) : null,
+        foregroundNotificationConfig: _canStartForegroundService
+            ? const ForegroundNotificationConfig(
+                notificationTitle: 'Ruck in Progress',
+                notificationText:
+                    'Tracking your ruck session - tap to return to app',
+                enableWakeLock: true, // Prevent CPU sleep
+                enableWifiLock: true, // Prevent WiFi sleep
+                notificationChannelName: 'Ruck Session Tracking',
+                notificationIcon:
+                    AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+                setOngoing: true, // Prevents dismissal during active sessions
+                color: Color.fromARGB(
+                    255, 255, 165, 0), // Orange color for high visibility
+              )
+            : null,
       );
     } else if (Platform.isIOS) {
       locationSettings = AppleSettings(
         accuracy: _currentConfig.accuracy,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
-        pauseLocationUpdatesAutomatically: false, // Critical: Keep GPS active in background
+        pauseLocationUpdatesAutomatically:
+            false, // Critical: Keep GPS active in background
         activityType: ActivityType.fitness, // Optimize for fitness tracking
-        showBackgroundLocationIndicator: true, // Required for background location
+        showBackgroundLocationIndicator:
+            true, // Required for background location
         allowBackgroundLocationUpdates: true, // Enable background updates
       );
     } else {
@@ -382,17 +405,17 @@ class LocationServiceImpl implements LocationService {
         distanceFilter: _currentConfig.distanceFilter.toInt(),
       );
     }
-    
+
     // Raw position stream with platform-specific settings
     final positionStream = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     );
-    
+
     // Subscribe to raw positions and convert to LocationPoint objects
     _rawLocationSubscription = positionStream.listen(
       (Position position) {
         if (!_isTracking) return; // Ignore updates if not tracking
-        
+
         final locationPoint = LocationPoint(
           latitude: position.latitude,
           longitude: position.longitude,
@@ -405,65 +428,79 @@ class LocationServiceImpl implements LocationService {
           courseDeg: position.heading,
           courseAccuracyDeg: position.headingAccuracy,
         );
-        
+
         // Log elevation data for debugging iOS vs Android differences
-        print('[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
-        
+        print(
+            '[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
+
         // Cross-platform location tracking diagnostics (sends to Crashlytics)
         final platform = Platform.isIOS ? 'iOS' : 'Android';
-        final timeSinceLastUpdate = _lastLocationUpdate != null 
-            ? DateTime.now().difference(_lastLocationUpdate!).inSeconds 
+        final timeSinceLastUpdate = _lastLocationUpdate != null
+            ? DateTime.now().difference(_lastLocationUpdate!).inSeconds
             : 0;
-        
+
         // Critical: Log significant gaps to Crashlytics for production debugging
         if (timeSinceLastUpdate > 60) {
-          final issueType = Platform.isIOS ? 'iOS background throttling' : 'Android Doze Mode or battery optimization';
-          AppLogger.critical('$platform Location Gap: ${timeSinceLastUpdate}s gap detected - possible $issueType', 
-            exception: '${platform}_LOCATION_GAP_${timeSinceLastUpdate}s');
-          
+          final issueType = Platform.isIOS
+              ? 'iOS background throttling'
+              : 'Android Doze Mode or battery optimization';
+          AppLogger.critical(
+              '$platform Location Gap: ${timeSinceLastUpdate}s gap detected - possible $issueType',
+              exception: '${platform}_LOCATION_GAP_${timeSinceLastUpdate}s');
+
           // On Android, log additional debugging info for 70+ minute failures
-          if (Platform.isAndroid && timeSinceLastUpdate > 4200) { // 70 minutes
-            AppLogger.critical('ANDROID CRITICAL: Location stopped after 70+ minutes!', 
-              exception: 'ANDROID_70MIN_LOCATION_FAILURE');
+          if (Platform.isAndroid && timeSinceLastUpdate > 4200) {
+            // 70 minutes
+            AppLogger.critical(
+                'ANDROID CRITICAL: Location stopped after 70+ minutes!',
+                exception: 'ANDROID_70MIN_LOCATION_FAILURE');
           }
         }
-        
+
         // Log GPS accuracy degradation to Crashlytics (non-critical)
         if (position.accuracy > 30) {
           // Use warning level instead of critical for moderate accuracy issues
-          AppLogger.warning('$platform GPS Accuracy Reduced: ${position.accuracy}m accuracy');
+          AppLogger.warning(
+              '$platform GPS Accuracy Reduced: ${position.accuracy}m accuracy');
         }
-        
+
         // For severe accuracy issues, log with more details
         if (position.accuracy > 100) {
-          AppLogger.critical('$platform Very Poor GPS Accuracy: ${position.accuracy}m', 
-            exception: 'platform=$platform, accuracy=${position.accuracy}m, lat=${position.latitude.toStringAsFixed(6)}, lng=${position.longitude.toStringAsFixed(6)}');
+          AppLogger.critical(
+              '$platform Very Poor GPS Accuracy: ${position.accuracy}m',
+              exception:
+                  'platform=$platform, accuracy=${position.accuracy}m, lat=${position.latitude.toStringAsFixed(6)}, lng=${position.longitude.toStringAsFixed(6)}');
         }
-        
+
         // Log location gaps (separate from accuracy issues)
         if (timeSinceLastUpdate > 120) {
-          AppLogger.warning('$platform Location Update Gap: ${timeSinceLastUpdate}s since last update');
+          AppLogger.warning(
+              '$platform Location Update Gap: ${timeSinceLastUpdate}s since last update');
         }
-        
+
         // Add to batch for API calls AND stream for UI updates
         _locationBatch.add(locationPoint);
-        _locationController.add(locationPoint); // For UI updates (distance, elevation, map)
-        
+        _locationController
+            .add(locationPoint); // For UI updates (distance, elevation, map)
+
         // Update last location update timestamp
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
-        
-        AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
+
+        AppLogger.debug(
+            'Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
       },
       onError: (error) async {
         // kCLErrorDomain code 1 (iOS) == permission denied. Treat differently so we don't spam Crashlytics.
         final errorString = error.toString();
-        final isPermissionDenied = errorString.contains('kCLErrorDomain error 1') ||
-            errorString.contains('PERMISSION_DENIED') ||
-            error is PermissionDeniedException;
+        final isPermissionDenied =
+            errorString.contains('kCLErrorDomain error 1') ||
+                errorString.contains('PERMISSION_DENIED') ||
+                error is PermissionDeniedException;
 
         if (isPermissionDenied) {
-          AppLogger.warning('Location permission denied while tracking – pausing GPS updates');
+          AppLogger.warning(
+              'Location permission denied while tracking – pausing GPS updates');
 
           // Stop tracking to avoid endless error spam
           await stopLocationTracking();
@@ -473,12 +510,15 @@ class LocationServiceImpl implements LocationService {
           Timer(const Duration(seconds: 30), () async {
             if (!_isTracking) {
               final hasPermission = await hasLocationPermission();
-              final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+              final serviceEnabled =
+                  await Geolocator.isLocationServiceEnabled();
               if (hasPermission && serviceEnabled) {
-                AppLogger.info('Permission restored – resuming location tracking');
+                AppLogger.info(
+                    'Permission restored – resuming location tracking');
                 _checkPermissionsAndStartTracking();
               } else {
-                AppLogger.info('Permission/service still not available after retry');
+                AppLogger.info(
+                    'Permission/service still not available after retry');
               }
             }
           });
@@ -495,7 +535,8 @@ class LocationServiceImpl implements LocationService {
               severity: ErrorSeverity.warning,
             );
           } catch (errorHandlerException) {
-            AppLogger.error('Error reporting failed during location permission denial: $errorHandlerException');
+            AppLogger.error(
+                'Error reporting failed during location permission denial: $errorHandlerException');
           }
           return; // Skip the generic critical-error flow below
         }
@@ -513,14 +554,16 @@ class LocationServiceImpl implements LocationService {
             },
           );
         } catch (errorHandlerException) {
-          AppLogger.error('Error reporting failed during location tracking stream error: $errorHandlerException');
+          AppLogger.error(
+              'Error reporting failed during location tracking stream error: $errorHandlerException');
         }
         AppLogger.error('Location service error', exception: error);
         _locationController.addError(error);
 
         // Attempt to restart location tracking after error
         if (_isTracking) {
-          AppLogger.info('Attempting to restart location tracking after error...');
+          AppLogger.info(
+              'Attempting to restart location tracking after error...');
           Timer(const Duration(seconds: 5), () {
             if (_isTracking) {
               _restartLocationTracking();
@@ -529,9 +572,10 @@ class LocationServiceImpl implements LocationService {
         }
       },
     );
-    
+
     // Integrate with background location service
-    BackgroundLocationService.startBackgroundTracking().catchError((error) async {
+    BackgroundLocationService.startBackgroundTracking()
+        .catchError((error) async {
       // Monitor background location service failures (critical for session tracking) - wrapped to prevent secondary errors
       try {
         await AppErrorHandler.handleCriticalError(
@@ -543,107 +587,121 @@ class LocationServiceImpl implements LocationService {
           },
         );
       } catch (errorHandlerException) {
-        AppLogger.error('Error reporting failed during background location service error: $errorHandlerException');
+        AppLogger.error(
+            'Error reporting failed during background location service error: $errorHandlerException');
       }
       AppLogger.error('Failed to start background service', exception: error);
     });
-    
+
     // Start location staleness monitoring
     _startLocationMonitoring();
-    
+
     // Start batch timer
-    _batchTimer = Timer.periodic(Duration(seconds: _currentConfig.batchInterval), (timer) {
+    _batchTimer = Timer.periodic(
+        Duration(seconds: _currentConfig.batchInterval), (timer) {
       _sendBatchUpdate();
     });
   }
-  
+
   /// Start monitoring for stale location updates and restart if needed
   void _startLocationMonitoring() {
     // Safely cancel existing timers
     try {
       _locationTimeoutTimer?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - monitoring location timeout timer cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - monitoring location timeout timer cancellation: $e');
     }
-    
+
     try {
       _stalenessCheckTimer?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - monitoring staleness check timer cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - monitoring staleness check timer cancellation: $e');
     }
-    
+
     // Check for complete location timeout (no updates at all)
-    _locationTimeoutTimer = Timer.periodic(Duration(seconds: _locationTimeoutSeconds), (timer) {
+    _locationTimeoutTimer =
+        Timer.periodic(Duration(seconds: _locationTimeoutSeconds), (timer) {
       if (!_isTracking) {
         timer.cancel();
         return;
       }
-      
-      if (_lastLocationUpdate == null || 
-          DateTime.now().difference(_lastLocationUpdate!).inSeconds > _locationTimeoutSeconds) {
+
+      if (_lastLocationUpdate == null ||
+          DateTime.now().difference(_lastLocationUpdate!).inSeconds >
+              _locationTimeoutSeconds) {
         AppLogger.warning('Location timeout detected - attempting restart');
         _restartLocationTracking();
       }
     });
-    
+
     // Check for stale location updates (same location for too long)
-    _stalenessCheckTimer = Timer.periodic(Duration(seconds: _stalenessCheckSeconds), (timer) {
+    _stalenessCheckTimer =
+        Timer.periodic(Duration(seconds: _stalenessCheckSeconds), (timer) {
       if (!_isTracking) {
         timer.cancel();
         return;
       }
-      
+
       if (_lastValidLocation != null) {
-        final timeDiff = DateTime.now().difference(_lastValidLocation!.timestamp).inSeconds;
+        final timeDiff =
+            DateTime.now().difference(_lastValidLocation!.timestamp).inSeconds;
         if (timeDiff > _stalenessCheckSeconds) {
-          AppLogger.warning('Stale location detected (${timeDiff}s old) - requesting fresh location');
+          AppLogger.warning(
+              'Stale location detected (${timeDiff}s old) - requesting fresh location');
           _requestFreshLocation();
         }
       }
     });
   }
-  
+
   /// Restart location tracking when issues are detected
   void _restartLocationTracking() async {
     if (!_isTracking) return;
-    
+
     AppLogger.info('Restarting location tracking...');
-    
+
     // Safely cancel existing subscription
     try {
       await _rawLocationSubscription?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - restart location subscription cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - restart location subscription cancellation: $e');
     }
-    
+
     // Wait a moment before restarting
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (!_isTracking) return; // Check if still tracking after delay
-    
+
     // Restart the position stream
     try {
       final locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
         intervalDuration: const Duration(seconds: 5),
-        foregroundNotificationConfig: _canStartForegroundService ? const ForegroundNotificationConfig(
-          notificationTitle: 'Ruck in Progress',
-          notificationText: 'GPS reconnected - tracking resumed',
-          enableWakeLock: true,
-          enableWifiLock: true,
-          notificationChannelName: 'Ruck Session Tracking',
-          notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
-          setOngoing: true,
-        ) : null,
+        foregroundNotificationConfig: _canStartForegroundService
+            ? const ForegroundNotificationConfig(
+                notificationTitle: 'Ruck in Progress',
+                notificationText: 'GPS reconnected - tracking resumed',
+                enableWakeLock: true,
+                enableWifiLock: true,
+                notificationChannelName: 'Ruck Session Tracking',
+                notificationIcon:
+                    AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+                setOngoing: true,
+              )
+            : null,
       );
-      
-      final positionStream = Geolocator.getPositionStream(locationSettings: locationSettings);
-      
+
+      final positionStream =
+          Geolocator.getPositionStream(locationSettings: locationSettings);
+
       _rawLocationSubscription = positionStream.listen(
         (Position position) {
           if (!_isTracking) return;
-          
+
           final locationPoint = LocationPoint(
             latitude: position.latitude,
             longitude: position.longitude,
@@ -656,12 +714,13 @@ class LocationServiceImpl implements LocationService {
             courseDeg: position.heading,
             courseAccuracyDeg: position.headingAccuracy,
           );
-          
+
           _locationBatch.add(locationPoint);
-          _locationController.add(locationPoint); // For UI updates (distance, elevation, map)
+          _locationController
+              .add(locationPoint); // For UI updates (distance, elevation, map)
           _lastLocationUpdate = DateTime.now();
           _lastValidLocation = locationPoint;
-          
+
           AppLogger.info('Location tracking resumed successfully');
         },
         onError: (error) {
@@ -672,7 +731,7 @@ class LocationServiceImpl implements LocationService {
       AppLogger.error('Failed to restart location tracking', exception: e);
     }
   }
-  
+
   /// Request a fresh location to break out of stale updates
   void _requestFreshLocation() async {
     try {
@@ -681,7 +740,7 @@ class LocationServiceImpl implements LocationService {
         desiredAccuracy: LocationAccuracy.bestForNavigation,
         timeLimit: const Duration(seconds: 15), // Increased from 10s
       );
-      
+
       if (_isTracking) {
         final locationPoint = LocationPoint(
           latitude: position.latitude,
@@ -695,80 +754,88 @@ class LocationServiceImpl implements LocationService {
           courseDeg: position.heading,
           courseAccuracyDeg: position.headingAccuracy,
         );
-        
+
         // Log elevation data for debugging iOS vs Android differences
-        print('[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
-        
+        print(
+            '[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
+
         _locationBatch.add(locationPoint);
-        _locationController.add(locationPoint); // For UI updates (distance, elevation, map)
+        _locationController
+            .add(locationPoint); // For UI updates (distance, elevation, map)
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
-        
+
         AppLogger.info('Fresh location obtained');
       }
     } catch (e) {
       AppLogger.error('Failed to get fresh location', exception: e);
     }
   }
-  
+
   /// Send a batch of location updates to the API
   void _sendBatchUpdate() {
-    AppLogger.info('🔄 Batch timer fired - checking for pending location points...');
-    
+    AppLogger.info(
+        '🔄 Batch timer fired - checking for pending location points...');
+
     if (_locationBatch.isEmpty) {
       AppLogger.info('📭 No location points to batch - skipping');
       return;
     }
-    
+
     final batchCount = _locationBatch.length;
     AppLogger.info('📦 Preparing to send batch of $batchCount location points');
-    
+
     // Broadcast batch update event for active session to handle
     _batchController.add(List<LocationPoint>.from(_locationBatch));
-    
-    // Clear batch  
+
+    // Clear batch
     _locationBatch.clear();
-    
-    AppLogger.info('✅ Batch update signal sent - $batchCount points queued for upload');
+
+    AppLogger.info(
+        '✅ Batch update signal sent - $batchCount points queued for upload');
   }
-  
+
   @override
   Future<void> stopLocationTracking() async {
     AppLogger.info('Stopping location tracking...');
     _isTracking = false;
-    
+
     // CRITICAL: Send any pending location data before stopping
     // This prevents data loss when stopping location tracking
     if (_locationBatch.isNotEmpty) {
-      AppLogger.info('📤 Sending ${_locationBatch.length} pending location points before stopping');
+      AppLogger.info(
+          '📤 Sending ${_locationBatch.length} pending location points before stopping');
       _sendBatchUpdate();
     }
-    
+
     // Safely cancel all subscriptions and timers
     try {
       await _rawLocationSubscription?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - location subscription cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - location subscription cancellation: $e');
     }
-    
+
     try {
       _batchTimer?.cancel();
     } catch (e) {
       AppLogger.debug('Safe to ignore - batch timer cancellation: $e');
     }
-    
+
     try {
       _locationTimeoutTimer?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - location timeout timer cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - location timeout timer cancellation: $e');
     }
-    
+
     try {
       _stalenessCheckTimer?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - staleness check timer cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - staleness check timer cancellation: $e');
     }
-    
+
     // Stop background location service with error handling
     try {
       await BackgroundLocationService.stopBackgroundTracking();
@@ -776,34 +843,39 @@ class LocationServiceImpl implements LocationService {
       // Log but don't crash - background service stop failures are common
       AppLogger.warning('Background service stop failed (safe to ignore): $e');
     }
-    
+
     // Clear tracking state
     _lastLocationUpdate = null;
     _lastValidLocation = null;
   }
-  
+
   @override
   double calculateDistance(LocationPoint point1, LocationPoint point2) {
     // Standard Haversine formula for calculating distance between two lat/lng points
     const double earthRadius = 6371.0; // Earth's radius in kilometers
-    
+
     final double lat1Rad = point1.latitude * (math.pi / 180);
     final double lat2Rad = point2.latitude * (math.pi / 180);
-    final double deltaLatRad = (point2.latitude - point1.latitude) * (math.pi / 180);
-    final double deltaLngRad = (point2.longitude - point1.longitude) * (math.pi / 180);
-    
+    final double deltaLatRad =
+        (point2.latitude - point1.latitude) * (math.pi / 180);
+    final double deltaLngRad =
+        (point2.longitude - point1.longitude) * (math.pi / 180);
+
     final double a = math.sin(deltaLatRad / 2) * math.sin(deltaLatRad / 2) +
-        math.cos(lat1Rad) * math.cos(lat2Rad) * 
-        math.sin(deltaLngRad / 2) * math.sin(deltaLngRad / 2);
-    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)); // CORRECT: sqrt(1 - a)
-    
+        math.cos(lat1Rad) *
+            math.cos(lat2Rad) *
+            math.sin(deltaLngRad / 2) *
+            math.sin(deltaLngRad / 2);
+    final double c =
+        2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)); // CORRECT: sqrt(1 - a)
+
     return earthRadius * c; // Return distance in kilometers
   }
-  
+
   @override
   void adjustTrackingFrequency(LocationTrackingMode mode) {
     AppLogger.info('📡 Adjusting location tracking frequency to: $mode');
-    
+
     // Get new configuration based on mode
     LocationTrackingConfig newConfig;
     switch (mode) {
@@ -820,71 +892,81 @@ class LocationServiceImpl implements LocationService {
         newConfig = LocationTrackingConfig.emergency;
         break;
     }
-    
+
     // Only restart if configuration actually changed
     if (_currentConfig.mode != newConfig.mode) {
       final previousConfig = _currentConfig;
       _currentConfig = newConfig;
-      
+
       // If currently tracking, restart with new configuration
       if (_isTracking) {
-        AppLogger.info('♻️ Restarting location tracking with new configuration');
-        
+        AppLogger.info(
+            '♻️ Restarting location tracking with new configuration');
+
         // Handle async restart without breaking the void signature
         () async {
           final success = await _restartLocationTrackingWithNewConfig();
-          
+
           if (!success) {
-            AppLogger.error('CRITICAL: Failed to restart location tracking - attempting recovery');
+            AppLogger.error(
+                'CRITICAL: Failed to restart location tracking - attempting recovery');
             _currentConfig = previousConfig;
-            
+
             // Try to recover with previous config
-            final recoverySuccess = await _restartLocationTrackingWithNewConfig();
-            
+            final recoverySuccess =
+                await _restartLocationTrackingWithNewConfig();
+
             if (!recoverySuccess) {
               // Last resort: just continue with existing tracking if possible
-              AppLogger.error('CRITICAL: Could not restart tracking - maintaining existing tracking state');
-              _isTracking = true; // Keep the flag true to accept any incoming location updates
+              AppLogger.error(
+                  'CRITICAL: Could not restart tracking - maintaining existing tracking state');
+              _isTracking =
+                  true; // Keep the flag true to accept any incoming location updates
             }
           }
         }();
       }
-      
-      AppLogger.info('✅ Location tracking frequency adjustment initiated: ${newConfig.mode} (${newConfig.distanceFilter}m, ${newConfig.batchInterval}s)');
+
+      AppLogger.info(
+          '✅ Location tracking frequency adjustment initiated: ${newConfig.mode} (${newConfig.distanceFilter}m, ${newConfig.batchInterval}s)');
     } else {
-      AppLogger.info('ℹ️ Location tracking already at requested frequency: $mode');
+      AppLogger.info(
+          'ℹ️ Location tracking already at requested frequency: $mode');
     }
   }
-  
+
   /// Restart location tracking with new configuration
   Future<bool> _restartLocationTrackingWithNewConfig() async {
     try {
       // CRITICAL: Send any pending location data before restarting
       // This prevents distance recording from stopping during memory pressure
       if (_locationBatch.isNotEmpty) {
-        AppLogger.info('📤 Sending ${_locationBatch.length} pending location points before config restart');
+        AppLogger.info(
+            '📤 Sending ${_locationBatch.length} pending location points before config restart');
         _sendBatchUpdate();
       }
-      
+
       // Safely cancel current tracking
       try {
         await _rawLocationSubscription?.cancel();
       } catch (e) {
-        AppLogger.debug('Safe to ignore - config restart location subscription cancellation: $e');
+        AppLogger.debug(
+            'Safe to ignore - config restart location subscription cancellation: $e');
       }
-      
+
       try {
         _batchTimer?.cancel();
       } catch (e) {
-        AppLogger.debug('Safe to ignore - config restart batch timer cancellation: $e');
+        AppLogger.debug(
+            'Safe to ignore - config restart batch timer cancellation: $e');
       }
-      
+
       // Start tracking with new configuration
       final locationSettings = LocationSettings(
         accuracy: _currentConfig.accuracy,
         distanceFilter: _currentConfig.distanceFilter.toInt(),
       );
-      
+
       _rawLocationSubscription = Geolocator.getPositionStream(
         locationSettings: locationSettings,
       ).listen(
@@ -902,7 +984,7 @@ class LocationServiceImpl implements LocationService {
               courseDeg: position.heading,
               courseAccuracyDeg: position.headingAccuracy,
             );
-            
+
             _locationBatch.add(locationPoint);
             _locationController.add(locationPoint);
             _lastLocationUpdate = DateTime.now();
@@ -910,61 +992,63 @@ class LocationServiceImpl implements LocationService {
           }
         },
         onError: (error) {
-          AppLogger.error('Location stream error after config restart', exception: error);
+          AppLogger.error('Location stream error after config restart',
+              exception: error);
           // Don't stop tracking on errors - GPS can be flaky
         },
       );
-      
+
       // Restart batch timer with new interval
       _batchTimer = Timer.periodic(
         Duration(seconds: _currentConfig.batchInterval),
         (_) => _sendBatchUpdate(),
       );
-      
+
       AppLogger.info('🔄 Location tracking restarted with new configuration');
       return true;
-      
     } catch (e) {
-      AppLogger.error('Failed to restart location tracking with new config', exception: e);
-      
+      AppLogger.error('Failed to restart location tracking with new config',
+          exception: e);
+
       // CRITICAL: If restart fails, try to maintain tracking with any config
       _isTracking = true; // Ensure flag stays true
       return false;
     }
   }
-  
+
   Future<void> startSignificantFallback() async {
     if (!Platform.isIOS || _significantSubscription != null) return;
-    
+
     AppLogger.info('Starting iOS significant location changes fallback');
     _usingSignificantFallback = true;
-    
+
     final settings = AppleSettings(
       accuracy: LocationAccuracy.low,
       distanceFilter: 500, // Significant change default
       activityType: ActivityType.fitness,
     );
-    
-         _significantSubscription = Geolocator.getPositionStream(locationSettings: settings).listen(
-       (position) {
-         // Handle significant update: lower accuracy, but better than nothing
-         final point = LocationPoint(
-           latitude: position.latitude,
-           longitude: position.longitude,
-           elevation: position.altitude,
-           accuracy: math.max(position.accuracy, 100.0), // Mark as coarse
-           timestamp: position.timestamp,
-           speed: position.speed,
-           verticalAccuracyM: position.altitudeAccuracy,
-           speedAccuracyMps: position.speedAccuracy,
-           courseDeg: position.heading,
-           courseAccuracyDeg: position.headingAccuracy,
-         );
-         _locationController.add(point);
-         AppLogger.info('Significant location update received during fallback');
-       },
-       onError: (e) => AppLogger.error('Significant changes error: $e'),
-     );
+
+    _significantSubscription =
+        Geolocator.getPositionStream(locationSettings: settings).listen(
+      (position) {
+        // Handle significant update: lower accuracy, but better than nothing
+        final point = LocationPoint(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          elevation: position.altitude,
+          accuracy: math.max(position.accuracy, 100.0), // Mark as coarse
+          timestamp: position.timestamp,
+          speed: position.speed,
+          verticalAccuracyM: position.altitudeAccuracy,
+          speedAccuracyMps: position.speedAccuracy,
+          courseDeg: position.heading,
+          courseAccuracyDeg: position.headingAccuracy,
+        );
+        _locationController.add(point);
+        AppLogger.info('Significant location update received during fallback');
+      },
+      onError: (e) => AppLogger.error('Significant changes error: $e'),
+    );
   }
 
   Future<void> stopSignificantFallback() async {
@@ -972,41 +1056,44 @@ class LocationServiceImpl implements LocationService {
     _significantSubscription = null;
     _usingSignificantFallback = false;
   }
-  
+
   /// Dispose of resources
-  
+
   void dispose() {
     // Safely dispose of all resources
     try {
       _rawLocationSubscription?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - dispose location subscription cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - dispose location subscription cancellation: $e');
     }
-    
+
     try {
       _batchTimer?.cancel();
     } catch (e) {
       AppLogger.debug('Safe to ignore - dispose batch timer cancellation: $e');
     }
-    
+
     try {
       _locationTimeoutTimer?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - dispose location timeout timer cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - dispose location timeout timer cancellation: $e');
     }
-    
+
     try {
       _stalenessCheckTimer?.cancel();
     } catch (e) {
-      AppLogger.debug('Safe to ignore - dispose staleness check timer cancellation: $e');
+      AppLogger.debug(
+          'Safe to ignore - dispose staleness check timer cancellation: $e');
     }
-    
+
     try {
       _locationController.close();
     } catch (e) {
       AppLogger.debug('Safe to ignore - dispose location controller close: $e');
     }
-    
+
     try {
       _batchController.close();
     } catch (e) {

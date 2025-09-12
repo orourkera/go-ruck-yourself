@@ -22,7 +22,8 @@ class PlannedRuckCreationForm extends StatefulWidget {
   });
 
   @override
-  State<PlannedRuckCreationForm> createState() => _PlannedRuckCreationFormState();
+  State<PlannedRuckCreationForm> createState() =>
+      _PlannedRuckCreationFormState();
 }
 
 class _PlannedRuckCreationFormState extends State<PlannedRuckCreationForm>
@@ -64,7 +65,7 @@ class _PlannedRuckCreationFormState extends State<PlannedRuckCreationForm>
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: widget.createPlannedRuck 
+          color: widget.createPlannedRuck
               ? AppColors.primary.withOpacity(0.3)
               : AppColors.divider,
           width: 1,
@@ -75,7 +76,8 @@ class _PlannedRuckCreationFormState extends State<PlannedRuckCreationForm>
         children: [
           // Header with toggle
           InkWell(
-            onTap: () => widget.onCreatePlannedRuckChanged(!widget.createPlannedRuck),
+            onTap: () =>
+                widget.onCreatePlannedRuckChanged(!widget.createPlannedRuck),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -84,8 +86,8 @@ class _PlannedRuckCreationFormState extends State<PlannedRuckCreationForm>
                   Icon(
                     Icons.calendar_today,
                     size: 20,
-                    color: widget.createPlannedRuck 
-                        ? AppColors.primary 
+                    color: widget.createPlannedRuck
+                        ? AppColors.primary
                         : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 12),
@@ -94,8 +96,8 @@ class _PlannedRuckCreationFormState extends State<PlannedRuckCreationForm>
                       'Create Planned Ruck',
                       style: AppTextStyles.subtitle1.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: widget.createPlannedRuck 
-                            ? AppColors.primary 
+                        color: widget.createPlannedRuck
+                            ? AppColors.primary
                             : AppColors.textPrimary,
                       ),
                     ),
@@ -119,14 +121,14 @@ class _PlannedRuckCreationFormState extends State<PlannedRuckCreationForm>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  
+
                   // Date selector
                   Text('Planned Date', style: AppTextStyles.subtitle2),
                   const SizedBox(height: 8),
                   _buildDateSelector(),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Notes field
                   Text('Notes', style: AppTextStyles.subtitle2),
                   const SizedBox(height: 8),

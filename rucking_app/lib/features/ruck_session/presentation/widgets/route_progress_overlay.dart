@@ -39,24 +39,28 @@ class RouteProgressOverlay extends StatelessWidget {
       preferMetric = true;
     }
 
-    final distanceRemaining = (plannedRouteDistance! - currentDistance).clamp(0.0, plannedRouteDistance!);
+    final distanceRemaining = (plannedRouteDistance! - currentDistance)
+        .clamp(0.0, plannedRouteDistance!);
     final elapsedMinutes = elapsedSeconds / 60;
-    
+
     // Calculate time remaining (estimate if no planned duration)
     final double timeRemaining;
     if (plannedRouteDuration != null) {
-      timeRemaining = (plannedRouteDuration! - elapsedMinutes).clamp(0.0, plannedRouteDuration!.toDouble());
+      timeRemaining = (plannedRouteDuration! - elapsedMinutes)
+          .clamp(0.0, plannedRouteDuration!.toDouble());
     } else {
       // Estimate remaining time based on current pace
       if (currentDistance > 0 && elapsedMinutes > 0) {
         final currentPaceMinutesPerKm = elapsedMinutes / currentDistance;
-        timeRemaining = (distanceRemaining / currentPaceMinutesPerKm).clamp(0.0, double.infinity);
+        timeRemaining = (distanceRemaining / currentPaceMinutesPerKm)
+            .clamp(0.0, double.infinity);
       } else {
         timeRemaining = 0.0;
       }
     }
 
-    final progressPercentage = (currentDistance / plannedRouteDistance!).clamp(0.0, 1.0);
+    final progressPercentage =
+        (currentDistance / plannedRouteDistance!).clamp(0.0, 1.0);
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -105,7 +109,7 @@ class RouteProgressOverlay extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Distance and time remaining
           Row(
             children: [
@@ -114,12 +118,13 @@ class RouteProgressOverlay extends StatelessWidget {
                 child: _buildProgressItem(
                   icon: Icons.straighten,
                   label: 'Remaining',
-                  value: MeasurementUtils.formatDistance(distanceRemaining, metric: preferMetric),
+                  value: MeasurementUtils.formatDistance(distanceRemaining,
+                      metric: preferMetric),
                   color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 16),
-              
+
               // Time remaining
               Expanded(
                 child: _buildProgressItem(
@@ -177,12 +182,12 @@ class RouteProgressOverlay extends StatelessWidget {
 
   String _formatTimeRemaining(double minutes) {
     if (minutes <= 0) return '0m';
-    
+
     final totalMinutes = minutes.round();
     if (totalMinutes < 60) {
       return '${totalMinutes}m';
     }
-    
+
     final hours = totalMinutes ~/ 60;
     final remainingMinutes = totalMinutes % 60;
     return '${hours}h ${remainingMinutes}m';

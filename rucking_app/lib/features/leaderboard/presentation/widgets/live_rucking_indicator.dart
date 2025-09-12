@@ -42,11 +42,12 @@ class _LiveRuckingIndicatorState extends State<LiveRuckingIndicator>
   @override
   void didUpdateWidget(LiveRuckingIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Start or stop blinking based on active ruckers
     if (widget.activeRuckersCount > 0 && oldWidget.activeRuckersCount == 0) {
       _blinkController.repeat(reverse: true);
-    } else if (widget.activeRuckersCount == 0 && oldWidget.activeRuckersCount > 0) {
+    } else if (widget.activeRuckersCount == 0 &&
+        oldWidget.activeRuckersCount > 0) {
       _blinkController.stop();
       _blinkController.reset();
     }
@@ -71,7 +72,8 @@ class _LiveRuckingIndicatorState extends State<LiveRuckingIndicator>
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(_blinkAnimation.value), // Fade from transparent to fully opaque
+            color: Colors.green.withOpacity(
+                _blinkAnimation.value), // Fade from transparent to fully opaque
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: Colors.green.withOpacity(_blinkAnimation.value),
@@ -95,7 +97,8 @@ class _LiveRuckingIndicatorState extends State<LiveRuckingIndicator>
                     ? '1 rucker rucking now!'
                     : '${widget.activeRuckersCount} ruckers rucking now!',
                 style: const TextStyle(
-                  color: Colors.white, // White text for contrast against green background
+                  color: Colors
+                      .white, // White text for contrast against green background
                   fontFamily: 'Bangers', // Use Bangers font
                   fontSize: 14, // Slightly bigger for Bangers font
                 ),

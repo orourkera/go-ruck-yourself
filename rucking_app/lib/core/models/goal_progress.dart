@@ -18,7 +18,8 @@ class GoalProgress {
       goalId: json['goal_id']?.toString() ?? json['goalId']?.toString() ?? '',
       currentValue: json['current_value'] ?? json['currentValue'],
       progressPercent: json['progress_percent'] ?? json['progressPercent'],
-      lastEvaluatedAt: _parseDate(json['last_evaluated_at'] ?? json['lastEvaluatedAt']),
+      lastEvaluatedAt:
+          _parseDate(json['last_evaluated_at'] ?? json['lastEvaluatedAt']),
       breakdown: _ensureMap(json['breakdown_json'] ?? json['breakdown']),
     );
   }
@@ -28,7 +29,8 @@ class GoalProgress {
       'goal_id': goalId,
       if (currentValue != null) 'current_value': currentValue,
       if (progressPercent != null) 'progress_percent': progressPercent,
-      if (lastEvaluatedAt != null) 'last_evaluated_at': lastEvaluatedAt!.toIso8601String(),
+      if (lastEvaluatedAt != null)
+        'last_evaluated_at': lastEvaluatedAt!.toIso8601String(),
       if (breakdown != null) 'breakdown_json': breakdown,
     };
   }

@@ -62,7 +62,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(goal.title ?? 'Untitled Goal', style: Theme.of(context).textTheme.headlineSmall),
+                Text(goal.title ?? 'Untitled Goal',
+                    style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
                 if (goal.description != null && goal.description!.isNotEmpty)
                   Text(goal.description!),
@@ -71,10 +72,12 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                   Card(
                     child: ListTile(
                       title: const Text('Progress'),
-                      subtitle: Text('${progress.currentValue ?? 0} / ${goal.targetValue ?? '-'}'),
+                      subtitle: Text(
+                          '${progress.currentValue ?? 0} / ${goal.targetValue ?? '-'}'),
                     ),
                   ),
-                if (schedule != null) _ScheduleCard(schedule: schedule, onEdit: _openEditSchedule),
+                if (schedule != null)
+                  _ScheduleCard(schedule: schedule, onEdit: _openEditSchedule),
                 const SizedBox(height: 8),
                 Card(
                   child: ExpansionTile(
@@ -82,7 +85,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                     children: messages.take(20).map((m) {
                       return ListTile(
                         title: Text(m.content ?? '-'),
-                        subtitle: Text('${m.channel ?? ''} • ${m.messageType ?? ''}'),
+                        subtitle:
+                            Text('${m.channel ?? ''} • ${m.messageType ?? ''}'),
                       );
                     }).toList(),
                   ),
@@ -92,7 +96,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                   onPressed: () async {
                     await _api.evaluateGoal(widget.goalId, force: true);
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Evaluation triggered')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Evaluation triggered')));
                     }
                   },
                   icon: const Icon(Icons.auto_awesome),
@@ -107,9 +112,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 
   Future<void> _openEditSchedule(GoalSchedule current) async {
-    final String? currentCron = (current.rules != null && current.rules!['cron'] != null)
-        ? current.rules!['cron'].toString()
-        : '';
+    final String? currentCron =
+        (current.rules != null && current.rules!['cron'] != null)
+            ? current.rules!['cron'].toString()
+            : '';
     final controller = TextEditingController(text: currentCron);
     final result = await showDialog<String>(
       context: context,
@@ -120,8 +126,12 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
           decoration: const InputDecoration(hintText: 'e.g. 0 9 * * *'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Save')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('Save')),
         ],
       ),
     );

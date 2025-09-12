@@ -25,17 +25,17 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     Emitter<ProfileState> emit,
   ) async {
     emit(AvatarUploading());
-    
+
     try {
       // Upload the avatar
       final avatarUrl = await _avatarService.uploadAvatar(event.imageFile);
-      
+
       // Get the current user
       final currentState = _authBloc.state;
       if (currentState is Authenticated) {
         // Trigger auth bloc to update the user
         _authBloc.add(AuthUpdateProfileRequested(avatarUrl: avatarUrl));
-        
+
         emit(AvatarUploadSuccess(avatarUrl));
       } else {
         emit(const AvatarUploadFailure('User not authenticated'));

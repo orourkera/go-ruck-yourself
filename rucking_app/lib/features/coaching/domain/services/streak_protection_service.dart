@@ -25,10 +25,11 @@ class StreakInfo {
     return StreakInfo(
       currentDays: json['current_days'] ?? 0,
       bestDays: json['best_days'] ?? 0,
-      lastSessionDate: json['last_session_date'] != null 
+      lastSessionDate: json['last_session_date'] != null
           ? DateTime.tryParse(json['last_session_date'])
           : null,
-      streakStartDate: DateTime.tryParse(json['streak_start_date']) ?? DateTime.now(),
+      streakStartDate:
+          DateTime.tryParse(json['streak_start_date']) ?? DateTime.now(),
       isActive: json['is_active'] ?? false,
       riskLevel: StreakRiskLevel.values.firstWhere(
         (level) => level.name == json['risk_level'],
@@ -44,7 +45,9 @@ class StreakInfo {
   }
 
   /// Check if streak is at risk
-  bool get isAtRisk => riskLevel == StreakRiskLevel.high || riskLevel == StreakRiskLevel.critical;
+  bool get isAtRisk =>
+      riskLevel == StreakRiskLevel.high ||
+      riskLevel == StreakRiskLevel.critical;
 
   /// Get next milestone days
   int get nextMilestone {
@@ -61,9 +64,9 @@ class StreakInfo {
 
 /// Risk levels for streak protection
 enum StreakRiskLevel {
-  safe,     // 0-1 days since last session
-  medium,   // 2 days since last session  
-  high,     // 3 days since last session
+  safe, // 0-1 days since last session
+  medium, // 2 days since last session
+  high, // 3 days since last session
   critical, // 4+ days since last session
 }
 
@@ -84,9 +87,9 @@ class StreakProtectionRecommendation {
 
 /// Urgency levels for streak protection
 enum StreakUrgency {
-  low,      // Informational, building momentum
-  medium,   // Gentle reminder
-  high,     // Strong encouragement
+  low, // Informational, building momentum
+  medium, // Gentle reminder
+  high, // Strong encouragement
   critical, // Urgent action needed
 }
 
@@ -146,7 +149,8 @@ class StreakProtectionService {
     ];
 
     if (streak.currentDays > 0 && streak.daysToNextMilestone <= 3) {
-      motivationalFactors.add('Only ${streak.daysToNextMilestone} days to ${streak.nextMilestone}-day milestone!');
+      motivationalFactors.add(
+          'Only ${streak.daysToNextMilestone} days to ${streak.nextMilestone}-day milestone!');
     }
 
     return StreakProtectionRecommendation(
@@ -390,12 +394,13 @@ class StreakProtectionService {
     CoachingNotificationPreferences preferences,
   ) {
     if (!preferences.enableStreakProtection) return false;
-    if (!streak.isActive || streak.currentDays < 3) return false; // Only protect meaningful streaks
-    
+    if (!streak.isActive || streak.currentDays < 3)
+      return false; // Only protect meaningful streaks
+
     // Send notifications for medium risk and higher
     return streak.riskLevel == StreakRiskLevel.medium ||
-           streak.riskLevel == StreakRiskLevel.high ||
-           streak.riskLevel == StreakRiskLevel.critical;
+        streak.riskLevel == StreakRiskLevel.high ||
+        streak.riskLevel == StreakRiskLevel.critical;
   }
 
   /// Get notification urgency based on risk level
@@ -415,7 +420,7 @@ class StreakProtectionService {
   /// Calculate streak milestone rewards
   List<String> getStreakMilestoneRewards(int streakDays) {
     final rewards = <String>[];
-    
+
     if (streakDays >= 7) rewards.add('Week Warrior badge');
     if (streakDays >= 14) rewards.add('Two Week Champion');
     if (streakDays >= 21) rewards.add('Habit Builder');
@@ -424,7 +429,7 @@ class StreakProtectionService {
     if (streakDays >= 90) rewards.add('Quarter Quest');
     if (streakDays >= 180) rewards.add('Half-Year Hero');
     if (streakDays >= 365) rewards.add('Annual Achiever');
-    
+
     return rewards;
   }
 }

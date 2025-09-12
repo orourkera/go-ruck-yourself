@@ -11,9 +11,9 @@ abstract class SessionEvent extends Equatable {
 /// Event for deleting a session
 class DeleteSessionEvent extends SessionEvent {
   final String sessionId;
-  
+
   const DeleteSessionEvent({required this.sessionId});
-  
+
   @override
   List<Object> get props => [sessionId];
 }

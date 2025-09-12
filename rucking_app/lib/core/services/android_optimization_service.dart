@@ -5,14 +5,16 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 /// Service to handle Android-specific optimizations for background location tracking
 class AndroidOptimizationService {
   static AndroidOptimizationService? _instance;
-  static AndroidOptimizationService get instance => _instance ??= AndroidOptimizationService._();
+  static AndroidOptimizationService get instance =>
+      _instance ??= AndroidOptimizationService._();
   AndroidOptimizationService._();
 
   /// Request all critical permissions for reliable background location tracking
   Future<bool> requestCriticalPermissions() async {
     if (!Platform.isAndroid) return true;
 
-    AppLogger.info('Requesting critical Android permissions for background location...');
+    AppLogger.info(
+        'Requesting critical Android permissions for background location...');
 
     bool allGranted = true;
 
@@ -23,17 +25,20 @@ class AndroidOptimizationService {
       if (!locationStatus.isGranted) allGranted = false;
 
       // 2. Background location (Android 10+)
-      final backgroundLocationStatus = await Permission.locationAlways.request();
+      final backgroundLocationStatus =
+          await Permission.locationAlways.request();
       AppLogger.info('Background location: $backgroundLocationStatus');
       if (!backgroundLocationStatus.isGranted) allGranted = false;
 
       // 3. Battery optimization exemption (CRITICAL for GPS tracking)
       if (await Permission.ignoreBatteryOptimizations.isDenied) {
         AppLogger.info('Requesting battery optimization exemption...');
-        final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
+        final batteryStatus =
+            await Permission.ignoreBatteryOptimizations.request();
         AppLogger.info('Battery optimization exemption: $batteryStatus');
         if (!batteryStatus.isGranted) {
-          AppLogger.warning('Battery optimization exemption denied - GPS may be throttled');
+          AppLogger.warning(
+              'Battery optimization exemption denied - GPS may be throttled');
           allGranted = false;
         }
       }
@@ -47,7 +52,6 @@ class AndroidOptimizationService {
       }
 
       return allGranted;
-
     } catch (e) {
       AppLogger.error('Error requesting critical permissions', exception: e);
       return false;
@@ -62,7 +66,8 @@ class AndroidOptimizationService {
       // Check location permissions
       final locationWhenInUse = await Permission.locationWhenInUse.isGranted;
       final backgroundLocation = await Permission.locationAlways.isGranted;
-      final batteryOptimization = await Permission.ignoreBatteryOptimizations.isGranted;
+      final batteryOptimization =
+          await Permission.ignoreBatteryOptimizations.isGranted;
 
       AppLogger.info('Permission status:');
       AppLogger.info('  Location when in use: $locationWhenInUse');
@@ -70,7 +75,6 @@ class AndroidOptimizationService {
       AppLogger.info('  Battery optimization exemption: $batteryOptimization');
 
       return locationWhenInUse && backgroundLocation && batteryOptimization;
-
     } catch (e) {
       AppLogger.error('Error checking permissions', exception: e);
       return false;
@@ -86,14 +90,18 @@ class AndroidOptimizationService {
     final status = <String, String>{};
 
     try {
-      status['locationWhenInUse'] = (await Permission.locationWhenInUse.status).toString();
-      status['locationAlways'] = (await Permission.locationAlways.status).toString();
-      status['batteryOptimization'] = (await Permission.ignoreBatteryOptimizations.status).toString();
-      status['systemAlertWindow'] = (await Permission.systemAlertWindow.status).toString();
-      status['notification'] = (await Permission.notification.status).toString();
+      status['locationWhenInUse'] =
+          (await Permission.locationWhenInUse.status).toString();
+      status['locationAlways'] =
+          (await Permission.locationAlways.status).toString();
+      status['batteryOptimization'] =
+          (await Permission.ignoreBatteryOptimizations.status).toString();
+      status['systemAlertWindow'] =
+          (await Permission.systemAlertWindow.status).toString();
+      status['notification'] =
+          (await Permission.notification.status).toString();
 
       return status;
-
     } catch (e) {
       AppLogger.error('Error getting permission status', exception: e);
       return {'error': e.toString()};
@@ -105,7 +113,7 @@ class AndroidOptimizationService {
     if (!Platform.isAndroid) return;
 
     AppLogger.info('=== Android Optimization Status ===');
-    
+
     final permissions = await getPermissionStatus();
     permissions.forEach((key, value) {
       AppLogger.info('$key: $value');
@@ -114,9 +122,11 @@ class AndroidOptimizationService {
     // Check if battery optimization is actually working
     final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
     if (batteryStatus.isGranted) {
-      AppLogger.info('✅ Battery optimization exemption granted - GPS should not be throttled');
+      AppLogger.info(
+          '✅ Battery optimization exemption granted - GPS should not be throttled');
     } else {
-      AppLogger.warning('⚠️ Battery optimization exemption denied - GPS may be throttled during background operation');
+      AppLogger.warning(
+          '⚠️ Battery optimization exemption denied - GPS may be throttled during background operation');
     }
 
     AppLogger.info('=== End Status ===');
@@ -143,20 +153,20 @@ This prevents Android from throttling GPS during background operation.
   /// Check if this is a problematic OEM device
   bool isProblematiOEMDevice() {
     final manufacturer = Platform.operatingSystemVersion.toLowerCase();
-    
+
     // Known problematic OEMs that aggressively kill background apps
     return manufacturer.contains('samsung') ||
-           manufacturer.contains('xiaomi') ||
-           manufacturer.contains('huawei') ||
-           manufacturer.contains('oppo') ||
-           manufacturer.contains('vivo') ||
-           manufacturer.contains('oneplus');
+        manufacturer.contains('xiaomi') ||
+        manufacturer.contains('huawei') ||
+        manufacturer.contains('oppo') ||
+        manufacturer.contains('vivo') ||
+        manufacturer.contains('oneplus');
   }
 
   /// Get OEM-specific optimization tips
   String getOEMSpecificTips() {
     final version = Platform.operatingSystemVersion.toLowerCase();
-    
+
     if (version.contains('samsung')) {
       return 'Samsung devices: Go to Settings → Apps → Ruck → Battery → Allow background activity';
     } else if (version.contains('xiaomi')) {

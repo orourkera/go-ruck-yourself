@@ -25,7 +25,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     with TickerProviderStateMixin {
   late final ScrollController _scrollController;
   late final ScrollController _horizontalScrollController; // For header
-  late final ScrollController _tableHorizontalScrollController; // For table rows
+  late final ScrollController
+      _tableHorizontalScrollController; // For table rows
   late final TextEditingController _searchController;
   late final AnimationController _refreshAnimationController;
   late final AnimationController _updateAnimationController;
@@ -37,7 +38,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   bool _isSearching = false;
   bool _isUpdatingScroll = false; // Prevent infinite loops
   String _currentTimePeriod = 'all_time'; // Default time period
-  
+
   // Shared horizontal scroll offset using ValueNotifier
   late ValueNotifier<double> _horizontalScrollNotifier;
 
@@ -48,7 +49,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     _horizontalScrollController = ScrollController();
     _horizontalScrollNotifier = ValueNotifier(0.0);
     _searchController = TextEditingController();
-    
+
     // Set up horizontal scroll sync listeners
     _setupScrollSync();
     _refreshAnimationController = AnimationController(
@@ -71,12 +72,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     _realTimeUpdateTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       // Only update if not currently loading, searching, or in error state
       final currentState = context.read<LeaderboardBloc>().state;
-      if (currentState is! LeaderboardLoading && 
+      if (currentState is! LeaderboardLoading &&
           currentState is! LeaderboardLoadingMore &&
           currentState is! LeaderboardError &&
           !_isSearching && // Don't interrupt user searches
           _scrollController.hasClients && // Ensure scroll controller is ready
-          _scrollController.position.pixels < _scrollController.position.maxScrollExtent * 0.8) { // Only if user isn't near bottom
+          _scrollController.position.pixels <
+              _scrollController.position.maxScrollExtent * 0.8) {
+        // Only if user isn't near bottom
         context.read<LeaderboardBloc>().add(const RefreshLeaderboard());
       }
     });
@@ -113,14 +116,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   /// Listen for scroll events like a hawk watching for mice
   void _onScroll() {
     final currentState = context.read<LeaderboardBloc>().state;
-    
+
     // Prevent multiple load requests and don't load on error states
-    if (currentState is LeaderboardLoadingMore || 
+    if (currentState is LeaderboardLoadingMore ||
         currentState is LeaderboardLoading ||
         currentState is LeaderboardError) {
       return;
     }
-    
+
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       // Only load more if we have more data available
@@ -133,75 +136,79 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: SafeArea(
-          child: Stack(
-            children: [
-              // Main content
-              Column(
-                children: [
-                  // Header with search and controls
-                  _buildHeader(),
-                  
-                  // Main leaderboard content
-                  Expanded(
-                    child: BlocConsumer<LeaderboardBloc, LeaderboardState>(
-                      listener: _handleStateChanges,
-                      builder: (context, state) {
-                        return RefreshIndicator(
-                          onRefresh: () async {
-                            context.read<LeaderboardBloc>().add(const RefreshLeaderboard());
-                            _refreshAnimationController.forward().then((_) {
-                              _refreshAnimationController.reset();
-                            });
-                          },
-                          child: _buildContent(state),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Floating live rucking indicator - positioned over nav bar
-              Positioned(
-                bottom: 60, // Much closer to nav bar
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Main content
+            Column(
+              children: [
+                // Header with search and controls
+                _buildHeader(),
+
+                // Main leaderboard content
+                Expanded(
+                  child: BlocConsumer<LeaderboardBloc, LeaderboardState>(
+                    listener: _handleStateChanges,
                     builder: (context, state) {
-                      int activeCount = 0;
-                      if (state is LeaderboardLoaded) {
-                        // Use backend-provided activeRuckersCount
-                        activeCount = state.activeRuckersCount;
-                      }
-                      return activeCount > 0 
-                        ? Transform.scale(
-                            scale: 1.5, // Make it 50% bigger
-                            child: LiveRuckingIndicator(activeRuckersCount: activeCount),
-                          )
-                        : const SizedBox.shrink(); // Hide when no active ruckers
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          context
+                              .read<LeaderboardBloc>()
+                              .add(const RefreshLeaderboard());
+                          _refreshAnimationController.forward().then((_) {
+                            _refreshAnimationController.reset();
+                          });
+                        },
+                        child: _buildContent(state),
+                      );
                     },
                   ),
                 ),
-              ),
-              
-              // Explosion animation overlay
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _explosionAnimationController,
-                  builder: (context, child) {
-                    if (_explosionAnimationController.value == 0) {
-                      return const SizedBox.shrink();
+              ],
+            ),
+
+            // Floating live rucking indicator - positioned over nav bar
+            Positioned(
+              bottom: 60, // Much closer to nav bar
+              left: 0,
+              right: 0,
+              child: Center(
+                child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
+                  builder: (context, state) {
+                    int activeCount = 0;
+                    if (state is LeaderboardLoaded) {
+                      // Use backend-provided activeRuckersCount
+                      activeCount = state.activeRuckersCount;
                     }
-                    return _buildExplosionAnimation();
+                    return activeCount > 0
+                        ? Transform.scale(
+                            scale: 1.5, // Make it 50% bigger
+                            child: LiveRuckingIndicator(
+                                activeRuckersCount: activeCount),
+                          )
+                        : const SizedBox
+                            .shrink(); // Hide when no active ruckers
                   },
                 ),
               ),
-            ],
-          ),
+            ),
+
+            // Explosion animation overlay
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _explosionAnimationController,
+                builder: (context, child) {
+                  if (_explosionAnimationController.value == 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildExplosionAnimation();
+                },
+              ),
+            ),
+          ],
         ),
+      ),
     );
   }
 
@@ -232,9 +239,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 child: Text(
                   'RUCK LEADERBOARD',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
                 ),
               ),
               // Manual scroll to user button
@@ -246,17 +253,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   } else if (state is LeaderboardUpdating) {
                     users = state.users;
                   }
-                  
-                  final hasCurrentUser = users.any((user) => user.isCurrentUser);
-                  
-                  return hasCurrentUser ? IconButton(
-                    onPressed: () => _scrollToCurrentUser(users),
-                    icon: const Icon(Icons.my_location),
-                    tooltip: 'Find My Position',
-                    style: IconButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                    ),
-                  ) : const SizedBox.shrink();
+
+                  final hasCurrentUser =
+                      users.any((user) => user.isCurrentUser);
+
+                  return hasCurrentUser
+                      ? IconButton(
+                          onPressed: () => _scrollToCurrentUser(users),
+                          icon: const Icon(Icons.my_location),
+                          tooltip: 'Find My Position',
+                          style: IconButton.styleFrom(
+                            backgroundColor:
+                                Theme.of(context).primaryColor.withOpacity(0.1),
+                          ),
+                        )
+                      : const SizedBox.shrink();
                 },
               ),
               // Search toggle button
@@ -267,23 +278,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     if (!_isSearching) {
                       _searchController.clear();
                       context.read<LeaderboardBloc>().add(
-                        const SearchLeaderboard(query: ''),
-                      );
+                            const SearchLeaderboard(query: ''),
+                          );
                     }
                   });
                 },
                 icon: Icon(_isSearching ? Icons.close : Icons.search),
                 style: IconButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                  backgroundColor:
+                      Theme.of(context).primaryColor.withOpacity(0.1),
                 ),
               ),
             ],
           ),
-          
+
           // Time period filter chips
           const SizedBox(height: 16),
           _buildTimePeriodFilters(),
-          
+
           // Search bar (if searching)
           if (_isSearching) ...[
             const SizedBox(height: 12),
@@ -305,8 +317,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 Future.delayed(const Duration(milliseconds: 500), () {
                   if (_searchController.text == query) {
                     context.read<LeaderboardBloc>().add(
-                      SearchLeaderboard(query: query),
-                    );
+                          SearchLeaderboard(query: query),
+                        );
                   }
                 });
               },
@@ -323,13 +335,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       return _buildLoadingState();
     } else if (state is LeaderboardError) {
       return _buildErrorState(state);
-    } else if (state is LeaderboardLoaded || 
-               state is LeaderboardLoadingMore || 
-               state is LeaderboardRefreshing ||
-               state is LeaderboardUpdating) {
+    } else if (state is LeaderboardLoaded ||
+        state is LeaderboardLoadingMore ||
+        state is LeaderboardRefreshing ||
+        state is LeaderboardUpdating) {
       return _buildLoadedState(state);
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -355,8 +367,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             Text(
               'Aw Shucks!',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -407,14 +419,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         children: [
           // FIXED LEFT TABLE - Header + Rank + User columns
           SizedBox(
-            width: 212, // 180px content (40px rank + 140px user) + 32px horizontal padding
+            width:
+                212, // 180px content (40px rank + 140px user) + 32px horizontal padding
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Fixed header
                 Container(
                   height: 56, // Increased header height
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     border: Border(
@@ -428,13 +442,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     children: [
                       const SizedBox(
                         width: 40,
-                        child: Text('#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        child: Text('#',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       const SizedBox(
-                        width: 140, // Fixed 140px for rucker column (-20px smaller)
+                        width:
+                            140, // Fixed 140px for rucker column (-20px smaller)
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('RUCKER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          child: Text('RUCKER',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ),
                     ],
@@ -445,18 +464,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   final index = entry.key;
                   final user = entry.value;
                   final rank = index + 1;
-                  
+
                   return Container(
                     height: 80, // Increased 1px more
                     margin: const EdgeInsets.symmetric(vertical: 2),
                     decoration: BoxDecoration(
-                      color: _getRowColor(context, user, rank, isUpdating && user.isCurrentlyRucking),
+                      color: _getRowColor(context, user, rank,
+                          isUpdating && user.isCurrentlyRucking),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(8),
                         bottomLeft: Radius.circular(8),
                       ),
-                      border: user.isCurrentUser 
-                          ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                      border: user.isCurrentUser
+                          ? Border.all(
+                              color: Theme.of(context).primaryColor, width: 2)
                           : null,
                     ),
                     child: Material(
@@ -480,7 +501,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     ),
                   );
                 }).toList(),
-                
+
                 // Loading indicator
                 if (isLoadingMore)
                   Container(
@@ -490,36 +511,41 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               ],
             ),
           ),
-          
+
           // SCROLLABLE RIGHT TABLE - Header + Stats columns
           Expanded(
             child: SingleChildScrollView(
               controller: _horizontalScrollController,
               scrollDirection: Axis.horizontal,
               child: SizedBox(
-                width: 532, // Updated: 500px columns (80+100+100+100+120) + 32px padding
+                width:
+                    532, // Updated: 500px columns (80+100+100+100+120) + 32px padding
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Scrollable header
                     Container(
                       height: 56, // Match left header height
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: Theme.of(context).scaffoldBackgroundColor,
                         border: Border(
                           bottom: BorderSide(
-                            color: Theme.of(context).dividerColor.withOpacity(0.3),
+                            color:
+                                Theme.of(context).dividerColor.withOpacity(0.3),
                             width: 1,
                           ),
                         ),
                       ),
                       child: Row(
                         children: [
-                          _buildPowerPointsHeader(120), // Moved to first position
+                          _buildPowerPointsHeader(
+                              120), // Moved to first position
                           _buildHeaderColumn('RUCKS', 'totalRucks', 80),
                           _buildHeaderColumn('DISTANCE', 'distanceKm', 100),
-                          _buildHeaderColumn('ELEVATION', 'elevationGainMeters', 100),
+                          _buildHeaderColumn(
+                              'ELEVATION', 'elevationGainMeters', 100),
                           _buildHeaderColumn('CALORIES', 'caloriesBurned', 100),
                         ],
                       ),
@@ -528,40 +554,58 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     ...users.asMap().entries.map((entry) {
                       final index = entry.key;
                       final user = entry.value;
-                      
+
                       return Container(
                         height: 80, // Match left row height
                         margin: const EdgeInsets.symmetric(vertical: 2),
                         decoration: BoxDecoration(
-                          color: _getRowColor(context, user, index + 1, isUpdating && user.isCurrentlyRucking),
+                          color: _getRowColor(context, user, index + 1,
+                              isUpdating && user.isCurrentlyRucking),
                           borderRadius: const BorderRadius.only(
                             topRight: Radius.circular(8),
                             bottomRight: Radius.circular(8),
                           ),
-                          border: user.isCurrentUser 
-                              ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                          border: user.isCurrentUser
+                              ? Border.all(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2)
                               : null,
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Row(
                             children: [
-                              _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 120, isPowerPoints: true), // Moved to first position
-                              _buildStatColumn(user.stats.totalRucks.toString(), width: 80),
-                              _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
-                              _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
-                              _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
+                              _buildStatColumn(
+                                  _formatPowerPoints(user.stats.powerPoints),
+                                  width: 120,
+                                  isPowerPoints:
+                                      true), // Moved to first position
+                              _buildStatColumn(user.stats.totalRucks.toString(),
+                                  width: 80),
+                              _buildStatColumn(
+                                  _formatDistance(user.stats.distanceKm),
+                                  width: 100),
+                              _buildStatColumn(
+                                  _formatElevation(
+                                      user.stats.elevationGainMeters),
+                                  width: 100),
+                              _buildStatColumn(
+                                  _formatCalories(
+                                      user.stats.caloriesBurned.round()),
+                                  width: 100),
                             ],
                           ),
                         ),
                       );
                     }).toList(),
-                    
+
                     // Loading indicator
                     if (isLoadingMore)
                       Container(
                         height: 80, // Match row height
-                        child: const Center(child: Text('Loading...', style: TextStyle(fontSize: 12))),
+                        child: const Center(
+                            child: Text('Loading...',
+                                style: TextStyle(fontSize: 12))),
                       ),
                   ],
                 ),
@@ -586,8 +630,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             Text(
               'No Ruckers Found',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -603,17 +647,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   /// Handle sorting like organizing a barn
   void _sort(String sortBy, bool ascending) {
     // Dispatch event to BLoC to handle sorting
-    context.read<LeaderboardBloc>().add(SortLeaderboard(sortBy: sortBy, ascending: ascending));
+    context
+        .read<LeaderboardBloc>()
+        .add(SortLeaderboard(sortBy: sortBy, ascending: ascending));
   }
 
   /// Build sortable header column
   Widget _buildHeaderColumn(String title, String sortBy, double width) {
     final isCurrentSort = _currentSortBy == sortBy;
-    final color = isCurrentSort 
-      ? Theme.of(context).primaryColor 
-      : Theme.of(context).brightness == Brightness.dark
-          ? Colors.grey.shade300
-          : Colors.grey.shade600;
+    final color = isCurrentSort
+        ? Theme.of(context).primaryColor
+        : Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey.shade300
+            : Colors.grey.shade600;
 
     return SizedBox(
       width: width,
@@ -658,9 +704,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   /// Build power points header with special styling
   Widget _buildPowerPointsHeader(double width) {
     final isCurrentSort = _currentSortBy == 'powerPoints';
-    final color = isCurrentSort 
-        ? Colors.amber.shade700 
-        : Colors.amber.shade700;
+    final color = isCurrentSort ? Colors.amber.shade700 : Colors.amber.shade700;
 
     return SizedBox(
       width: width,
@@ -683,7 +727,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             // PP text - tappable for sorting
             GestureDetector(
               onTap: () {
-                // Sort by power points 
+                // Sort by power points
                 final newAscending = isCurrentSort ? !_currentAscending : false;
                 _sort('powerPoints', newAscending);
               },
@@ -727,7 +771,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildExplosionAnimation() {
     final animation = _explosionAnimationController;
     final screenSize = MediaQuery.of(context).size;
-    
+
     return IgnorePointer(
       child: Container(
         color: Colors.transparent,
@@ -735,9 +779,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           children: List.generate(20, (index) {
             final angle = (index / 20) * 2 * 3.14159;
             final distance = animation.value * 200;
-            final x = screenSize.width / 2 + distance * (index % 2 == 0 ? 1 : -1) * 0.5;
-            final y = screenSize.height / 2 + distance * (index % 3 == 0 ? 1 : -1) * 0.5;
-            
+            final x = screenSize.width / 2 +
+                distance * (index % 2 == 0 ? 1 : -1) * 0.5;
+            final y = screenSize.height / 2 +
+                distance * (index % 3 == 0 ? 1 : -1) * 0.5;
+
             return Positioned(
               left: x,
               top: y,
@@ -749,7 +795,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: [Colors.orange, Colors.red, Colors.yellow, Colors.blue][index % 4],
+                      color: [
+                        Colors.orange,
+                        Colors.red,
+                        Colors.yellow,
+                        Colors.blue
+                      ][index % 4],
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -788,8 +839,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               label: Text(
                 period['label']!,
                 style: TextStyle(
-                  color: isSelected 
-                      ? Theme.of(context).primaryColor 
+                  color: isSelected
+                      ? Theme.of(context).primaryColor
                       : Theme.of(context).textTheme.bodyMedium?.color,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
@@ -801,8 +852,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     _currentTimePeriod = period['key']!;
                   });
                   context.read<LeaderboardBloc>().add(
-                    FilterLeaderboardByTimePeriod(timePeriod: period['key']!),
-                  );
+                        FilterLeaderboardByTimePeriod(
+                            timePeriod: period['key']!),
+                      );
                 }
               },
               selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
@@ -821,19 +873,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       _currentSortBy = state.sortBy;
       _currentAscending = state.ascending;
       _currentTimePeriod = state.timePeriod;
-      
+
       // Auto-scroll to current user position
       _scrollToCurrentUser(state.users);
     } else if (state is LeaderboardUpdating) {
       // Also scroll on updates in case user position changed
       _scrollToCurrentUser(state.users);
-      
+
       // Show subtle update animation
       _updateAnimationController.forward().then((_) {
         _updateAnimationController.reset();
       });
     }
-    
+
     if (state is LeaderboardError) {
       StyledSnackBar.show(
         context: context,
@@ -851,35 +903,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       print('[LEADERBOARD] Current user not found in leaderboard');
       return; // Current user not found
     }
-    
+
     print('[LEADERBOARD] Found current user at index $currentUserIndex');
-    
+
     // Use a longer delay to ensure layout is complete
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted || !_scrollController.hasClients) {
         print('[LEADERBOARD] Scroll controller not ready or widget disposed');
         return;
       }
-      
-      // Calculate scroll position 
+
+      // Calculate scroll position
       // Each row is 80px + 4px margin (2px top + 2px bottom) = 84px total
       const rowHeight = 84.0;
-      
+
       // Target position: center the current user's row in the viewport
-      final targetPosition = (currentUserIndex * rowHeight) - (MediaQuery.of(context).size.height * 0.3);
-      
+      final targetPosition = (currentUserIndex * rowHeight) -
+          (MediaQuery.of(context).size.height * 0.3);
+
       // Ensure we don't scroll past bounds
       final maxScrollExtent = _scrollController.position.maxScrollExtent;
       final clampedPosition = targetPosition.clamp(0.0, maxScrollExtent);
-      
-      print('[LEADERBOARD] Scrolling to position: $clampedPosition (target: $targetPosition, max: $maxScrollExtent)');
-      
+
+      print(
+          '[LEADERBOARD] Scrolling to position: $clampedPosition (target: $targetPosition, max: $maxScrollExtent)');
+
       // Animate to position
-      _scrollController.animateTo(
+      _scrollController
+          .animateTo(
         clampedPosition,
         duration: const Duration(milliseconds: 1000),
         curve: Curves.easeInOut,
-      ).then((_) {
+      )
+          .then((_) {
         print('[LEADERBOARD] Scroll animation completed');
       }).catchError((error) {
         print('[LEADERBOARD] Scroll animation failed: $error');
@@ -892,7 +948,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return SizedBox(
       width: 40,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center, // Center vertically in the row
+        mainAxisAlignment:
+            MainAxisAlignment.center, // Center vertically in the row
         children: [
           if (rank <= 3)
             Text(
@@ -917,7 +974,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildUserColumn(BuildContext context, LeaderboardUserModel user) {
     return SizedBox(
       width: 140, // Fixed 140px for rucker column (-20px smaller)
-      child: ClipRect( // Clip any overflow
+      child: ClipRect(
+        // Clip any overflow
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
@@ -937,7 +995,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Image.asset(
-                                  user.gender == 'female' 
+                                  user.gender == 'female'
                                       ? 'assets/images/lady rucker profile.png'
                                       : 'assets/images/profile.png',
                                   fit: BoxFit.cover,
@@ -945,7 +1003,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                               },
                             )
                           : Image.asset(
-                              user.gender == 'female' 
+                              user.gender == 'female'
                                   ? 'assets/images/lady rucker profile.png'
                                   : 'assets/images/profile.png',
                               fit: BoxFit.cover,
@@ -995,9 +1053,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                           style: TextStyle(
                             fontFamily: 'Bangers',
                             fontSize: 10,
-                            color: Theme.of(context).brightness == Brightness.dark 
-                                ? Colors.lightGreen.shade300 
-                                : Colors.green.shade700,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.lightGreen.shade300
+                                    : Colors.green.shade700,
                             height: 0.8, // Reduce line height to save space
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -1015,7 +1074,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   /// Build stat column
-  Widget _buildStatColumn(String value, {required double width, bool isPowerPoints = false}) {
+  Widget _buildStatColumn(String value,
+      {required double width, bool isPowerPoints = false}) {
     return SizedBox(
       width: width,
       child: Text(
@@ -1090,19 +1150,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   /// Get row background color
-  Color _getRowColor(BuildContext context, LeaderboardUserModel user, int rank, bool isUpdating) {
+  Color _getRowColor(BuildContext context, LeaderboardUserModel user, int rank,
+      bool isUpdating) {
     if (user.isCurrentlyRucking) {
       // HIGHEST PRIORITY: Always highlight currently rucking users with prominent green
-      return isUpdating 
-        ? Colors.green.withOpacity(0.35) // Very strong green during updates
-        : Colors.green.withOpacity(0.25); // Much more visible green always
+      return isUpdating
+          ? Colors.green.withOpacity(0.35) // Very strong green during updates
+          : Colors.green.withOpacity(0.25); // Much more visible green always
     } else if (user.isCurrentUser) {
       return Theme.of(context).primaryColor.withOpacity(0.05);
     } else if (rank <= 3) {
       final medalColor = _getMedalColor(rank);
-      return medalColor != null ? medalColor.withOpacity(0.05) : Theme.of(context).cardColor;
+      return medalColor != null
+          ? medalColor.withOpacity(0.05)
+          : Theme.of(context).cardColor;
     } else if (isUpdating) {
-      return Colors.blue.withOpacity(0.08); // Subtle blue highlight for general updates
+      return Colors.blue
+          .withOpacity(0.08); // Subtle blue highlight for general updates
     }
     return Theme.of(context).cardColor;
   }
@@ -1151,11 +1215,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     color: Colors.green,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).scaffoldBackgroundColor
-                          : Colors.white, 
-                      width: 2
-                    ),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).scaffoldBackgroundColor
+                            : Colors.white,
+                        width: 2),
                   ),
                 )
               : const SizedBox.shrink(),

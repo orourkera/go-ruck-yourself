@@ -6,22 +6,24 @@ class ClubsCacheService {
   static const String _clubsListKey = 'clubs_list_cache';
   static const String _clubDetailsPrefix = 'club_details_';
   static const String _timestampKey = 'clubs_cache_timestamp';
-  static const Duration _cacheDuration = Duration(minutes: 15); // Cache valid for 15 minutes
+  static const Duration _cacheDuration =
+      Duration(minutes: 15); // Cache valid for 15 minutes
 
   /// Saves clubs list to local storage
   Future<void> cacheClubsList(List<dynamic> clubs, {String? cacheKey}) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Use custom cache key if provided (for filtered results)
     final key = cacheKey ?? _clubsListKey;
-    
+
     final String jsonData = jsonEncode(clubs);
     await prefs.setString(key, jsonData);
     await prefs.setInt(_timestampKey, DateTime.now().millisecondsSinceEpoch);
   }
 
   /// Saves individual club details to local storage
-  Future<void> cacheClubDetails(String clubId, Map<String, dynamic> clubDetails) async {
+  Future<void> cacheClubDetails(
+      String clubId, Map<String, dynamic> clubDetails) async {
     final prefs = await SharedPreferences.getInstance();
     final String key = '$_clubDetailsPrefix$clubId';
     final String jsonData = jsonEncode(clubDetails);
@@ -31,22 +33,22 @@ class ClubsCacheService {
   /// Retrieves cached clubs list if it exists and is not expired
   Future<List<dynamic>?> getCachedClubsList({String? cacheKey}) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Use custom cache key if provided
     final key = cacheKey ?? _clubsListKey;
-    
+
     // Check if cache exists
     if (!prefs.containsKey(key)) return null;
-    
+
     // Check if cache is expired
     final timestamp = prefs.getInt(_timestampKey) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - timestamp > _cacheDuration.inMilliseconds) return null;
-    
+
     // Return cached data
     final String? jsonData = prefs.getString(key);
     if (jsonData == null) return null;
-    
+
     try {
       return jsonDecode(jsonData) as List<dynamic>;
     } catch (e) {
@@ -58,13 +60,13 @@ class ClubsCacheService {
   Future<Map<String, dynamic>?> getCachedClubDetails(String clubId) async {
     final prefs = await SharedPreferences.getInstance();
     final String key = '$_clubDetailsPrefix$clubId';
-    
+
     // Check if cache exists
     if (!prefs.containsKey(key)) return null;
-    
+
     final String? jsonData = prefs.getString(key);
     if (jsonData == null) return null;
-    
+
     try {
       return jsonDecode(jsonData) as Map<String, dynamic>;
     } catch (e) {
@@ -73,12 +75,13 @@ class ClubsCacheService {
   }
 
   /// Generates cache key for filtered club results
-  String _generateCacheKey({String? search, bool? isPublic, String? membershipFilter}) {
+  String _generateCacheKey(
+      {String? search, bool? isPublic, String? membershipFilter}) {
     final filters = <String>[];
     if (search != null && search.isNotEmpty) filters.add('search:$search');
     if (isPublic != null) filters.add('public:$isPublic');
     if (membershipFilter != null) filters.add('membership:$membershipFilter');
-    
+
     if (filters.isEmpty) return _clubsListKey;
     return '${_clubsListKey}_${filters.join('_')}';
   }
@@ -115,14 +118,16 @@ class ClubsCacheService {
   /// Invalidates cache when clubs are modified
   Future<void> invalidateCache() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Get all keys and remove clubs-related cache entries
-    final keys = prefs.getKeys().where((key) => 
-      key.startsWith(_clubsListKey) || 
-      key.startsWith(_clubDetailsPrefix) ||
-      key == _timestampKey
-    ).toList();
-    
+    final keys = prefs
+        .getKeys()
+        .where((key) =>
+            key.startsWith(_clubsListKey) ||
+            key.startsWith(_clubDetailsPrefix) ||
+            key == _timestampKey)
+        .toList();
+
     for (final key in keys) {
       await prefs.remove(key);
     }

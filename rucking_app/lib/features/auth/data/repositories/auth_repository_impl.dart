@@ -8,9 +8,9 @@ import 'dart:convert';
 /// Implementation of the AuthRepository interface
 class AuthRepositoryImpl implements AuthRepository {
   final AuthService _authService;
-  
+
   AuthRepositoryImpl(this._authService);
-  
+
   @override
   Future<User> login({required String email, required String password}) async {
     return await _authService.signIn(email, password);
@@ -20,12 +20,12 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<User> googleLogin() async {
     return await _authService.googleSignIn();
   }
-  
+
   @override
   Future<User> appleLogin() async {
     return await _authService.appleSignIn();
   }
-  
+
   @override
   Future<User> googleRegister({
     required String email,
@@ -48,7 +48,7 @@ class AuthRepositoryImpl implements AuthRepository {
       gender: gender,
     );
   }
-  
+
   @override
   Future<User> register({
     required String username, // This is the display name
@@ -71,22 +71,22 @@ class AuthRepositoryImpl implements AuthRepository {
       gender: gender,
     );
   }
-  
+
   @override
   Future<void> logout() async {
     await _authService.signOut();
   }
-  
+
   @override
   Future<bool> isAuthenticated() async {
     return await _authService.isAuthenticated();
   }
-  
+
   @override
   Future<User?> getCurrentUser() async {
     return await _authService.getCurrentUser();
   }
-  
+
   @override
   Future<User> updateProfile({
     String? username,
@@ -141,23 +141,27 @@ class AuthRepositoryImpl implements AuthRepository {
       return newToken;
     } catch (e) {
       // Utilize ErrorHandler to get a user-friendly error message
-      final userFriendlyMessage = ErrorHandler.getUserFriendlyMessage(e, 'Token Refresh');
+      final userFriendlyMessage =
+          ErrorHandler.getUserFriendlyMessage(e, 'Token Refresh');
       // If the error is related to authentication, trigger logout to clear invalid tokens
-      if (e.toString().contains('Unauthorized') || e.toString().contains('401')) {
+      if (e.toString().contains('Unauthorized') ||
+          e.toString().contains('401')) {
         await _authService.signOut();
         // Log a message indicating manual login is required due to persistent auth issues
-        print('[AUTH] Persistent authentication failure. Manual login required.');
-        print('[AUTH] The refresh token is invalid. Please log in again to obtain a new token.');
+        print(
+            '[AUTH] Persistent authentication failure. Manual login required.');
+        print(
+            '[AUTH] The refresh token is invalid. Please log in again to obtain a new token.');
       }
       throw Exception('Failed to refresh token: $userFriendlyMessage');
     }
   }
-  
+
   @override
   Future<void> requestPasswordReset({required String email}) async {
     await _authService.requestPasswordReset(email: email);
   }
-  
+
   @override
   Future<void> confirmPasswordReset({
     required String token,

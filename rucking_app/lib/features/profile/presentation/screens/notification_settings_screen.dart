@@ -10,10 +10,12 @@ class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState();
+  State<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState
+    extends State<NotificationSettingsScreen> {
   // Local state for notification preferences (will sync with user model)
   bool _clubsEnabled = true;
   bool _buddiesEnabled = true;
@@ -47,7 +49,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }) {
     // Update auth bloc with new notification preferences
     Map<String, bool> updates = {};
-    
+
     switch (type) {
       case 'clubs':
         updates['clubs'] = enabled;
@@ -67,8 +69,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     }
 
     context.read<AuthBloc>().add(
-      AuthUpdateNotificationPreferences(updates),
-    );
+          AuthUpdateNotificationPreferences(updates),
+        );
 
     // Show confirmation
     StyledSnackBar.show(
@@ -167,7 +169,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                           'Notification Preferences',
                           style: AppTextStyles.titleMedium.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                            color: isDark
+                                ? const Color(0xFF728C69)
+                                : AppColors.textDark,
                           ),
                         ),
                       ],
@@ -176,13 +180,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     Text(
                       'Choose which types of notifications you want to receive. You can change these settings at any time.',
                       style: AppTextStyles.bodyMedium.copyWith(
-                        color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                        color: isDark
+                            ? const Color(0xFF728C69).withOpacity(0.8)
+                            : AppColors.textDarkSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 24),
 
               // Notification settings
@@ -204,11 +210,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     _buildNotificationToggle(
                       icon: Icons.groups,
                       title: 'Club Notifications',
-                      subtitle: 'Membership updates, club events, and discussions',
+                      subtitle:
+                          'Membership updates, club events, and discussions',
                       value: _clubsEnabled,
                       onChanged: (value) {
                         setState(() => _clubsEnabled = value);
-                        _updateNotificationSetting(type: 'clubs', enabled: value);
+                        _updateNotificationSetting(
+                            type: 'clubs', enabled: value);
                       },
                       ladyModeColor: ladyModeColor,
                       isDark: isDark,
@@ -221,7 +229,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       value: _buddiesEnabled,
                       onChanged: (value) {
                         setState(() => _buddiesEnabled = value);
-                        _updateNotificationSetting(type: 'buddies', enabled: value);
+                        _updateNotificationSetting(
+                            type: 'buddies', enabled: value);
                       },
                       ladyModeColor: ladyModeColor,
                       isDark: isDark,
@@ -234,7 +243,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       value: _eventsEnabled,
                       onChanged: (value) {
                         setState(() => _eventsEnabled = value);
-                        _updateNotificationSetting(type: 'events', enabled: value);
+                        _updateNotificationSetting(
+                            type: 'events', enabled: value);
                       },
                       ladyModeColor: ladyModeColor,
                       isDark: isDark,
@@ -243,11 +253,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     _buildNotificationToggle(
                       icon: Icons.emoji_events,
                       title: 'Duel Notifications',
-                      subtitle: 'Duel invitations, progress updates, and completion',
+                      subtitle:
+                          'Duel invitations, progress updates, and completion',
                       value: _duelsEnabled,
                       onChanged: (value) {
                         setState(() => _duelsEnabled = value);
-                        _updateNotificationSetting(type: 'duels', enabled: value);
+                        _updateNotificationSetting(
+                            type: 'duels', enabled: value);
                       },
                       ladyModeColor: ladyModeColor,
                       isDark: isDark,
@@ -256,11 +268,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     _buildNotificationToggle(
                       icon: Icons.celebration,
                       title: 'First Ruck Notifications',
-                      subtitle: 'Celebrate when community members complete their first ruck',
+                      subtitle:
+                          'Celebrate when community members complete their first ruck',
                       value: _firstRuckEnabled,
                       onChanged: (value) {
                         setState(() => _firstRuckEnabled = value);
-                        _updateNotificationSetting(type: 'first_ruck', enabled: value);
+                        _updateNotificationSetting(
+                            type: 'first_ruck', enabled: value);
                       },
                       ladyModeColor: ladyModeColor,
                       isDark: isDark,
@@ -276,7 +290,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800]?.withOpacity(0.3) : Colors.grey[100],
+                  color: isDark
+                      ? Colors.grey[800]?.withOpacity(0.3)
+                      : Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -284,7 +300,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   children: [
                     Icon(
                       Icons.info_outline,
-                      color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                      color: isDark
+                          ? const Color(0xFF728C69).withOpacity(0.8)
+                          : AppColors.textDarkSecondary,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -292,7 +310,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       child: Text(
                         'Push notifications will still be delivered to your device, but these settings control which types you receive. You can also manage notification permissions in your device settings.',
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                          color: isDark
+                              ? const Color(0xFF728C69).withOpacity(0.8)
+                              : AppColors.textDarkSecondary,
                         ),
                       ),
                     ),
@@ -333,14 +353,17 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   title,
                   style: AppTextStyles.bodyLarge.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                    color:
+                        isDark ? const Color(0xFF728C69) : AppColors.textDark,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                    color: isDark
+                        ? const Color(0xFF728C69).withOpacity(0.8)
+                        : AppColors.textDarkSecondary,
                   ),
                 ),
               ],

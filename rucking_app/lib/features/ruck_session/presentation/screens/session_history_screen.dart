@@ -26,31 +26,32 @@ class SessionHistoryScreen extends StatefulWidget {
   State<SessionHistoryScreen> createState() => _SessionHistoryScreenState();
 }
 
-class _SessionHistoryScreenState extends State<SessionHistoryScreen> with SingleTickerProviderStateMixin {
+class _SessionHistoryScreenState extends State<SessionHistoryScreen>
+    with SingleTickerProviderStateMixin {
   final _refreshKey = GlobalKey<RefreshIndicatorState>();
   late TabController _tabController;
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _loadSessions();
   }
-  
+
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadSessions() async {
     // Get the session history bloc and request sessions
     final historyBloc = context.read<SessionHistoryBloc>();
-    
+
     // Trigger fresh load
     historyBloc.add(const LoadSessionHistory());
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,40 +90,47 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       ),
     );
   }
-  
+
   Widget _buildHistoryTab() {
     // Get user preferences for metric/imperial
     final authState = context.read<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    
+    final bool preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+
     return RefreshIndicator(
       key: _refreshKey,
       onRefresh: _loadSessions,
       child: BlocBuilder<SessionHistoryBloc, SessionHistoryState>(
         builder: (context, state) {
-          AppLogger.info('[SESSION_HISTORY_SCREEN] Building UI with state: ${state.runtimeType}');
-          
+          AppLogger.info(
+              '[SESSION_HISTORY_SCREEN] Building UI with state: ${state.runtimeType}');
+
           if (state is SessionHistoryLoading) {
             AppLogger.info('[SESSION_HISTORY_SCREEN] Showing loading skeleton');
             return SingleChildScrollView(
               child: Column(
-                children: List.generate(5, (index) => const SessionCardSkeleton()),
+                children:
+                    List.generate(5, (index) => const SessionCardSkeleton()),
               ),
             );
           } else if (state is SessionHistoryLoaded) {
             final sessions = state.sessions;
-            AppLogger.info('[SESSION_HISTORY_SCREEN] Loaded state with ${sessions.length} sessions');
-            
+            AppLogger.info(
+                '[SESSION_HISTORY_SCREEN] Loaded state with ${sessions.length} sessions');
+
             if (sessions.isEmpty) {
-              AppLogger.info('[SESSION_HISTORY_SCREEN] No sessions found, showing empty state');
+              AppLogger.info(
+                  '[SESSION_HISTORY_SCREEN] No sessions found, showing empty state');
               return _buildEmptyState();
             }
-            
-            AppLogger.info('[SESSION_HISTORY_SCREEN] Building ListView with ${sessions.length} sessions');
+
+            AppLogger.info(
+                '[SESSION_HISTORY_SCREEN] Building ListView with ${sessions.length} sessions');
             for (int i = 0; i < sessions.length; i++) {
-              AppLogger.debug('[SESSION_HISTORY_SCREEN] Session $i: id=${sessions[i].id}, status=${sessions[i].status}');
+              AppLogger.debug(
+                  '[SESSION_HISTORY_SCREEN] Session $i: id=${sessions[i].id}, status=${sessions[i].status}');
             }
-            
+
             return ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: sessions.length + (state.hasMoreData ? 1 : 0),
@@ -143,8 +151,8 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
                         child: ElevatedButton(
                           onPressed: () {
                             context.read<SessionHistoryBloc>().add(
-                              const LoadSessionHistory(loadMore: true),
-                            );
+                                  const LoadSessionHistory(loadMore: true),
+                                );
                           },
                           child: const Text('Load More Sessions'),
                         ),
@@ -152,9 +160,10 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
                     );
                   }
                 }
-                
+
                 final session = sessions[index];
-                AppLogger.debug('[SESSION_HISTORY_SCREEN] Building SessionCard for session ${session.id}');
+                AppLogger.debug(
+                    '[SESSION_HISTORY_SCREEN] Building SessionCard for session ${session.id}');
                 return SessionCard(
                   session: session,
                   preferMetric: preferMetric,
@@ -163,10 +172,12 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
               },
             );
           } else if (state is SessionHistoryError) {
-            AppLogger.error('[SESSION_HISTORY_SCREEN] Error state: ${state.message}');
+            AppLogger.error(
+                '[SESSION_HISTORY_SCREEN] Error state: ${state.message}');
             return _buildErrorState(state.message);
           } else {
-            AppLogger.warning('[SESSION_HISTORY_SCREEN] Unknown state: ${state.runtimeType}');
+            AppLogger.warning(
+                '[SESSION_HISTORY_SCREEN] Unknown state: ${state.runtimeType}');
             return const Center(
               child: Text('No session data available. Pull down to refresh.'),
             );
@@ -175,7 +186,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       ),
     );
   }
-  
+
   Future<void> _navigateToSessionDetail(RuckSession session) async {
     AppLogger.info('Navigating to session detail for session ${session.id}');
     showDialog(
@@ -197,11 +208,13 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       final fullSession = await repo.fetchSessionById(session.id!);
       Navigator.of(context).pop(); // Remove loading dialog
       if (fullSession != null) {
-        Navigator.of(context).push<bool>(
+        Navigator.of(context)
+            .push<bool>(
           MaterialPageRoute(
             builder: (context) => SessionDetailScreen(session: fullSession),
           ),
-        ).then((refreshNeeded) {
+        )
+            .then((refreshNeeded) {
           // If returned with true (session deleted), refresh the data
           if (refreshNeeded == true) {
             context.read<SessionHistoryBloc>().add(const LoadSessionHistory());
@@ -223,7 +236,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       );
     }
   }
-  
+
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
@@ -248,7 +261,8 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
               onPressed: () {
                 // Navigate to the screen where users create a new session
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const CreateSessionScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const CreateSessionScreen()),
                 );
               },
               icon: const Icon(Icons.add),
@@ -259,14 +273,12 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> with Single
       ),
     );
   }
-  
+
   Widget _buildErrorState(String message) {
     // Translate the error message to a user-friendly one
-    final userFriendlyMessage = ErrorHandler.getUserFriendlyMessage(
-      message, 
-      'Session History'
-    );
-    
+    final userFriendlyMessage =
+        ErrorHandler.getUserFriendlyMessage(message, 'Session History');
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),

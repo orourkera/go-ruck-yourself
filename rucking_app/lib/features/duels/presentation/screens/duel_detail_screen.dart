@@ -29,7 +29,6 @@ class DuelDetailScreen extends StatefulWidget {
 }
 
 class _DuelDetailScreenState extends State<DuelDetailScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -70,14 +69,14 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                     switch (value) {
                       case 'refresh':
                         context.read<DuelDetailBloc>().add(
-                          RefreshDuelDetail(duelId: widget.duelId),
-                        );
+                              RefreshDuelDetail(duelId: widget.duelId),
+                            );
                         break;
                       case 'withdraw':
                         HapticFeedback.vibrate();
                         context.read<DuelDetailBloc>().add(
-                          WithdrawFromDuel(duelId: widget.duelId),
-                        );
+                              WithdrawFromDuel(duelId: widget.duelId),
+                            );
                         break;
                       case 'delete':
                         _showDeleteConfirmationDialog(context, state.duel);
@@ -107,7 +106,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                             children: [
                               Icon(Icons.exit_to_app, color: Colors.red),
                               SizedBox(width: 8),
-                              Text('Withdraw', style: TextStyle(color: Colors.red)),
+                              Text('Withdraw',
+                                  style: TextStyle(color: Colors.red)),
                             ],
                           ),
                         ),
@@ -123,7 +123,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                             children: [
                               Icon(Icons.delete, color: Colors.red),
                               SizedBox(width: 8),
-                              Text('Delete Duel', style: TextStyle(color: Colors.red)),
+                              Text('Delete Duel',
+                                  style: TextStyle(color: Colors.red)),
                             ],
                           ),
                         ),
@@ -137,8 +138,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
               return IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: () => context.read<DuelDetailBloc>().add(
-                  RefreshDuelDetail(duelId: widget.duelId),
-                ),
+                      RefreshDuelDetail(duelId: widget.duelId),
+                    ),
               );
             },
           ),
@@ -232,8 +233,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.read<DuelDetailBloc>().add(
-                      LoadDuelDetail(duelId: widget.duelId),
-                    ),
+                          LoadDuelDetail(duelId: widget.duelId),
+                        ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -242,7 +243,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
           } else if (state is DuelDetailLoaded) {
             return _buildDuelDetailContent(state);
           }
-          
+
           return const SizedBox.shrink();
         },
       ),
@@ -252,20 +253,20 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
   Widget _buildDuelDetailContent(DuelDetailLoaded state) {
     final duel = state.duel;
     final participants = state.participants;
-    
+
     // Sort participants by achievement percentage
     final sortedParticipants = List<DuelParticipant>.from(participants)
       ..sort((a, b) {
         final aProgress = (a.currentValue / duel.targetValue).clamp(0.0, 1.0);
         final bProgress = (b.currentValue / duel.targetValue).clamp(0.0, 1.0);
-        
+
         if (aProgress == bProgress) {
           return b.currentValue.compareTo(a.currentValue);
         }
-        
+
         return bProgress.compareTo(aProgress);
       });
-    
+
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -275,24 +276,24 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
             participants: participants,
             currentUserId: _getCurrentUserId() ?? '',
             showJoinButton: _canUserJoin(duel),
-            onJoin: _canUserJoin(duel) 
+            onJoin: _canUserJoin(duel)
                 ? () {
                     HapticFeedback.vibrate();
                     context.read<DuelDetailBloc>().add(
-                      JoinDuelFromDetail(duelId: widget.duelId),
-                    );
+                          JoinDuelFromDetail(duelId: widget.duelId),
+                        );
                   }
                 : null,
             showStartButton: _canUserStartDuel(duel),
             onStartDuel: _canUserStartDuel(duel)
                 ? () => context.read<DuelDetailBloc>().add(
-                    StartDuelManually(duelId: widget.duelId),
-                  )
+                      StartDuelManually(duelId: widget.duelId),
+                    )
                 : null,
             isJoining: state is DuelJoiningFromDetail,
             isStarting: state is DuelStartingManually,
           ),
-          
+
           // Leaderboard Section Header
           Container(
             width: double.infinity,
@@ -301,19 +302,20 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
             child: Text(
               'Leaderboard',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
           ),
-          
+
           // Leaderboard List
           ...sortedParticipants.asMap().entries.map((entry) {
             final index = entry.key;
             final participant = entry.value;
-            final progress = (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
+            final progress =
+                (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
             final isCompleted = progress >= 1.0;
             final isWinner = participant.id == duel.winnerId;
-            
+
             return Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 16,
@@ -323,7 +325,9 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                 elevation: isWinner ? 4 : 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: isWinner ? BorderSide(color: Colors.amber, width: 2) : BorderSide.none,
+                  side: isWinner
+                      ? BorderSide(color: Colors.amber, width: 2)
+                      : BorderSide.none,
                 ),
                 child: Container(
                   decoration: isWinner
@@ -345,7 +349,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                       children: [
                         CircleAvatar(
                           radius: 24,
-                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primary,
                           child: Text(
                             '${index + 1}',
                             style: const TextStyle(
@@ -366,13 +371,16 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                                       participant.username,
                                       style: TextStyle(
                                         fontSize: 16,
-                                        fontWeight: isWinner ? FontWeight.bold : FontWeight.w600,
+                                        fontWeight: isWinner
+                                            ? FontWeight.bold
+                                            : FontWeight.w600,
                                       ),
                                     ),
                                   ),
                                   if (isWinner)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.amber,
                                         borderRadius: BorderRadius.circular(12),
@@ -403,7 +411,11 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                                       value: progress,
                                       backgroundColor: Colors.grey[200],
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                        isCompleted ? Colors.green : Theme.of(context).colorScheme.primary,
+                                        isCompleted
+                                            ? Colors.green
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .primary,
                                       ),
                                       minHeight: 6,
                                     ),
@@ -414,7 +426,11 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: isCompleted ? Colors.green : Theme.of(context).colorScheme.primary,
+                                      color: isCompleted
+                                          ? Colors.green
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .primary,
                                     ),
                                   ),
                                 ],
@@ -429,7 +445,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
               ),
             );
           }).toList(),
-          
+
           // Comments section
           DuelCommentsSection(duelId: duel.id),
         ],
@@ -444,7 +460,7 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
     // - Check if max participants reached
     return duel.status == 'pending' || duel.status == 'active';
   }
-  
+
   String? _getCurrentUserId() {
     try {
       final authState = context.read<AuthBloc>().state;
@@ -457,30 +473,29 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
       return null;
     }
   }
-  
+
   bool _isUserParticipant(List<DuelParticipant> participants) {
     final currentUserId = _getCurrentUserId();
     if (currentUserId == null) return false;
-    
+
     return participants.any((p) => p.userId == currentUserId);
   }
-  
+
   bool _isUserCreator(Duel duel) {
     final currentUserId = _getCurrentUserId();
     if (currentUserId == null) return false;
-    
+
     return duel.creatorId == currentUserId;
   }
-  
+
   bool _canUserStartDuel(Duel duel) {
     // Only the creator can manually start a duel
     // The duel must be in pending status
     // Allow manual start for both auto and manual mode duels (in case auto didn't trigger)
     final bool isCreator = _isUserCreator(duel);
-    
-    final bool canStart = isCreator && 
-                        duel.status == DuelStatus.pending;
-                        
+
+    final bool canStart = isCreator && duel.status == DuelStatus.pending;
+
     // Also ensure there are enough participants
     if (canStart) {
       final state = context.read<DuelDetailBloc>().state;
@@ -492,38 +507,39 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
         return acceptedParticipants >= duel.minParticipants;
       }
     }
-    
+
     return false;
   }
-  
+
   bool _canUserDeleteDuel(Duel duel) {
     // Only the creator can delete a duel
     // The duel must not have started yet
     return _isUserCreator(duel) && duel.status == DuelStatus.pending;
   }
-  
+
   bool _canUserWithdraw(Duel duel, List<DuelParticipant> participants) {
     // User can only withdraw if:
     // 1. They are a participant (not the creator)
     // 2. The duel hasn't started yet (status is pending)
     // 3. They are in accepted status
-    
+
     if (!_isUserParticipant(participants) || _isUserCreator(duel)) {
       return false;
     }
-    
+
     if (duel.status != DuelStatus.pending) {
       return false;
     }
-    
+
     final currentUserId = _getCurrentUserId();
     if (currentUserId == null) return false;
-    
+
     final userParticipant = participants.firstWhere(
       (p) => p.userId == currentUserId,
-      orElse: () => throw StateError('User is participant but not found in list'),
+      orElse: () =>
+          throw StateError('User is participant but not found in list'),
     );
-    
+
     return userParticipant.status == DuelParticipantStatus.accepted;
   }
 
@@ -542,8 +558,8 @@ class _DuelDetailScreenState extends State<DuelDetailScreen> {
             TextButton(
               onPressed: () {
                 context.read<DuelDetailBloc>().add(
-                  DeleteDuel(duelId: duel.id),
-                );
+                      DeleteDuel(duelId: duel.id),
+                    );
                 Navigator.of(context).pop();
               },
               child: const Text('Delete'),

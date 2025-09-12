@@ -13,7 +13,7 @@ abstract class EventsRepository {
     DateTime? startDate,
     DateTime? endDate,
   });
-  
+
   Future<Event> createEvent({
     required String title,
     String? description,
@@ -30,9 +30,9 @@ abstract class EventsRepository {
     double? ruckWeightKg,
     File? bannerImageFile,
   });
-  
+
   Future<EventDetails> getEventDetails(String eventId);
-  
+
   Future<Event> updateEvent({
     required String eventId,
     String? title,
@@ -49,48 +49,48 @@ abstract class EventsRepository {
     double? ruckWeightKg,
     File? bannerImageFile,
   });
-  
+
   Future<void> cancelEvent(String eventId);
-  
+
   // Event participation management
   Future<void> joinEvent(String eventId);
-  
+
   Future<void> leaveEvent(String eventId);
-  
+
   Future<List<EventParticipant>> getEventParticipants(String eventId);
-  
+
   Future<void> manageParticipation({
     required String eventId,
     required String userId,
     required String action, // 'approve', 'reject'
   });
-  
+
   // Event comments
   Future<List<EventComment>> getEventComments(String eventId);
-  
+
   Future<EventComment> addEventComment({
     required String eventId,
     required String comment,
   });
-  
+
   Future<EventComment> updateEventComment({
     required String eventId,
     required String commentId,
     required String comment,
   });
-  
+
   Future<void> deleteEventComment({
     required String eventId,
     required String commentId,
   });
-  
+
   // Event progress and leaderboard
   Future<EventLeaderboard> getEventLeaderboard(String eventId);
-  
+
   Future<EventProgress?> getUserEventProgress({
     required String eventId,
     required String userId,
   });
-  
+
   Future<Map<String, dynamic>> startRuckFromEvent(String eventId);
 }

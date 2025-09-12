@@ -14,7 +14,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationRepository repository;
   int _previousUnreadCount = -1; // -1 means uninitialized
   Timer? _pollingTimer;
-  
+
   NotificationBloc({
     required this.repository,
   }) : super(const NotificationState()) {
@@ -33,24 +33,28 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         'current_state_loading': state.isLoading,
       });
       emit(state.copyWith(isLoading: true));
-      
+
       final notifications = await repository.getNotifications();
       final unreadCount = notifications.where((n) => !n.isRead).length;
-      
-      AppLogger.sessionCompletion('Notifications loaded successfully', context: {
-        'total_notifications': notifications.length,
-        'unread_count': unreadCount,
-        'previous_unread_count': _previousUnreadCount,
-        'notification_types': notifications.map((n) => n.type).toSet().toList(),
-      });
-      
+
+      AppLogger.sessionCompletion('Notifications loaded successfully',
+          context: {
+            'total_notifications': notifications.length,
+            'unread_count': unreadCount,
+            'previous_unread_count': _previousUnreadCount,
+            'notification_types':
+                notifications.map((n) => n.type).toSet().toList(),
+          });
+
       // Check if we have new notifications and should vibrate
       if (unreadCount > _previousUnreadCount && _previousUnreadCount >= 0) {
-        AppLogger.sessionCompletion('New notifications detected - triggering vibration', context: {
-          'new_unread_count': unreadCount,
-          'previous_unread_count': _previousUnreadCount,
-          'new_notifications_count': unreadCount - _previousUnreadCount,
-        });
+        AppLogger.sessionCompletion(
+            'New notifications detected - triggering vibration',
+            context: {
+              'new_unread_count': unreadCount,
+              'previous_unread_count': _previousUnreadCount,
+              'new_notifications_count': unreadCount - _previousUnreadCount,
+            });
         await _vibrateForNewNotification();
       } else {
         AppLogger.sessionCompletion('No new notifications detected', context: {
@@ -59,9 +63,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           'is_initialized': _previousUnreadCount >= 0,
         });
       }
-      
+
       _previousUnreadCount = unreadCount;
-      
+
       emit(state.copyWith(
         isLoading: false,
         notifications: notifications,
@@ -69,11 +73,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         hasError: false,
         error: '',
       ));
-      
-      AppLogger.sessionCompletion('Notification state updated successfully', context: {
-        'final_unread_count': unreadCount,
-        'total_notifications': notifications.length,
-      });
+
+      AppLogger.sessionCompletion('Notification state updated successfully',
+          context: {
+            'final_unread_count': unreadCount,
+            'total_notifications': notifications.length,
+          });
     } catch (e) {
       AppLogger.sessionCompletion('Error loading notifications', context: {
         'error': e.toString(),
@@ -94,7 +99,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     Emitter<NotificationState> emit,
   ) async {
     try {
-      final success = await repository.markNotificationAsRead(event.notificationId);
+      final success =
+          await repository.markNotificationAsRead(event.notificationId);
       if (success) {
         final updatedNotifications = state.notifications.map((notification) {
           if (notification.id == event.notificationId) {
@@ -102,10 +108,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           }
           return notification;
         }).toList();
-        
-        final newUnreadCount = updatedNotifications.where((n) => !n.isRead).length;
+
+        final newUnreadCount =
+            updatedNotifications.where((n) => !n.isRead).length;
         _previousUnreadCount = newUnreadCount; // Update tracked count
-        
+
         emit(state.copyWith(
           notifications: updatedNotifications,
           unreadCount: newUnreadCount,
@@ -127,9 +134,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         final updatedNotifications = state.notifications
             .map((notification) => notification.copyWith(isRead: true))
             .toList();
-        
+
         _previousUnreadCount = 0; // Update tracked count
-        
+
         emit(state.copyWith(
           notifications: updatedNotifications,
           unreadCount: 0,
@@ -148,20 +155,21 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       'interval_seconds': interval.inSeconds,
       'existing_timer_active': _pollingTimer?.isActive ?? false,
     });
-    
+
     // Immediately fetch notifications so UI badge is up-to-date on app launch
     add(const NotificationsRequested());
     // Cancel any existing timer
     _pollingTimer?.cancel();
-    
+
     // Create new timer with appropriate interval
     _pollingTimer = Timer.periodic(interval, (_) {
       add(const NotificationsRequested());
     });
-    
-    AppLogger.sessionCompletion('Notification polling started successfully', context: {
-      'interval_seconds': interval.inSeconds,
-    });
+
+    AppLogger.sessionCompletion('Notification polling started successfully',
+        context: {
+          'interval_seconds': interval.inSeconds,
+        });
   }
 
   /// Stop polling for new notifications
@@ -191,8 +199,9 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
   Future<void> _vibrateForNewNotification() async {
     try {
-      AppLogger.sessionCompletion('Attempting vibration for new notification', context: {});
-      
+      AppLogger.sessionCompletion('Attempting vibration for new notification',
+          context: {});
+
       // Check if vibration is available
       bool? hasVibrator = await Vibration.hasVibrator();
       if (hasVibrator != true) {
@@ -201,21 +210,22 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
         });
         return;
       }
-      
+
       // Check custom vibration support
       bool? hasCustomVibrations = await Vibration.hasCustomVibrationsSupport();
-      
+
       AppLogger.sessionCompletion('Vibration capabilities checked', context: {
         'has_vibrator': hasVibrator,
         'has_custom_vibrations': hasCustomVibrations,
       });
-      
+
       if (hasCustomVibrations == true) {
         // Use pattern vibration: short-pause-short-pause-long
         await Vibration.vibrate(pattern: [0, 200, 100, 200, 100, 500]);
-        AppLogger.sessionCompletion('Custom pattern vibration completed', context: {
-          'pattern_used': [0, 200, 100, 200, 100, 500],
-        });
+        AppLogger.sessionCompletion('Custom pattern vibration completed',
+            context: {
+              'pattern_used': [0, 200, 100, 200, 100, 500],
+            });
       } else {
         // Use simple vibration
         await Vibration.vibrate(duration: 300);

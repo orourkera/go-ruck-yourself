@@ -28,26 +28,25 @@ class DuelModel extends Duel {
     int minParticipants = 2,
     this.participants = const [],
   }) : super(
-    id: id,
-    title: title,
-    description: description,
-    challengeType: challengeType,
-    targetValue: targetValue,
-    timeframeHours: timeframeHours,
-    maxParticipants: maxParticipants,
-    isPublic: isPublic,
-    status: status,
-    creatorId: creatorId,
-    winnerId: winnerId,
-    creatorCity: creatorCity,
-    creatorState: creatorState,
-    startsAt: startsAt,
-    endsAt: endsAt,
-    createdAt: createdAt,
-    updatedAt: updatedAt,
-    minParticipants: minParticipants,
-    startMode: startMode
-  );
+            id: id,
+            title: title,
+            description: description,
+            challengeType: challengeType,
+            targetValue: targetValue,
+            timeframeHours: timeframeHours,
+            maxParticipants: maxParticipants,
+            isPublic: isPublic,
+            status: status,
+            creatorId: creatorId,
+            winnerId: winnerId,
+            creatorCity: creatorCity,
+            creatorState: creatorState,
+            startsAt: startsAt,
+            endsAt: endsAt,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            minParticipants: minParticipants,
+            startMode: startMode);
 
   factory DuelModel.fromJson(Map<String, dynamic> json) {
     try {
@@ -64,20 +63,25 @@ class DuelModel extends Duel {
         id: json['id']?.toString() ?? '',
         creatorId: json['creator_id']?.toString() ?? '',
         title: json['title']?.toString() ?? 'Unknown Title',
-        challengeType: _parseChallengeType(json['challenge_type']?.toString() ?? 'distance'),
+        challengeType: _parseChallengeType(
+            json['challenge_type']?.toString() ?? 'distance'),
         targetValue: (json['target_value'] as num?)?.toDouble() ?? 0.0,
         timeframeHours: json['timeframe_hours'] as int? ?? 24,
         creatorCity: json['creator_city']?.toString(),
         creatorState: json['creator_state']?.toString(),
         isPublic: json['is_public'] as bool? ?? true,
         status: _parseStatus(json['status']?.toString() ?? 'pending'),
-        createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
-        updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : DateTime.now(),
-        startsAt: json['starts_at'] != null 
-            ? DateTime.parse(json['starts_at'] as String) 
+        createdAt: json['created_at'] != null
+            ? DateTime.parse(json['created_at'] as String)
+            : DateTime.now(),
+        updatedAt: json['updated_at'] != null
+            ? DateTime.parse(json['updated_at'] as String)
+            : DateTime.now(),
+        startsAt: json['starts_at'] != null
+            ? DateTime.parse(json['starts_at'] as String)
             : null,
-        endsAt: json['ends_at'] != null 
-            ? DateTime.parse(json['ends_at'] as String) 
+        endsAt: json['ends_at'] != null
+            ? DateTime.parse(json['ends_at'] as String)
             : null,
         winnerId: json['winner_id']?.toString(),
         description: json['description']?.toString(),
@@ -85,8 +89,10 @@ class DuelModel extends Duel {
         currentParticipants: json['current_participants'] as int?,
         minParticipants: json['min_participants'] as int? ?? 2,
         participants: (json['participants'] as List<dynamic>?)
-            ?.map((p) => DuelParticipantModel.fromJson(p as Map<String, dynamic>))
-            .toList() ?? [],
+                ?.map((p) =>
+                    DuelParticipantModel.fromJson(p as Map<String, dynamic>))
+                .toList() ??
+            [],
         startMode: startMode,
       );
     } catch (e, stackTrace) {

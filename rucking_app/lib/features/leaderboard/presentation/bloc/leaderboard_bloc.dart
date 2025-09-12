@@ -6,11 +6,11 @@ import 'leaderboard_state.dart';
 
 /// Well butter my grits! This here Bloc manages our leaderboard like a champion bull rider
 /// Handles loading, sorting, searching, and real-time updates
-/// 
+///
 /// 🔒 PRIVACY: Only shows users with Allow_Ruck_Sharing = true (backend filtered)
 class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   final LeaderboardRepository repository;
-  
+
   // Keep track of current data for real-time updates
   List<LeaderboardUserModel> _currentUsers = [];
   String _currentSortBy = 'powerPoints';
@@ -49,14 +49,14 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       _currentSortBy = event.sortBy;
       _currentAscending = event.ascending;
       _currentTimePeriod = event.timePeriod;
-      
+
       print('🔍 BLOC: About to call repository.getLeaderboard...');
       final response = await repository.getLeaderboard(
         sortBy: event.sortBy,
         ascending: event.ascending,
         timePeriod: event.timePeriod,
         // Remove limit to get ALL users instead of pagination
-        limit: 100,  // Load 100 users at a time
+        limit: 100, // Load 100 users at a time
         offset: 0,
       );
       print('🔍 BLOC: Repository returned ${response.users.length} users');
@@ -70,10 +70,12 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       _hasMore = response.hasMore;
       _currentOffset = response.users.length;
 
-      print('🔍 BLOC: About to emit LeaderboardLoaded state with ${response.users.length} users');
-      print('🔍 BLOC: Data check - users: ${response.users.length}, currentUserRank: $currentUserRank, activeRuckersCount: ${response.activeRuckersCount}');
+      print(
+          '🔍 BLOC: About to emit LeaderboardLoaded state with ${response.users.length} users');
+      print(
+          '🔍 BLOC: Data check - users: ${response.users.length}, currentUserRank: $currentUserRank, activeRuckersCount: ${response.activeRuckersCount}');
       print('🔍 BLOC: Creating LeaderboardLoaded state...');
-      
+
       final loadedState = LeaderboardLoaded(
         users: response.users,
         sortBy: _currentSortBy,
@@ -85,13 +87,14 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         timePeriod: _currentTimePeriod,
       );
       print('🔍 BLOC: LeaderboardLoaded state created successfully');
-      
+
       emit(loadedState);
       print('🔍 BLOC: Successfully emitted LeaderboardLoaded state!');
     } catch (e) {
       print('🔍 BLOC: ERROR in _onLoadLeaderboard: $e');
       print('🔍 BLOC: Error type: ${e.runtimeType}');
-      emit(LeaderboardError(message: 'Well I\'ll be! Failed to load leaderboard: $e'));
+      emit(LeaderboardError(
+          message: 'Well I\'ll be! Failed to load leaderboard: $e'));
     }
   }
 
@@ -201,7 +204,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   ) async {
     _currentSearchQuery = event.query.isEmpty ? null : event.query;
     _currentOffset = 0;
-    
+
     try {
       final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
@@ -211,7 +214,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         limit: 100,
         offset: 0,
       );
-      
+
       final currentUserRank = await _getCurrentUserRank();
 
       _currentUsers = response.users;
@@ -227,7 +230,8 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         timePeriod: _currentTimePeriod,
       ));
     } catch (e) {
-      emit(LeaderboardError(message: 'Well I\'ll be! Failed to search leaderboard: $e'));
+      emit(LeaderboardError(
+          message: 'Well I\'ll be! Failed to search leaderboard: $e'));
     }
   }
 
@@ -238,9 +242,9 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   ) async {
     _currentTimePeriod = event.timePeriod;
     _currentOffset = 0;
-    
+
     emit(const LeaderboardLoading());
-    
+
     try {
       final response = await repository.getLeaderboard(
         sortBy: _currentSortBy,
@@ -250,9 +254,9 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         limit: 100,
         offset: 0,
       );
-      
+
       final currentUserRank = await _getCurrentUserRank();
-      
+
       _currentUsers = response.users;
       emit(LeaderboardLoaded(
         users: response.users,
@@ -266,7 +270,8 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         timePeriod: _currentTimePeriod,
       ));
     } catch (e) {
-      emit(LeaderboardError(message: 'Well I\'ll be! Failed to filter leaderboard: $e'));
+      emit(LeaderboardError(
+          message: 'Well I\'ll be! Failed to filter leaderboard: $e'));
     }
   }
 
@@ -276,7 +281,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     Emitter<LeaderboardState> emit,
   ) async {
     if (state is! LeaderboardLoaded) return;
-    
+
     final currentState = state as LeaderboardLoaded;
     if (!currentState.hasMore) return;
 
@@ -326,7 +331,8 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     if (state is! LeaderboardLoaded) return;
 
     final currentState = state as LeaderboardLoaded;
-    final updatedUsers = _updateUserStatus(currentState.users, event.userId, isRucking: true);
+    final updatedUsers =
+        _updateUserStatus(currentState.users, event.userId, isRucking: true);
 
     emit(LeaderboardUpdating(
       users: updatedUsers,
@@ -349,7 +355,8 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     if (state is! LeaderboardLoaded) return;
 
     final currentState = state as LeaderboardLoaded;
-    final updatedUsers = _updateUserStats(currentState.users, event.userId, event.newStats);
+    final updatedUsers =
+        _updateUserStats(currentState.users, event.userId, event.newStats);
 
     emit(LeaderboardUpdating(
       users: updatedUsers,
@@ -384,10 +391,8 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
 
   /// Update user status (currently rucking)
   List<LeaderboardUserModel> _updateUserStatus(
-    List<LeaderboardUserModel> users,
-    String userId,
-    {required bool isRucking}
-  ) {
+      List<LeaderboardUserModel> users, String userId,
+      {required bool isRucking}) {
     return users.map((user) {
       if (user.userId == userId) {
         return user.copyWith(isCurrentlyRucking: isRucking);
@@ -408,13 +413,17 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
         final updatedStats = LeaderboardStatsModel(
           totalRucks: newStats['totalRucks'] ?? user.stats.totalRucks,
           distanceKm: newStats['distanceKm'] ?? user.stats.distanceKm,
-          elevationGainMeters: newStats['elevationGainMeters'] ?? user.stats.elevationGainMeters,
-          caloriesBurned: newStats['caloriesBurned'] ?? user.stats.caloriesBurned,
+          elevationGainMeters:
+              newStats['elevationGainMeters'] ?? user.stats.elevationGainMeters,
+          caloriesBurned:
+              newStats['caloriesBurned'] ?? user.stats.caloriesBurned,
           powerPoints: newStats['powerPoints'] ?? user.stats.powerPoints,
-          averageDistanceKm: newStats['averageDistanceKm'] ?? user.stats.averageDistanceKm,
-          averagePaceMinKm: newStats['averagePaceMinKm'] ?? user.stats.averagePaceMinKm,
+          averageDistanceKm:
+              newStats['averageDistanceKm'] ?? user.stats.averageDistanceKm,
+          averagePaceMinKm:
+              newStats['averagePaceMinKm'] ?? user.stats.averagePaceMinKm,
         );
-        
+
         return user.copyWith(
           stats: updatedStats,
           isCurrentlyRucking: false,

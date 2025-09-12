@@ -46,7 +46,8 @@ void main() {
     // Default mocks
     when(mockAuthService.isAuthenticated()).thenAnswer((_) async => true);
     when(mockStorageService.getObject(any)).thenAnswer((_) async => null);
-    when(mockWatchService.startSessionOnWatch(any, isMetric: anyNamed('isMetric')))
+    when(mockWatchService.startSessionOnWatch(any,
+            isMetric: anyNamed('isMetric')))
         .thenAnswer((_) async {});
     when(mockWatchService.sendSessionIdToWatch(any)).thenAnswer((_) async {});
   });
@@ -92,7 +93,8 @@ void main() {
       expect(states.last.errorMessage, null);
 
       // Verify watch service calls
-      verify(mockWatchService.startSessionOnWatch(ruckWeight, isMetric: false)).called(1);
+      verify(mockWatchService.startSessionOnWatch(ruckWeight, isMetric: false))
+          .called(1);
       verify(mockWatchService.sendSessionIdToWatch(any)).called(1);
 
       // Verify API call
@@ -103,7 +105,8 @@ void main() {
 
     test('handles SessionStartRequested with error', () async {
       // Setup mock to throw error
-      when(mockRepository.createSession(any)).thenThrow(Exception('Network error'));
+      when(mockRepository.createSession(any))
+          .thenThrow(Exception('Network error'));
 
       final event = SessionStartRequested(
         ruckWeightKg: 20.0,
@@ -249,7 +252,8 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 100));
 
       // Verify imperial (false) was used
-      verify(mockWatchService.startSessionOnWatch(any, isMetric: false)).called(1);
+      verify(mockWatchService.startSessionOnWatch(any, isMetric: false))
+          .called(1);
     });
 
     test('getUserMetricPreference reads from storage', () async {
@@ -266,7 +270,8 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 100));
 
       // Verify metric (true) was used
-      verify(mockWatchService.startSessionOnWatch(any, isMetric: true)).called(1);
+      verify(mockWatchService.startSessionOnWatch(any, isMetric: true))
+          .called(1);
     });
 
     test('getters return correct values', () async {

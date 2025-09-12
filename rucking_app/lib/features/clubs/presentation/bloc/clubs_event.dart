@@ -47,7 +47,16 @@ class CreateClub extends ClubsEvent {
   });
 
   @override
-  List<Object?> get props => [name, description, isPublic, maxMembers, logo, location, latitude, longitude];
+  List<Object?> get props => [
+        name,
+        description,
+        isPublic,
+        maxMembers,
+        logo,
+        location,
+        latitude,
+        longitude
+      ];
 }
 
 class LoadClubDetails extends ClubsEvent {
@@ -83,7 +92,17 @@ class UpdateClub extends ClubsEvent {
   });
 
   @override
-  List<Object?> get props => [clubId, name, description, isPublic, maxMembers, logo, location, latitude, longitude];
+  List<Object?> get props => [
+        clubId,
+        name,
+        description,
+        isPublic,
+        maxMembers,
+        logo,
+        location,
+        latitude,
+        longitude
+      ];
 }
 
 class DeleteClub extends ClubsEvent {

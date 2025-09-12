@@ -40,7 +40,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
+
   PlanCreationStep _currentStep = PlanCreationStep.greeting;
   String _streamingText = '';
   bool _isStreaming = false;
@@ -52,7 +52,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   CoachingPersonality? _hoveredPersonality;
   PlanPersonalization? _personalization;
   String _generatedSummary = '';
-  
+
   late OpenAIResponsesService _openAiService;
   late CoachingService _coachingService;
 
@@ -61,7 +61,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     CoachingPlanType(
       id: 'fat-loss',
       name: 'Fat Loss & Feel Better',
-      description: 'Build a steady calorie deficit and improve everyday energy with low-impact, progressive rucking plus complementary cardio/strength. We keep it safe, sustainable, and data-driven—no crash tactics.',
+      description:
+          'Build a steady calorie deficit and improve everyday energy with low-impact, progressive rucking plus complementary cardio/strength. We keep it safe, sustainable, and data-driven—no crash tactics.',
       duration: '12 weeks',
       icon: Icons.favorite,
       color: AppColors.error,
@@ -70,7 +71,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     CoachingPlanType(
       id: 'get-faster',
       name: 'Get Faster at Rucking',
-      description: 'Improve your 60-minute ruck pace at a fixed load using aerobic base, controlled tempo work, and smart hills—without trashing your legs.',
+      description:
+          'Improve your 60-minute ruck pace at a fixed load using aerobic base, controlled tempo work, and smart hills—without trashing your legs.',
       duration: '10 weeks',
       icon: Icons.speed,
       color: AppColors.primary,
@@ -79,7 +81,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     CoachingPlanType(
       id: 'event-prep',
       name: '12-Mile Under 3:00',
-      description: 'Arrive prepared for your event with focused quality sessions, a long-ruck progression, and a taper that respects your feet and recovery.',
+      description:
+          'Arrive prepared for your event with focused quality sessions, a long-ruck progression, and a taper that respects your feet and recovery.',
       duration: '16 weeks',
       icon: Icons.flag,
       color: AppColors.secondary,
@@ -88,7 +91,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     CoachingPlanType(
       id: 'daily-discipline',
       name: 'Daily Discipline Streak',
-      description: 'Build an unbreakable habit with bite-size sessions, flexible scheduling, and gentle accountability—movement every day, without overuse.',
+      description:
+          'Build an unbreakable habit with bite-size sessions, flexible scheduling, and gentle accountability—movement every day, without overuse.',
       duration: '8 weeks',
       icon: Icons.calendar_today,
       color: AppColors.success,
@@ -97,7 +101,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     CoachingPlanType(
       id: 'age-strong',
       name: 'Posture/Balance & Age-Strong',
-      description: 'Move taller and steadier with light loaded walks plus simple balance/strength work that supports joints and confidence.',
+      description:
+          'Move taller and steadier with light loaded walks plus simple balance/strength work that supports joints and confidence.',
       duration: '12 weeks',
       icon: Icons.accessibility_new,
       color: AppColors.accent,
@@ -106,7 +111,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     CoachingPlanType(
       id: 'load-capacity',
       name: 'Load Capacity Builder',
-      description: 'Safely increase how much weight you can carry. We progress one knob at a time (time → hills → small load bumps) with readiness checks so feet, knees, and back adapt without flare-ups.',
+      description:
+          'Safely increase how much weight you can carry. We progress one knob at a time (time → hills → small load bumps) with readiness checks so feet, knees, and back adapt without flare-ups.',
       duration: '14 weeks',
       icon: Icons.fitness_center,
       color: AppColors.brown,
@@ -124,7 +130,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
+
     _initializeServices();
     _startGreetingSequence();
   }
@@ -145,24 +151,23 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     try {
       // Method 1: Platform-level keyboard dismissal
       SystemChannels.textInput.invokeMethod('TextInput.hide');
-      
+
       // Method 2: Focus-based dismissal
       FocusScope.of(context).unfocus();
       FocusManager.instance.primaryFocus?.unfocus();
-      
+
       // Method 3: Clear all focus nodes
       if (FocusScope.of(context).hasFocus) {
         FocusScope.of(context).requestFocus(FocusNode());
       }
-      
+
       // Method 4: Widget tree level unfocus
       WidgetsBinding.instance.focusManager.primaryFocus?.unfocus();
-      
+
       // Method 5: Create a new unfocusable node and focus it
       final FocusNode dummyNode = FocusNode();
       FocusScope.of(context).requestFocus(dummyNode);
       dummyNode.dispose();
-      
     } catch (e) {
       // If anything fails, at least try the basic approaches
       try {
@@ -174,7 +179,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
 
   void _startGreetingSequence() {
     _animationController.forward();
-    
+
     // Start streaming the greeting after a short delay
     Future.delayed(const Duration(milliseconds: 500), () {
       _streamGreeting();
@@ -183,20 +188,23 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
 
   void _streamGreeting() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isStreaming = true;
       _streamingText = '';
     });
 
     final authState = context.read<AuthBloc>().state;
-    final username = authState is Authenticated ? authState.user.username : 'Rucker';
+    final username =
+        authState is Authenticated ? authState.user.username : 'Rucker';
 
     try {
       await _openAiService.stream(
         model: 'gpt-4.1',
-        instructions: 'You are a friendly, enthusiastic AI fitness coach for a rucking app. Your job is to greet users warmly and get them excited about creating a training plan.',
-        input: 'Greet the user named "$username" and ask them what kind of goal they want to set. Keep it brief, friendly, and motivating. End with asking what kind of goal they want to set.',
+        instructions:
+            'You are a friendly, enthusiastic AI fitness coach for a rucking app. Your job is to greet users warmly and get them excited about creating a training plan.',
+        input:
+            'Greet the user named "$username" and ask them what kind of goal they want to set. Keep it brief, friendly, and motivating. End with asking what kind of goal they want to set.',
         temperature: 0.7,
         maxOutputTokens: 150,
         onDelta: (delta) {
@@ -220,7 +228,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
           if (mounted) {
             setState(() {
               _isStreaming = false;
-              _streamingText = "Hi $username! I'm your AI coach, and I'm excited to help you create the perfect rucking plan. What kind of goal do you want to set?";
+              _streamingText =
+                  "Hi $username! I'm your AI coach, and I'm excited to help you create the perfect rucking plan. What kind of goal do you want to set?";
               _showGoalPills = true;
             });
           }
@@ -232,7 +241,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       if (mounted) {
         setState(() {
           _isStreaming = false;
-          _streamingText = "Hi $username! I'm your AI coach, and I'm excited to help you create the perfect rucking plan. What kind of goal do you want to set?";
+          _streamingText =
+              "Hi $username! I'm your AI coach, and I'm excited to help you create the perfect rucking plan. What kind of goal do you want to set?";
           _showGoalPills = true;
         });
       }
@@ -245,7 +255,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     if (confirmed == true) {
       // Dismiss keyboard before moving to personalization step
       _dismissKeyboard();
-      
+
       setState(() {
         _selectedPlanType = planType;
         _currentStep = PlanCreationStep.personalization;
@@ -334,29 +344,30 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   void _onPersonalizationComplete(PlanPersonalization personalization) {
     // Dismiss keyboard when moving to next step
     _dismissKeyboard();
-    
+
     // Add a small delay and dismiss again to ensure it works
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         _dismissKeyboard();
       }
     });
-    
+
     setState(() {
       _personalization = personalization;
       _currentStep = PlanCreationStep.planPreview;
     });
-    
+
     // Generate AI plan preview summary
     _generatePlanPreviewSummary();
   }
 
   Future<void> _generatePlanPreviewSummary() async {
     if (_selectedPlanType == null || _personalization == null) return;
-    
+
     final authState = context.read<AuthBloc>().state;
-    final username = authState is Authenticated ? authState.user.username : 'Rucker';
-    
+    final username =
+        authState is Authenticated ? authState.user.username : 'Rucker';
+
     final prompt = '''
 Create a detailed personalized training plan brief for ${username}'s ${_selectedPlanType!.name} goal in a motivational coaching tone.
 
@@ -397,7 +408,8 @@ Write in plain text with clear headings - no asterisks, no markdown formatting. 
     try {
       await _openAiService.stream(
         model: 'gpt-4.1',
-        instructions: 'You are an enthusiastic AI fitness coach creating a personalized plan summary for ${username}. Address them by name throughout. Be motivational, specific, and exciting. Use plain text formatting only - no markdown, no asterisks, no special formatting. Write in clear paragraphs with proper headings.',
+        instructions:
+            'You are an enthusiastic AI fitness coach creating a personalized plan summary for ${username}. Address them by name throughout. Be motivational, specific, and exciting. Use plain text formatting only - no markdown, no asterisks, no special formatting. Write in clear paragraphs with proper headings.',
         input: prompt,
         temperature: 0.7,
         maxOutputTokens: 650,
@@ -420,7 +432,8 @@ Write in plain text with clear headings - no asterisks, no markdown formatting. 
     } catch (e) {
       AppLogger.error('Failed to generate plan preview summary: $e');
       setState(() {
-        _planPreviewSummary = 'I\'m so excited about your ${_selectedPlanType!.name} journey! This ${_selectedPlanType!.duration} plan is perfectly tailored to your goals and schedule. With ${_personalization!.trainingDaysPerWeek} training days per week, you\'re going to see incredible progress toward ${_personalization!.successDefinition}. Let\'s make this happen!';
+        _planPreviewSummary =
+            'I\'m so excited about your ${_selectedPlanType!.name} journey! This ${_selectedPlanType!.duration} plan is perfectly tailored to your goals and schedule. With ${_personalization!.trainingDaysPerWeek} training days per week, you\'re going to see incredible progress toward ${_personalization!.successDefinition}. Let\'s make this happen!';
         _isGeneratingPreview = false;
       });
     }
@@ -429,7 +442,7 @@ Write in plain text with clear headings - no asterisks, no markdown formatting. 
   void _onPersonalitySelected(CoachingPersonality personality) {
     // Dismiss keyboard when moving to next step
     _dismissKeyboard();
-    
+
     setState(() {
       _selectedPersonality = personality;
       _currentStep = PlanCreationStep.commitment;
@@ -472,7 +485,8 @@ Keep it under 200 words, motivational, and specific to their answers.
 
       await _openAiService.stream(
         model: 'gpt-4.1',
-        instructions: 'You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan. Use markdown formatting with headers, bullet points, and emphasis for better readability.',
+        instructions:
+            'You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan. Use markdown formatting with headers, bullet points, and emphasis for better readability.',
         input: prompt,
         temperature: 0.7,
         maxOutputTokens: 1000,
@@ -496,14 +510,17 @@ Keep it under 200 words, motivational, and specific to their answers.
     } catch (e) {
       AppLogger.error('Failed to generate plan summary: $e');
       setState(() {
-        _generatedSummary = 'Your personalized ${_selectedPlanType!.name} plan is ready! Let\'s crush those goals together.';
+        _generatedSummary =
+            'Your personalized ${_selectedPlanType!.name} plan is ready! Let\'s crush those goals together.';
         _isStreaming = false;
       });
     }
   }
 
   void _onCommitToPlan() async {
-    if (_selectedPlanType == null || _selectedPersonality == null || _personalization == null) {
+    if (_selectedPlanType == null ||
+        _selectedPersonality == null ||
+        _personalization == null) {
       AppLogger.error('Missing required data for plan creation');
       return;
     }
@@ -511,7 +528,7 @@ Keep it under 200 words, motivational, and specific to their answers.
     setState(() {
       _currentStep = PlanCreationStep.creating;
     });
-    
+
     try {
       // Create the personalized coaching plan via API
       final planData = await _coachingService.createCoachingPlan(
@@ -519,24 +536,24 @@ Keep it under 200 words, motivational, and specific to their answers.
         coachingPersonality: _selectedPersonality!.id,
         personalization: _personalization!,
       );
-      
+
       // The planData is the response data from backend: {plan_id, message, start_date, duration_weeks}
       final planId = planData['plan_id'];
       AppLogger.info('Successfully created coaching plan: $planId');
-      
+
       if (mounted) {
         setState(() {
           _currentStep = PlanCreationStep.generatingSummary;
         });
-        
+
         // Generate AI summary of the plan
         await _generatePlanSummary(planData);
-        
+
         if (mounted) {
           setState(() {
             _currentStep = PlanCreationStep.complete;
           });
-          
+
           // Navigate back with success after a brief delay
           Future.delayed(const Duration(seconds: 3), () {
             if (mounted) {
@@ -547,7 +564,7 @@ Keep it under 200 words, motivational, and specific to their answers.
       }
     } catch (e) {
       AppLogger.error('Failed to create coaching plan: $e');
-      
+
       if (mounted) {
         // Show error and go back to commitment step
         ScaffoldMessenger.of(context).showSnackBar(
@@ -557,7 +574,7 @@ Keep it under 200 words, motivational, and specific to their answers.
             duration: const Duration(seconds: 4),
           ),
         );
-        
+
         setState(() {
           _currentStep = PlanCreationStep.commitment;
         });
@@ -568,7 +585,7 @@ Keep it under 200 words, motivational, and specific to their answers.
   void _onBackPressed() {
     // Always dismiss keyboard when navigating
     _dismissKeyboard();
-    
+
     switch (_currentStep) {
       case PlanCreationStep.goalSelection:
         Navigator.of(context).pop();
@@ -612,7 +629,7 @@ Keep it under 200 words, motivational, and specific to their answers.
       },
       child: Scaffold(
         backgroundColor: AppColors.backgroundLight,
-        appBar: _currentStep != PlanCreationStep.greeting && 
+        appBar: _currentStep != PlanCreationStep.greeting &&
                 _currentStep != PlanCreationStep.creating &&
                 _currentStep != PlanCreationStep.generatingSummary &&
                 _currentStep != PlanCreationStep.complete
@@ -690,7 +707,7 @@ Keep it under 200 words, motivational, and specific to their answers.
               ),
             ),
             const SizedBox(height: 32),
-            
+
             // Streaming text bubble
             Container(
               padding: const EdgeInsets.all(20),
@@ -725,7 +742,8 @@ Keep it under 200 words, motivational, and specific to their answers.
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -741,7 +759,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                 ],
               ),
             ),
-            
+
             // Goal selection pills (shown after streaming completes)
             if (_showGoalPills) ...[
               const SizedBox(height: 32),
@@ -756,7 +774,8 @@ Keep it under 200 words, motivational, and specific to their answers.
                     return GestureDetector(
                       onTap: () => _onPlanTypeSelected(planType),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(25),
@@ -841,7 +860,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                 ],
               ),
             ),
-            
+
             // Plan type cards
             Expanded(
               child: ListView.builder(
@@ -872,8 +891,9 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   Widget _buildPlanPreviewStep() {
-    if (_selectedPlanType == null || _personalization == null) return const SizedBox.shrink();
-    
+    if (_selectedPlanType == null || _personalization == null)
+      return const SizedBox.shrink();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -904,7 +924,7 @@ Keep it under 200 words, motivational, and specific to their answers.
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Goal title with emoji
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -927,7 +947,7 @@ Keep it under 200 words, motivational, and specific to their answers.
             ],
           ),
           const SizedBox(height: 32),
-          
+
           // AI-generated personalized summary
           Flexible(
             child: Container(
@@ -937,20 +957,20 @@ Keep it under 200 words, motivational, and specific to their answers.
                 maxHeight: MediaQuery.of(context).size.height * 0.6,
               ),
               padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
                     Text(
                       _planPreviewSummary + (_isGeneratingPreview ? '▌' : ''),
                       style: AppTextStyles.bodyLarge.copyWith(
@@ -967,7 +987,8 @@ Keep it under 200 words, motivational, and specific to their answers.
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -980,25 +1001,27 @@ Keep it under 200 words, motivational, and specific to their answers.
                         ],
                       ),
                     ],
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ),
-          
+          ),
+
           const SizedBox(height: 24),
-          
+
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: !_isGeneratingPreview ? () {
-                // Dismiss keyboard when moving to next step
-                _dismissKeyboard();
-                
-                setState(() {
-                  _currentStep = PlanCreationStep.personalitySelection;
-                });
-              } : null,
+              onPressed: !_isGeneratingPreview
+                  ? () {
+                      // Dismiss keyboard when moving to next step
+                      _dismissKeyboard();
+
+                      setState(() {
+                        _currentStep = PlanCreationStep.personalitySelection;
+                      });
+                    }
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -1008,9 +1031,9 @@ Keep it under 200 words, motivational, and specific to their answers.
                 ),
               ),
               child: Text(
-                _isGeneratingPreview 
-                  ? 'Creating your plan...'
-                  : 'Perfect! Let\'s choose coaching style',
+                _isGeneratingPreview
+                    ? 'Creating your plan...'
+                    : 'Perfect! Let\'s choose coaching style',
                 style: AppTextStyles.titleMedium,
               ),
             ),
@@ -1019,7 +1042,6 @@ Keep it under 200 words, motivational, and specific to their answers.
       ),
     );
   }
-
 
   Widget _buildPersonalitySelectionStep() {
     return SingleChildScrollView(
@@ -1041,7 +1063,6 @@ Keep it under 200 words, motivational, and specific to their answers.
             ),
           ),
           const SizedBox(height: 24),
-          
           PersonalitySelector(
             onPersonalitySelected: _onPersonalitySelected,
           ),
@@ -1051,10 +1072,12 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   Widget _buildCommitmentStep() {
-    if (_selectedPlanType == null || _selectedPersonality == null || _personalization == null) {
+    if (_selectedPlanType == null ||
+        _selectedPersonality == null ||
+        _personalization == null) {
       return const SizedBox.shrink();
     }
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -1067,7 +1090,10 @@ Keep it under 200 words, motivational, and specific to their answers.
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
-                colors: [_selectedPersonality!.color, _selectedPersonality!.color.withOpacity(0.7)],
+                colors: [
+                  _selectedPersonality!.color,
+                  _selectedPersonality!.color.withOpacity(0.7)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1085,9 +1111,9 @@ Keep it under 200 words, motivational, and specific to their answers.
               color: Colors.white,
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Conversational greeting based on personality
           Container(
             padding: const EdgeInsets.all(20),
@@ -1127,9 +1153,9 @@ Keep it under 200 words, motivational, and specific to their answers.
               ],
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Plan overview in conversational style
           Container(
             padding: const EdgeInsets.all(24),
@@ -1168,9 +1194,11 @@ Keep it under 200 words, motivational, and specific to their answers.
                           ),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _selectedPersonality!.color.withOpacity(0.1),
+                              color:
+                                  _selectedPersonality!.color.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -1186,9 +1214,9 @@ Keep it under 200 words, motivational, and specific to their answers.
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Conversational plan details
                 Text(
                   _getPersonalizedPlanSummary(),
@@ -1197,17 +1225,17 @@ Keep it under 200 words, motivational, and specific to their answers.
                     color: Colors.grey[700],
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Key details in a more conversational format
                 _buildConversationalDetails(),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Motivational call to action
           Container(
             padding: const EdgeInsets.all(24),
@@ -1245,9 +1273,9 @@ Keep it under 200 words, motivational, and specific to their answers.
               ],
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Action button with personality-based text
           SizedBox(
             width: double.infinity,
@@ -1364,7 +1392,7 @@ Keep it under 200 words, motivational, and specific to their answers.
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Title
           Text(
             'Your Plan is Ready!',
@@ -1375,7 +1403,7 @@ Keep it under 200 words, motivational, and specific to their answers.
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          
+
           // AI-generated summary
           Container(
             width: double.infinity,
@@ -1397,70 +1425,70 @@ Keep it under 200 words, motivational, and specific to their answers.
             ),
             child: SingleChildScrollView(
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome,
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Your AI Coach Says:',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
                           color: AppColors.primary,
-                          size: 24,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Your AI Coach Says:',
-                          style: AppTextStyles.titleMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _generatedSummary.isNotEmpty 
-                        ? MarkdownBody(
-                            data: _generatedSummary,
-                            styleSheet: MarkdownStyleSheet(
-                              p: AppTextStyles.bodyLarge.copyWith(height: 1.5),
-                              h1: AppTextStyles.headlineLarge.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 24,
-                              ),
-                              h2: AppTextStyles.headlineMedium.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 20,
-                              ),
-                              h3: AppTextStyles.titleLarge.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 18,
-                              ),
-                              listBullet: AppTextStyles.bodyLarge.copyWith(
-                                color: AppColors.primary,
-                                height: 1.5,
-                              ),
-                              strong: AppTextStyles.bodyLarge.copyWith(
-                                fontWeight: FontWeight.bold,
-                                height: 1.5,
-                              ),
-                              em: AppTextStyles.bodyLarge.copyWith(
-                                fontStyle: FontStyle.italic,
-                                height: 1.5,
-                              ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _generatedSummary.isNotEmpty
+                      ? MarkdownBody(
+                          data: _generatedSummary,
+                          styleSheet: MarkdownStyleSheet(
+                            p: AppTextStyles.bodyLarge.copyWith(height: 1.5),
+                            h1: AppTextStyles.headlineLarge.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 24,
                             ),
-                          )
-                        : Text(
-                            'Your personalized ${_selectedPlanType?.name ?? "training"} plan is ready! Let\'s crush those goals together.',
-                            style: AppTextStyles.bodyLarge.copyWith(
+                            h2: AppTextStyles.headlineMedium.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 20,
+                            ),
+                            h3: AppTextStyles.titleLarge.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 18,
+                            ),
+                            listBullet: AppTextStyles.bodyLarge.copyWith(
+                              color: AppColors.primary,
+                              height: 1.5,
+                            ),
+                            strong: AppTextStyles.bodyLarge.copyWith(
+                              fontWeight: FontWeight.bold,
+                              height: 1.5,
+                            ),
+                            em: AppTextStyles.bodyLarge.copyWith(
+                              fontStyle: FontStyle.italic,
                               height: 1.5,
                             ),
                           ),
-                  ],
-                ),
+                        )
+                      : Text(
+                          'Your personalized ${_selectedPlanType?.name ?? "training"} plan is ready! Let\'s crush those goals together.',
+                          style: AppTextStyles.bodyLarge.copyWith(
+                            height: 1.5,
+                          ),
+                        ),
+                ],
               ),
             ),
-          
+          ),
+
           const SizedBox(height: 24),
-          
+
           // Bottom message
           Text(
             'Check your homepage for personalized insights and session recommendations.',
@@ -1505,7 +1533,8 @@ Keep it under 200 words, motivational, and specific to their answers.
   String _getStreakTargetDescription() {
     if (_personalization!.streakTargetDays != null) {
       return '\n- Streak Target: ${_personalization!.streakTargetDays} days in a row';
-    } else if (_personalization!.streakTargetRucks != null && _personalization!.streakTimeframeDays != null) {
+    } else if (_personalization!.streakTargetRucks != null &&
+        _personalization!.streakTimeframeDays != null) {
       return '\n- Streak Target: ${_personalization!.streakTargetRucks} rucks in ${_personalization!.streakTimeframeDays} days';
     }
     return '';
@@ -1514,7 +1543,8 @@ Keep it under 200 words, motivational, and specific to their answers.
   String _getStreakTargetInstruction() {
     if (_personalization!.streakTargetDays != null) {
       return '\n\n7. STREAK TARGET: How to build toward their ${_personalization!.streakTargetDays}-day consecutive streak goal with strategies for streak protection and recovery.';
-    } else if (_personalization!.streakTargetRucks != null && _personalization!.streakTimeframeDays != null) {
+    } else if (_personalization!.streakTargetRucks != null &&
+        _personalization!.streakTimeframeDays != null) {
       return '\n\n7. STREAK TARGET: How to achieve ${_personalization!.streakTargetRucks} rucks in ${_personalization!.streakTimeframeDays} days with flexible scheduling and recovery strategies.';
     }
     return '';
@@ -1523,7 +1553,7 @@ Keep it under 200 words, motivational, and specific to their answers.
   String _getPersonalizedGreeting() {
     final personality = _selectedPersonality!;
     final planName = _selectedPlanType!.name.toLowerCase();
-    
+
     switch (personality.id) {
       case 'Supportive Friend':
         return 'I\'m so excited for you! 🌟\nYou\'ve created something amazing here.';
@@ -1550,8 +1580,10 @@ Keep it under 200 words, motivational, and specific to their answers.
 
   String _getPersonalizedEncouragement() {
     final personality = _selectedPersonality!;
-    final why = _personalization!.why?.isNotEmpty == true ? _personalization!.why!.first : 'your goals';
-    
+    final why = _personalization!.why?.isNotEmpty == true
+        ? _personalization!.why!.first
+        : 'your goals';
+
     switch (personality.id) {
       case 'Supportive Friend':
         return 'I can see how much $why means to you, and honestly? You\'ve got this. This plan is going to help you feel stronger and more confident every single day.';
@@ -1581,7 +1613,7 @@ Keep it under 200 words, motivational, and specific to their answers.
     final planName = _selectedPlanType!.name;
     final days = _personalization!.trainingDaysPerWeek ?? 3;
     final minutes = _personalization!.minimumSessionMinutes ?? 30;
-    
+
     switch (personality.id) {
       case 'Supportive Friend':
         return 'Here\'s what we\'re going to do together: $days days a week of $planName training, starting with just $minutes minutes. It\'s going to be so manageable, and I\'ll be cheering you on every step!';
@@ -1607,9 +1639,11 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   Widget _buildConversationalDetails() {
-    final challenges = _personalization!.challenges?.join(' and ') ?? 'your busy schedule';
-    final preferredDays = _personalization!.preferredDays?.join(', ') ?? 'flexible days';
-    
+    final challenges =
+        _personalization!.challenges?.join(' and ') ?? 'your busy schedule';
+    final preferredDays =
+        _personalization!.preferredDays?.join(', ') ?? 'flexible days';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1649,7 +1683,6 @@ Keep it under 200 words, motivational, and specific to their answers.
             ],
           ),
         ),
-        
         if (_personalization!.unloadedOk == true) ...[
           const SizedBox(height: 12),
           Container(
@@ -1684,7 +1717,7 @@ Keep it under 200 words, motivational, and specific to their answers.
 
   String _getPersonalizedCallToAction() {
     final personality = _selectedPersonality!;
-    
+
     switch (personality.id) {
       case 'Supportive Friend':
         return 'Ready to start this amazing journey together? I believe in you completely!';
@@ -1711,7 +1744,7 @@ Keep it under 200 words, motivational, and specific to their answers.
 
   String _getPersonalizedButtonText() {
     final personality = _selectedPersonality!;
-    
+
     switch (personality.id) {
       case 'Supportive Friend':
         return 'Yes, let\'s do this together! 💪';

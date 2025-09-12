@@ -31,20 +31,29 @@ class RuckPhoto extends Equatable {
     try {
       // Extract the primary data fields from backend response
       final String id = json['id']?.toString() ?? '';
-      final String url = json['url']?.toString() ?? json['photo_url']?.toString() ?? '';
+      final String url =
+          json['url']?.toString() ?? json['photo_url']?.toString() ?? '';
       final String thumbnailUrl = json['thumbnail_url']?.toString() ?? '';
-      final String ruckId = json['ruck_id']?.toString() ?? json['ruck_session_id']?.toString() ?? '';
+      final String ruckId = json['ruck_id']?.toString() ??
+          json['ruck_session_id']?.toString() ??
+          '';
       final String userId = json['user_id']?.toString() ?? '';
-      final String filename = json['filename']?.toString() ?? json['file_name']?.toString() ?? '';
+      final String filename =
+          json['filename']?.toString() ?? json['file_name']?.toString() ?? '';
       final String? originalFilename = json['original_filename']?.toString();
       final String? contentType = json['content_type']?.toString();
-      final int? size = json['size'] is int ? json['size'] : (json['file_size'] is int ? json['file_size'] : null);
-      
+      final int? size = json['size'] is int
+          ? json['size']
+          : (json['file_size'] is int ? json['file_size'] : null);
+
       // Handle the timestamp parsing with enhanced fallback options
       DateTime parsedAt;
       try {
-        final dynamic timestamp = json['created_at'] ?? json['taken_at'] ?? json['uploaded_at'] ?? json['timestamp'];
-        
+        final dynamic timestamp = json['created_at'] ??
+            json['taken_at'] ??
+            json['uploaded_at'] ??
+            json['timestamp'];
+
         if (timestamp is String) {
           // Handle ISO format timestamps like "2023-XX-XXTXX:XX:XX.XXXXXXZ"
           parsedAt = DateTime.parse(timestamp);
@@ -61,7 +70,7 @@ class RuckPhoto extends Equatable {
       } catch (e) {
         parsedAt = DateTime.now();
       }
-      
+
       // Create and return the RuckPhoto object
       final photo = RuckPhoto(
         id: id,
@@ -75,25 +84,26 @@ class RuckPhoto extends Equatable {
         url: url,
         thumbnailUrl: thumbnailUrl,
       );
-      
+
       return photo;
-      
     } catch (e, stack) {
-      
       // Attempt to create a minimal RuckPhoto with fallback values
       try {
         final fallbackPhoto = RuckPhoto(
           id: json['id']?.toString() ?? '',
-          ruckId: json['ruck_id']?.toString() ?? json['ruck_session_id']?.toString() ?? '',
+          ruckId: json['ruck_id']?.toString() ??
+              json['ruck_session_id']?.toString() ??
+              '',
           userId: json['user_id']?.toString() ?? '',
-          filename: json['filename']?.toString() ?? json['file_name']?.toString() ?? '',
+          filename: json['filename']?.toString() ??
+              json['file_name']?.toString() ??
+              '',
           createdAt: DateTime.now(),
           url: json['url']?.toString() ?? json['photo_url']?.toString() ?? '',
           thumbnailUrl: json['thumbnail_url']?.toString() ?? '',
         );
         return fallbackPhoto;
       } catch (fallbackError) {
-        
         // Return an empty photo object as the absolute last resort
         return RuckPhoto(
           id: '',
@@ -126,18 +136,19 @@ class RuckPhoto extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    ruckId,
-    userId,
-    filename,
-    originalFilename,
-    contentType,
-    size,
-    createdAt,
-    url,
-    thumbnailUrl,
-  ];
-  
+        id,
+        ruckId,
+        userId,
+        filename,
+        originalFilename,
+        contentType,
+        size,
+        createdAt,
+        url,
+        thumbnailUrl,
+      ];
+
   @override
-  String toString() => 'RuckPhoto(id: $id, ruckId: $ruckId, filename: $filename)';
+  String toString() =>
+      'RuckPhoto(id: $id, ruckId: $ruckId, filename: $filename)';
 }

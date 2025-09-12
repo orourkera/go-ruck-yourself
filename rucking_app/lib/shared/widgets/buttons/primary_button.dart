@@ -31,7 +31,7 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBackgroundColor = backgroundColor ?? 
+    final effectiveBackgroundColor = backgroundColor ??
         (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
     final effectiveTextColor = textColor ?? Colors.white;
     final isDisabled = onPressed == null && !isLoading;
@@ -41,18 +41,18 @@ class PrimaryButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDisabled 
-              ? AppColors.greyLight 
-              : effectiveBackgroundColor,
+          backgroundColor:
+              isDisabled ? AppColors.greyLight : effectiveBackgroundColor,
           foregroundColor: effectiveTextColor,
           disabledBackgroundColor: AppColors.greyLight,
           disabledForegroundColor: AppColors.greyDark,
           elevation: isDisabled ? 0 : 2,
           shadowColor: effectiveBackgroundColor.withOpacity(0.3),
-          padding: padding ?? const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 16,
-          ),
+          padding: padding ??
+              const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
+              ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius ?? 8),
           ),
@@ -136,8 +136,8 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBorderColor = borderColor ?? 
-        (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
+    final effectiveBorderColor =
+        borderColor ?? (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
     final effectiveTextColor = textColor ?? effectiveBorderColor;
     final isDisabled = onPressed == null && !isLoading;
 
@@ -148,10 +148,11 @@ class SecondaryButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: effectiveTextColor,
           disabledForegroundColor: AppColors.greyDark,
-          padding: padding ?? const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 16,
-          ),
+          padding: padding ??
+              const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
+              ),
           side: BorderSide(
             color: isDisabled ? AppColors.greyLight : effectiveBorderColor,
             width: 1.5,

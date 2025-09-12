@@ -3,7 +3,7 @@ import 'package:rucking_app/features/achievements/data/models/achievement_model.
 
 abstract class AchievementState extends Equatable {
   const AchievementState();
-  
+
   @override
   List<Object> get props => [];
 }
@@ -20,7 +20,7 @@ class AchievementsLoaded extends AchievementState {
   final AchievementStats? stats;
   final List<UserAchievement> recentAchievements;
   final List<Achievement> newlyEarned;
-  
+
   const AchievementsLoaded({
     required this.allAchievements,
     required this.categories,
@@ -30,25 +30,26 @@ class AchievementsLoaded extends AchievementState {
     required this.recentAchievements,
     this.newlyEarned = const [],
   });
-  
+
   @override
   List<Object> get props => [
-    allAchievements,
-    categories,
-    userAchievements,
-    userProgress,
-    stats ?? const AchievementStats(
-      totalEarned: 0,
-      totalAvailable: 0,
-      completionPercentage: 0.0,
-      powerPoints: 0,
-      byCategory: {},
-      byTier: {},
-    ),
-    recentAchievements,
-    newlyEarned,
-  ];
-  
+        allAchievements,
+        categories,
+        userAchievements,
+        userProgress,
+        stats ??
+            const AchievementStats(
+              totalEarned: 0,
+              totalAvailable: 0,
+              completionPercentage: 0.0,
+              powerPoints: 0,
+              byCategory: {},
+              byTier: {},
+            ),
+        recentAchievements,
+        newlyEarned,
+      ];
+
   AchievementsLoaded copyWith({
     List<Achievement>? allAchievements,
     List<String>? categories,
@@ -85,24 +86,27 @@ class AchievementsLoaded extends AchievementState {
   }
 
   AchievementProgress? getProgressForAchievement(String achievementId) {
-    return userProgress.where((p) => p.achievementId == achievementId).firstOrNull;
+    return userProgress
+        .where((p) => p.achievementId == achievementId)
+        .firstOrNull;
   }
 
   double getOverallProgress() {
     if (allAchievements.isEmpty) return 0.0;
-    return (userAchievements.length / allAchievements.length * 100).clamp(0.0, 100.0);
+    return (userAchievements.length / allAchievements.length * 100)
+        .clamp(0.0, 100.0);
   }
 }
 
 class AchievementsError extends AchievementState {
   final String message;
   final String? errorCode;
-  
+
   const AchievementsError({
     required this.message,
     this.errorCode,
   });
-  
+
   @override
   List<Object> get props => [message, errorCode ?? ''];
 }
@@ -110,12 +114,12 @@ class AchievementsError extends AchievementState {
 class AchievementsSessionChecked extends AchievementState {
   final List<Achievement> newAchievements;
   final AchievementsLoaded previousState;
-  
+
   const AchievementsSessionChecked({
     required this.newAchievements,
     required this.previousState,
   });
-  
+
   @override
   List<Object> get props => [newAchievements, previousState];
 }

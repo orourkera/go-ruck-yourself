@@ -6,13 +6,13 @@ class ClubShareService {
     try {
       // Create a beautiful share message with club details
       final String shareText = _buildShareText(clubDetails);
-      
+
       // Share using the native share sheet
       final result = await Share.share(
         shareText,
         subject: 'Join ${clubDetails.club.name} on Ruck!',
       );
-      
+
       if (result.status == ShareResultStatus.success) {
         print('Club shared successfully');
       } else if (result.status == ShareResultStatus.dismissed) {
@@ -24,10 +24,10 @@ class ClubShareService {
       await _shareTextOnly(clubDetails);
     }
   }
-  
+
   static String _buildShareText(ClubDetails clubDetails) {
     final club = clubDetails.club;
-    
+
     // Base share text with club details
     String shareText = '''🏃‍♂️ Join ${club.name} on Ruck!
 
@@ -41,10 +41,10 @@ Download Ruck and join the club:
 https://getrucky.com/clubs/${club.id}
 
 #Ruck #Fitness #Community''';
-    
+
     return shareText;
   }
-  
+
   static Future<void> _shareTextOnly(ClubDetails clubDetails) async {
     try {
       final String shareText = '''🏃‍♂️ Join ${clubDetails.club.name} on Ruck!
@@ -55,17 +55,17 @@ ${clubDetails.club.description != null && clubDetails.club.description!.isNotEmp
 Download the Ruck app to join this amazing rucking community!
 
 #Ruck #Fitness #Community''';
-      
+
       await Share.share(shareText);
     } catch (e) {
       print('Error in fallback text sharing: $e');
     }
   }
-  
+
   static String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays < 7) {
       return '${difference.inDays} days ago';
     } else if (difference.inDays < 30) {

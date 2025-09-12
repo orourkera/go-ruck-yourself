@@ -62,7 +62,8 @@ class _SecurityTimeoutWidgetState extends State<SecurityTimeoutWidget> {
 
       // Navigate to login screen
       if (mounted && context.mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
       }
     }
   }
@@ -72,7 +73,7 @@ class _SecurityTimeoutWidgetState extends State<SecurityTimeoutWidget> {
     if (!widget.enabled) {
       return widget.child;
     }
-    
+
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: _startInactivityTimer,

@@ -12,7 +12,8 @@ class StravaSettingsWidget extends StatefulWidget {
   State<StravaSettingsWidget> createState() => _StravaSettingsWidgetState();
 }
 
-class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with WidgetsBindingObserver {
+class _StravaSettingsWidgetState extends State<StravaSettingsWidget>
+    with WidgetsBindingObserver {
   final StravaService _stravaService = StravaService();
   StravaConnectionStatus? _connectionStatus;
   bool _isLoading = false;
@@ -41,7 +42,7 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
 
   Future<void> _loadConnectionStatus() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final status = await _stravaService.getConnectionStatus();
       if (mounted) {
@@ -52,11 +53,13 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
       }
     } catch (e) {
       AppLogger.error('[STRAVA_SETTINGS] Failed to load status: $e');
-      
+
       // Handle authentication errors gracefully - show as disconnected
       // The API client will handle token refresh automatically
-      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
-        AppLogger.info('[STRAVA_SETTINGS] Authentication error - showing as disconnected');
+      if (e.toString().contains('401') ||
+          e.toString().contains('Unauthorized')) {
+        AppLogger.info(
+            '[STRAVA_SETTINGS] Authentication error - showing as disconnected');
         if (mounted) {
           setState(() {
             _connectionStatus = StravaConnectionStatus(connected: false);
@@ -74,10 +77,10 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
 
   Future<void> _connectToStrava() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final success = await _stravaService.connectToStrava();
-      
+
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -85,7 +88,7 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Reload status after a short delay to allow OAuth flow
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
@@ -144,10 +147,10 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
     if (shouldDisconnect != true) return;
 
     setState(() => _isLoading = true);
-    
+
     try {
       final success = await _stravaService.disconnect();
-      
+
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -219,7 +222,7 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
-              isConnected 
+              isConnected
                   ? 'Connected • Export your rucks to Strava'
                   : 'Connect to automatically export ruck sessions',
             ),
@@ -328,7 +331,7 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget> with Widget
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Today';
     } else if (difference.inDays == 1) {

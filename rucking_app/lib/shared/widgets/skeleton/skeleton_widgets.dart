@@ -8,7 +8,7 @@ class SessionCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return SkeletonLoader(
       isLoading: true,
       child: Card(
@@ -28,7 +28,7 @@ class SessionCardSkeleton extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Stats grid
               Row(
                 children: [
@@ -94,7 +94,7 @@ class RuckBuddyCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return SkeletonLoader(
       isLoading: true,
       child: Card(
@@ -123,7 +123,7 @@ class RuckBuddyCardSkeleton extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Map placeholder
               const SkeletonBox(
                 width: double.infinity,
@@ -131,7 +131,7 @@ class RuckBuddyCardSkeleton extends StatelessWidget {
                 borderRadius: BorderRadius.all(Radius.circular(8)),
               ),
               const SizedBox(height: 16),
-              
+
               // Stats row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -160,7 +160,7 @@ class RuckBuddyCardSkeleton extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Social actions row
               Row(
                 children: [
@@ -182,7 +182,7 @@ class RuckBuddyCardSkeleton extends StatelessWidget {
 /// Skeleton for photo carousel
 class PhotoCarouselSkeleton extends StatelessWidget {
   final double height;
-  
+
   const PhotoCarouselSkeleton({
     Key? key,
     this.height = 240,
@@ -276,7 +276,7 @@ class HomeStatsSkeleton extends StatelessWidget {
 /// Skeleton for user avatar
 class UserAvatarSkeleton extends StatelessWidget {
   final double size;
-  
+
   const UserAvatarSkeleton({
     Key? key,
     this.size = 50,
@@ -295,7 +295,7 @@ class UserAvatarSkeleton extends StatelessWidget {
 class ListSkeleton extends StatelessWidget {
   final int itemCount;
   final Widget Function(int index) itemBuilder;
-  
+
   const ListSkeleton({
     Key? key,
     this.itemCount = 5,
@@ -321,7 +321,7 @@ class AchievementSummarySkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return SkeletonLoader(
       isLoading: true,
       child: Card(
@@ -350,12 +350,12 @@ class AchievementSummarySkeleton extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Stats row
               const AchievementStatsSkeleton(),
-              
+
               const SizedBox(height: 16),
-              
+
               // Recent achievement/next challenge
               const RecentAchievementSkeleton(),
             ],
@@ -408,13 +408,13 @@ class RecentAchievementSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return SkeletonLoader(
       isLoading: true,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDarkMode 
+          color: isDarkMode
               ? Colors.grey[800]!.withOpacity(0.3)
               : Colors.white.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),

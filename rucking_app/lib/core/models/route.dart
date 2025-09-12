@@ -120,46 +120,52 @@ class Route extends Equatable {
       externalId: json['external_id'] as String?,
       externalUrl: json['external_url'] as String?,
       routePolyline: json['route_polyline']?.toString() ?? '',
-      startLatitude: json['start_latitude'] != null ? (json['start_latitude'] as num).toDouble() : 0.0,
-      startLongitude: json['start_longitude'] != null ? (json['start_longitude'] as num).toDouble() : 0.0,
-      endLatitude: json['end_latitude'] != null 
-          ? (json['end_latitude'] as num).toDouble() 
+      startLatitude: json['start_latitude'] != null
+          ? (json['start_latitude'] as num).toDouble()
+          : 0.0,
+      startLongitude: json['start_longitude'] != null
+          ? (json['start_longitude'] as num).toDouble()
+          : 0.0,
+      endLatitude: json['end_latitude'] != null
+          ? (json['end_latitude'] as num).toDouble()
           : null,
-      endLongitude: json['end_longitude'] != null 
-          ? (json['end_longitude'] as num).toDouble() 
+      endLongitude: json['end_longitude'] != null
+          ? (json['end_longitude'] as num).toDouble()
           : null,
       distanceKm: (json['distance_km'] as num).toDouble(),
-      elevationGainM: json['elevation_gain_m'] != null 
-          ? (json['elevation_gain_m'] as num).toDouble() 
+      elevationGainM: json['elevation_gain_m'] != null
+          ? (json['elevation_gain_m'] as num).toDouble()
           : null,
-      elevationLossM: json['elevation_loss_m'] != null 
-          ? (json['elevation_loss_m'] as num).toDouble() 
+      elevationLossM: json['elevation_loss_m'] != null
+          ? (json['elevation_loss_m'] as num).toDouble()
           : null,
       trailDifficulty: json['trail_difficulty'] as String?,
       trailType: json['trail_type'] as String?,
       surfaceType: json['surface_type'] as String?,
       totalPlannedCount: json['total_planned_count'] as int? ?? 0,
       totalCompletedCount: json['total_completed_count'] as int? ?? 0,
-      averageRating: json['average_rating'] != null 
-          ? (json['average_rating'] as num).toDouble() 
+      averageRating: json['average_rating'] != null
+          ? (json['average_rating'] as num).toDouble()
           : null,
       isPublic: json['is_public'] as bool? ?? false,
       isVerified: json['is_verified'] as bool? ?? false,
       createdByUserId: json['created_by_user_id'] as String?,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'] as String) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : null,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at'] as String) 
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
           : null,
       elevationPoints: json['elevation_points'] != null
           ? (json['elevation_points'] as List)
-              .map((e) => RouteElevationPoint.fromJson(e as Map<String, dynamic>))
+              .map((e) =>
+                  RouteElevationPoint.fromJson(e as Map<String, dynamic>))
               .toList()
           : [],
       pointsOfInterest: json['points_of_interest'] != null
           ? (json['points_of_interest'] as List)
-              .map((e) => RoutePointOfInterest.fromJson(e as Map<String, dynamic>))
+              .map((e) =>
+                  RoutePointOfInterest.fromJson(e as Map<String, dynamic>))
               .toList()
           : [],
     );
@@ -193,9 +199,9 @@ class Route extends Equatable {
       if (createdByUserId != null) 'created_by_user_id': createdByUserId,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
-      if (elevationPoints.isNotEmpty) 
+      if (elevationPoints.isNotEmpty)
         'elevation_points': elevationPoints.map((e) => e.toJson()).toList(),
-      if (pointsOfInterest.isNotEmpty) 
+      if (pointsOfInterest.isNotEmpty)
         'points_of_interest': pointsOfInterest.map((e) => e.toJson()).toList(),
     };
   }
@@ -311,19 +317,19 @@ class Route extends Equatable {
   /// Get popularity score based on usage
   double get popularityScore {
     if (totalCompletedCount == 0) return 0.0;
-    
+
     double score = totalCompletedCount * 10.0;
-    
+
     // Bonus for high rating
     if (averageRating != null && averageRating! >= 4.0) {
       score += averageRating! * 5;
     }
-    
+
     // Bonus for verified routes
     if (isVerified) {
       score += 10;
     }
-    
+
     return score.clamp(0.0, 100.0);
   }
 
@@ -342,13 +348,14 @@ class Route extends Equatable {
       RouteDifficulty.hard => 18.0,
       RouteDifficulty.extreme => 22.0,
     };
-    
+
     // Adjust for elevation gain
     if (elevationGainM != null && elevationGainM! > 0) {
-      double elevationAdjustment = (elevationGainM! / 100) * 2; // 2 minutes per 100m elevation
+      double elevationAdjustment =
+          (elevationGainM! / 100) * 2; // 2 minutes per 100m elevation
       pacePerKm += elevationAdjustment;
     }
-    
+
     return (distanceKm * pacePerKm).round();
   }
 

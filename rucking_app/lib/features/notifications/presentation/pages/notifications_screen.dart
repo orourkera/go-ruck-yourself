@@ -27,7 +27,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     // Stop any notification polling while viewing notifications screen
     _notificationBloc.stopPolling();
-    
+
     // Request notifications to display them
     _notificationBloc.add(const NotificationsRequested());
   }
@@ -120,11 +120,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   _notificationBloc.add(const AllNotificationsRead());
                 });
               }
-              
+
               if (state.notifications.isEmpty) {
                 return _buildEmptyState();
               }
-              
+
               return RefreshIndicator(
                 onRefresh: () async {
                   _notificationBloc.add(const NotificationsRequested());
@@ -132,7 +132,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: state.notifications.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final notification = state.notifications[index];
                     return NotificationCard(
@@ -182,7 +183,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _handleNotificationTap(AppNotification notification) {
     // Mark as read first
     _notificationBloc.add(NotificationRead(notification.id));
-    
+
     // Use the centralized notification navigation utility
     NotificationNavigation.navigateToNotificationDestination(
       context,

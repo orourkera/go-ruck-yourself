@@ -19,7 +19,8 @@ class PostSessionUpsellScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<PostSessionUpsellScreen> createState() => _PostSessionUpsellScreenState();
+  State<PostSessionUpsellScreen> createState() =>
+      _PostSessionUpsellScreenState();
 }
 
 class _PostSessionUpsellScreenState extends State<PostSessionUpsellScreen> {
@@ -132,17 +133,22 @@ class _PostSessionUpsellScreenState extends State<PostSessionUpsellScreen> {
                       children: [
                         _buildStatRow(
                           'Distance',
-                          MeasurementUtils.formatDistance(widget.session.distance, metric: true),
+                          MeasurementUtils.formatDistance(
+                              widget.session.distance,
+                              metric: true),
                         ),
                         const SizedBox(height: 8),
                         _buildStatRow(
                           'Duration',
-                          MeasurementUtils.formatDuration(widget.session.duration),
+                          MeasurementUtils.formatDuration(
+                              widget.session.duration),
                         ),
                         const SizedBox(height: 8),
                         _buildStatRow(
                           'Weight',
-                          MeasurementUtils.formatWeight(widget.session.ruckWeightKg, metric: true),
+                          MeasurementUtils.formatWeight(
+                              widget.session.ruckWeightKg,
+                              metric: true),
                         ),
                       ],
                     ),
@@ -216,27 +222,29 @@ class _PostSessionUpsellScreenState extends State<PostSessionUpsellScreen> {
     ];
 
     return Column(
-      children: benefits.map((benefit) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Icon(
-              Icons.check_circle,
-              color: AppColors.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                benefit,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textLight,
+      children: benefits
+          .map((benefit) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        benefit,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textLight,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      )).toList(),
+              ))
+          .toList(),
     );
   }
 }

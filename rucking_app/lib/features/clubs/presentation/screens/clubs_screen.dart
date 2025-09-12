@@ -137,9 +137,9 @@ class _ClubsScreenState extends State<ClubsScreen> {
                       ),
                       onSubmitted: (_) => _performSearch(),
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Filter chips
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -147,7 +147,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
                         children: [
                           _buildFilterChip(
                             'All Clubs',
-                            _membershipFilter == null && _isPublicFilter == null,
+                            _membershipFilter == null &&
+                                _isPublicFilter == null,
                             () {
                               setState(() {
                                 _membershipFilter = null;
@@ -198,7 +199,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   ],
                 ),
               ),
-              
+
               // Clubs list
               Expanded(
                 child: BlocBuilder<ClubsBloc, ClubsState>(
@@ -228,7 +229,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                     } else if (state is ClubsError) {
                       return _buildErrorState(state.message);
                     }
-                    
+
                     return const SizedBox.shrink();
                   },
                 ),
@@ -255,7 +256,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+          color:
+              isSelected ? Theme.of(context).primaryColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? Theme.of(context).primaryColor : AppColors.grey,
@@ -265,10 +267,10 @@ class _ClubsScreenState extends State<ClubsScreen> {
           label,
           style: AppTextStyles.bodySmall.copyWith(
             color: isSelected
-              ? Colors.white
-              : Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : AppColors.textDark,
+                ? Colors.white
+                : Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : AppColors.textDark,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
@@ -293,12 +295,15 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: Theme.of(context).primaryColor,
-                    backgroundImage: club.logoUrl != null && club.logoUrl!.isNotEmpty
-                        ? NetworkImage(club.logoUrl!)
-                        : null,
+                    backgroundImage:
+                        club.logoUrl != null && club.logoUrl!.isNotEmpty
+                            ? NetworkImage(club.logoUrl!)
+                            : null,
                     child: club.logoUrl == null || club.logoUrl!.isEmpty
                         ? Text(
-                            club.name.isNotEmpty ? club.name[0].toUpperCase() : 'C',
+                            club.name.isNotEmpty
+                                ? club.name[0].toUpperCase()
+                                : 'C',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -328,7 +333,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                        if (club.location != null && club.location!.isNotEmpty) ...[
+                        if (club.location != null &&
+                            club.location!.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Row(
                             children: [
@@ -359,15 +365,20 @@ class _ClubsScreenState extends State<ClubsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: club.isPublic ? Theme.of(context).primaryColor.withOpacity(0.1) : AppColors.grey.withOpacity(0.1),
+                          color: club.isPublic
+                              ? Theme.of(context).primaryColor.withOpacity(0.1)
+                              : AppColors.grey.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           club.isPublic ? 'Public' : 'Private',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: club.isPublic ? Theme.of(context).primaryColor : AppColors.grey,
+                            color: club.isPublic
+                                ? Theme.of(context).primaryColor
+                                : AppColors.grey,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -383,16 +394,17 @@ class _ClubsScreenState extends State<ClubsScreen> {
                   ),
                 ],
               ),
-              
               const SizedBox(height: 12),
-              
               Row(
                 children: [
                   if (club.userRole != null) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: club.isUserAdmin ? Theme.of(context).primaryColor : AppColors.secondary,
+                        color: club.isUserAdmin
+                            ? Theme.of(context).primaryColor
+                            : AppColors.secondary,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -405,7 +417,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
                     ),
                   ] else if (club.isUserPending) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.orange,
                         borderRadius: BorderRadius.circular(8),
@@ -422,7 +435,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
                     GestureDetector(
                       onTap: () => _joinClub(club.id),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Theme.of(context).primaryColor,
                           borderRadius: BorderRadius.circular(8),
@@ -437,9 +451,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                       ),
                     ),
                   ],
-                  
                   const Spacer(),
-                  
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
@@ -490,9 +502,7 @@ class _ClubsScreenState extends State<ClubsScreen> {
                 ),
               ],
             ),
-            
             const SizedBox(height: 12),
-            
             Row(
               children: [
                 SkeletonLine(width: 60, height: 16),

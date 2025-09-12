@@ -28,7 +28,7 @@ class _PremiumTabInterceptorState extends State<PremiumTabInterceptor> {
   @override
   void initState() {
     super.initState();
-    
+
     // PAYWALL DISABLED: Commenting out premium status checks
     // Trigger a fresh premium status check when accessing premium tabs
     // if (widget.tabIndex == 2 || widget.tabIndex == 3) {
@@ -43,7 +43,7 @@ class _PremiumTabInterceptorState extends State<PremiumTabInterceptor> {
     // PAYWALL DISABLED: Always allow access to all features
     // Making app 100% free temporarily
     return widget.child;
-    
+
     /* 
     // ORIGINAL PAYWALL LOGIC - PRESERVED FOR FUTURE RESTORATION
     return BlocBuilder<PremiumBloc, PremiumState>(

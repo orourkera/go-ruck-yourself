@@ -9,12 +9,12 @@ import 'package:get_it/get_it.dart';
 /// Provides methods to search, retrieve, create, and manage routes
 class RoutesRepository {
   final ApiClient _apiClient;
-  
-  RoutesRepository({ApiClient? apiClient}) 
+
+  RoutesRepository({ApiClient? apiClient})
       : _apiClient = apiClient ?? GetIt.instance<ApiClient>();
 
   /// Get all routes with optional filtering
-  /// 
+  ///
   /// Parameters:
   /// - [limit]: Maximum number of routes to return (default: 20)
   /// - [offset]: Number of routes to skip for pagination (default: 0)
@@ -47,23 +47,29 @@ class RoutesRepository {
         'limit': limit.toString(),
         'offset': offset.toString(),
       };
-      
+
       if (search?.isNotEmpty == true) queryParams['search'] = search!;
       if (source?.isNotEmpty == true) queryParams['source'] = source!;
-      if (difficulty?.isNotEmpty == true) queryParams['difficulty'] = difficulty!;
-      if (minDistance != null) queryParams['min_distance'] = minDistance.toString();
-      if (maxDistance != null) queryParams['max_distance'] = maxDistance.toString();
-      if (nearLatitude != null) queryParams['near_lat'] = nearLatitude.toString();
-      if (nearLongitude != null) queryParams['near_lng'] = nearLongitude.toString();
+      if (difficulty?.isNotEmpty == true)
+        queryParams['difficulty'] = difficulty!;
+      if (minDistance != null)
+        queryParams['min_distance'] = minDistance.toString();
+      if (maxDistance != null)
+        queryParams['max_distance'] = maxDistance.toString();
+      if (nearLatitude != null)
+        queryParams['near_lat'] = nearLatitude.toString();
+      if (nearLongitude != null)
+        queryParams['near_lng'] = nearLongitude.toString();
       if (radiusKm != null) queryParams['radius_km'] = radiusKm.toString();
       if (isPublic != null) queryParams['is_public'] = isPublic.toString();
-      if (isVerified != null) queryParams['is_verified'] = isVerified.toString();
+      if (isVerified != null)
+        queryParams['is_verified'] = isVerified.toString();
 
       final data = await _apiClient.get('/routes', queryParams: queryParams);
       final routes = (data['routes'] as List)
           .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
           .toList();
-      
+
       AppLogger.info('Retrieved ${routes.length} routes');
       return routes;
     } catch (e) {
@@ -73,7 +79,7 @@ class RoutesRepository {
   }
 
   /// Get a specific route by ID with optional detailed data
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route to retrieve
   /// - [includeElevation]: Include elevation profile points (default: false)
@@ -88,7 +94,8 @@ class RoutesRepository {
       if (includeElevation) queryParams['include_elevation'] = 'true';
       if (includePois) queryParams['include_pois'] = 'true';
 
-      final data = await _apiClient.get('/routes/$routeId', queryParams: queryParams.isNotEmpty ? queryParams : null);
+      final data = await _apiClient.get('/routes/$routeId',
+          queryParams: queryParams.isNotEmpty ? queryParams : null);
       final route = Route.fromJson(data as Map<String, dynamic>);
       AppLogger.info('Retrieved route: ${route.name}');
       return route;
@@ -99,7 +106,7 @@ class RoutesRepository {
   }
 
   /// Create a new route
-  /// 
+  ///
   /// Parameters:
   /// - [route]: Route data to create
   Future<Route> createRoute(Route route) async {
@@ -115,7 +122,7 @@ class RoutesRepository {
   }
 
   /// Update an existing route
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route to update
   /// - [route]: Updated route data
@@ -132,7 +139,7 @@ class RoutesRepository {
   }
 
   /// Update route visibility
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route to update
   /// - [isPublic]: Whether the route should be public
@@ -141,8 +148,10 @@ class RoutesRepository {
       final data = await _apiClient.patch('/routes/$routeId', {
         'is_public': isPublic,
       });
-      final updatedRoute = Route.fromJson(data['route'] as Map<String, dynamic>);
-      AppLogger.info('Updated route visibility: ${updatedRoute.name} -> ${isPublic ? "public" : "private"}');
+      final updatedRoute =
+          Route.fromJson(data['route'] as Map<String, dynamic>);
+      AppLogger.info(
+          'Updated route visibility: ${updatedRoute.name} -> ${isPublic ? "public" : "private"}');
       return updatedRoute;
     } catch (e) {
       AppLogger.error('Error updating route visibility $routeId: $e');
@@ -151,7 +160,7 @@ class RoutesRepository {
   }
 
   /// Delete a route
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route to delete
   Future<bool> deleteRoute(String routeId) async {
@@ -166,17 +175,19 @@ class RoutesRepository {
   }
 
   /// Get elevation profile for a route
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route
   Future<List<RouteElevationPoint>> getRouteElevation(String routeId) async {
     try {
       final data = await _apiClient.get('/routes/$routeId/elevation');
       final elevationPoints = (data['elevation_points'] as List)
-          .map((pointJson) => RouteElevationPoint.fromJson(pointJson as Map<String, dynamic>))
+          .map((pointJson) =>
+              RouteElevationPoint.fromJson(pointJson as Map<String, dynamic>))
           .toList();
-      
-      AppLogger.info('Retrieved ${elevationPoints.length} elevation points for route $routeId');
+
+      AppLogger.info(
+          'Retrieved ${elevationPoints.length} elevation points for route $routeId');
       return elevationPoints;
     } catch (e) {
       AppLogger.error('Error getting route elevation $routeId: $e');
@@ -185,16 +196,17 @@ class RoutesRepository {
   }
 
   /// Get points of interest for a route
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route
   Future<List<RoutePointOfInterest>> getRoutePois(String routeId) async {
     try {
       final data = await _apiClient.get('/routes/$routeId/pois');
       final pois = (data['pois'] as List)
-          .map((poiJson) => RoutePointOfInterest.fromJson(poiJson as Map<String, dynamic>))
+          .map((poiJson) =>
+              RoutePointOfInterest.fromJson(poiJson as Map<String, dynamic>))
           .toList();
-      
+
       AppLogger.info('Retrieved ${pois.length} POIs for route $routeId');
       return pois;
     } catch (e) {
@@ -204,7 +216,7 @@ class RoutesRepository {
   }
 
   /// Search for trending/popular routes
-  /// 
+  ///
   /// Parameters:
   /// - [limit]: Maximum number of routes to return (default: 10)
   /// - [timeframe]: Timeframe for trending ('day', 'week', 'month')
@@ -218,11 +230,12 @@ class RoutesRepository {
         'timeframe': timeframe,
       };
 
-      final data = await _apiClient.get('/routes/trending', queryParams: queryParams);
+      final data =
+          await _apiClient.get('/routes/trending', queryParams: queryParams);
       final routes = (data['trending_routes'] as List)
           .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
           .toList();
-      
+
       AppLogger.info('Retrieved ${routes.length} trending routes');
       return routes;
     } catch (e) {
@@ -232,7 +245,7 @@ class RoutesRepository {
   }
 
   /// Get routes created by current user
-  /// 
+  ///
   /// Parameters:
   /// - [limit]: Maximum number of routes to return (default: 20)
   /// - [offset]: Number of routes to skip for pagination (default: 0)
@@ -247,29 +260,33 @@ class RoutesRepository {
         'created_by_me': 'true',
       };
 
-      final response = await _apiClient.get('/routes', queryParams: queryParams);
-    
-    // Debug: Print raw API response
-    AppLogger.info('=== API Response Debug ===');
-    AppLogger.info('Response keys: ${response.keys.toList()}');
-    
-    final data = response['data'] ?? response; // Handle both nested and flat structures
-    AppLogger.info('Data keys: ${data.keys.toList()}');
-    
-    final routesList = data['routes'] as List? ?? [];
-    AppLogger.info('Routes list length: ${routesList.length}');
-    
-    if (routesList.isNotEmpty) {
-      final firstRoute = routesList.first as Map<String, dynamic>;
-      AppLogger.info('First route keys: ${firstRoute.keys.toList()}');
-      AppLogger.info('First route polyline: "${firstRoute['route_polyline']}"');
-      AppLogger.info('First route polyline type: ${firstRoute['route_polyline'].runtimeType}');
-    }
-    
-    final routes = routesList
-        .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
-        .toList();
-      
+      final response =
+          await _apiClient.get('/routes', queryParams: queryParams);
+
+      // Debug: Print raw API response
+      AppLogger.info('=== API Response Debug ===');
+      AppLogger.info('Response keys: ${response.keys.toList()}');
+
+      final data = response['data'] ??
+          response; // Handle both nested and flat structures
+      AppLogger.info('Data keys: ${data.keys.toList()}');
+
+      final routesList = data['routes'] as List? ?? [];
+      AppLogger.info('Routes list length: ${routesList.length}');
+
+      if (routesList.isNotEmpty) {
+        final firstRoute = routesList.first as Map<String, dynamic>;
+        AppLogger.info('First route keys: ${firstRoute.keys.toList()}');
+        AppLogger.info(
+            'First route polyline: "${firstRoute['route_polyline']}"');
+        AppLogger.info(
+            'First route polyline type: ${firstRoute['route_polyline'].runtimeType}');
+      }
+
+      final routes = routesList
+          .map((routeJson) => Route.fromJson(routeJson as Map<String, dynamic>))
+          .toList();
+
       AppLogger.info('Retrieved ${routes.length} user routes');
       return routes;
     } catch (e) {
@@ -279,7 +296,7 @@ class RoutesRepository {
   }
 
   /// Rate a route
-  /// 
+  ///
   /// Parameters:
   /// - [routeId]: ID of the route to rate
   /// - [rating]: Rating value (1-5 stars)

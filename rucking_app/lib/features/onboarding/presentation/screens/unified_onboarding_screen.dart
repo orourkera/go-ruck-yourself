@@ -21,7 +21,8 @@ class UnifiedOnboardingScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<UnifiedOnboardingScreen> createState() => _UnifiedOnboardingScreenState();
+  State<UnifiedOnboardingScreen> createState() =>
+      _UnifiedOnboardingScreenState();
 }
 
 class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
@@ -30,7 +31,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
   // Permission states
   bool _locationPermissionGranted = false;
-  bool _healthPermissionGranted = !Platform.isIOS; // Auto-grant on non-iOS platforms
+  bool _healthPermissionGranted =
+      !Platform.isIOS; // Auto-grant on non-iOS platforms
   bool _batteryOptimizationHandled = false;
 
   @override
@@ -43,7 +45,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
     try {
       // Check location permission
       final locationService = GetIt.instance<LocationService>();
-      _locationPermissionGranted = await locationService.hasLocationPermission();
+      _locationPermissionGranted =
+          await locationService.hasLocationPermission();
 
       // Check health permission (only on iOS)
       if (Platform.isIOS) {
@@ -111,7 +114,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
     return _buildPermissionStep(
       icon: Icons.location_on,
       title: 'Location Access',
-      description: 'We need location access to track your ruck sessions accurately. This enables:',
+      description:
+          'We need location access to track your ruck sessions accurately. This enables:',
       features: [
         'GPS tracking during your rucks',
         'Distance and pace calculations',
@@ -128,7 +132,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
     return _buildPermissionStep(
       icon: Icons.favorite,
       title: Platform.isIOS ? 'Apple Health Integration' : 'Health Integration',
-      description: 'Connect with ${Platform.isIOS ? 'Apple Health' : 'your health app'} to enhance your experience:',
+      description:
+          'Connect with ${Platform.isIOS ? 'Apple Health' : 'your health app'} to enhance your experience:',
       features: [
         'Heart rate monitoring during rucks',
         'Automatic workout syncing',
@@ -137,7 +142,9 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
       ],
       buttonText: 'Connect Health',
       onPressed: _requestHealthPermission,
-      imagePath: Platform.isIOS ? 'assets/images/apple health screen.png' : 'assets/images/health_integration.png',
+      imagePath: Platform.isIOS
+          ? 'assets/images/apple health screen.png'
+          : 'assets/images/health_integration.png',
     );
   }
 
@@ -145,7 +152,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
     return _buildPermissionStep(
       icon: Icons.battery_saver,
       title: 'Background Tracking',
-      description: 'For the best tracking experience on Android, we recommend optimizing battery settings:',
+      description:
+          'For the best tracking experience on Android, we recommend optimizing battery settings:',
       features: [
         'Continuous GPS tracking',
         'Background location updates',
@@ -281,7 +289,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
                       ),
                     ),
                   const SizedBox(height: 32),
-                  
+
                   // Title
                   Text(
                     title,
@@ -292,7 +300,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Description
                   Text(
                     description,
@@ -302,7 +310,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Features list
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -314,34 +322,38 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
                       ),
                     ),
                     child: Column(
-                      children: features.map((feature) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                feature,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: Colors.black87,
+                      children: features
+                          .map((feature) => Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        feature,
+                                        style:
+                                            AppTextStyles.bodyMedium.copyWith(
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
+                              ))
+                          .toList(),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          
+
           // Action button
           const SizedBox(height: 24),
           SizedBox(
@@ -365,7 +377,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
               ),
             ),
           ),
-          
+
           // Skip button for non-essential permissions
           if (title.contains('Health') || title.contains('Background'))
             TextButton(
@@ -384,16 +396,17 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
   Future<void> _requestLocationPermission() async {
     setState(() => _isProcessing = true);
-    
+
     try {
       final locationService = GetIt.instance<LocationService>();
-      final granted = await locationService.requestLocationPermission(context: context);
-      
+      final granted =
+          await locationService.requestLocationPermission(context: context);
+
       setState(() {
         _locationPermissionGranted = granted;
         _isProcessing = false;
       });
-      
+
       if (granted) {
         AppLogger.info('[ONBOARDING] Location permission granted');
       } else {
@@ -411,18 +424,18 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
   Future<void> _requestHealthPermission() async {
     setState(() => _isProcessing = true);
-    
+
     try {
       final healthService = GetIt.instance<HealthService>();
       final isAvailable = await healthService.isHealthDataAvailable();
-      
+
       if (isAvailable) {
         final granted = await healthService.requestAuthorization();
         setState(() {
           _healthPermissionGranted = granted;
           _isProcessing = false;
         });
-        
+
         if (granted) {
           AppLogger.info('[ONBOARDING] Health permission granted');
           StyledSnackBar.showSuccess(
@@ -445,17 +458,18 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
   Future<void> _requestBatteryOptimization() async {
     setState(() => _isProcessing = true);
-    
+
     try {
       if (Platform.isAndroid) {
-        await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
+        await BatteryOptimizationService.ensureBackgroundExecutionPermissions(
+            context: context);
       }
-      
+
       setState(() {
         _batteryOptimizationHandled = true;
         _isProcessing = false;
       });
-      
+
       AppLogger.info('[ONBOARDING] Battery optimization handled');
     } catch (e) {
       AppLogger.error('[ONBOARDING] Error handling battery optimization: $e');

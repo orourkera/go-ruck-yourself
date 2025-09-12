@@ -45,24 +45,24 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
   late AnimationController _emergencyButtonController;
   late Animation<double> _primaryButtonAnimation;
   late Animation<double> _emergencyPulseAnimation;
-  
+
   bool _showExpandedControls = false;
   bool _showStopConfirmation = false;
 
   @override
   void initState() {
     super.initState();
-    
+
     _primaryButtonController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    
+
     _emergencyButtonController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    
+
     _primaryButtonAnimation = Tween<double>(
       begin: 1.0,
       end: 0.95,
@@ -70,7 +70,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
       parent: _primaryButtonController,
       curve: Curves.easeInOut,
     ));
-    
+
     _emergencyPulseAnimation = Tween<double>(
       begin: 1.0,
       end: 1.1,
@@ -78,7 +78,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
       parent: _emergencyButtonController,
       curve: Curves.easeInOut,
     ));
-    
+
     if (widget.showEmergencyControls) {
       _emergencyButtonController.repeat(reverse: true);
     }
@@ -120,35 +120,34 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Main controls row
           _buildMainControls(),
-          
+
           // Quick actions
           if (widget.showQuickActions) ...[
             const SizedBox(height: 16),
             _buildQuickActions(),
           ],
-          
+
           // Advanced controls (expandable)
           if (widget.showAdvancedControls) ...[
             const SizedBox(height: 12),
             _buildAdvancedToggle(),
-            
             if (_showExpandedControls) ...[
               const SizedBox(height: 16),
               _buildAdvancedControls(),
             ],
           ],
-          
+
           // Emergency controls
           if (widget.showEmergencyControls) ...[
             const SizedBox(height: 16),
             _buildEmergencyControls(),
           ],
-          
+
           // Stop confirmation dialog
           if (_showStopConfirmation) ...[
             const SizedBox(height: 16),
@@ -176,9 +175,9 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
             },
           ),
         ),
-        
+
         const SizedBox(width: 16),
-        
+
         // Stop button
         Expanded(
           child: _buildStopButton(),
@@ -189,7 +188,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
 
   Widget _buildPrimaryActionButton() {
     final isPaused = widget.activeSession.status == RuckSessionStatus.paused;
-    
+
     return GestureDetector(
       onTapDown: (_) => _primaryButtonController.forward(),
       onTapUp: (_) => _primaryButtonController.reverse(),
@@ -199,7 +198,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
         height: 60,
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: isPaused 
+            colors: isPaused
                 ? [AppColors.success, AppColors.success.withOpacity(0.8)]
                 : [AppColors.warning, AppColors.warning.withOpacity(0.8)],
             begin: Alignment.topCenter,
@@ -285,21 +284,18 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
           onPressed: widget.onMarkWaypointPressed,
           color: AppColors.info,
         ),
-        
         _buildQuickActionButton(
           icon: Icons.camera_alt,
           label: 'Photo',
           onPressed: widget.onTakePhotoPressed,
           color: AppColors.primary,
         ),
-        
         _buildQuickActionButton(
           icon: Icons.share_location,
           label: 'Share',
           onPressed: widget.onShareLocationPressed,
           color: AppColors.success,
         ),
-        
         _buildQuickActionButton(
           icon: Icons.settings,
           label: 'Settings',
@@ -420,9 +416,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
               ),
             ],
           ),
-          
           const SizedBox(height: 12),
-          
           Row(
             children: [
               Expanded(
@@ -569,18 +563,14 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
               ),
             ],
           ),
-          
           const SizedBox(height: 8),
-          
           Text(
             'This will end your current ruck session. All progress will be saved.',
             style: AppTextStyles.body2.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
-          
           const SizedBox(height: 16),
-          
           Row(
             children: [
               Expanded(
@@ -595,9 +585,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
                   ),
                 ),
               ),
-              
               const SizedBox(width: 12),
-              
               Expanded(
                 child: ElevatedButton(
                   onPressed: _confirmStop,
@@ -619,7 +607,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
 
   void _handlePrimaryAction() {
     HapticFeedback.mediumImpact();
-    
+
     if (widget.activeSession.status == RuckSessionStatus.paused) {
       widget.onResumePressed?.call();
     } else {
@@ -650,7 +638,7 @@ class _SessionControlsWidgetState extends State<SessionControlsWidget>
 
   void _handleEmergencyPress() {
     HapticFeedback.heavyImpact();
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,

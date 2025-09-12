@@ -7,13 +7,13 @@ class DuelCompletionService {
   final ApiClient _apiClient;
   Timer? _completionCheckTimer;
   bool _isStarted = false;
-  
+
   DuelCompletionService(this._apiClient);
 
   /// Start periodic checking for duel completion (every 2 minutes)
   void startCompletionChecking() {
     if (_isStarted) return; // Prevent multiple starts
-    
+
     _completionCheckTimer?.cancel();
     _completionCheckTimer = Timer.periodic(
       const Duration(minutes: 2),
@@ -35,7 +35,7 @@ class DuelCompletionService {
   Future<void> _triggerBackendCompletionCheck() async {
     try {
       final response = await _apiClient.post('/duels/completion-check', {});
-      
+
       final completedCount = response['completed_duels']?.length ?? 0;
       if (completedCount > 0) {
         AppLogger.info('Backend completed $completedCount expired duels');
@@ -48,7 +48,8 @@ class DuelCompletionService {
 
   /// Manually trigger completion check (for immediate completion after progress update)
   Future<void> checkDuelCompletion(String duelId) async {
-    AppLogger.info('Manually triggering duel completion check for duel $duelId');
+    AppLogger.info(
+        'Manually triggering duel completion check for duel $duelId');
     await _triggerBackendCompletionCheck();
   }
 

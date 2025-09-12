@@ -178,7 +178,7 @@ class UserStatsCard extends StatelessWidget {
 
   Widget _buildAchievementBadge() {
     final achievementText = _getAchievementText();
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),

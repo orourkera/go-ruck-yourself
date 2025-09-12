@@ -46,14 +46,19 @@ class Club extends Equatable {
       isPublic: json['is_public'] as bool,
       maxMembers: json['max_members'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String? ?? json['created_at'] as String),
+      updatedAt: DateTime.parse(
+          json['updated_at'] as String? ?? json['created_at'] as String),
       memberCount: json['member_count'] as int? ?? 0, // Default to 0 if null
       userRole: json['user_role'] as String?,
       userStatus: json['user_status'] as String?,
       logoUrl: json['logo_url'] as String?,
       location: json['location'] as String?,
-      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
-      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
     );
   }
 
@@ -80,6 +85,7 @@ class Club extends Equatable {
   bool get isUserAdmin {
     return userRole == 'admin';
   }
+
   bool get isUserMember => userRole == 'member' || userRole == 'admin';
   bool get isUserPending => userStatus == 'pending';
   bool get canJoin => userRole == null && userStatus == null;
@@ -164,7 +170,8 @@ class ClubDetails extends Equatable {
 
   factory ClubDetails.fromJson(Map<String, dynamic> json) {
     // Support both old and new API formats
-    final clubJson = json.containsKey('club') ? json['club'] as Map<String, dynamic> : json;
+    final clubJson =
+        json.containsKey('club') ? json['club'] as Map<String, dynamic> : json;
 
     // Get admin user data
     ClubMember adminUser;
@@ -202,7 +209,8 @@ class ClubDetails extends Equatable {
           .map((member) => ClubMember.fromJson(member as Map<String, dynamic>))
           .toList(),
       pendingRequests: (clubJson['pending_requests'] as List<dynamic>? ?? [])
-          .map((request) => ClubMember.fromJson(request as Map<String, dynamic>))
+          .map(
+              (request) => ClubMember.fromJson(request as Map<String, dynamic>))
           .toList(),
       adminUser: adminUser,
     );

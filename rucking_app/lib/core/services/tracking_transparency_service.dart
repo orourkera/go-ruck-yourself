@@ -16,29 +16,32 @@ class TrackingTransparencyService {
       }
 
       AppLogger.info('[ATT] Starting App Tracking Transparency request...');
-      
+
       // Check the current status first
       final status = await AppTrackingTransparency.trackingAuthorizationStatus;
       AppLogger.info('[ATT] Current tracking status: $status');
-      
+
       // If we've already shown the dialog and received an answer, just return the result
       if (status != TrackingStatus.notDetermined) {
         final isAuthorized = status == TrackingStatus.authorized;
-        AppLogger.info('[ATT] Previous decision found - tracking authorized: $isAuthorized');
+        AppLogger.info(
+            '[ATT] Previous decision found - tracking authorized: $isAuthorized');
         return isAuthorized;
       }
 
       // Initial request - show the system dialog
       AppLogger.info('[ATT] Showing ATT permission dialog to user...');
-      
+
       // Additional check before showing dialog
       AppLogger.info('[ATT] Platform check: iOS = ${Platform.isIOS}');
       AppLogger.info('[ATT] App state: UI should be fully loaded');
-      
-      final authStatus = await AppTrackingTransparency.requestTrackingAuthorization();
+
+      final authStatus =
+          await AppTrackingTransparency.requestTrackingAuthorization();
       AppLogger.info('[ATT] User decision received: $authStatus');
-      AppLogger.info('[ATT] Authorization status enum value: ${authStatus.index}');
-      
+      AppLogger.info(
+          '[ATT] Authorization status enum value: ${authStatus.index}');
+
       // App can track if the user authorized it
       final canTrack = authStatus == TrackingStatus.authorized;
       AppLogger.info('[ATT] Final tracking permission: $canTrack');
@@ -46,7 +49,7 @@ class TrackingTransparencyService {
     } catch (e) {
       // Log errors but don't crash the app
       AppLogger.error('[ATT] Error requesting tracking authorization: $e');
-      
+
       // Default to no tracking if there's an error
       return false;
     }

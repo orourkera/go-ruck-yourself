@@ -11,8 +11,8 @@ import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.d
 
 abstract class RuckBuddiesRemoteDataSource {
   /// Gets a list of public ruck sessions from other users
-  /// 
-  /// Filter options: 
+  ///
+  /// Filter options:
   /// - 'closest' - Closest rucks (requires lat/lon)
   /// - 'calories' - Most calories burned
   /// - 'distance' - Furthest distance
@@ -20,13 +20,12 @@ abstract class RuckBuddiesRemoteDataSource {
   /// - 'elevation' - Most elevation gain
   ///
   /// Throws a [ServerException] if there is an error
-  Future<List<RuckBuddyModel>> getRuckBuddies({
-    required int limit, 
-    required int offset, 
-    required String filter,
-    double? latitude,
-    double? longitude
-  });
+  Future<List<RuckBuddyModel>> getRuckBuddies(
+      {required int limit,
+      required int offset,
+      required String filter,
+      double? latitude,
+      double? longitude});
 }
 
 class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
@@ -35,18 +34,17 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
   RuckBuddiesRemoteDataSourceImpl({required this.apiClient});
 
   @override
-  Future<List<RuckBuddyModel>> getRuckBuddies({
-    required int limit, 
-    required int offset, 
-    required String filter,
-    double? latitude,
-    double? longitude
-  }) async {
+  Future<List<RuckBuddyModel>> getRuckBuddies(
+      {required int limit,
+      required int offset,
+      required String filter,
+      double? latitude,
+      double? longitude}) async {
     try {
       // Convert filter to the sort_by parameter format expected by API
       String sortBy;
       bool followingOnly = false;
-      
+
       switch (filter) {
         case 'following':
           sortBy = 'proximity_asc'; // Default sort for following
@@ -71,19 +69,20 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
       }
 
       final queryParams = {
-        'page': (offset ~/ limit + 1).toString(), // Convert offset to page number
+        'page':
+            (offset ~/ limit + 1).toString(), // Convert offset to page number
         'per_page': limit.toString(),
         'sort_by': sortBy,
-        'exclude_manual': 'true',  // Exclude manual sessions
+        'exclude_manual': 'true', // Exclude manual sessions
         'following_only': followingOnly.toString(),
       };
-      
+
       // Add location data if available and we're using proximity filter
       if (sortBy == 'proximity_asc' && latitude != null && longitude != null) {
         queryParams['latitude'] = latitude.toString();
         queryParams['longitude'] = longitude.toString();
       }
-      
+
       // Get current user ID for following filter
       String? currentUserId;
       if (followingOnly) {
@@ -109,13 +108,17 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
           if (currentUserId != null) 'p_user_id': currentUserId,
         },
       );
-      
+
       // Debug logging to see raw response
-      debugPrint('[API] Raw ruck buddies response type: ${response.runtimeType}');
-      debugPrint('[API] Response keys: ${response is Map ? (response as Map).keys.toString() : 'Not a map'}');
-      
+      debugPrint(
+          '[API] Raw ruck buddies response type: ${response.runtimeType}');
+      debugPrint(
+          '[API] Response keys: ${response is Map ? (response as Map).keys.toString() : 'Not a map'}');
+
       // More detailed logging of first several entries
-      if (response is Map && response.containsKey('ruck_sessions') && response['ruck_sessions'] is List) {
+      if (response is Map &&
+          response.containsKey('ruck_sessions') &&
+          response['ruck_sessions'] is List) {
         List<dynamic> sessions = response['ruck_sessions'];
         for (int i = 0; i < (sessions.length > 3 ? 3 : sessions.length); i++) {
           var session = sessions[i];
@@ -133,19 +136,27 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
       } else if (response is List) {
         data = response;
         debugPrint('Found ${data.length} ruck sessions in RPC response');
-      } else if (response is Map && response.containsKey('data') && response['data'] is List) {
+      } else if (response is Map &&
+          response.containsKey('data') &&
+          response['data'] is List) {
         data = response['data'] as List;
         debugPrint('Found ${data.length} ruck sessions in data field');
-      } else if (response is Map && response.containsKey('sessions') && response['sessions'] is List) {
+      } else if (response is Map &&
+          response.containsKey('sessions') &&
+          response['sessions'] is List) {
         data = response['sessions'] as List;
         debugPrint('Found ${data.length} ruck sessions in sessions field');
-      } else if (response is Map && response.containsKey('items') && response['items'] is List) {
+      } else if (response is Map &&
+          response.containsKey('items') &&
+          response['items'] is List) {
         data = response['items'] as List;
         debugPrint('Found ${data.length} ruck sessions in items field');
-      } else if (response is Map && response.containsKey('results') && response['results'] is List) {
+      } else if (response is Map &&
+          response.containsKey('results') &&
+          response['results'] is List) {
         data = response['results'] as List;
         debugPrint('Found ${data.length} ruck sessions in results field');
-      } else if (response is Map) { 
+      } else if (response is Map) {
         // Search for any List field in response
         List<dynamic> foundList = [];
         for (var key in response.keys) {
@@ -160,7 +171,7 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
         debugPrint('No ruck sessions found in response: $response');
         data = [];
       }
-      
+
       // Add null safety and type checking for RPC response
       final processedData = <RuckBuddyModel>[];
       for (int i = 0; i < data.length; i++) {
@@ -170,7 +181,8 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
           continue;
         }
         if (item is! Map<String, dynamic>) {
-          debugPrint('⚠️ Session $i is not a Map: ${item.runtimeType}, skipping');
+          debugPrint(
+              '⚠️ Session $i is not a Map: ${item.runtimeType}, skipping');
           continue;
         }
         try {
@@ -181,8 +193,9 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
           // Continue processing other sessions
         }
       }
-      
-      debugPrint('✅ Successfully parsed ${processedData.length}/${data.length} ruck buddy sessions');
+
+      debugPrint(
+          '✅ Successfully parsed ${processedData.length}/${data.length} ruck buddy sessions');
       return processedData;
     } catch (e) {
       throw ServerException(

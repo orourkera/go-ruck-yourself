@@ -4,28 +4,28 @@ import 'package:equatable/equatable.dart';
 class DuelComment extends Equatable {
   /// Unique ID of the comment
   final String id;
-  
+
   /// ID of the duel that was commented on
   final String duelId;
-  
+
   /// ID of the user who wrote the comment
   final String userId;
-  
+
   /// Display name of the user who wrote the comment
   final String userDisplayName;
-  
+
   /// Optional user avatar URL
   final String? userAvatarUrl;
-  
+
   /// The comment text content
   final String content;
-  
+
   /// Timestamp when the comment was created
   final DateTime createdAt;
-  
+
   /// Optional timestamp when the comment was last edited
   final DateTime? updatedAt;
-  
+
   /// Whether this comment has been edited
   bool get isEdited => updatedAt != null && updatedAt != createdAt;
 
@@ -42,7 +42,8 @@ class DuelComment extends Equatable {
   });
 
   @override
-  List<Object?> get props => [id, duelId, userId, content, createdAt, updatedAt];
+  List<Object?> get props =>
+      [id, duelId, userId, content, createdAt, updatedAt];
 
   /// Creates a DuelComment from a JSON map
   factory DuelComment.fromJson(Map<String, dynamic> json) {
@@ -54,8 +55,8 @@ class DuelComment extends Equatable {
       userAvatarUrl: json['user_avatar_url'],
       content: json['content'] ?? '',
       createdAt: DateTime.parse(json['created_at']),
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']) 
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'])
           : null,
     );
   }

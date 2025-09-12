@@ -12,7 +12,8 @@ class RespondToInvitation implements UseCase<void, RespondToInvitationParams> {
   Future<Either<Failure, void>> call(RespondToInvitationParams params) async {
     // Validate action
     if (params.action != 'accept' && params.action != 'decline') {
-      return Left(ValidationFailure('Invalid action. Must be "accept" or "decline"'));
+      return Left(
+          ValidationFailure('Invalid action. Must be "accept" or "decline"'));
     }
 
     return await repository.respondToInvitation(

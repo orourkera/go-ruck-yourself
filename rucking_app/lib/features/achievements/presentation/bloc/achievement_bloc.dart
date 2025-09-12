@@ -9,12 +9,11 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 
 class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
   final AchievementRepository _achievementRepository;
-  
+
   AchievementBloc({
     required AchievementRepository achievementRepository,
   })  : _achievementRepository = achievementRepository,
         super(AchievementsInitial()) {
-    
     on<LoadAchievements>(_onLoadAchievements);
     on<LoadAchievementCategories>(_onLoadAchievementCategories);
     on<LoadUserAchievements>(_onLoadUserAchievements);
@@ -30,13 +29,16 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      debugPrint('🏆 [AchievementBloc] LoadAchievements event received with unitPreference: ${event.unitPreference}');
+      debugPrint(
+          '🏆 [AchievementBloc] LoadAchievements event received with unitPreference: ${event.unitPreference}');
       emit(AchievementsLoading());
-      
+
       debugPrint('🏆 [AchievementBloc] Fetching all achievements...');
-      final achievements = await _achievementRepository.getAllAchievements(unitPreference: event.unitPreference);
-      debugPrint('🏆 [AchievementBloc] Fetched ${achievements.length} achievements');
-      
+      final achievements = await _achievementRepository.getAllAchievements(
+          unitPreference: event.unitPreference);
+      debugPrint(
+          '🏆 [AchievementBloc] Fetched ${achievements.length} achievements');
+
       // If we already have some state, preserve it and just update achievements
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
@@ -50,12 +52,14 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
           userProgress: [],
           recentAchievements: [],
         ));
-        debugPrint('🏆 [AchievementBloc] Emitted basic AchievementsLoaded state');
+        debugPrint(
+            '🏆 [AchievementBloc] Emitted basic AchievementsLoaded state');
       }
     } catch (e) {
       debugPrint('🏆 [AchievementBloc] Error loading achievements: $e');
       AppLogger.error('Failed to load achievements', exception: e);
-      emit(AchievementsError(message: 'Failed to load achievements: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to load achievements: ${e.toString()}'));
     }
   }
 
@@ -64,8 +68,9 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      final categories = await _achievementRepository.getAchievementCategories();
-      
+      final categories =
+          await _achievementRepository.getAchievementCategories();
+
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         emit(currentState.copyWith(categories: categories));
@@ -80,7 +85,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       }
     } catch (e) {
       AppLogger.error('Failed to load achievement categories', exception: e);
-      emit(AchievementsError(message: 'Failed to load categories: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to load categories: ${e.toString()}'));
     }
   }
 
@@ -92,12 +98,14 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       // Validate userId before making API call to prevent 500 errors
       if (event.userId.isEmpty) {
         AppLogger.error('Cannot load achievements: User ID is empty');
-        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        emit(const AchievementsError(
+            message: 'User profile not found. Please sign in again.'));
         return;
       }
-      
-      final userAchievements = await _achievementRepository.getUserAchievements(event.userId);
-      
+
+      final userAchievements =
+          await _achievementRepository.getUserAchievements(event.userId);
+
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         emit(currentState.copyWith(userAchievements: userAchievements));
@@ -112,7 +120,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       }
     } catch (e) {
       AppLogger.error('Failed to load user achievements', exception: e);
-      emit(AchievementsError(message: 'Failed to load your achievements: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to load your achievements: ${e.toString()}'));
     }
   }
 
@@ -124,12 +133,14 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       // Validate userId before making API call to prevent 500 errors
       if (event.userId.isEmpty) {
         AppLogger.error('Cannot load achievement progress: User ID is empty');
-        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        emit(const AchievementsError(
+            message: 'User profile not found. Please sign in again.'));
         return;
       }
-      
-      final userProgress = await _achievementRepository.getUserAchievementProgress(event.userId);
-      
+
+      final userProgress =
+          await _achievementRepository.getUserAchievementProgress(event.userId);
+
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         emit(currentState.copyWith(userProgress: userProgress));
@@ -144,7 +155,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       }
     } catch (e) {
       AppLogger.error('Failed to load user achievement progress', exception: e);
-      emit(AchievementsError(message: 'Failed to load achievement progress: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to load achievement progress: ${e.toString()}'));
     }
   }
 
@@ -153,55 +165,65 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      AppLogger.sessionCompletion('Checking achievements for session', context: {
-        'session_id': event.sessionId,
-        'current_state_type': state.runtimeType.toString(),
-      });
-      
-      final newAchievements = await _achievementRepository.checkSessionAchievements(event.sessionId);
-      
+      AppLogger.sessionCompletion('Checking achievements for session',
+          context: {
+            'session_id': event.sessionId,
+            'current_state_type': state.runtimeType.toString(),
+          });
+
+      final newAchievements = await _achievementRepository
+          .checkSessionAchievements(event.sessionId);
+
       AppLogger.sessionCompletion('Achievement check completed', context: {
         'session_id': event.sessionId,
         'new_achievements_count': newAchievements.length,
-        'achievements_earned': newAchievements.map((a) => {
-          'id': a.id,
-          'name': a.name,
-          'description': a.description,
-        }).toList(),
+        'achievements_earned': newAchievements
+            .map((a) => {
+                  'id': a.id,
+                  'name': a.name,
+                  'description': a.description,
+                })
+            .toList(),
       });
-      
+
       if (newAchievements.isNotEmpty) {
         AppLogger.sessionCompletion('New achievements earned!', context: {
           'session_id': event.sessionId,
           'achievements_count': newAchievements.length,
           'achievement_names': newAchievements.map((a) => a.name).toList(),
         });
-        
+
         // Clear cache when new achievements are found so data will be refreshed
         await _achievementRepository.clearCache();
-        AppLogger.sessionCompletion('Achievement cache cleared due to new achievements', context: {
-          'session_id': event.sessionId,
-        });
-        
+        AppLogger.sessionCompletion(
+            'Achievement cache cleared due to new achievements',
+            context: {
+              'session_id': event.sessionId,
+            });
+
         if (state is AchievementsLoaded) {
           final currentState = state as AchievementsLoaded;
-          
-          AppLogger.sessionCompletion('Emitting AchievementsSessionChecked state', context: {
-            'session_id': event.sessionId,
-            'previous_state_type': currentState.runtimeType.toString(),
-          });
-          
+
+          AppLogger.sessionCompletion(
+              'Emitting AchievementsSessionChecked state',
+              context: {
+                'session_id': event.sessionId,
+                'previous_state_type': currentState.runtimeType.toString(),
+              });
+
           // Update the newly earned list and emit session checked state
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: currentState.copyWith(newlyEarned: newAchievements),
           ));
         } else {
-          AppLogger.sessionCompletion('Creating new AchievementsLoaded state for achievements', context: {
-            'session_id': event.sessionId,
-            'previous_state_type': state.runtimeType.toString(),
-          });
-          
+          AppLogger.sessionCompletion(
+              'Creating new AchievementsLoaded state for achievements',
+              context: {
+                'session_id': event.sessionId,
+                'previous_state_type': state.runtimeType.toString(),
+              });
+
           emit(AchievementsSessionChecked(
             newAchievements: newAchievements,
             previousState: AchievementsLoaded(
@@ -215,10 +237,11 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
           ));
         }
       } else {
-        AppLogger.sessionCompletion('No new achievements earned for session', context: {
-          'session_id': event.sessionId,
-        });
-        
+        AppLogger.sessionCompletion('No new achievements earned for session',
+            context: {
+              'session_id': event.sessionId,
+            });
+
         // Still need to emit AchievementsSessionChecked even with no achievements
         // so the completion flow knows the check is complete
         if (state is AchievementsLoaded) {
@@ -242,13 +265,15 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
         }
       }
     } catch (e) {
-      AppLogger.sessionCompletion('Error checking session achievements', context: {
-        'session_id': event.sessionId,
-        'error': e.toString(),
-        'error_type': e.runtimeType.toString(),
-      });
+      AppLogger.sessionCompletion('Error checking session achievements',
+          context: {
+            'session_id': event.sessionId,
+            'error': e.toString(),
+            'error_type': e.runtimeType.toString(),
+          });
       AppLogger.error('Failed to check session achievements', exception: e);
-      emit(AchievementsError(message: 'Failed to check session achievements: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to check session achievements: ${e.toString()}'));
     }
   }
 
@@ -260,12 +285,15 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       // Validate userId before making API call to prevent 500 errors
       if (event.userId.isEmpty) {
         AppLogger.error('Cannot load achievement stats: User ID is empty');
-        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        emit(const AchievementsError(
+            message: 'User profile not found. Please sign in again.'));
         return;
       }
-      
-      final stats = await _achievementRepository.getAchievementStats(event.userId, unitPreference: event.unitPreference);
-      
+
+      final stats = await _achievementRepository.getAchievementStats(
+          event.userId,
+          unitPreference: event.unitPreference);
+
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         emit(currentState.copyWith(stats: stats));
@@ -281,7 +309,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       }
     } catch (e) {
       AppLogger.error('Failed to load achievement stats', exception: e);
-      emit(AchievementsError(message: 'Failed to load achievement stats: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to load achievement stats: ${e.toString()}'));
     }
   }
 
@@ -290,8 +319,9 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
     Emitter<AchievementState> emit,
   ) async {
     try {
-      final recentAchievements = await _achievementRepository.getRecentAchievements();
-      
+      final recentAchievements =
+          await _achievementRepository.getRecentAchievements();
+
       if (state is AchievementsLoaded) {
         final currentState = state as AchievementsLoaded;
         emit(currentState.copyWith(recentAchievements: recentAchievements));
@@ -306,7 +336,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       }
     } catch (e) {
       AppLogger.error('Failed to load recent achievements', exception: e);
-      emit(AchievementsError(message: 'Failed to load recent achievements: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to load recent achievements: ${e.toString()}'));
     }
   }
 
@@ -318,23 +349,26 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       // Validate userId before making API call to prevent 500 errors
       if (event.userId.isEmpty) {
         AppLogger.error('Cannot refresh achievement data: User ID is empty');
-        emit(const AchievementsError(message: 'User profile not found. Please sign in again.'));
+        emit(const AchievementsError(
+            message: 'User profile not found. Please sign in again.'));
         return;
       }
-      
+
       emit(AchievementsLoading());
-      
+
       // Clear cache first to force fresh data fetch
       debugPrint('🏆 [AchievementBloc] Clearing achievement cache for refresh');
       await _achievementRepository.clearCache();
-      
+
       // Load all data in parallel for better performance
       final results = await Future.wait([
-        _achievementRepository.getAllAchievements(unitPreference: event.unitPreference),
+        _achievementRepository.getAllAchievements(
+            unitPreference: event.unitPreference),
         _achievementRepository.getAchievementCategories(),
         _achievementRepository.getUserAchievements(event.userId),
         _achievementRepository.getUserAchievementProgress(event.userId),
-        _achievementRepository.getAchievementStats(event.userId, unitPreference: event.unitPreference),
+        _achievementRepository.getAchievementStats(event.userId,
+            unitPreference: event.unitPreference),
         _achievementRepository.getRecentAchievements(),
       ]);
 
@@ -355,7 +389,8 @@ class AchievementBloc extends Bloc<AchievementEvent, AchievementState> {
       ));
     } catch (e) {
       AppLogger.error('Failed to refresh achievement data', exception: e);
-      emit(AchievementsError(message: 'Failed to refresh achievement data: ${e.toString()}'));
+      emit(AchievementsError(
+          message: 'Failed to refresh achievement data: ${e.toString()}'));
     }
   }
 }

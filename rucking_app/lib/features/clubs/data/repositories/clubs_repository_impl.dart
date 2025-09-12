@@ -29,17 +29,17 @@ class ClubsRepositoryImpl implements ClubsRepository {
       isPublic: isPublic,
       membershipFilter: membershipFilter,
     );
-    
+
     if (cachedData != null) {
       // Return cached clubs
       return cachedData
           .map((json) => Club.fromJson(json as Map<String, dynamic>))
           .toList();
     }
-    
+
     // No cache or expired, fetch from API
     final queryParams = <String, String>{};
-    
+
     if (search != null && search.isNotEmpty) {
       queryParams['search'] = search;
     }
@@ -51,11 +51,11 @@ class ClubsRepositoryImpl implements ClubsRepository {
     }
 
     final response = await _apiClient.get('/clubs', queryParams: queryParams);
-    
+
     final clubsList = (response['clubs'] as List)
         .map((json) => Club.fromJson(json as Map<String, dynamic>))
         .toList();
-    
+
     // Cache the response data
     await _cacheService.cacheFilteredClubs(
       response['clubs'] as List,
@@ -63,7 +63,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
       isPublic: isPublic,
       membershipFilter: membershipFilter,
     );
-    
+
     return clubsList;
   }
 
@@ -88,10 +88,10 @@ class ClubsRepositoryImpl implements ClubsRepository {
     };
 
     final response = await _apiClient.post('/clubs', body);
-    
+
     // Invalidate clubs list cache since we created a new club
     await _cacheService.invalidateCache();
-    
+
     return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
@@ -99,15 +99,16 @@ class ClubsRepositoryImpl implements ClubsRepository {
   Future<ClubDetails> getClubDetails(String clubId) async {
     // FORCE CLEAR CACHE TO DEBUG ADMIN ISSUE
     await _cacheService.invalidateClubDetails(clubId);
-    
+
     // No cache, fetch from API
     final response = await _apiClient.get('/clubs/$clubId');
-    
+
     final clubDetails = ClubDetails.fromJson(response as Map<String, dynamic>);
-    
+
     // Cache the club details
-    await _cacheService.cacheClubDetails(clubId, response as Map<String, dynamic>);
-    
+    await _cacheService.cacheClubDetails(
+        clubId, response as Map<String, dynamic>);
+
     return clubDetails;
   }
 
@@ -124,7 +125,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     double? longitude,
   }) async {
     final body = <String, dynamic>{};
-    
+
     if (name != null) body['name'] = name;
     if (description != null) body['description'] = description;
     if (isPublic != null) body['is_public'] = isPublic;
@@ -132,7 +133,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     // Note: location is for display only, not stored in database - only lat/lng are stored
     if (latitude != null) body['latitude'] = latitude;
     if (longitude != null) body['longitude'] = longitude;
-    
+
     // Handle logo upload
     if (logo != null) {
       try {
@@ -144,18 +145,18 @@ class ClubsRepositoryImpl implements ClubsRepository {
     }
 
     final response = await _apiClient.put('/clubs/$clubId', body);
-    
+
     // Invalidate caches since club was updated
     await _cacheService.invalidateCache();
     await _cacheService.invalidateClubDetails(clubId);
-    
+
     return Club.fromJson(response['club'] as Map<String, dynamic>);
   }
 
   @override
   Future<void> deleteClub(String clubId) async {
     await _apiClient.delete('/clubs/$clubId');
-    
+
     // Invalidate caches since club was deleted
     await _cacheService.invalidateCache();
     await _cacheService.invalidateClubDetails(clubId);
@@ -164,7 +165,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
   @override
   Future<void> requestMembership(String clubId) async {
     await _apiClient.post('/clubs/$clubId/join', {});
-    
+
     // Invalidate both club details and clubs list cache since membership status changed
     await _cacheService.invalidateClubDetails(clubId);
     await _cacheService.invalidateCache(); // Clear clubs list cache too
@@ -178,12 +179,12 @@ class ClubsRepositoryImpl implements ClubsRepository {
     String? role,
   }) async {
     final body = <String, dynamic>{};
-    
+
     if (action != null) body['action'] = action;
     if (role != null) body['role'] = role;
 
     await _apiClient.put('/clubs/$clubId/members/$userId', body);
-    
+
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
     await _cacheService.invalidateCache(); // Clear clubs list cache too
@@ -192,7 +193,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
   @override
   Future<void> removeMembership(String clubId, String userId) async {
     await _apiClient.delete('/clubs/$clubId/members/$userId');
-    
+
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
     await _cacheService.invalidateCache(); // Clear clubs list cache too
@@ -201,7 +202,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
   @override
   Future<void> leaveClub(String clubId) async {
     await _apiClient.post('/clubs/$clubId/leave', {});
-    
+
     // Invalidate both club details and clubs list cache since membership changed
     await _cacheService.invalidateClubDetails(clubId);
     await _cacheService.invalidateCache(); // Clear clubs list cache too

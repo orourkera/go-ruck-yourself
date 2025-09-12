@@ -29,12 +29,12 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Column(
       children: [
         // Sort options
         _buildSortOptions(isDarkMode),
-        
+
         // Leaderboard content
         Expanded(
           child: BlocBuilder<EventProgressBloc, EventProgressState>(
@@ -46,14 +46,14 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
                   message: state.message,
                   onRetry: () {
                     context.read<EventProgressBloc>().add(
-                      LoadEventLeaderboard(widget.eventId),
-                    );
+                          LoadEventLeaderboard(widget.eventId),
+                        );
                   },
                 );
               } else if (state is EventLeaderboardLoaded) {
                 return _buildLeaderboard(state.leaderboard, isDarkMode);
               }
-              
+
               return _buildLoadingSkeleton();
             },
           ),
@@ -74,7 +74,6 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
             ),
           ),
           const SizedBox(width: 12),
-          
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -89,13 +88,12 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
               ),
             ),
           ),
-          
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
               context.read<EventProgressBloc>().add(
-                RefreshEventLeaderboard(widget.eventId),
-              );
+                    RefreshEventLeaderboard(widget.eventId),
+                  );
             },
           ),
         ],
@@ -105,7 +103,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
 
   Widget _buildSortChip(String value, String label, bool isDarkMode) {
     final isSelected = _sortBy == value;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -115,12 +113,11 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? Theme.of(context).primaryColor 
-              : Colors.transparent,
+          color:
+              isSelected ? Theme.of(context).primaryColor : Colors.transparent,
           border: Border.all(
-            color: isSelected 
-                ? Theme.of(context).primaryColor 
+            color: isSelected
+                ? Theme.of(context).primaryColor
                 : Colors.grey.withOpacity(0.3),
           ),
           borderRadius: BorderRadius.circular(16),
@@ -128,10 +125,10 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
         child: Text(
           label,
           style: AppTextStyles.bodySmall.copyWith(
-            color: isSelected 
-                ? Colors.white 
-                : isDarkMode 
-                    ? Colors.white 
+            color: isSelected
+                ? Colors.white
+                : isDarkMode
+                    ? Colors.white
                     : Colors.black87,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -178,7 +175,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
 
   Widget _buildLeaderboard(EventLeaderboard leaderboard, bool isDarkMode) {
     List<EventProgress> sortedEntries;
-    
+
     switch (_sortBy) {
       case 'distance':
         sortedEntries = leaderboard.leaderboardByDistance;
@@ -192,7 +189,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
       default:
         sortedEntries = leaderboard.leaderboardByDistance;
     }
-    
+
     if (sortedEntries.isEmpty) {
       return Center(
         child: Column(
@@ -222,12 +219,12 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
         ),
       );
     }
-    
+
     return RefreshIndicator(
       onRefresh: () async {
         context.read<EventProgressBloc>().add(
-          RefreshEventLeaderboard(widget.eventId),
-        );
+              RefreshEventLeaderboard(widget.eventId),
+            );
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -235,25 +232,26 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
         itemBuilder: (context, index) {
           final entry = sortedEntries[index];
           final rank = index + 1;
-          
+
           return _buildLeaderboardEntry(entry, rank, isDarkMode);
         },
       ),
     );
   }
 
-  Widget _buildLeaderboardEntry(EventProgress entry, int rank, bool isDarkMode) {
+  Widget _buildLeaderboardEntry(
+      EventProgress entry, int rank, bool isDarkMode) {
     // Get user's metric preference from auth bloc
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     // Display dashes instead of 0 values when the user has no completed rucks
     final String distanceText = entry.totalDistance > 0
         ? entry.formattedTotalDistance(metric: preferMetric)
         : '--';
-    final String timeText = entry.totalTime > 0
-        ? entry.formattedTotalTime
-        : '--';
-    
+    final String timeText =
+        entry.totalTime > 0 ? entry.formattedTotalTime : '--';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -275,16 +273,17 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
         children: [
           // Rank badge
           _buildRankBadge(rank, isDarkMode),
-          
+
           const SizedBox(width: 12),
-          
+
           // User avatar
           CircleAvatar(
             radius: 20,
             backgroundColor: Colors.grey[300],
-            backgroundImage: entry.user?.avatar != null && entry.user!.avatar!.isNotEmpty
-                ? NetworkImage(entry.user!.avatar!)
-                : null,
+            backgroundImage:
+                entry.user?.avatar != null && entry.user!.avatar!.isNotEmpty
+                    ? NetworkImage(entry.user!.avatar!)
+                    : null,
             child: entry.user?.avatar == null || entry.user!.avatar!.isEmpty
                 ? Icon(
                     Icons.person,
@@ -293,9 +292,9 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
                   )
                 : null,
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // User info
           Expanded(
             child: Column(
@@ -318,7 +317,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
               ],
             ),
           ),
-          
+
           // Progress stats
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -340,7 +339,9 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
               if (entry.averagePaceMinutesPerKm > 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  MeasurementUtils.formatPaceSeconds(entry.averagePaceMinutesPerKm * 60, metric: preferMetric),
+                  MeasurementUtils.formatPaceSeconds(
+                      entry.averagePaceMinutesPerKm * 60,
+                      metric: preferMetric),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
                   ),
@@ -356,7 +357,7 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
   Widget _buildRankBadge(int rank, bool isDarkMode) {
     Color badgeColor;
     Color textColor;
-    
+
     if (rank == 1) {
       badgeColor = const Color(0xFFFFD700); // Gold
       textColor = Colors.black;
@@ -370,16 +371,14 @@ class _EventLeaderboardWidgetState extends State<EventLeaderboardWidget> {
       badgeColor = isDarkMode ? Colors.grey[700]! : Colors.grey[200]!;
       textColor = isDarkMode ? Colors.white : Colors.black87;
     }
-    
+
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
         color: badgeColor,
         shape: BoxShape.circle,
-        border: rank <= 3 
-            ? Border.all(color: Colors.white, width: 2)
-            : null,
+        border: rank <= 3 ? Border.all(color: Colors.white, width: 2) : null,
       ),
       child: Center(
         child: Text(

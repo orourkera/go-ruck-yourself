@@ -23,21 +23,27 @@ class GoalsApiService {
     if (pageSize != null) query['page_size'] = pageSize;
     if (status != null) query['status'] = status;
 
-    final data = await _api.get(ApiEndpoints.goalsWithProgress, queryParams: query);
+    final data =
+        await _api.get(ApiEndpoints.goalsWithProgress, queryParams: query);
     // The API may return either a raw List or a wrapped Map like { items: [...], meta: {...} }
     List<dynamic> list;
     if (data is List) {
       list = data;
     } else if (data is Map) {
       final map = Map<String, dynamic>.from(data);
-      final dynamic items = map['items'] ?? map['data'] ?? map['goals'] ?? map['results'] ?? map['records'];
+      final dynamic items = map['items'] ??
+          map['data'] ??
+          map['goals'] ??
+          map['results'] ??
+          map['records'];
       if (items is List) {
         list = items;
       } else {
         // Fallback to empty if structure is unexpected
         // Debug aid: print keys to understand payload shape during development
         // ignore: avoid_print
-        print('[GoalsApiService] Unexpected goals-with-progress response shape. Keys: ${map.keys.toList()}');
+        print(
+            '[GoalsApiService] Unexpected goals-with-progress response shape. Keys: ${map.keys.toList()}');
         list = const [];
       }
     } else {
@@ -46,7 +52,8 @@ class GoalsApiService {
 
     return list
         .whereType<dynamic>()
-        .map((e) => GoalWithProgress.fromJson(Map<String, dynamic>.from(e as Map)))
+        .map((e) =>
+            GoalWithProgress.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 
@@ -71,9 +78,11 @@ class GoalsApiService {
   }
 
   // Upsert goal schedule
-  Future<GoalSchedule> upsertGoalSchedule(String goalId, GoalSchedule schedule) async {
+  Future<GoalSchedule> upsertGoalSchedule(
+      String goalId, GoalSchedule schedule) async {
     final body = schedule.toJson();
-    final data = await _api.put(ApiEndpoints.getGoalScheduleEndpoint(goalId), body);
+    final data =
+        await _api.put(ApiEndpoints.getGoalScheduleEndpoint(goalId), body);
     return GoalSchedule.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
@@ -95,7 +104,8 @@ class GoalsApiService {
     if (limit != null) query['limit'] = limit;
     if (sentOnly != null) query['sent_only'] = sentOnly;
 
-    final data = await _api.get(ApiEndpoints.getGoalMessagesEndpoint(goalId), queryParams: query);
+    final data = await _api.get(ApiEndpoints.getGoalMessagesEndpoint(goalId),
+        queryParams: query);
     final list = (data as List?) ?? const [];
     return list
         .map((e) => GoalMessage.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -103,16 +113,19 @@ class GoalsApiService {
   }
 
   // Trigger evaluation for a goal
-  Future<Map<String, dynamic>> evaluateGoal(String goalId, {bool? force}) async {
+  Future<Map<String, dynamic>> evaluateGoal(String goalId,
+      {bool? force}) async {
     final body = <String, dynamic>{};
     if (force != null) body['force'] = force;
-    final data = await _api.post(ApiEndpoints.getGoalEvaluateEndpoint(goalId), body);
+    final data =
+        await _api.post(ApiEndpoints.getGoalEvaluateEndpoint(goalId), body);
     return Map<String, dynamic>.from(data as Map);
   }
 
   // Trigger evaluation for all goals (scheduler/crons)
   Future<Map<String, dynamic>> evaluateAllGoals() async {
-    final data = await _api.post(ApiEndpoints.getGoalsEvaluateAllEndpoint(), {});
+    final data =
+        await _api.post(ApiEndpoints.getGoalsEvaluateAllEndpoint(), {});
     return Map<String, dynamic>.from(data as Map);
   }
 
@@ -128,12 +141,14 @@ class GoalsApiService {
     if (messageType != null) body['message_type'] = messageType;
     if (params != null) body['params'] = params;
 
-    final data = await _api.post(ApiEndpoints.getGoalNotifyEndpoint(goalId), body);
+    final data =
+        await _api.post(ApiEndpoints.getGoalNotifyEndpoint(goalId), body);
     return GoalMessage.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
   // Parse a natural language goal into a structured object
-  Future<Map<String, dynamic>> parseGoal(String inputText, {Map<String, dynamic>? userHistory}) async {
+  Future<Map<String, dynamic>> parseGoal(String inputText,
+      {Map<String, dynamic>? userHistory}) async {
     final promptVersion = RemoteConfigService.instance.getAIGoalPromptVersion();
     final body = <String, dynamic>{
       'text': inputText,
@@ -161,9 +176,11 @@ class GoalsApiService {
   }
 
   // Fetch AI Cheerleader user history for richer context (recent rucks, achievements, ai history)
-  Future<Map<String, dynamic>> getAICheerleaderUserHistory({int? rucksLimit, int? achievementsLimit}) async {
+  Future<Map<String, dynamic>> getAICheerleaderUserHistory(
+      {int? rucksLimit, int? achievementsLimit}) async {
     // Now using user insights endpoint which provides structured historical data
     final data = await _api.get(ApiEndpoints.userInsights);
-    return Map<String, dynamic>.from((data ?? const <String, dynamic>{}) as Map);
+    return Map<String, dynamic>.from(
+        (data ?? const <String, dynamic>{}) as Map);
   }
 }

@@ -4,17 +4,20 @@ import '../../../../core/usecases/usecase.dart';
 import '../entities/duel_stats.dart';
 import '../repositories/duels_repository.dart';
 
-class GetDuelStatsLeaderboard implements UseCase<List<DuelStats>, GetDuelStatsLeaderboardParams> {
+class GetDuelStatsLeaderboard
+    implements UseCase<List<DuelStats>, GetDuelStatsLeaderboardParams> {
   final DuelsRepository repository;
 
   GetDuelStatsLeaderboard(this.repository);
 
   @override
-  Future<Either<Failure, List<DuelStats>>> call(GetDuelStatsLeaderboardParams params) async {
+  Future<Either<Failure, List<DuelStats>>> call(
+      GetDuelStatsLeaderboardParams params) async {
     // Validate stat type
     final validStatTypes = ['wins', 'completion_rate', 'total_duels'];
     if (!validStatTypes.contains(params.statType)) {
-      return Left(ValidationFailure('Invalid stat type. Must be one of: ${validStatTypes.join(', ')}'));
+      return Left(ValidationFailure(
+          'Invalid stat type. Must be one of: ${validStatTypes.join(', ')}'));
     }
 
     // Validate limit

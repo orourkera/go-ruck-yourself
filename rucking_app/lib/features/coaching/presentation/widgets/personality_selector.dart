@@ -29,7 +29,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
           runSpacing: 12,
           children: CoachingPersonality.allPersonalities.map((personality) {
             final isSelected = _selectedPersonality?.id == personality.id;
-            
+
             return GestureDetector(
               onTap: () {
                 setState(() {
@@ -38,41 +38,39 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                 // Don't call widget.onPersonalitySelected immediately - let user see the example first
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected 
-                    ? AppColors.primary 
-                    : Colors.white,
+                  color: isSelected ? AppColors.primary : Colors.white,
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
-                    color: AppColors.primary.withOpacity(isSelected ? 1.0 : 0.5),
+                    color:
+                        AppColors.primary.withOpacity(isSelected ? 1.0 : 0.5),
                     width: isSelected ? 2 : 1,
                   ),
-                  boxShadow: isSelected ? [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ] : null,
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       personality.icon,
-                      color: isSelected 
-                        ? Colors.white 
-                        : AppColors.primary,
+                      color: isSelected ? Colors.white : AppColors.primary,
                       size: 18,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       personality.name,
                       style: AppTextStyles.bodyMedium.copyWith(
-                        color: isSelected 
-                          ? Colors.white 
-                          : AppColors.primary,
+                        color: isSelected ? Colors.white : AppColors.primary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -82,9 +80,9 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
             );
           }).toList(),
         ),
-        
+
         const SizedBox(height: 32),
-        
+
         // Dynamic Example Display
         if (_selectedPersonality != null) ...[
           Container(
@@ -147,9 +145,9 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Example quote
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -218,14 +216,15 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
             ),
           ),
         ],
-        
+
         // Continue Button (appears when personality is selected)
         if (_selectedPersonality != null) ...[
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => widget.onPersonalitySelected(_selectedPersonality!),
+              onPressed: () =>
+                  widget.onPersonalitySelected(_selectedPersonality!),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,

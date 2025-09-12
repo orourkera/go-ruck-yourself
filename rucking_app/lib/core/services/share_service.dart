@@ -13,7 +13,8 @@ import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
 
 /// Service for handling session sharing with visual share cards
 class ShareService {
-  static final ScreenshotController _screenshotController = ScreenshotController();
+  static final ScreenshotController _screenshotController =
+      ScreenshotController();
 
   /// Share a ruck session with a beautiful visual share card (enhanced version)
   static Future<void> shareSessionCard({
@@ -26,7 +27,8 @@ class ShareService {
     ShareBackgroundOption? backgroundOption,
   }) async {
     try {
-      AppLogger.info('Starting session share with custom background for session ${session.id}');
+      AppLogger.info(
+          'Starting session share with custom background for session ${session.id}');
 
       // Create the share card widget with background option
       final shareCard = ShareCardWidget(
@@ -40,7 +42,7 @@ class ShareService {
 
       // Capture screenshot of the share card
       final Uint8List? imageBytes = await _captureShareCard(shareCard);
-      
+
       if (imageBytes == null) {
         throw Exception('Failed to capture share card image');
       }
@@ -62,11 +64,11 @@ class ShareService {
         subject: 'Ruck - Session Completed!',
       );
 
-      AppLogger.info('Session share with custom background completed successfully');
-
+      AppLogger.info(
+          'Session share with custom background completed successfully');
     } catch (e, stackTrace) {
       AppLogger.error('Failed to share session: $e', exception: e);
-      
+
       // Fallback to text-only sharing
       await _shareTextOnly(session, preferMetric);
     }
@@ -95,7 +97,7 @@ class ShareService {
 
       // Capture screenshot of the share card
       final Uint8List? imageBytes = await _captureShareCard(shareCard);
-      
+
       if (imageBytes == null) {
         throw Exception('Failed to capture share card image');
       }
@@ -118,10 +120,9 @@ class ShareService {
       );
 
       AppLogger.info('Session share completed successfully');
-
     } catch (e, stackTrace) {
       AppLogger.error('Failed to share session: $e', exception: e);
-      
+
       // Fallback to text-only sharing
       await _shareTextOnly(session, preferMetric);
     }
@@ -143,10 +144,12 @@ class ShareService {
 
   /// Create share text with session details
   static String _createShareText(RuckSession session, bool preferMetric) {
-    final formattedDate = session.startTime.day.toString().padLeft(2, '0') + 
-                         '/' + session.startTime.month.toString().padLeft(2, '0') + 
-                         '/' + session.startTime.year.toString();
-    
+    final formattedDate = session.startTime.day.toString().padLeft(2, '0') +
+        '/' +
+        session.startTime.month.toString().padLeft(2, '0') +
+        '/' +
+        session.startTime.year.toString();
+
     return '''🏋️ Ruck - Session Completed!
 
 📅 $formattedDate
@@ -160,7 +163,8 @@ Get the app and start your rucking journey!
   }
 
   /// Fallback text-only sharing
-  static Future<void> _shareTextOnly(RuckSession session, bool preferMetric) async {
+  static Future<void> _shareTextOnly(
+      RuckSession session, bool preferMetric) async {
     try {
       final shareText = _createShareText(session, preferMetric);
       await Share.share(

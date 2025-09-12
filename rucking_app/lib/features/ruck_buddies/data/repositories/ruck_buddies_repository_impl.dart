@@ -17,8 +17,9 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
   // Cache for ruck buddies data
   static Map<String, List<RuckBuddy>>? _ruckBuddiesCache;
   static DateTime? _ruckBuddiesCacheTime;
-  static const Duration _ruckBuddiesCacheValidity = Duration(minutes: 3); // 3 minute cache
-  
+  static const Duration _ruckBuddiesCacheValidity =
+      Duration(minutes: 3); // 3 minute cache
+
   // Track cache keys for different filter combinations
   static String _createCacheKey({
     required String filter,
@@ -48,19 +49,21 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
         limit: limit,
         offset: offset,
       );
-      
+
       // Check if we have cached data that's still valid (only for first page)
       final now = DateTime.now();
       if (offset == 0 && // Only cache first page for simplicity
-          _ruckBuddiesCache != null && 
+          _ruckBuddiesCache != null &&
           _ruckBuddiesCacheTime != null &&
           now.difference(_ruckBuddiesCacheTime!) < _ruckBuddiesCacheValidity &&
           _ruckBuddiesCache!.containsKey(cacheKey)) {
-        AppLogger.debug('[RUCK_BUDDIES] Using cached data for filter: $filter (${_ruckBuddiesCache![cacheKey]!.length} items)');
+        AppLogger.debug(
+            '[RUCK_BUDDIES] Using cached data for filter: $filter (${_ruckBuddiesCache![cacheKey]!.length} items)');
         return Right(_ruckBuddiesCache![cacheKey]!);
       }
 
-      AppLogger.info('[RUCK_BUDDIES] Fetching from API - filter: $filter, offset: $offset, limit: $limit');
+      AppLogger.info(
+          '[RUCK_BUDDIES] Fetching from API - filter: $filter, offset: $offset, limit: $limit');
       final ruckBuddies = await remoteDataSource.getRuckBuddies(
         limit: limit,
         offset: offset,
@@ -68,13 +71,14 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
         latitude: latitude,
         longitude: longitude,
       );
-      
+
       // Cache the results (only for first page to keep it simple)
       if (offset == 0) {
         _ruckBuddiesCache ??= <String, List<RuckBuddy>>{};
         _ruckBuddiesCache![cacheKey] = ruckBuddies;
         _ruckBuddiesCacheTime = now;
-        AppLogger.debug('[RUCK_BUDDIES] Cached ${ruckBuddies.length} items for filter: $filter');
+        AppLogger.debug(
+            '[RUCK_BUDDIES] Cached ${ruckBuddies.length} items for filter: $filter');
       }
 
       return Right(ruckBuddies);
@@ -93,17 +97,18 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
         },
         sendToBackend: true,
       );
-      return Left(ServerFailure(message: 'Unexpected error occurred: ${e.toString()}'));
+      return Left(
+          ServerFailure(message: 'Unexpected error occurred: ${e.toString()}'));
     }
   }
-  
+
   /// Clear the ruck buddies cache (useful when new data is available)
   static void clearRuckBuddiesCache() {
     _ruckBuddiesCache?.clear();
     _ruckBuddiesCacheTime = null;
     AppLogger.debug('[RUCK_BUDDIES] Cache cleared');
   }
-  
+
   /// Check if we have valid cached data for the given parameters
   static List<RuckBuddy>? getCachedRuckBuddies({
     required String filter,
@@ -114,7 +119,7 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
   }) {
     // Only check cache for first page
     if (offset != 0) return null;
-    
+
     final cacheKey = _createCacheKey(
       filter: filter,
       latitude: latitude,
@@ -122,16 +127,17 @@ class RuckBuddiesRepositoryImpl implements RuckBuddiesRepository {
       limit: limit,
       offset: offset,
     );
-    
+
     final now = DateTime.now();
-    if (_ruckBuddiesCache != null && 
+    if (_ruckBuddiesCache != null &&
         _ruckBuddiesCacheTime != null &&
         now.difference(_ruckBuddiesCacheTime!) < _ruckBuddiesCacheValidity &&
         _ruckBuddiesCache!.containsKey(cacheKey)) {
-      AppLogger.debug('[RUCK_BUDDIES] Found cached data for filter: $filter (${_ruckBuddiesCache![cacheKey]!.length} items)');
+      AppLogger.debug(
+          '[RUCK_BUDDIES] Found cached data for filter: $filter (${_ruckBuddiesCache![cacheKey]!.length} items)');
       return _ruckBuddiesCache![cacheKey]!;
     }
-    
+
     return null;
   }
 }

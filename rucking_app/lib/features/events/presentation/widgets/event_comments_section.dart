@@ -42,7 +42,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final authState = context.read<AuthBloc>().state;
     final userId = authState is Authenticated ? authState.user.userId : null;
-    
+
     return Column(
       children: [
         // Comments list
@@ -55,7 +55,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                 setState(() {
                   _isSubmitting = false;
                 });
-                
+
                 StyledSnackBar.showSuccess(
                   context: context,
                   message: 'Comment added successfully',
@@ -64,7 +64,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                 setState(() {
                   _isSubmitting = false;
                 });
-                
+
                 StyledSnackBar.showError(
                   context: context,
                   message: state.message,
@@ -79,21 +79,21 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                   message: state.message,
                   onRetry: () {
                     context.read<EventCommentsBloc>().add(
-                      LoadEventComments(widget.eventId),
-                    );
+                          LoadEventComments(widget.eventId),
+                        );
                   },
                 );
               } else if (state is EventCommentsLoaded) {
                 final comments = state.comments;
-                
+
                 return _buildCommentsList(comments, isDarkMode, userId);
               }
-              
+
               return _buildLoadingSkeleton();
             },
           ),
         ),
-        
+
         // Comment input
         _buildCommentInput(isDarkMode),
       ],
@@ -131,7 +131,8 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
     );
   }
 
-  Widget _buildCommentsList(List<EventComment> comments, bool isDarkMode, String? userId) {
+  Widget _buildCommentsList(
+      List<EventComment> comments, bool isDarkMode, String? userId) {
     if (comments.isEmpty) {
       return Center(
         child: Column(
@@ -160,12 +161,12 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
         ),
       );
     }
-    
+
     return RefreshIndicator(
       onRefresh: () async {
         context.read<EventCommentsBloc>().add(
-          RefreshEventComments(widget.eventId),
-        );
+              RefreshEventComments(widget.eventId),
+            );
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -178,7 +179,8 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
     );
   }
 
-  Widget _buildCommentItem(EventComment comment, bool isDarkMode, String? userId) {
+  Widget _buildCommentItem(
+      EventComment comment, bool isDarkMode, String? userId) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -190,9 +192,9 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
             username: comment.user?.username ?? 'Unknown User',
             size: 16,
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // Comment content
           Expanded(
             child: Column(
@@ -217,9 +219,9 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 4),
-                
+
                 // Comment text
                 Text(
                   comment.comment,
@@ -227,7 +229,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                     color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                   ),
                 ),
-                
+
                 // Comment metadata
                 if (comment.updatedAt != comment.createdAt)
                   Padding(
@@ -243,7 +245,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
               ],
             ),
           ),
-          
+
           // Comment actions (for owner)
           if (comment.userId == userId)
             PopupMenuButton<String>(
@@ -320,9 +322,9 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                 enabled: !_isSubmitting,
               ),
             ),
-            
+
             const SizedBox(width: 8),
-            
+
             // Send button
             Container(
               decoration: BoxDecoration(
@@ -336,13 +338,15 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Icon(Icons.arrow_right_alt, color: Colors.white),
-                onPressed: _isSubmitting || _commentController.text.trim().isEmpty
-                    ? null
-                    : _submitComment,
+                onPressed:
+                    _isSubmitting || _commentController.text.trim().isEmpty
+                        ? null
+                        : _submitComment,
               ),
             ),
           ],
@@ -354,22 +358,22 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
   void _submitComment() {
     final content = _commentController.text.trim();
     if (content.isEmpty) return;
-    
+
     setState(() {
       _isSubmitting = true;
     });
-    
+
     context.read<EventCommentsBloc>().add(
-      AddEventComment(
-        eventId: widget.eventId,
-        comment: content,
-      ),
-    );
+          AddEventComment(
+            eventId: widget.eventId,
+            comment: content,
+          ),
+        );
   }
 
   void _showEditCommentDialog(EventComment comment) {
     final editController = TextEditingController(text: comment.comment);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -393,12 +397,12 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
               final newContent = editController.text.trim();
               if (newContent.isNotEmpty && newContent != comment.comment) {
                 context.read<EventCommentsBloc>().add(
-                  UpdateEventComment(
-                    eventId: widget.eventId,
-                    commentId: comment.id,
-                    comment: newContent,
-                  ),
-                );
+                      UpdateEventComment(
+                        eventId: widget.eventId,
+                        commentId: comment.id,
+                        comment: newContent,
+                      ),
+                    );
               }
               Navigator.of(context).pop();
             },
@@ -450,7 +454,7 @@ class _EventCommentsSectionState extends State<EventCommentsSection> {
   String _formatCommentTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inMinutes < 60) {

@@ -18,7 +18,9 @@ class GoalSchedule {
   factory GoalSchedule.fromJson(Map<String, dynamic> json) {
     return GoalSchedule(
       goalId: json['goal_id']?.toString() ?? json['goalId']?.toString() ?? '',
-      enabled: json['enabled'] is bool ? json['enabled'] : (json['enabled']?.toString() == 'true'),
+      enabled: json['enabled'] is bool
+          ? json['enabled']
+          : (json['enabled']?.toString() == 'true'),
       status: json['status']?.toString(),
       nextRunAt: _parseDate(json['next_run_at'] ?? json['nextRunAt']),
       lastSentAt: _parseDate(json['last_sent_at'] ?? json['lastSentAt']),

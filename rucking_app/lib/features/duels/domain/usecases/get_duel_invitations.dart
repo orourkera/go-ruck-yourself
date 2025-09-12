@@ -4,13 +4,15 @@ import '../../../../core/usecases/usecase.dart';
 import '../entities/duel_invitation.dart';
 import '../repositories/duels_repository.dart';
 
-class GetDuelInvitations implements UseCase<List<DuelInvitation>, GetDuelInvitationsParams> {
+class GetDuelInvitations
+    implements UseCase<List<DuelInvitation>, GetDuelInvitationsParams> {
   final DuelsRepository repository;
 
   GetDuelInvitations(this.repository);
 
   @override
-  Future<Either<Failure, List<DuelInvitation>>> call(GetDuelInvitationsParams params) async {
+  Future<Either<Failure, List<DuelInvitation>>> call(
+      GetDuelInvitationsParams params) async {
     return await repository.getDuelInvitations(status: params.status);
   }
 }

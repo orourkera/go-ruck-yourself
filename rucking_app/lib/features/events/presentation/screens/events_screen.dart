@@ -27,12 +27,12 @@ class EventsScreen extends StatefulWidget {
 class _EventsScreenState extends State<EventsScreen> {
   late EventsBloc _eventsBloc;
   final ScrollController _scrollController = ScrollController();
-  
+
   @override
   void initState() {
     super.initState();
     _eventsBloc = getIt<EventsBloc>();
-    
+
     // Schedule BLoC event for the first frame to avoid context access issues
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -47,7 +47,8 @@ class _EventsScreenState extends State<EventsScreen> {
     super.dispose();
   }
 
-  void _onFilterChanged(String? status, String? clubId, bool? includeParticipating, bool? sortByDistance) {
+  void _onFilterChanged(String? status, String? clubId,
+      bool? includeParticipating, bool? sortByDistance) {
     _eventsBloc.add(LoadEvents(
       status: status,
       clubId: clubId,
@@ -72,8 +73,8 @@ class _EventsScreenState extends State<EventsScreen> {
     return BlocProvider.value(
       value: _eventsBloc,
       child: Scaffold(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? Colors.black 
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
             : AppColors.backgroundLight,
         appBar: AppBar(
           title: Text(
@@ -85,11 +86,14 @@ class _EventsScreenState extends State<EventsScreen> {
           elevation: 0,
           automaticallyImplyLeading: false,
           iconTheme: IconThemeData(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.add, color: Colors.white), // Make add button white
+              icon: const Icon(Icons.add,
+                  color: Colors.white), // Make add button white
               onPressed: _navigateToCreateEvent,
             ),
           ],
@@ -98,7 +102,7 @@ class _EventsScreenState extends State<EventsScreen> {
           child: Column(
             children: [
               const SizedBox(height: 12),
-              
+
               // Filter chips for event status
               BlocBuilder<EventsBloc, EventsState>(
                 builder: (context, state) {
@@ -106,7 +110,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   String? currentClubId;
                   bool? currentIncludeParticipating;
                   bool? currentSortByDistance;
-                  
+
                   // Extract current filters from state if available
                   if (state is EventsLoaded) {
                     currentStatus = state.status;
@@ -114,7 +118,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     currentIncludeParticipating = state.includeParticipating;
                     currentSortByDistance = state.sortByDistance;
                   }
-                  
+
                   return EventFilterChips(
                     selectedStatus: currentStatus,
                     selectedClubId: currentClubId,
@@ -124,9 +128,9 @@ class _EventsScreenState extends State<EventsScreen> {
                   );
                 },
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               // Main content area
               Expanded(
                 child: BlocConsumer<EventsBloc, EventsState>(
@@ -141,15 +145,15 @@ class _EventsScreenState extends State<EventsScreen> {
                         context: context,
                         message: state.message,
                       );
-                      
+
                       if (state.shouldRefresh) {
                         _eventsBloc.add(RefreshEvents());
                       }
-                      
+
                       // Handle navigation after starting ruck session
                       if (state.sessionId != null) {
                         Navigator.of(context).pushReplacementNamed(
-                          '/active_session', 
+                          '/active_session',
                           arguments: state.sessionId,
                         );
                       }
@@ -160,18 +164,20 @@ class _EventsScreenState extends State<EventsScreen> {
                     if (state is EventsInitial || state is EventsLoading) {
                       return SingleChildScrollView(
                         child: Column(
-                          children: List.generate(3, (index) => const EventCardSkeleton()),
+                          children: List.generate(
+                              3, (index) => const EventCardSkeleton()),
                         ),
                       );
-                    } 
+                    }
                     // Handle loaded state with data
                     else if (state is EventsLoaded) {
                       final events = state.events;
-                      
+
                       if (events.isEmpty) {
                         return EmptyState(
                           title: 'No Events Yet',
-                          message: 'Be the first to create an event in your area!',
+                          message:
+                              'Be the first to create an event in your area!',
                           action: ElevatedButton(
                             onPressed: _navigateToCreateEvent,
                             style: ElevatedButton.styleFrom(
@@ -182,12 +188,12 @@ class _EventsScreenState extends State<EventsScreen> {
                           ),
                         );
                       }
-                      
+
                       return RefreshIndicator(
                         onRefresh: () async {
                           print('🔄 Pull to refresh triggered');
                           final completer = Completer<void>();
-                          
+
                           // Listen for state changes to complete the refresh
                           late StreamSubscription subscription;
                           subscription = _eventsBloc.stream.listen((state) {
@@ -199,9 +205,9 @@ class _EventsScreenState extends State<EventsScreen> {
                               }
                             }
                           });
-                          
+
                           _eventsBloc.add(RefreshEvents());
-                          
+
                           // Timeout after 10 seconds
                           return completer.future.timeout(
                             const Duration(seconds: 10),
@@ -236,10 +242,11 @@ class _EventsScreenState extends State<EventsScreen> {
                         },
                       );
                     }
-                    
+
                     // Fallback
                     return Column(
-                      children: List.generate(3, (index) => const EventCardSkeleton()),
+                      children: List.generate(
+                          3, (index) => const EventCardSkeleton()),
                     );
                   },
                 ),
@@ -288,13 +295,13 @@ class EventCardSkeleton extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Description skeleton
               const SkeletonLine(width: double.infinity),
               const SizedBox(height: 4),
               const SkeletonLine(width: 200),
               const SizedBox(height: 12),
-              
+
               // Details skeleton
               Row(
                 children: const [

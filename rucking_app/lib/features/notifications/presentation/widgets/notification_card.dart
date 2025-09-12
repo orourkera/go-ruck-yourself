@@ -21,7 +21,9 @@ class NotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dismissible(
       key: Key(notification.id),
-      direction: onDismiss != null ? DismissDirection.endToStart : DismissDirection.none,
+      direction: onDismiss != null
+          ? DismissDirection.endToStart
+          : DismissDirection.none,
       onDismissed: (_) => onDismiss?.call(),
       background: Container(
         color: AppColors.error,
@@ -37,7 +39,9 @@ class NotificationCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           decoration: BoxDecoration(
-            color: notification.isRead ? Colors.white : AppColors.backgroundLight.withOpacity(0.5),
+            color: notification.isRead
+                ? Colors.white
+                : AppColors.backgroundLight.withOpacity(0.5),
             border: Border(
               bottom: BorderSide(
                 color: AppColors.greyLight,
@@ -57,7 +61,9 @@ class NotificationCard extends StatelessWidget {
                     Text(
                       notification.message,
                       style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
+                        fontWeight: notification.isRead
+                            ? FontWeight.normal
+                            : FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4.0),

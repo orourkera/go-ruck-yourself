@@ -9,7 +9,8 @@ import 'package:rucking_app/core/services/analytics_service.dart';
 
 /// Manages global navigation state and coordinates between different navigation systems
 class NavigationStateManager extends ChangeNotifier {
-  static final NavigationStateManager _instance = NavigationStateManager._internal();
+  static final NavigationStateManager _instance =
+      NavigationStateManager._internal();
   factory NavigationStateManager() => _instance;
   NavigationStateManager._internal();
 
@@ -19,7 +20,7 @@ class NavigationStateManager extends ChangeNotifier {
   final List<String> _navigationHistory = [];
   bool _isNavigating = false;
   String? _pendingDeepLink;
-  
+
   // Tab state persistence
   final Map<int, String> _tabRouteHistory = {};
   final Map<int, GlobalKey<NavigatorState>> _tabNavigatorKeys = {};
@@ -37,10 +38,10 @@ class NavigationStateManager extends ChangeNotifier {
     for (int i = 0; i < 4; i++) {
       _tabNavigatorKeys[i] = GlobalKey<NavigatorState>();
     }
-    
+
     // Set up deep link handling
     DeepLinkHandler.initialize();
-    
+
     // Load saved navigation state
     _loadNavigationState();
   }
@@ -54,13 +55,13 @@ class NavigationStateManager extends ChangeNotifier {
     }
 
     final previousIndex = _currentBottomTabIndex;
-    
+
     // Save current tab's route
     _tabRouteHistory[previousIndex] = _currentRoute;
-    
+
     // Update current tab
     _currentBottomTabIndex = index;
-    
+
     // Restore or navigate to tab's route
     final savedRoute = _tabRouteHistory[index];
     if (savedRoute != null) {
@@ -69,40 +70,40 @@ class NavigationStateManager extends ChangeNotifier {
       // Navigate to default route for this tab
       BottomNavigationConfig.navigateToTab(context, index);
     }
-    
+
     // Analytics
     AnalyticsService.trackTabSwitch(previousIndex, index);
-    
+
     // Save state
     _saveNavigationState();
-    
+
     notifyListeners();
   }
 
   /// Handle route changes from GoRouter
   void onRouteChanged(String route, BuildContext context) {
     if (_isNavigating) return; // Prevent recursive calls
-    
+
     _currentRoute = route;
     _navigationHistory.add(route);
-    
+
     // Limit history size
     if (_navigationHistory.length > 50) {
       _navigationHistory.removeAt(0);
     }
-    
+
     // Update bottom tab index based on route
     final newTabIndex = BottomNavigationConfig.getTabIndexForRoute(route);
     if (newTabIndex != _currentBottomTabIndex) {
       _currentBottomTabIndex = newTabIndex;
     }
-    
+
     // Analytics
     AnalyticsService.trackNavigation(route);
-    
+
     // Save state
     _saveNavigationState();
-    
+
     notifyListeners();
   }
 
@@ -110,7 +111,7 @@ class NavigationStateManager extends ChangeNotifier {
   Future<void> handleDeepLink(String link, BuildContext context) async {
     _pendingDeepLink = link;
     notifyListeners();
-    
+
     try {
       await DeepLinkHandler.handleDeepLink(context, link);
       _pendingDeepLink = null;
@@ -119,20 +120,22 @@ class NavigationStateManager extends ChangeNotifier {
       // Handle error
       debugPrint('Failed to handle deep link: $e');
     }
-    
+
     notifyListeners();
   }
 
   /// Navigate with proper state management
-  Future<void> navigateTo(String route, BuildContext context, {
+  Future<void> navigateTo(
+    String route,
+    BuildContext context, {
     Object? extra,
     bool replace = false,
   }) async {
     if (_isNavigating) return;
-    
+
     _isNavigating = true;
     notifyListeners();
-    
+
     try {
       if (replace) {
         context.pushReplacement(route, extra: extra);
@@ -151,12 +154,12 @@ class NavigationStateManager extends ChangeNotifier {
       _navigationHistory.removeLast();
       final previousRoute = _navigationHistory.last;
       _currentRoute = previousRoute;
-      
+
       context.pop();
       notifyListeners();
       return true;
     }
-    
+
     return false;
   }
 
@@ -166,7 +169,7 @@ class NavigationStateManager extends ChangeNotifier {
     _tabRouteHistory.clear();
     _currentBottomTabIndex = 0;
     _currentRoute = '/home';
-    
+
     notifyListeners();
   }
 
@@ -211,7 +214,7 @@ class NavigationStateManager extends ChangeNotifier {
   void _handleSameTabTap(int index, BuildContext context) {
     final navigatorKey = _tabNavigatorKeys[index];
     final navigator = navigatorKey?.currentState;
-    
+
     if (navigator != null && navigator.canPop()) {
       // Pop to root if there are screens on the stack
       navigator.popUntil((route) => route.isFirst);
@@ -336,12 +339,12 @@ class _NavigationProviderState extends State<NavigationProvider>
   @override
   void initState() {
     super.initState();
-    
+
     _navigationManager = NavigationStateManager();
     _navigationBloc = NavigationBloc(_navigationManager);
-    
+
     _navigationManager.initialize();
-    
+
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -375,21 +378,22 @@ class _NavigationProviderState extends State<NavigationProvider>
 
 /// Helper extensions for easy navigation
 extension NavigationExtensions on BuildContext {
-  NavigationStateManager get navigationManager => read<NavigationStateManager>();
+  NavigationStateManager get navigationManager =>
+      read<NavigationStateManager>();
   NavigationBloc get navigationBloc => read<NavigationBloc>();
-  
+
   void switchTab(int index) {
     navigationBloc.changeTab(index, this);
   }
-  
+
   void handleDeepLink(String link) {
     navigationBloc.handleDeepLink(link, this);
   }
-  
+
   void navigateToRoute(String route, {Object? extra}) {
     navigationBloc.navigateTo(route, this, extra: extra);
   }
-  
+
   bool popRoute() {
     return navigationBloc.pop(this);
   }
@@ -398,9 +402,10 @@ extension NavigationExtensions on BuildContext {
 /// Custom route information parser for AllTrails routes
 class AllTrailsRouteInformationParser extends RouteInformationParser<Object> {
   @override
-  Future<Object> parseRouteInformation(RouteInformation routeInformation) async {
+  Future<Object> parseRouteInformation(
+      RouteInformation routeInformation) async {
     final uri = routeInformation.uri;
-    
+
     // Handle AllTrails specific routes
     if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'route') {
       return AllTrailsRouteMatch(
@@ -408,7 +413,7 @@ class AllTrailsRouteInformationParser extends RouteInformationParser<Object> {
         queryParameters: uri.queryParameters,
       );
     }
-    
+
     // Handle other routes
     return uri;
   }
@@ -423,11 +428,11 @@ class AllTrailsRouteInformationParser extends RouteInformationParser<Object> {
         ),
       );
     }
-    
+
     if (configuration is Uri) {
       return RouteInformation(uri: configuration);
     }
-    
+
     return null;
   }
 }

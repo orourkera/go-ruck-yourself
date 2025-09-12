@@ -20,7 +20,8 @@ class GoalWithProgress {
       progress: json['progress'] is Map<String, dynamic>
           ? GoalProgress.fromJson(json['progress'] as Map<String, dynamic>)
           : (json['latest_progress'] is Map<String, dynamic>
-              ? GoalProgress.fromJson(json['latest_progress'] as Map<String, dynamic>)
+              ? GoalProgress.fromJson(
+                  json['latest_progress'] as Map<String, dynamic>)
               : null),
     );
   }

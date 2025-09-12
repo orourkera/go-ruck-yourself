@@ -77,27 +77,31 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
             icon: const Icon(Icons.notifications),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const DuelInvitationsScreen()),
+              MaterialPageRoute(
+                  builder: (context) => const DuelInvitationsScreen()),
             ),
           ),
         ],
       ),
-      floatingActionButton: _hasActiveDuel ? null : FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const CreateDuelScreen()),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Create Duel',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      floatingActionButton: _hasActiveDuel
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CreateDuelScreen()),
+              ),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text(
+                'Create Duel',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
       body: BlocListener<DuelListBloc, DuelListState>(
         listener: (context, state) {
           if (state is DuelListLoaded && _currentUserId != null) {
@@ -105,14 +109,15 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
             final activeDuel = state.duels.where((duel) {
               final isParticipant = _isCurrentUserParticipant(duel);
               final isCreator = duel.creatorId == _currentUserId;
-              final isActive = duel.status == DuelStatus.active || duel.status == DuelStatus.pending;
+              final isActive = duel.status == DuelStatus.active ||
+                  duel.status == DuelStatus.pending;
               return (isParticipant || isCreator) && isActive;
             }).firstOrNull;
-            
+
             setState(() {
               _hasActiveDuel = activeDuel != null;
             });
-            
+
             // Only navigate if we haven't already navigated and there's an active duel
             if (!_hasActiveInactivelyNavigated && activeDuel != null) {
               _hasActiveInactivelyNavigated = true;
@@ -121,7 +126,8 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => DuelDetailScreen(duelId: activeDuel.id),
+                    builder: (context) =>
+                        DuelDetailScreen(duelId: activeDuel.id),
                   ),
                 );
               });
@@ -214,7 +220,8 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () => context.read<DuelListBloc>().add(const RefreshDuels()),
+                  onPressed: () =>
+                      context.read<DuelListBloc>().add(const RefreshDuels()),
                   child: const Text('Retry'),
                 ),
               ],
@@ -228,7 +235,7 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
             child: _buildDuelsList(state, isMyDuels: isMyDuels),
           );
         }
-        
+
         return const SizedBox.shrink();
       },
     );
@@ -250,40 +257,41 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
               Text(
                 'No duels match your filters',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
-                ),
+                      color: Colors.grey[600],
+                    ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Try adjusting your filters or create a new duel',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[500],
-                ),
+                      color: Colors.grey[500],
+                    ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               TextButton(
-                onPressed: () => context.read<DuelListBloc>().add(const ClearFilters()),
+                onPressed: () =>
+                    context.read<DuelListBloc>().add(const ClearFilters()),
                 child: const Text('Clear Filters'),
               ),
             ] else ...[
               Text(
                 isMyDuels ? 'No Duels Yet!' : 'No Duels to Discover!',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.bold,
-                ),
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
-                  isMyDuels 
-                    ? 'You haven\'t joined or created any duels yet. Get started by creating your first duel or browsing available duels to join!'
-                    : 'No duels are currently available to join. Create a new duel to get started!',
+                  isMyDuels
+                      ? 'You haven\'t joined or created any duels yet. Get started by creating your first duel or browsing available duels to join!'
+                      : 'No duels are currently available to join. Create a new duel to get started!',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[500],
-                  ),
+                        color: Colors.grey[500],
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -298,24 +306,31 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
       itemCount: state.duels.length,
       itemBuilder: (context, index) {
         final duel = state.duels[index];
-        final isCurrentUserCreator = _currentUserId != null && duel.creatorId == _currentUserId;
+        final isCurrentUserCreator =
+            _currentUserId != null && duel.creatorId == _currentUserId;
         final isCurrentUserParticipant = _isCurrentUserParticipant(duel);
-        
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: DuelCard(
             duel: duel,
             participants: duel is DuelModel ? duel.participants : [],
-            showJoinButton: !_hasUserActiveOrPendingDuel(state.duels) && !isCurrentUserCreator && !isCurrentUserParticipant,
+            showJoinButton: !_hasUserActiveOrPendingDuel(state.duels) &&
+                !isCurrentUserCreator &&
+                !isCurrentUserParticipant,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DuelDetailScreen(duelId: duel.id),
               ),
             ),
-            onJoin: (!_hasUserActiveOrPendingDuel(state.duels) && !isCurrentUserCreator && !isCurrentUserParticipant) ? () => context.read<DuelListBloc>().add(
-              JoinDuel(duelId: duel.id),
-            ) : null,
+            onJoin: (!_hasUserActiveOrPendingDuel(state.duels) &&
+                    !isCurrentUserCreator &&
+                    !isCurrentUserParticipant)
+                ? () => context.read<DuelListBloc>().add(
+                      JoinDuel(duelId: duel.id),
+                    )
+                : null,
           ),
         );
       },
@@ -324,19 +339,22 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
 
   bool _isCurrentUserParticipant(Duel duel) {
     if (duel is DuelModel) {
-      return duel.participants.any((participant) => participant.userId == _currentUserId);
+      return duel.participants
+          .any((participant) => participant.userId == _currentUserId);
     }
     return false;
   }
 
   bool _hasUserActiveOrPendingDuel(List<Duel> duels) {
     if (_currentUserId == null) return false;
-    
+
     return duels.any((duel) {
-      final isActive = (duel.status == DuelStatus.active || duel.status == DuelStatus.pending) && duel.status != DuelStatus.cancelled;
+      final isActive = (duel.status == DuelStatus.active ||
+              duel.status == DuelStatus.pending) &&
+          duel.status != DuelStatus.cancelled;
       final isCreator = duel.creatorId == _currentUserId;
       final isParticipant = _isCurrentUserParticipant(duel);
-      
+
       return isActive && (isCreator || isParticipant);
     });
   }
@@ -351,10 +369,10 @@ class _DuelsListScreenState extends State<DuelsListScreen> {
       builder: (context) => DuelFilterSheet(
         onApplyFilters: (status, challengeType, location) {
           context.read<DuelListBloc>().add(FilterDuels(
-            status: status,
-            challengeType: challengeType,
-            location: location,
-          ));
+                status: status,
+                challengeType: challengeType,
+                location: location,
+              ));
           Navigator.pop(context);
         },
         onClearFilters: () {

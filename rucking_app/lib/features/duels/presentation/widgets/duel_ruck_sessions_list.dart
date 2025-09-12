@@ -36,8 +36,8 @@ class _DuelRuckSessionsListState extends State<DuelRuckSessionsList> {
 
   bool _isDuelStarted() {
     // Check if duel has started based on its status or start date
-    return widget.duel.status == DuelStatus.active || 
-           (widget.duel.startsAt != null && 
+    return widget.duel.status == DuelStatus.active ||
+        (widget.duel.startsAt != null &&
             DateTime.now().isAfter(widget.duel.startsAt!));
   }
 
@@ -69,7 +69,7 @@ class _DuelRuckSessionsListState extends State<DuelRuckSessionsList> {
           );
         } else if (state is RuckBuddiesLoaded) {
           final ruckSessions = state.ruckBuddies;
-          
+
           if (ruckSessions.isEmpty) {
             return _buildNoSessionsState();
           }
@@ -190,7 +190,7 @@ class _DuelRuckSessionsListState extends State<DuelRuckSessionsList> {
             ],
           ),
         ),
-        
+
         // List of ruck sessions
         Expanded(
           child: ListView.builder(
@@ -198,7 +198,7 @@ class _DuelRuckSessionsListState extends State<DuelRuckSessionsList> {
             itemCount: ruckSessions.length,
             itemBuilder: (context, index) {
               final ruckSession = ruckSessions[index];
-              
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16.0),
                 child: RuckBuddyCard(

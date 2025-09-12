@@ -26,7 +26,8 @@ class ClubsLoaded extends ClubsState {
   });
 
   @override
-  List<Object?> get props => [clubs, searchQuery, isPublicFilter, membershipFilter];
+  List<Object?> get props =>
+      [clubs, searchQuery, isPublicFilter, membershipFilter];
 }
 
 class ClubsError extends ClubsState {

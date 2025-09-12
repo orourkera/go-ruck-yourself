@@ -59,7 +59,6 @@ import 'active_session_coordinator.dart';
 part 'active_session_event.dart';
 part 'active_session_state.dart';
 
-
 class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   int _paceTickCounter = 0;
   final ApiClient _apiClient;
@@ -74,7 +73,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final TerrainTracker _terrainTracker;
   final ConnectivityService _connectivityService;
   final SessionCompletionDetectionService _completionDetectionService;
-  
+
   // AI Cheerleader services
   final AICheerleaderService _aiCheerleaderService;
   final OpenAIService _openAIService;
@@ -106,10 +105,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   int? _latestHeartRate;
   int? _minHeartRate;
   int? _maxHeartRate;
-  
+
   /// Heart rate throttling - only save one sample every 30 seconds
   DateTime? _lastSavedHeartRateTime;
-  
+
   /// Heart rate API throttling - only send to API every 30 seconds
   DateTime? _lastApiHeartRateTime;
 
@@ -184,7 +183,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<FetchSessionPhotosRequested>(_onFetchSessionPhotosRequested);
     on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
     on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
-    on<AICheerleaderManualTriggerRequested>(_onAICheerleaderManualTriggerRequested);
+    on<AICheerleaderManualTriggerRequested>(
+        _onAICheerleaderManualTriggerRequested);
     on<ClearSessionPhotos>(_onClearSessionPhotos);
     on<TakePhotoRequested>(_onTakePhotoRequested);
     on<PickPhotoRequested>(_onPickPhotoRequested);
@@ -201,36 +201,34 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onSessionStarted(
-    SessionStarted event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
+      SessionStarted event, Emitter<ActiveSessionState> emit) async {
     AppLogger.info('Starting session with delegation to coordinator');
-    
+
     try {
       // Capture AI Cheerleader parameters
       _aiCheerleaderEnabled = event.aiCheerleaderEnabled;
       _aiCheerleaderPersonality = event.aiCheerleaderPersonality;
       _aiCheerleaderExplicitContent = event.aiCheerleaderExplicitContent;
-      
+
       // Reset AI Cheerleader service for new session
       if (_aiCheerleaderEnabled) {
         _aiCheerleaderService.reset();
-        AppLogger.info('AI Cheerleader enabled: $_aiCheerleaderPersonality (explicit: $_aiCheerleaderExplicitContent)');
-        
+        AppLogger.info(
+            'AI Cheerleader enabled: $_aiCheerleaderPersonality (explicit: $_aiCheerleaderExplicitContent)');
+
         // Get current user for context
         final authService = GetIt.I<AuthService>();
         _currentUser = await authService.getCurrentUser();
       }
-      
+
       // Create coordinator if it doesn't exist
       if (_coordinator == null) {
         _coordinator = _createCoordinator();
         _setupCoordinatorSubscription();
       }
-      
+
       // Delegate to coordinator
       _coordinator!.add(event);
-      
     } catch (e) {
       AppLogger.error('Session start failed: $e');
       emit(ActiveSessionFailure(errorMessage: 'Failed to start session: $e'));
@@ -265,7 +263,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           // This prevents "emit after event handler completed" errors
           _onCoordinatorStateChanged(coordinatorState);
         } catch (e, stack) {
-          AppLogger.error('[CRITICAL] Error in coordinator state handler (GPS continues): $e');
+          AppLogger.error(
+              '[CRITICAL] Error in coordinator state handler (GPS continues): $e');
           AppLogger.error('[CRITICAL] Stack: $stack');
           // DO NOT rethrow - this would kill the coordinator stream and stop GPS updates
           // The session continues even if AI cheerleader or other features fail
@@ -276,14 +275,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // Don't fail the session for coordinator errors - try to recover
         // Only fail if we explicitly detect GPS is completely dead
       },
-      cancelOnError: false,  // CRITICAL: Don't cancel subscription on errors
+      cancelOnError: false, // CRITICAL: Don't cancel subscription on errors
     );
   }
 
   /// Handle state changes from the coordinator
   void _onCoordinatorStateChanged(ActiveSessionState coordinatorState) {
     // CRITICAL: Wrap each feature in try-catch to prevent cascading failures
-    
+
     // Handle completion detection service lifecycle
     try {
       _handleCompletionDetectionServiceLifecycle(coordinatorState);
@@ -291,15 +290,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.error('[COMPLETION_DETECTION] Error handling lifecycle: $e');
       // Continue - don't let this break the session
     }
-    
+
     // Check for AI Cheerleader triggers if enabled and session is running
     // CRITICAL: This must NEVER crash the coordinator stream
-    if (_aiCheerleaderEnabled && 
+    if (_aiCheerleaderEnabled &&
         coordinatorState is ActiveSessionRunning &&
         _aiCheerleaderPersonality != null &&
         _currentUser != null) {
-      AppLogger.info('[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
-      
+      AppLogger.info(
+          '[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
+
       // Fire and forget with complete isolation
       Future.microtask(() async {
         try {
@@ -322,9 +322,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
       });
     } else {
-      AppLogger.info('[AI_DEBUG] AI triggers skipped - enabled: $_aiCheerleaderEnabled, running: ${coordinatorState is ActiveSessionRunning}, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
+      AppLogger.info(
+          '[AI_DEBUG] AI triggers skipped - enabled: $_aiCheerleaderEnabled, running: ${coordinatorState is ActiveSessionRunning}, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
     }
-    
+
     // Instead of calling emit directly, we use a custom event to safely forward states
     // This ensures the emission happens within a proper event handler context
     add(_CoordinatorStateForwarded(coordinatorState));
@@ -336,18 +337,20 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       if (state is ActiveSessionRunning && state.isPaused == false) {
         // Start monitoring if session is actively running
         if (!_completionDetectionService.isMonitoring) {
-          AppLogger.info('[SESSION_COMPLETION] Starting completion detection monitoring');
+          AppLogger.info(
+              '[SESSION_COMPLETION] Starting completion detection monitoring');
           _completionDetectionService.startMonitoring();
-          
+
           // Update heart rate data if available
           if (state.latestHeartRate != null) {
             // Calculate average heart rate from samples
             double? workoutAverage;
             if (state.heartRateSamples.isNotEmpty) {
-              final totalHr = state.heartRateSamples.fold<double>(0, (sum, sample) => sum + sample.bpm);
+              final totalHr = state.heartRateSamples
+                  .fold<double>(0, (sum, sample) => sum + sample.bpm);
               workoutAverage = totalHr / state.heartRateSamples.length;
             }
-            
+
             _completionDetectionService.updateHeartRateData(
               currentHeartRate: state.latestHeartRate!.toDouble(),
               restingHeartRate: null, // Could be added from health profile
@@ -358,26 +361,31 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } else {
         // Stop monitoring if session is paused, completed, or failed
         if (_completionDetectionService.isMonitoring) {
-          AppLogger.info('[SESSION_COMPLETION] Stopping completion detection monitoring');
+          AppLogger.info(
+              '[SESSION_COMPLETION] Stopping completion detection monitoring');
           _completionDetectionService.stopMonitoring();
         }
       }
     } catch (e) {
-      AppLogger.error('[SESSION_COMPLETION] Error managing detection service lifecycle: $e');
+      AppLogger.error(
+          '[SESSION_COMPLETION] Error managing detection service lifecycle: $e');
     }
   }
 
   /// Check for AI Cheerleader triggers and process them
   Future<void> _checkAICheerleaderTriggers(ActiveSessionRunning state) async {
     try {
-      AppLogger.info('[AI_DEBUG] Analyzing triggers for state: distance=${state.distanceKm}km, time=${state.elapsedSeconds}s');
+      AppLogger.info(
+          '[AI_DEBUG] Analyzing triggers for state: distance=${state.distanceKm}km, time=${state.elapsedSeconds}s');
       final trigger = _aiCheerleaderService.analyzeTriggers(
         state,
         preferMetric: _currentUser!.preferMetric,
       );
-      AppLogger.info('[AI_DEBUG] Trigger analysis result: ${trigger?.type.name ?? 'null'}');
+      AppLogger.info(
+          '[AI_DEBUG] Trigger analysis result: ${trigger?.type.name ?? 'null'}');
       if (trigger != null) {
-        AppLogger.info('[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
+        AppLogger.info(
+            '[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
         await _processAICheerleaderTrigger(trigger, state);
       } else {
         AppLogger.info('[AI_DEBUG] No trigger detected this cycle');
@@ -392,29 +400,41 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     AICheerleaderManualTriggerRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER BUTTON PRESSED =======');
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] AI Cheerleader enabled: $_aiCheerleaderEnabled');
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] AI Cheerleader personality: $_aiCheerleaderPersonality');
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER BUTTON PRESSED =======');
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] AI Cheerleader enabled: $_aiCheerleaderEnabled');
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] AI Cheerleader personality: $_aiCheerleaderPersonality');
     AppLogger.warning('[AI_CHEERLEADER_DEBUG] Current user: $_currentUser');
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Current state type: ${state.runtimeType}');
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] State is ActiveSessionRunning: ${state is ActiveSessionRunning}');
-    
-    if (!_aiCheerleaderEnabled || 
-        _aiCheerleaderPersonality == null || 
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] Current state type: ${state.runtimeType}');
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] State is ActiveSessionRunning: ${state is ActiveSessionRunning}');
+
+    if (!_aiCheerleaderEnabled ||
+        _aiCheerleaderPersonality == null ||
         _currentUser == null ||
         state is! ActiveSessionRunning) {
-      AppLogger.error('[AI_CHEERLEADER_DEBUG] Manual trigger REJECTED - conditions not met:');
-      AppLogger.error('[AI_CHEERLEADER_DEBUG] - AI enabled: $_aiCheerleaderEnabled');
-      AppLogger.error('[AI_CHEERLEADER_DEBUG] - Personality set: $_aiCheerleaderPersonality');
-      AppLogger.error('[AI_CHEERLEADER_DEBUG] - User exists: ${_currentUser != null}');
-      AppLogger.error('[AI_CHEERLEADER_DEBUG] - Session running: ${state is ActiveSessionRunning}');
+      AppLogger.error(
+          '[AI_CHEERLEADER_DEBUG] Manual trigger REJECTED - conditions not met:');
+      AppLogger.error(
+          '[AI_CHEERLEADER_DEBUG] - AI enabled: $_aiCheerleaderEnabled');
+      AppLogger.error(
+          '[AI_CHEERLEADER_DEBUG] - Personality set: $_aiCheerleaderPersonality');
+      AppLogger.error(
+          '[AI_CHEERLEADER_DEBUG] - User exists: ${_currentUser != null}');
+      AppLogger.error(
+          '[AI_CHEERLEADER_DEBUG] - Session running: ${state is ActiveSessionRunning}');
       return;
     }
 
     final runningState = state as ActiveSessionRunning;
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Session state OK - proceeding with trigger');
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Session elapsed: ${runningState.elapsedSeconds}s, distance: ${runningState.distanceKm}km');
-    
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] Session state OK - proceeding with trigger');
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] Session elapsed: ${runningState.elapsedSeconds}s, distance: ${runningState.distanceKm}km');
+
     // Create a special manual trigger with current session context
     final manualTrigger = CheerleaderTrigger(
       type: TriggerType.manualRequest,
@@ -424,10 +444,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         'manualRequest': true,
       },
     );
-    
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Manual trigger created, calling _processAICheerleaderTrigger...');
-    final generatedMessage = await _processAICheerleaderTrigger(manualTrigger, runningState);
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER PROCESSING COMPLETE =======');
+
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] Manual trigger created, calling _processAICheerleaderTrigger...');
+    final generatedMessage =
+        await _processAICheerleaderTrigger(manualTrigger, runningState);
+    AppLogger.warning(
+        '[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER PROCESSING COMPLETE =======');
 
     // Emit UI-visible message if available
     if (generatedMessage != null && generatedMessage.isNotEmpty) {
@@ -440,36 +463,41 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   /// Process AI Cheerleader trigger through the full pipeline
   Future<String?> _processAICheerleaderTrigger(
-    CheerleaderTrigger trigger, 
-    ActiveSessionRunning state
-  ) async {
+      CheerleaderTrigger trigger, ActiveSessionRunning state) async {
     try {
       AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1: Assembling context...');
       // 1. Fetch historical user data for richer AI context
       Map<String, dynamic>? history;
       try {
-        AppLogger.info('[AI_CHEERLEADER_DEBUG] Fetching user history from ${ApiEndpoints.aiCheerleaderLogs}');
-        final historyResp = await _apiClient.get(ApiEndpoints.aiCheerleaderLogs, queryParams: {
+        AppLogger.info(
+            '[AI_CHEERLEADER_DEBUG] Fetching user history from ${ApiEndpoints.aiCheerleaderLogs}');
+        final historyResp =
+            await _apiClient.get(ApiEndpoints.aiCheerleaderLogs, queryParams: {
           'limit': 20,
           'offset': 0,
         });
         if (historyResp is Map<String, dynamic>) {
           history = historyResp;
-          AppLogger.info('[AI_CHEERLEADER_DEBUG] User history fetched successfully');
+          AppLogger.info(
+              '[AI_CHEERLEADER_DEBUG] User history fetched successfully');
         } else {
-          AppLogger.warning('[AI_CHEERLEADER_DEBUG] Unexpected user history response type: ${historyResp.runtimeType}');
+          AppLogger.warning(
+              '[AI_CHEERLEADER_DEBUG] Unexpected user history response type: ${historyResp.runtimeType}');
         }
       } catch (e) {
-        AppLogger.warning('[AI_CHEERLEADER_DEBUG] Failed to fetch user history (continuing without it): $e');
+        AppLogger.warning(
+            '[AI_CHEERLEADER_DEBUG] Failed to fetch user history (continuing without it): $e');
       }
 
       // 2. Fetch coaching plan data for AI context
       Map<String, dynamic>? coachingPlan;
       try {
         final coachingResponse = await _apiClient.get('/user-coaching-plans');
-        if (coachingResponse != null && coachingResponse is Map<String, dynamic>) {
+        if (coachingResponse != null &&
+            coachingResponse is Map<String, dynamic>) {
           coachingPlan = coachingResponse;
-          AppLogger.info('[AI_CHEERLEADER_DEBUG] Fetched coaching plan data: ${coachingPlan?['plan_name']}');
+          AppLogger.info(
+              '[AI_CHEERLEADER_DEBUG] Fetched coaching plan data: ${coachingPlan?['plan_name']}');
         }
       } catch (e) {
         AppLogger.info('[AI_CHEERLEADER_DEBUG] No coaching plan available: $e');
@@ -485,14 +513,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         history: history,
         coachingPlan: coachingPlan,
       );
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Context keys: ${context.keys.toList()}');
+      AppLogger.warning(
+          '[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
+      AppLogger.warning(
+          '[AI_CHEERLEADER_DEBUG] Context keys: ${context.keys.toList()}');
 
       // Inspect assembled context typing and normalize environment before any location work
-      AppLogger.info('[AI_CONTEXT_DEBUG] Context runtimeType: ${context.runtimeType}');
+      AppLogger.info(
+          '[AI_CONTEXT_DEBUG] Context runtimeType: ${context.runtimeType}');
       final envRawBefore = context['environment'];
-      AppLogger.info('[AI_CONTEXT_DEBUG] Environment (pre-normalization) type: ${envRawBefore?.runtimeType}');
-      AppLogger.info('[AI_CONTEXT_DEBUG] Environment (pre-normalization) value: $envRawBefore');
+      AppLogger.info(
+          '[AI_CONTEXT_DEBUG] Environment (pre-normalization) type: ${envRawBefore?.runtimeType}');
+      AppLogger.info(
+          '[AI_CONTEXT_DEBUG] Environment (pre-normalization) value: $envRawBefore');
       try {
         if (envRawBefore is Map) {
           final envKeys = (envRawBefore as Map).keys.toList();
@@ -501,76 +534,97 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } catch (_) {}
 
       // Normalize environment to Map<String, dynamic> to avoid Map<String, String> inference downstream
-      final Map<String, dynamic> _normalizedEnv =
-          (envRawBefore is Map)
-              ? Map<String, dynamic>.from(envRawBefore as Map)
-              : <String, dynamic>{};
+      final Map<String, dynamic> _normalizedEnv = (envRawBefore is Map)
+          ? Map<String, dynamic>.from(envRawBefore as Map)
+          : <String, dynamic>{};
       context['environment'] = _normalizedEnv;
-      AppLogger.info('[AI_CONTEXT_DEBUG] Environment normalized type: ${context['environment']?.runtimeType}');
-      AppLogger.info('[AI_CONTEXT_DEBUG] Environment normalized value: ${context['environment']}');
+      AppLogger.info(
+          '[AI_CONTEXT_DEBUG] Environment normalized type: ${context['environment']?.runtimeType}');
+      AppLogger.info(
+          '[AI_CONTEXT_DEBUG] Environment normalized value: ${context['environment']}');
 
       // 2. Add location context if available
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 2: Adding location context...');
+      AppLogger.warning(
+          '[AI_CHEERLEADER_DEBUG] Step 2: Adding location context...');
       AppLogger.warning('[AI_LOCATION_DEBUG] Checking location context...');
       AppLogger.warning('[AI_LOCATION_DEBUG] State type: ${state.runtimeType}');
-      AppLogger.warning('[AI_LOCATION_DEBUG] About to access state.locationPoints...');
-      
+      AppLogger.warning(
+          '[AI_LOCATION_DEBUG] About to access state.locationPoints...');
+
       try {
         // SAFETY: Check if locationPoints exists and is accessible
         final pointsCount = state.locationPoints?.length ?? 0;
-        AppLogger.warning('[AI_LOCATION_DEBUG] Location points available: $pointsCount');
-        AppLogger.warning('[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints?.runtimeType ?? "null"}');
-        
-        AppLogger.warning('[AI_LOCATION_DEBUG] About to check if locationPoints is not empty...');
-        final lastLocation = (state.locationPoints != null && state.locationPoints.isNotEmpty) ? state.locationPoints.last : null;
-        AppLogger.warning('[AI_LOCATION_DEBUG] Last location extracted: $lastLocation');
-        AppLogger.warning('[AI_LOCATION_DEBUG] Last location type: ${lastLocation.runtimeType}');
-        
+        AppLogger.warning(
+            '[AI_LOCATION_DEBUG] Location points available: $pointsCount');
+        AppLogger.warning(
+            '[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints?.runtimeType ?? "null"}');
+
+        AppLogger.warning(
+            '[AI_LOCATION_DEBUG] About to check if locationPoints is not empty...');
+        final lastLocation =
+            (state.locationPoints != null && state.locationPoints.isNotEmpty)
+                ? state.locationPoints.last
+                : null;
+        AppLogger.warning(
+            '[AI_LOCATION_DEBUG] Last location extracted: $lastLocation');
+        AppLogger.warning(
+            '[AI_LOCATION_DEBUG] Last location type: ${lastLocation.runtimeType}');
+
         if (lastLocation != null) {
-          AppLogger.warning('[AI_LOCATION_DEBUG] Last location coords: ${lastLocation.latitude}, ${lastLocation.longitude}');
-          AppLogger.warning('[AI_LOCATION_DEBUG] About to call getLocationContext...');
-          
-          final locationContext = await _locationContextService.getLocationContext(
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] Last location coords: ${lastLocation.latitude}, ${lastLocation.longitude}');
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] About to call getLocationContext...');
+
+          final locationContext = await _locationContextService
+              .getLocationContext(
             lastLocation.latitude,
             lastLocation.longitude,
-          ).timeout(
+          )
+              .timeout(
             Duration(seconds: 5),
             onTimeout: () {
-              AppLogger.warning('[AI_LOCATION_DEBUG] Location context call timed out after 5 seconds');
+              AppLogger.warning(
+                  '[AI_LOCATION_DEBUG] Location context call timed out after 5 seconds');
               return null;
             },
           );
-          AppLogger.warning('[AI_LOCATION_DEBUG] getLocationContext call completed');
-          
-          AppLogger.info('[AI_LOCATION_DEBUG] Location context result: $locationContext');
-          
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] getLocationContext call completed');
+
+          AppLogger.info(
+              '[AI_LOCATION_DEBUG] Location context result: $locationContext');
+
           if (locationContext != null) {
             // Ensure environment is a mutable Map<String, dynamic> before adding location
             final envRaw = context['environment'];
-            AppLogger.warning('[AI_LOCATION_DEBUG] Environment before update - type: ${envRaw.runtimeType}, value: $envRaw');
+            AppLogger.warning(
+                '[AI_LOCATION_DEBUG] Environment before update - type: ${envRaw.runtimeType}, value: $envRaw');
 
             // Create a dynamic-typed copy to avoid Map<String, String> value type restriction
-            final Map<String, dynamic> environment =
-                (envRaw is Map)
-                    ? Map<String, dynamic>.from(envRaw as Map)
-                    : <String, dynamic>{};
+            final Map<String, dynamic> environment = (envRaw is Map)
+                ? Map<String, dynamic>.from(envRaw as Map)
+                : <String, dynamic>{};
 
             environment['location'] = {
               'description': locationContext.description,
               'city': locationContext.city,
               'terrain': locationContext.terrain,
-              'landmark': locationContext.landmark ?? '', // Handle nullable landmark
+              'landmark':
+                  locationContext.landmark ?? '', // Handle nullable landmark
               'weatherCondition': locationContext.weatherCondition,
               'temperature': locationContext.temperature,
             };
             context['environment'] = environment;
-            AppLogger.info('[AI_LOCATION_DEBUG] Added location to context: ${environment['location']}');
-            
+            AppLogger.info(
+                '[AI_LOCATION_DEBUG] Added location to context: ${environment['location']}');
+
             // Also populate a dedicated weather map for OpenAIService prompt consumption
             // OpenAIService._buildBaseContext expects environment['weather'] with keys like tempF/tempC and condition/summary
             final weatherMap = <String, dynamic>{};
             if (locationContext.temperature != null) {
-              weatherMap['tempF'] = locationContext.temperature; // Fahrenheit already
+              weatherMap['tempF'] =
+                  locationContext.temperature; // Fahrenheit already
             }
             final condition = locationContext.weatherCondition;
             if (condition != null && condition.isNotEmpty) {
@@ -578,28 +632,37 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             }
             if (weatherMap.isNotEmpty) {
               environment['weather'] = weatherMap;
-              context['environment'] = environment; // reassign to ensure updated ref
-              AppLogger.info('[AI_LOCATION_DEBUG] Added weather to context: ${environment['weather']}');
+              context['environment'] =
+                  environment; // reassign to ensure updated ref
+              AppLogger.info(
+                  '[AI_LOCATION_DEBUG] Added weather to context: ${environment['weather']}');
             }
           } else {
-            AppLogger.warning('[AI_LOCATION_DEBUG] Location context service returned null');
+            AppLogger.warning(
+                '[AI_LOCATION_DEBUG] Location context service returned null');
           }
         } else {
-          AppLogger.warning('[AI_LOCATION_DEBUG] No location points available in session state');
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] No location points available in session state');
         }
       } catch (e) {
         AppLogger.error('[AI_LOCATION_DEBUG] Error in location processing: $e');
         AppLogger.error('[AI_LOCATION_DEBUG] Error type: ${e.runtimeType}');
-        AppLogger.warning('[AI_LOCATION_DEBUG] Continuing without location context due to error');
+        AppLogger.warning(
+            '[AI_LOCATION_DEBUG] Continuing without location context due to error');
         // Don't rethrow - continue without location context
       }
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 2 complete: Location context processed');
+      AppLogger.warning(
+          '[AI_CHEERLEADER_DEBUG] Step 2 complete: Location context processed');
 
       // 3. Generate motivational text with OpenAI (LOCAL GENERATION ONLY)
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3: Calling LOCAL OpenAI service...');
-      AppLogger.info('[AI_CHEERLEADER_DEBUG] Using local OpenAI generation with full context');
-      AppLogger.info('[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
-      
+      AppLogger.warning(
+          '[AI_CHEERLEADER_DEBUG] Step 3: Calling LOCAL OpenAI service...');
+      AppLogger.info(
+          '[AI_CHEERLEADER_DEBUG] Using local OpenAI generation with full context');
+      AppLogger.info(
+          '[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
+
       final messageStartTime = DateTime.now();
       String? message;
       try {
@@ -609,20 +672,25 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           personality: _aiCheerleaderPersonality!,
           explicitContent: _aiCheerleaderExplicitContent,
         );
-        AppLogger.info('[AI_CHEERLEADER_DEBUG] Local OpenAI service returned: $message');
+        AppLogger.info(
+            '[AI_CHEERLEADER_DEBUG] Local OpenAI service returned: $message');
       } catch (e) {
-        AppLogger.error('[AI_CHEERLEADER_DEBUG] Local OpenAI service failed: $e');
+        AppLogger.error(
+            '[AI_CHEERLEADER_DEBUG] Local OpenAI service failed: $e');
         message = null;
       }
       final messageEndTime = DateTime.now();
-      final generationTimeMs = messageEndTime.difference(messageStartTime).inMilliseconds;
-      
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 3 complete: OpenAI call finished');
-      AppLogger.info('[AI_CHEERLEADER_DEBUG] Received message from OpenAI: $message');
+      final generationTimeMs =
+          messageEndTime.difference(messageStartTime).inMilliseconds;
+
+      AppLogger.warning(
+          '[AI_CHEERLEADER_DEBUG] Step 3 complete: OpenAI call finished');
+      AppLogger.info(
+          '[AI_CHEERLEADER_DEBUG] Received message from OpenAI: $message');
 
       if (message != null && message.isNotEmpty) {
         AppLogger.info('[AI_CHEERLEADER] Generated message: "$message"');
-        
+
         // 4. Synthesize speech with ElevenLabs
         final synthesisStartTime = DateTime.now();
         final audioBytes = await _elevenLabsService.synthesizeSpeech(
@@ -630,26 +698,29 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           personality: _aiCheerleaderPersonality!,
         );
         final synthesisEndTime = DateTime.now();
-        final synthesisTimeMs = synthesisEndTime.difference(synthesisStartTime).inMilliseconds;
+        final synthesisTimeMs =
+            synthesisEndTime.difference(synthesisStartTime).inMilliseconds;
         final synthesisSuccess = audioBytes != null;
 
         if (audioBytes != null) {
           AppLogger.info('[AI_CHEERLEADER] Audio synthesized successfully');
-          
+
           // 5. Play audio through audio service
           final playbackSuccess = await _audioService.playCheerleaderAudio(
             audioBytes: audioBytes,
             fallbackText: message,
             personality: _aiCheerleaderPersonality!,
           );
-          
+
           if (playbackSuccess) {
-            AppLogger.info('[AI_CHEERLEADER] Audio playback completed successfully');
+            AppLogger.info(
+                '[AI_CHEERLEADER] Audio playback completed successfully');
           } else {
             AppLogger.warning('[AI_CHEERLEADER] Audio playback failed');
           }
         } else {
-          AppLogger.warning('[AI_CHEERLEADER] Audio synthesis failed, skipping playback (TTS disabled)');
+          AppLogger.warning(
+              '[AI_CHEERLEADER] Audio synthesis failed, skipping playback (TTS disabled)');
         }
 
         // 5. Log interaction to analytics
@@ -680,19 +751,19 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             synthesisSuccess: synthesisSuccess,
             synthesisTimeMs: synthesisTimeMs,
           );
-          AppLogger.info('[AI_ANALYTICS] Interaction logged successfully for automatic trigger');
+          AppLogger.info(
+              '[AI_ANALYTICS] Interaction logged successfully for automatic trigger');
         } catch (e) {
-          AppLogger.error('[AI_ANALYTICS] Failed to log automatic trigger interaction: $e');
+          AppLogger.error(
+              '[AI_ANALYTICS] Failed to log automatic trigger interaction: $e');
         }
         // Return the generated message for optional UI display
         return message;
-
       } else {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
       }
 
       return null;
-
     } catch (e, stackTrace) {
       AppLogger.error('[AI_CHEERLEADER] Pipeline processing failed: $e');
       AppLogger.error('[AI_CHEERLEADER] Stack trace: $stackTrace');
@@ -703,40 +774,42 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _startLocationUpdates(String sessionId) {
     _locationSubscription?.cancel();
     _batchLocationSubscription?.cancel();
-    
+
     _locationSubscription = _locationService.startLocationTracking().listen(
       (locationPoint) {
         add(LocationUpdated(locationPoint));
-        _lastLocationTimestamp = DateTime.now(); // Update last location timestamp
+        _lastLocationTimestamp =
+            DateTime.now(); // Update last location timestamp
       },
       onError: (error) {
-        AppLogger.warning('Location tracking error (continuing session without GPS): $error');
+        AppLogger.warning(
+            'Location tracking error (continuing session without GPS): $error');
         // Don't stop the session - continue in offline mode without location updates
         // This allows users to ruck indoors, on airplanes, or in poor GPS areas
       },
     );
-    
+
     // Only use batch location updates to prevent duplicate API calls
     _batchLocationSubscription = _locationService.batchedLocationUpdates.listen(
       (batch) {
         add(BatchLocationUpdated(batch));
       },
       onError: (error) {
-        AppLogger.warning('Batch location tracking error (continuing session without GPS): $error');
+        AppLogger.warning(
+            'Batch location tracking error (continuing session without GPS): $error');
         // Don't stop the session - continue in offline mode without location updates
         // This allows users to ruck indoors, on airplanes, or in poor GPS areas
       },
     );
-    
+
     AppLogger.debug('Location tracking started for session $sessionId.');
   }
 
   Future<void> _onBatchLocationUpdated(
-    BatchLocationUpdated event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
-    AppLogger.debug('Batch location update received: ${event.locationPoints.length} points');
-    
+      BatchLocationUpdated event, Emitter<ActiveSessionState> emit) async {
+    AppLogger.debug(
+        'Batch location update received: ${event.locationPoints.length} points');
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -750,7 +823,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.debug('Location update received: ${event.locationPoint}');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -758,19 +831,24 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.warning('No coordinator available for location update');
     }
   }
-  
+
   /// Process batch upload of location points
-  Future<void> _processBatchLocationUpload(String sessionId, List<LocationPoint> locationPoints) async {
-    AppLogger.info('Uploading batch of ${locationPoints.length} location points');
-    
+  Future<void> _processBatchLocationUpload(
+      String sessionId, List<LocationPoint> locationPoints) async {
+    AppLogger.info(
+        'Uploading batch of ${locationPoints.length} location points');
+
     final locationData = locationPoints.map((point) => point.toJson()).toList();
-    
+
     try {
       await _apiClient.addLocationPoints(sessionId, locationData);
-      AppLogger.info('Successfully uploaded ${locationPoints.length} location points');
+      AppLogger.info(
+          'Successfully uploaded ${locationPoints.length} location points');
     } catch (e) {
-      if (e.toString().contains('401') || e.toString().contains('Already Used')) {
-        AppLogger.warning('[SESSION_RECOVERY] Location batch sync failed due to auth issue, will retry: $e');
+      if (e.toString().contains('401') ||
+          e.toString().contains('Already Used')) {
+        AppLogger.warning(
+            '[SESSION_RECOVERY] Location batch sync failed due to auth issue, will retry: $e');
         // Don't kill the session - continue tracking locally
       } else {
         AppLogger.warning('Failed to send location batch to backend: $e');
@@ -778,25 +856,29 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
-  
-  Future<void> _onTimerStarted(TimerStarted event, Emitter<ActiveSessionState> emit) async {
+  Future<void> _onTimerStarted(
+      TimerStarted event, Emitter<ActiveSessionState> emit) async {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) => add(const Tick()));
+    _ticker = Timer.periodic(
+        const Duration(seconds: 1), (timer) => add(const Tick()));
 
     _watchdogTimer?.cancel();
     _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (DateTime.now().difference(_lastLocationTimestamp).inSeconds > 60 && _validLocationCount > 0) {
-        AppLogger.warning('Watchdog: No valid location for 60s. Restarting location service.');
+      if (DateTime.now().difference(_lastLocationTimestamp).inSeconds > 60 &&
+          _validLocationCount > 0) {
+        AppLogger.warning(
+            'Watchdog: No valid location for 60s. Restarting location service.');
         _locationService.stopLocationTracking();
         if (state is ActiveSessionRunning) {
-           _startLocationUpdates((state as ActiveSessionRunning).sessionId);
+          _startLocationUpdates((state as ActiveSessionRunning).sessionId);
         }
         _lastLocationTimestamp = DateTime.now();
       }
     });
 
     _sessionPersistenceTimer?.cancel();
-    _sessionPersistenceTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+    _sessionPersistenceTimer =
+        Timer.periodic(const Duration(minutes: 1), (timer) async {
       if (state is ActiveSessionRunning) {
         final currentState = state as ActiveSessionRunning;
         await _activeSessionStorage.saveActiveSession(currentState);
@@ -808,11 +890,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   void _stopTickerAndWatchdog() {
-    _ticker?.cancel(); _ticker = null;
-    _watchdogTimer?.cancel(); _watchdogTimer = null;
-    _sessionPersistenceTimer?.cancel(); _sessionPersistenceTimer = null;
-    _batchUploadTimer?.cancel(); _batchUploadTimer = null;
-    AppLogger.debug('Master timer, watchdog, session persistence, and batch upload timers stopped.');
+    _ticker?.cancel();
+    _ticker = null;
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _sessionPersistenceTimer?.cancel();
+    _sessionPersistenceTimer = null;
+    _batchUploadTimer?.cancel();
+    _batchUploadTimer = null;
+    AppLogger.debug(
+        'Master timer, watchdog, session persistence, and batch upload timers stopped.');
   }
 
   /// Start batch upload timer for real-time data uploads during session
@@ -824,13 +911,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         await _processBatchUpload(currentState.sessionId);
       }
     });
-    AppLogger.info('Batch upload timer started - uploading data every ${_batchUploadInterval.inMinutes} minutes');
+    AppLogger.info(
+        'Batch upload timer started - uploading data every ${_batchUploadInterval.inMinutes} minutes');
   }
 
   /// Process batch upload of pending location points and heart rate samples
   Future<void> _processBatchUpload(String sessionId) async {
     AppLogger.debug('Processing batch upload for session: $sessionId');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       // Create a custom event for batch upload processing
@@ -843,8 +931,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // Upload methods now handled by UploadManager
 
   Future<void> _onTick(Tick event, Emitter<ActiveSessionState> emit) async {
-    AppLogger.debug('[OLD_BLOC] Tick event received - main bloc is processing events');
-    
+    AppLogger.debug(
+        '[OLD_BLOC] Tick event received - main bloc is processing events');
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -854,68 +943,75 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onSessionPaused(
-    SessionPaused event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
-    AppLogger.info('[OLD_BLOC] ===== SESSION PAUSE EVENT RECEIVED IN HANDLER =====');
+      SessionPaused event, Emitter<ActiveSessionState> emit) async {
+    AppLogger.info(
+        '[OLD_BLOC] ===== SESSION PAUSE EVENT RECEIVED IN HANDLER =====');
     AppLogger.info('[OLD_BLOC] ===== SESSION PAUSE EVENT RECEIVED =====');
     AppLogger.info('[OLD_BLOC] Pausing session with delegation to coordinator');
     AppLogger.info('[OLD_BLOC] Coordinator exists: ${_coordinator != null}');
     AppLogger.info('[OLD_BLOC] Event source: ${event.source}');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      AppLogger.info('[OLD_BLOC] Delegating SessionPaused event to coordinator...');
+      AppLogger.info(
+          '[OLD_BLOC] Delegating SessionPaused event to coordinator...');
       _coordinator!.add(event);
       AppLogger.info('[OLD_BLOC] SessionPaused event delegated successfully');
     } else {
-      AppLogger.warning('[OLD_BLOC] No coordinator available for session pause');
-      emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
+      AppLogger.warning(
+          '[OLD_BLOC] No coordinator available for session pause');
+      emit(ActiveSessionFailure(
+          errorMessage: 'Session coordinator not initialized'));
     }
   }
 
   Future<void> _onSessionResumed(
-    SessionResumed event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
+      SessionResumed event, Emitter<ActiveSessionState> emit) async {
     AppLogger.info('[OLD_BLOC] ===== SESSION RESUME EVENT RECEIVED =====');
-    AppLogger.info('[OLD_BLOC] Resuming session with delegation to coordinator');
+    AppLogger.info(
+        '[OLD_BLOC] Resuming session with delegation to coordinator');
     AppLogger.info('[OLD_BLOC] Coordinator exists: ${_coordinator != null}');
     AppLogger.info('[OLD_BLOC] Event source: ${event.source}');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      AppLogger.info('[OLD_BLOC] Delegating SessionResumed event to coordinator...');
+      AppLogger.info(
+          '[OLD_BLOC] Delegating SessionResumed event to coordinator...');
       _coordinator!.add(event);
       AppLogger.info('[OLD_BLOC] SessionResumed event delegated successfully');
     } else {
-      AppLogger.warning('[OLD_BLOC] No coordinator available for session resume');
-      emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
+      AppLogger.warning(
+          '[OLD_BLOC] No coordinator available for session resume');
+      emit(ActiveSessionFailure(
+          errorMessage: 'Session coordinator not initialized'));
     }
   }
 
   Future<void> _onSessionCompleted(
-    SessionCompleted event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
+      SessionCompleted event, Emitter<ActiveSessionState> emit) async {
     print('🚀🚀🚀 MAIN BLOC SESSION COMPLETION STARTED 🚀🚀🚀');
-    AppLogger.error('[OLD_BLOC] ===== MAIN BLOC SESSION COMPLETION STARTED =====');
+    AppLogger.error(
+        '[OLD_BLOC] ===== MAIN BLOC SESSION COMPLETION STARTED =====');
     AppLogger.info('[OLD_BLOC] Session completion requested');
     AppLogger.info('[OLD_BLOC] Current state: ${state.runtimeType}');
     AppLogger.info('[OLD_BLOC] Session completed event: $event');
-    AppLogger.error('[OLD_BLOC] Coordinator null check: _coordinator == null? ${_coordinator == null}');
-    
+    AppLogger.error(
+        '[OLD_BLOC] Coordinator null check: _coordinator == null? ${_coordinator == null}');
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       AppLogger.error('[OLD_BLOC] ===== DELEGATING TO COORDINATOR =====');
       AppLogger.info('[OLD_BLOC] Delegating to coordinator');
       _coordinator!.add(event);
-      AppLogger.info('[OLD_BLOC] Event sent to coordinator, waiting for state update');
+      AppLogger.info(
+          '[OLD_BLOC] Event sent to coordinator, waiting for state update');
       AppLogger.error('[OLD_BLOC] ===== DELEGATION COMPLETE =====');
     } else {
       AppLogger.error('[OLD_BLOC] ===== NO COORDINATOR AVAILABLE =====');
-      AppLogger.error('[OLD_BLOC] No coordinator available for session completion');
-      emit(ActiveSessionFailure(errorMessage: 'Session coordinator not initialized'));
+      AppLogger.error(
+          '[OLD_BLOC] No coordinator available for session completion');
+      emit(ActiveSessionFailure(
+          errorMessage: 'Session coordinator not initialized'));
     }
   }
 
@@ -923,46 +1019,49 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     SessionFailed event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.error('Session failed with delegation to coordinator', exception: Exception(event.errorMessage));
-    
+    AppLogger.error('Session failed with delegation to coordinator',
+        exception: Exception(event.errorMessage));
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
       AppLogger.warning('No coordinator available for session failure');
-      emit(ActiveSessionFailure(errorMessage: event.errorMessage, sessionDetails: null));
+      emit(ActiveSessionFailure(
+          errorMessage: event.errorMessage, sessionDetails: null));
     }
   }
 
   // Heart rate monitoring start/stop is now handled by HeartRateManager
   Future<void> _startHeartRateMonitoring(String sessionId) async {
     AppLogger.debug('Starting heart rate monitoring through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      _coordinator!.add(HeartRateMonitoringStartRequested(sessionId: sessionId));
+      _coordinator!
+          .add(HeartRateMonitoringStartRequested(sessionId: sessionId));
     } else {
-      AppLogger.warning('No coordinator available for heart rate monitoring start');
+      AppLogger.warning(
+          'No coordinator available for heart rate monitoring start');
     }
   }
 
   Future<void> _stopHeartRateMonitoring() async {
     AppLogger.debug('Stopping heart rate monitoring through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(HeartRateMonitoringStopRequested());
     } else {
-      AppLogger.warning('No coordinator available for heart rate monitoring stop');
+      AppLogger.warning(
+          'No coordinator available for heart rate monitoring stop');
     }
   }
 
   Future<void> _onHeartRateUpdated(
-    HeartRateUpdated event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
+      HeartRateUpdated event, Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Heart rate updated: ${event.sample.bpm} bpm');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -972,27 +1071,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onHeartRateBufferProcessed(
-    HeartRateBufferProcessed event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
+      HeartRateBufferProcessed event, Emitter<ActiveSessionState> emit) async {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
-      
+
       // Apply the same 30-second throttling to API uploads as we do for local storage
       final now = DateTime.now();
-      final shouldSendToApi = _lastApiHeartRateTime == null || 
+      final shouldSendToApi = _lastApiHeartRateTime == null ||
           now.difference(_lastApiHeartRateTime!).inSeconds >= 30;
-      
+
       if (shouldSendToApi) {
         // Delegate to coordinator for heart rate batch upload
         if (_coordinator != null) {
-          _coordinator!.add(HeartRateBatchUploadRequested(samples: event.samples));
+          _coordinator!
+              .add(HeartRateBatchUploadRequested(samples: event.samples));
         } else {
-          AppLogger.warning('No coordinator available for heart rate batch upload');
+          AppLogger.warning(
+              'No coordinator available for heart rate batch upload');
         }
         _lastApiHeartRateTime = now;
       } else {
-        AppLogger.debug('[HR_API_THROTTLE] Skipped sending ${event.samples.length} heart rate samples to API (throttled)');
+        AppLogger.debug(
+            '[HR_API_THROTTLE] Skipped sending ${event.samples.length} heart rate samples to API (throttled)');
       }
       // Optionally emit state if UI needs to reflect that a batch was sent, though usually not needed.
     }
@@ -1000,30 +1100,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   // Heart rate API calls now handled by HeartRateManager
 
-  Future<void> _onFetchSessionPhotosRequested(
-    FetchSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
+  Future<void> _onFetchSessionPhotosRequested(FetchSessionPhotosRequested event,
+      Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Fetching session photos for ruck ID: ${event.ruckId}');
-    
+
     try {
       // Fetch photos directly from the repository
       final photos = await _sessionRepository.getSessionPhotos(event.ruckId);
-      
+
       // Emit SessionPhotosLoadedForId state so UI can listen for it
       emit(SessionPhotosLoadedForId(
         sessionId: event.ruckId.toString(),
         photos: photos,
       ));
-      
+
       // Also update the current state with the fetched photos if it's a running session
       final currentState = state;
       if (currentState is ActiveSessionRunning) {
         emit(currentState.copyWith(photos: photos));
       }
-      
-      AppLogger.debug('Successfully fetched ${photos.length} photos for ruck ${event.ruckId}, emitted SessionPhotosLoadedForId state');
+
+      AppLogger.debug(
+          'Successfully fetched ${photos.length} photos for ruck ${event.ruckId}, emitted SessionPhotosLoadedForId state');
     } catch (e, stackTrace) {
-      AppLogger.error('Failed to fetch session photos for ruck ${event.ruckId}', exception: e);
-      
+      AppLogger.error('Failed to fetch session photos for ruck ${event.ruckId}',
+          exception: e);
+
       // Log to Sentry for debugging
       await AppErrorHandler.handleError(
         'Fetch session photos',
@@ -1039,96 +1141,107 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onUploadSessionPhotosRequested(
-      UploadSessionPhotosRequested event, Emitter<ActiveSessionState> emit) async {
+      UploadSessionPhotosRequested event,
+      Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Uploading session photos through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo uploading, creating coordinator');
-      
+      AppLogger.warning(
+          'No coordinator available for photo uploading, creating coordinator');
+
       // Create coordinator if it doesn't exist
       _coordinator = _createCoordinator();
       _setupCoordinatorSubscription();
-      
+
       // Now delegate to the newly created coordinator
       _coordinator!.add(event);
     }
   }
 
-  Future<void> _onDeleteSessionPhotoRequested(
-      DeleteSessionPhotoRequested event, Emitter<ActiveSessionState> emit) async {
+  Future<void> _onDeleteSessionPhotoRequested(DeleteSessionPhotoRequested event,
+      Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Deleting session photo through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo deletion, creating coordinator');
-      
+      AppLogger.warning(
+          'No coordinator available for photo deletion, creating coordinator');
+
       // Create coordinator if it doesn't exist
       _coordinator = _createCoordinator();
       _setupCoordinatorSubscription();
-      
+
       // Now delegate to the newly created coordinator
       _coordinator!.add(event);
     }
   }
 
-  void _onClearSessionPhotos(ClearSessionPhotos event, Emitter<ActiveSessionState> emit) {
+  void _onClearSessionPhotos(
+      ClearSessionPhotos event, Emitter<ActiveSessionState> emit) {
     if (state is ActiveSessionRunning) {
       final currentState = state as ActiveSessionRunning;
       emit(currentState.copyWith(photos: []));
     }
   }
 
-  Future<void> _onTakePhotoRequested(TakePhotoRequested event, Emitter<ActiveSessionState> emit) async {
+  Future<void> _onTakePhotoRequested(
+      TakePhotoRequested event, Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Taking photo through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo taking, creating coordinator');
-      
+      AppLogger.warning(
+          'No coordinator available for photo taking, creating coordinator');
+
       // Create coordinator if it doesn't exist
       _coordinator = _createCoordinator();
       _setupCoordinatorSubscription();
-      
+
       // Now delegate to the newly created coordinator
       _coordinator!.add(event);
     }
   }
 
-  Future<void> _onPickPhotoRequested(PickPhotoRequested event, Emitter<ActiveSessionState> emit) async {
+  Future<void> _onPickPhotoRequested(
+      PickPhotoRequested event, Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Picking photo through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for photo picking, creating coordinator');
-      
+      AppLogger.warning(
+          'No coordinator available for photo picking, creating coordinator');
+
       // Create coordinator if it doesn't exist
       _coordinator = _createCoordinator();
       _setupCoordinatorSubscription();
-      
+
       // Now delegate to the newly created coordinator
       _coordinator!.add(event);
     }
   }
-  
-  Future<void> _onLoadSessionForViewing(LoadSessionForViewing event, Emitter<ActiveSessionState> emit) async {
+
+  Future<void> _onLoadSessionForViewing(
+      LoadSessionForViewing event, Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Loading session for viewing through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       try {
-        AppLogger.debug('Attempting to delegate LoadSessionForViewing to coordinator');
+        AppLogger.debug(
+            'Attempting to delegate LoadSessionForViewing to coordinator');
         _coordinator!.add(event);
       } catch (e) {
-        AppLogger.error('Failed to delegate LoadSessionForViewing to coordinator: $e');
+        AppLogger.error(
+            'Failed to delegate LoadSessionForViewing to coordinator: $e');
         // Fallback to prevent UI breakage
         emit(SessionSummaryGenerated(
           session: event.session,
@@ -1147,31 +1260,37 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
-  void _onUpdateStateWithSessionPhotos(UpdateStateWithSessionPhotos event, Emitter<ActiveSessionState> emit) {
-      // Cast List<dynamic> to List<RuckPhoto> to fix type mismatch
-      final List<RuckPhoto> typedPhotos = event.photos.map((photo) => 
-          photo is RuckPhoto ? photo : RuckPhoto.fromJson(photo as Map<String, dynamic>)
-      ).toList();
-      
-      if (state is ActiveSessionRunning) {
-        final currentState = state as ActiveSessionRunning;
-        emit(currentState.copyWith(photos: typedPhotos, isPhotosLoading: false));
-      } else if (state is SessionSummaryGenerated) {
-        final currentState = state as SessionSummaryGenerated;
-        emit(currentState.copyWith(photos: typedPhotos, isPhotosLoading: false));
-      }
+  void _onUpdateStateWithSessionPhotos(
+      UpdateStateWithSessionPhotos event, Emitter<ActiveSessionState> emit) {
+    // Cast List<dynamic> to List<RuckPhoto> to fix type mismatch
+    final List<RuckPhoto> typedPhotos = event.photos
+        .map((photo) => photo is RuckPhoto
+            ? photo
+            : RuckPhoto.fromJson(photo as Map<String, dynamic>))
+        .toList();
+
+    if (state is ActiveSessionRunning) {
+      final currentState = state as ActiveSessionRunning;
+      emit(currentState.copyWith(photos: typedPhotos, isPhotosLoading: false));
+    } else if (state is SessionSummaryGenerated) {
+      final currentState = state as SessionSummaryGenerated;
+      emit(currentState.copyWith(photos: typedPhotos, isPhotosLoading: false));
+    }
   }
 
-  void _onSessionErrorCleared(SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
+  void _onSessionErrorCleared(
+      SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
     if (state is ActiveSessionFailure) {
       // Potentially transition to a more stable state, e.g., ActiveSessionInitial
       // or back to the previous running state if details are available and make sense.
       // For simplicity, transitioning to initial.
-      emit(ActiveSessionInitial()); 
-    } else if (state is ActiveSessionRunning && (state as ActiveSessionRunning).errorMessage != null) {
+      emit(ActiveSessionInitial());
+    } else if (state is ActiveSessionRunning &&
+        (state as ActiveSessionRunning).errorMessage != null) {
       final currentState = state as ActiveSessionRunning;
       emit(currentState.copyWith(clearErrorMessage: true));
-    } else if (state is SessionSummaryGenerated && (state as SessionSummaryGenerated).errorMessage != null) {
+    } else if (state is SessionSummaryGenerated &&
+        (state as SessionSummaryGenerated).errorMessage != null) {
       final currentState = state as SessionSummaryGenerated;
       emit(currentState.copyWith(clearErrorMessage: true));
     }
@@ -1182,7 +1301,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.debug('Requesting session recovery through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -1192,11 +1311,9 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   }
 
   Future<void> _onSessionReset(
-    SessionReset event, 
-    Emitter<ActiveSessionState> emit
-  ) async {
+      SessionReset event, Emitter<ActiveSessionState> emit) async {
     AppLogger.debug('Resetting session through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -1208,19 +1325,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   double? _calculateCurrentPace(List<LocationPoint> points) {
     if (points.length < 2) return null;
-    
+
     try {
       final lastPoint = points.last;
       final secondLastPoint = points[points.length - 2];
-      
+
       final distance = _calculateDistance(
-        secondLastPoint.latitude, secondLastPoint.longitude,
-        lastPoint.latitude, lastPoint.longitude,
+        secondLastPoint.latitude,
+        secondLastPoint.longitude,
+        lastPoint.latitude,
+        lastPoint.longitude,
       );
-      
-      final timeDiff = lastPoint.timestamp.difference(secondLastPoint.timestamp).inSeconds;
+
+      final timeDiff =
+          lastPoint.timestamp.difference(secondLastPoint.timestamp).inSeconds;
       if (timeDiff <= 0 || distance <= 0) return null;
-      
+
       // Return pace in minutes per km
       return (timeDiff / 60) / (distance / 1000);
     } catch (e) {
@@ -1228,7 +1348,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // Earth radius in meters
     final double dLat = (lat2 - lat1) * (math.pi / 180);
     final double dLon = (lon2 - lon1) * (math.pi / 180);
@@ -1244,28 +1365,28 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   @override
   Future<void> close() async {
     AppLogger.debug('Closing ActiveSessionBloc - cleaning up resources');
-    
+
     // Clean up coordinator first
     try {
       await _coordinatorSubscription?.cancel();
       await _coordinator?.close();
       _coordinator = null;
-      
+
       // Stop session completion detection monitoring
       _completionDetectionService.stopMonitoring();
-      
+
       // Clean up the underlying services that this bloc still directly manages
       // Stop location tracking
       await _locationService.stopLocationTracking();
-      
+
       // Stop heart rate monitoring if it was started
       _heartRateService.stopHeartRateMonitoring();
-      
+
       AppLogger.debug('ActiveSessionBloc resources cleaned up successfully');
     } catch (e) {
       AppLogger.error('Error during ActiveSessionBloc cleanup: $e');
     }
-    
+
     return super.close();
   }
 
@@ -1287,7 +1408,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.debug('Requesting session cleanup through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
@@ -1295,13 +1416,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.warning('No coordinator available for session cleanup');
     }
   }
-  
+
   // Memory pressure handling is now managed by MemoryPressureManager
 
   // Offline session sync is now handled by UploadManager
   void _syncOfflineSessionsInBackground() {
     AppLogger.debug('Syncing offline sessions through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(OfflineSessionSyncRequested());
@@ -1318,7 +1439,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     List<HeartRateSample> heartRateSamples,
   ) async {
     AppLogger.debug('Building completion payload through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(CompletionPayloadBuildRequested(
@@ -1328,7 +1449,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         heartRateSamples: heartRateSamples,
       ));
     } else {
-      AppLogger.warning('No coordinator available for completion payload building');
+      AppLogger.warning(
+          'No coordinator available for completion payload building');
     }
     return {}; // Placeholder - actual data will come through coordinator
   }
@@ -1336,10 +1458,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // Connectivity monitoring is now handled by LocationTrackingManager
   void _startConnectivityMonitoring(String sessionId) {
     AppLogger.debug('Starting connectivity monitoring through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      _coordinator!.add(ConnectivityMonitoringStartRequested(sessionId: sessionId));
+      _coordinator!
+          .add(ConnectivityMonitoringStartRequested(sessionId: sessionId));
     } else {
       AppLogger.warning('No coordinator available for connectivity monitoring');
     }
@@ -1348,43 +1471,48 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // Location tracking ensurance is now handled by LocationTrackingManager
   void _ensureLocationTrackingActive(String sessionId) {
     AppLogger.debug('Ensuring location tracking through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      _coordinator!.add(LocationTrackingEnsureActiveRequested(sessionId: sessionId));
+      _coordinator!
+          .add(LocationTrackingEnsureActiveRequested(sessionId: sessionId));
     } else {
-      AppLogger.warning('No coordinator available for location tracking ensurance');
+      AppLogger.warning(
+          'No coordinator available for location tracking ensurance');
     }
   }
 
   // Offline session sync is now handled by UploadManager
   Future<void> _attemptOfflineSessionSync(String sessionId) async {
     AppLogger.debug('Attempting offline session sync through coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
-      _coordinator!.add(OfflineSessionSyncAttemptRequested(sessionId: sessionId));
+      _coordinator!
+          .add(OfflineSessionSyncAttemptRequested(sessionId: sessionId));
     } else {
-      AppLogger.warning('No coordinator available for offline session sync attempt');
+      AppLogger.warning(
+          'No coordinator available for offline session sync attempt');
     }
   }
-  
+
   // All diagnostic methods removed - now handled by managers
-  
+
   Future<void> _onMemoryPressureDetected(
     MemoryPressureDetected event,
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.debug('Memory pressure detected, delegating to coordinator');
-    
+
     // Delegate to coordinator if it exists
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {
-      AppLogger.warning('No coordinator available for memory pressure handling');
+      AppLogger.warning(
+          'No coordinator available for memory pressure handling');
     }
   }
-  
+
   /// Handle coordinator state forwarding
   void _onCoordinatorStateForwarded(
     _CoordinatorStateForwarded event,
@@ -1393,46 +1521,46 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Safely emit the coordinator state within an event handler context
     emit(event.state);
   }
-  
+
   Future<void> _onCheckForCrashedSession(
     CheckForCrashedSession event,
     Emitter<ActiveSessionState> emit,
   ) async {
     AppLogger.info('Checking for crashed sessions on app startup');
-    
+
     try {
       // Create coordinator if it doesn't exist to handle crash recovery
       if (_coordinator == null) {
         _coordinator = _createCoordinator();
         _setupCoordinatorSubscription();
       }
-      
+
       // Delegate crash recovery check to coordinator
       // The coordinator will internally check with its SessionLifecycleManager
       _coordinator!.add(event);
-      
+
       AppLogger.info('Crash recovery check delegated to coordinator');
-      
     } catch (e) {
       AppLogger.error('Error during crash recovery check: $e');
       // Continue gracefully - not critical for app startup
     }
   }
-  
-  Future<void> _onSessionRecovered(SessionRecovered event, Emitter<ActiveSessionState> emit) async {
+
+  Future<void> _onSessionRecovered(
+      SessionRecovered event, Emitter<ActiveSessionState> emit) async {
     // Just emit current state - coordinator handles the actual recovery
     emit(state);
   }
-  
+
   // All diagnostic and memory pressure methods removed - now handled by dedicated managers
 }
 
 /// Internal event for safely forwarding coordinator states
 class _CoordinatorStateForwarded extends ActiveSessionEvent {
   final ActiveSessionState state;
-  
+
   const _CoordinatorStateForwarded(this.state);
-  
+
   @override
   List<Object> get props => [state];
 }

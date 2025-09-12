@@ -34,7 +34,7 @@ class SessionMetricsService {
     int totalCalories = 0;
     double totalElevationGain = 0;
     double totalElevationLoss = 0;
-    
+
     for (final s in list) {
       totalDistanceKm += s.totalDistanceKm ?? 0;
       totalDurationSec += s.totalDurationSec ?? 0;
@@ -43,9 +43,8 @@ class SessionMetricsService {
       totalElevationLoss += s.elevationLoss ?? 0;
     }
 
-    final avgPaceSecPerKm = totalDistanceKm > 0
-        ? totalDurationSec / totalDistanceKm
-        : 0.0;
+    final avgPaceSecPerKm =
+        totalDistanceKm > 0 ? totalDurationSec / totalDistanceKm : 0.0;
 
     return {
       'total_distance_km': totalDistanceKm,

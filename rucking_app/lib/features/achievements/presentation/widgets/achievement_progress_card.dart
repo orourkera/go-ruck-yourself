@@ -38,9 +38,9 @@ class AchievementProgressCard extends StatelessWidget {
                 progress: progressPercentage,
                 size: 50.0,
               ),
-              
+
               const SizedBox(width: 16.0),
-              
+
               // Achievement details
               Expanded(
                 child: Column(
@@ -51,26 +51,27 @@ class AchievementProgressCard extends StatelessWidget {
                       achievement.name,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: isEarned 
-                            ? _getCategoryColor() 
+                        color: isEarned
+                            ? _getCategoryColor()
                             : theme.textTheme.titleMedium?.color,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 4.0),
-                    
+
                     // Achievement description
                     Text(
                       achievement.description,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        color:
+                            theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    
+
                     const SizedBox(height: 8.0),
-                    
+
                     // Progress bar or completed indicator
                     if (isEarned)
                       _buildCompletedIndicator(theme)
@@ -81,10 +82,9 @@ class AchievementProgressCard extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Tier indicator
-              if (isEarned)
-                _buildTierChip(theme),
+              if (isEarned) _buildTierChip(theme),
             ],
           ),
         ),
@@ -114,7 +114,7 @@ class AchievementProgressCard extends StatelessWidget {
 
   Widget _buildProgressIndicator(ThemeData theme) {
     final progressPercentage = progress!.progressPercentage;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -136,18 +136,14 @@ class AchievementProgressCard extends StatelessWidget {
             ),
           ],
         ),
-        
         const SizedBox(height: 4.0),
-        
         LinearProgressIndicator(
           value: progressPercentage / 100,
           backgroundColor: Colors.grey.shade300,
           valueColor: AlwaysStoppedAnimation<Color>(_getCategoryColor()),
           minHeight: 6.0,
         ),
-        
         const SizedBox(height: 4.0),
-        
         Text(
           _getProgressText(),
           style: theme.textTheme.bodySmall?.copyWith(
@@ -197,10 +193,10 @@ class AchievementProgressCard extends StatelessWidget {
 
   String _getProgressText() {
     if (progress == null) return '';
-    
+
     final current = progress!.currentValue;
     final target = progress!.targetValue;
-    
+
     // Format based on achievement type
     switch (achievement.category.toLowerCase()) {
       case 'distance':

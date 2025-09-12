@@ -18,7 +18,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);  // Tabs: Stats, Clubs, Recent Rucks
+    _tabController = TabController(
+        length: 3, vsync: this); // Tabs: Stats, Clubs, Recent Rucks
     context.read<PublicProfileBloc>().add(LoadPublicProfile(widget.userId));
   }
 
@@ -34,16 +35,23 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       appBar: AppBar(title: Text('Profile')),
       body: BlocBuilder<PublicProfileBloc, PublicProfileState>(
         builder: (context, state) {
-          if (state is PublicProfileLoading) return Center(child: CircularProgressIndicator());
-          if (state is PublicProfileError) return Center(child: Text(state.message));
+          if (state is PublicProfileLoading)
+            return Center(child: CircularProgressIndicator());
+          if (state is PublicProfileError)
+            return Center(child: Text(state.message));
           if (state is PublicProfileLoaded) {
             return SingleChildScrollView(
               child: Column(
                 children: [
                   ProfileHeader(profile: state.profile, isOwnProfile: false),
                   if (!state.profile.isPrivateProfile) ...[
-                    ProfileStatsGrid(stats: state.stats ?? UserProfileStats(/* defaults */)),
-                    TabBar(controller: _tabController, tabs: [Tab(text: 'Stats'), Tab(text: 'Clubs'), Tab(text: 'Recent')]),
+                    ProfileStatsGrid(
+                        stats: state.stats ?? UserProfileStats(/* defaults */)),
+                    TabBar(controller: _tabController, tabs: [
+                      Tab(text: 'Stats'),
+                      Tab(text: 'Clubs'),
+                      Tab(text: 'Recent')
+                    ]),
                     SizedBox(
                       height: 300,
                       child: TabBarView(
@@ -52,9 +60,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                           // Stats view
                           Text('Detailed Stats'),
                           // Clubs list
-                          ListView.builder(itemCount: state.clubs?.length ?? 0, itemBuilder: (_, i) => ListTile(title: Text(state.clubs![i].name))),
+                          ListView.builder(
+                              itemCount: state.clubs?.length ?? 0,
+                              itemBuilder: (_, i) =>
+                                  ListTile(title: Text(state.clubs![i].name))),
                           // Recent rucks
-                          ListView.builder(itemCount: state.recentRucks?.length ?? 0, itemBuilder: (_, i) => ListTile(title: Text('Ruck ${i+1}'))),
+                          ListView.builder(
+                              itemCount: state.recentRucks?.length ?? 0,
+                              itemBuilder: (_, i) =>
+                                  ListTile(title: Text('Ruck ${i + 1}'))),
                         ],
                       ),
                     ),
@@ -69,4 +83,4 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       ),
     );
   }
-} 
+}

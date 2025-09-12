@@ -39,7 +39,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
   void _onUrlChanged() {
     final url = _urlController.text.trim();
     final detectedSource = _detectUrlSource(url);
-    
+
     if (detectedSource != _detectedSource) {
       setState(() {
         _detectedSource = detectedSource;
@@ -51,7 +51,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
     try {
       final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
       final clipboardText = clipboardData?.text?.trim();
-      
+
       if (clipboardText != null && _isValidUrl(clipboardText)) {
         _showClipboardSuggestion(clipboardText);
       }
@@ -62,7 +62,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
 
   void _showClipboardSuggestion(String url) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Found URL in clipboard: ${_truncateUrl(url)}'),
@@ -119,8 +119,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
           const SizedBox(height: 12),
 
           // Detected source indicator
-          if (_detectedSource != null)
-            _buildSourceIndicator(_detectedSource!),
+          if (_detectedSource != null) _buildSourceIndicator(_detectedSource!),
 
           const SizedBox(height: 16),
 
@@ -129,7 +128,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: widget.isLoading ? null : _submitForm,
-              icon: widget.isLoading 
+              icon: widget.isLoading
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -139,7 +138,8 @@ class _UrlImportFormState extends State<UrlImportForm> {
                       ),
                     )
                   : const Icon(Icons.download),
-              label: Text(widget.isLoading ? 'Importing...' : 'Import from URL'),
+              label:
+                  Text(widget.isLoading ? 'Importing...' : 'Import from URL'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -287,7 +287,8 @@ class _UrlImportFormState extends State<UrlImportForm> {
     );
   }
 
-  Widget _buildQuickActionChip(String label, IconData icon, VoidCallback onTap) {
+  Widget _buildQuickActionChip(
+      String label, IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -348,16 +349,16 @@ class _UrlImportFormState extends State<UrlImportForm> {
   bool _isSupportedUrl(String url) {
     final lowerUrl = url.toLowerCase();
     return lowerUrl.contains('alltrails.com') ||
-           lowerUrl.contains('strava.com') ||
-           lowerUrl.contains('garmin.com') ||
-           lowerUrl.endsWith('.gpx');
+        lowerUrl.contains('strava.com') ||
+        lowerUrl.contains('garmin.com') ||
+        lowerUrl.endsWith('.gpx');
   }
 
   String? _detectUrlSource(String url) {
     if (url.isEmpty) return null;
-    
+
     final lowerUrl = url.toLowerCase();
-    
+
     if (lowerUrl.contains('alltrails.com')) {
       return 'AllTrails';
     } else if (lowerUrl.contains('strava.com')) {
@@ -367,7 +368,7 @@ class _UrlImportFormState extends State<UrlImportForm> {
     } else if (lowerUrl.endsWith('.gpx')) {
       return 'GPX';
     }
-    
+
     return null;
   }
 
@@ -455,16 +456,17 @@ class _CompactUrlInputState extends State<CompactUrlInput> {
               decoration: const InputDecoration(
                 hintText: 'Enter URL...',
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onSubmitted: widget.onSubmit,
             ),
           ),
           IconButton(
-            onPressed: widget.isLoading 
-                ? null 
+            onPressed: widget.isLoading
+                ? null
                 : () => widget.onSubmit(_controller.text.trim()),
-            icon: widget.isLoading 
+            icon: widget.isLoading
                 ? const SizedBox(
                     width: 16,
                     height: 16,

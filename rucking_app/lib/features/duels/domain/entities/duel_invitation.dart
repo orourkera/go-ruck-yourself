@@ -111,7 +111,7 @@ class DuelInvitation extends Equatable {
 
   String? get targetValueDisplay {
     if (targetValue == null || challengeType == null) return null;
-    
+
     String unit;
     switch (challengeType!) {
       case 'distance':
@@ -129,7 +129,7 @@ class DuelInvitation extends Equatable {
       default:
         unit = '';
     }
-    
+
     return '${targetValue!.toStringAsFixed(targetValue! % 1 == 0 ? 0 : 1)} $unit';
   }
 

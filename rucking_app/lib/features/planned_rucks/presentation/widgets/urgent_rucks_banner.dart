@@ -214,7 +214,8 @@ class CompactUrgentRucksBanner extends StatelessWidget {
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 12,
-                  color: (backgroundColor ?? AppColors.warning).withOpacity(0.7),
+                  color:
+                      (backgroundColor ?? AppColors.warning).withOpacity(0.7),
                 ),
               ],
             ],
@@ -243,7 +244,8 @@ class AnimatedUrgentRucksBanner extends StatefulWidget {
   });
 
   @override
-  State<AnimatedUrgentRucksBanner> createState() => _AnimatedUrgentRucksBannerState();
+  State<AnimatedUrgentRucksBanner> createState() =>
+      _AnimatedUrgentRucksBannerState();
 }
 
 class _AnimatedUrgentRucksBannerState extends State<AnimatedUrgentRucksBanner>
@@ -260,7 +262,7 @@ class _AnimatedUrgentRucksBannerState extends State<AnimatedUrgentRucksBanner>
       duration: widget.animationDuration,
       vsync: this,
     );
-    
+
     _slideAnimation = Tween<double>(
       begin: -1.0,
       end: 0.0,
@@ -268,7 +270,7 @@ class _AnimatedUrgentRucksBannerState extends State<AnimatedUrgentRucksBanner>
       parent: _animationController,
       curve: Curves.easeOutCubic,
     ));
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -285,7 +287,7 @@ class _AnimatedUrgentRucksBannerState extends State<AnimatedUrgentRucksBanner>
   @override
   void didUpdateWidget(AnimatedUrgentRucksBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (_shouldShow() && !_isDismissed) {
       _animationController.forward();
     } else {

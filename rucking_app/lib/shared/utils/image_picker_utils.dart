@@ -10,13 +10,15 @@ class ImagePickerUtils {
   static final ImagePicker _picker = ImagePicker();
 
   /// Show a dialog to choose between camera and gallery, then show crop modal
-  static Future<File?> pickImage(BuildContext context, {bool showCropModal = true}) async {
+  static Future<File?> pickImage(BuildContext context,
+      {bool showCropModal = true}) async {
     final result = await showDialog<String?>(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Select Image'),
-          content: const Text('Choose how you\'d like to select your avatar image:'),
+          content:
+              const Text('Choose how you\'d like to select your avatar image:'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, 'camera'),
@@ -54,16 +56,16 @@ class ImagePickerUtils {
     );
 
     if (result == null) return null;
-    
+
     File? selectedFile;
     if (result == 'camera') {
       selectedFile = await _pickImageFromCamera();
     } else if (result == 'gallery') {
       selectedFile = await _pickImageFromGallery();
     }
-    
+
     if (selectedFile == null) return null;
-    
+
     // Show crop modal if requested
     if (showCropModal && context.mounted) {
       final croppedFile = await Navigator.of(context).push<File>(
@@ -76,10 +78,10 @@ class ImagePickerUtils {
           fullscreenDialog: true,
         ),
       );
-      
+
       return croppedFile ?? selectedFile;
     }
-    
+
     return selectedFile;
   }
 
@@ -106,26 +108,26 @@ class ImagePickerUtils {
         // First pick the image
         AppLogger.debug('🖼️ Picking image from gallery...');
         final image = await _pickImageFromGallery();
-        
+
         // Dismiss loading indicator
         if (context.mounted) {
           Navigator.of(context).pop();
         }
-        
+
         if (image == null) {
           AppLogger.debug('🖼️ No image selected');
           return null;
         }
-        
+
         AppLogger.debug('🖼️ Image selected: ${image.path}');
 
         // Show crop modal with 16:9 aspect ratio (standard for banners)
         if (context.mounted) {
           AppLogger.debug('🖼️ Showing crop modal...');
-          
+
           // Add a small delay to ensure the loading dialog is fully dismissed
           await Future.delayed(const Duration(milliseconds: 100));
-          
+
           final croppedFile = await showModalBottomSheet<File?>(
             context: context,
             isScrollControlled: true,
@@ -137,14 +139,16 @@ class ImagePickerUtils {
               return ImprovedImageCropModal(
                 imageFile: File(image.path),
                 title: 'Crop Event Banner',
-                aspectRatio: 16/9, // Standard widescreen aspect ratio for banners
+                aspectRatio:
+                    16 / 9, // Standard widescreen aspect ratio for banners
                 cropShape: CropShape.rectangle,
               );
             },
           );
-          
-          AppLogger.debug('🖼️ Crop modal dismissed, result: ${croppedFile?.path ?? "null"}');
-          
+
+          AppLogger.debug(
+              '🖼️ Crop modal dismissed, result: ${croppedFile?.path ?? "null"}');
+
           // Debug logging for crop result
           if (croppedFile != null) {
             final exists = await croppedFile.exists();
@@ -158,13 +162,14 @@ class ImagePickerUtils {
           }
         }
       } catch (e, stackTrace) {
-        AppLogger.error('Error in pickEventBannerImage: $e', stackTrace: stackTrace);
-        
+        AppLogger.error('Error in pickEventBannerImage: $e',
+            stackTrace: stackTrace);
+
         // Dismiss loading indicator on error
         if (context.mounted) {
           Navigator.of(context).pop();
         }
-        
+
         // Show error to user
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -174,14 +179,15 @@ class ImagePickerUtils {
             ),
           );
         }
-        
+
         return null;
       }
     } catch (e, stackTrace) {
-      AppLogger.error('Unexpected error in pickEventBannerImage: $e', stackTrace: stackTrace);
+      AppLogger.error('Unexpected error in pickEventBannerImage: $e',
+          stackTrace: stackTrace);
       return null;
     }
-    
+
     return null;
   }
 

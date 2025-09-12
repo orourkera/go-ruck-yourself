@@ -25,7 +25,7 @@ class BottomNavigationConfig {
         route: '/home',
         badgeCount: null,
       ),
-      
+
       // My Rucks (AllTrails Integration)
       BottomNavigationItem(
         index: myRucksIndex,
@@ -33,9 +33,10 @@ class BottomNavigationConfig {
         activeIcon: Icons.route,
         label: 'My Routes',
         route: AllTrailsRouter.myRucks,
-        badgeCount: context != null ? _getPlannedRucksBadgeCount(context) : null,
+        badgeCount:
+            context != null ? _getPlannedRucksBadgeCount(context) : null,
       ),
-      
+
       // Explore/Import Routes
       BottomNavigationItem(
         index: exploreIndex,
@@ -45,7 +46,7 @@ class BottomNavigationConfig {
         route: AllTrailsRouter.routeImport,
         badgeCount: null,
       ),
-      
+
       // Profile
       BottomNavigationItem(
         index: profileIndex,
@@ -67,7 +68,7 @@ class BottomNavigationConfig {
     bool showBadges = true,
   }) {
     final items = getNavigationItems(context);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.backgroundLight,
@@ -87,7 +88,7 @@ class BottomNavigationConfig {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: items.map((item) {
               final isActive = currentIndex == item.index;
-              
+
               return Expanded(
                 child: _buildNavigationItem(
                   context: context,
@@ -131,21 +132,23 @@ class BottomNavigationConfig {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: isActive 
+                    color: isActive
                         ? AppColors.primary.withOpacity(0.1)
                         : Colors.transparent,
                   ),
                   child: Icon(
                     isActive ? item.activeIcon : item.icon,
-                    color: isActive 
-                        ? AppColors.primary 
+                    color: isActive
+                        ? AppColors.primary
                         : AppColors.textDarkSecondary,
                     size: 24,
                   ),
                 ),
-                
+
                 // Badge
-                if (showBadge && item.badgeCount != null && item.badgeCount! > 0)
+                if (showBadge &&
+                    item.badgeCount != null &&
+                    item.badgeCount! > 0)
                   Positioned(
                     right: 0,
                     top: 0,
@@ -153,20 +156,18 @@ class BottomNavigationConfig {
                   ),
               ],
             ),
-            
+
             const SizedBox(height: 4),
-            
+
             // Label
             if (showLabel)
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: isActive 
-                      ? AppColors.primary 
+                  color: isActive
+                      ? AppColors.primary
                       : AppColors.textDarkSecondary,
-                  fontWeight: isActive 
-                      ? FontWeight.w600 
-                      : FontWeight.normal,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
                 child: Text(
                   item.label,
@@ -210,7 +211,7 @@ class BottomNavigationConfig {
     final items = getNavigationItems(context);
     if (index >= 0 && index < items.length) {
       final route = items[index].route;
-      
+
       // Special handling for AllTrails routes
       switch (index) {
         case myRucksIndex:
@@ -234,22 +235,23 @@ class BottomNavigationConfig {
     try {
       final plannedRuckBloc = context.read<PlannedRuckBloc>();
       final state = plannedRuckBloc.state;
-      
+
       if (state is PlannedRuckLoaded) {
         // Count today's rucks and overdue rucks
-        final urgentCount = state.todaysRucks.length + state.overdueRucks.length;
+        final urgentCount =
+            state.todaysRucks.length + state.overdueRucks.length;
         return urgentCount > 0 ? urgentCount : null;
       }
     } catch (e) {
       // BLoC not available, return null
     }
-    
+
     return null;
   }
 
   /// Floating Action Button integration for quick actions
   static Widget? buildFloatingActionButton(
-    BuildContext context, 
+    BuildContext context,
     int currentIndex,
   ) {
     switch (currentIndex) {
@@ -306,14 +308,15 @@ class BottomNavigationConfig {
 
   /// Deep link handling for bottom navigation
   static int getTabIndexForRoute(String route) {
-    final items = getNavigationItems(null); // Context not needed for route matching
-    
+    final items =
+        getNavigationItems(null); // Context not needed for route matching
+
     for (final item in items) {
       if (route.startsWith(item.route)) {
         return item.index;
       }
     }
-    
+
     return homeIndex; // Default to home
   }
 
@@ -335,18 +338,18 @@ class BottomNavigationConfig {
           });
         }
         break;
-        
+
       case 'route_import_complete':
         navigateToTab(context, myRucksIndex);
         break;
-        
+
       case 'session_milestone':
         final sessionId = data['sessionId'] as String?;
         if (sessionId != null) {
           AllTrailsRouter.navigateToActiveSession(context, sessionId);
         }
         break;
-        
+
       default:
         // Navigate to home for unknown notification types
         navigateToTab(context, homeIndex);
@@ -391,18 +394,19 @@ class EnhancedBottomNavigationBar extends StatefulWidget {
   });
 
   @override
-  State<EnhancedBottomNavigationBar> createState() => _EnhancedBottomNavigationBarState();
+  State<EnhancedBottomNavigationBar> createState() =>
+      _EnhancedBottomNavigationBarState();
 }
 
-class _EnhancedBottomNavigationBarState extends State<EnhancedBottomNavigationBar>
-    with TickerProviderStateMixin {
+class _EnhancedBottomNavigationBarState
+    extends State<EnhancedBottomNavigationBar> with TickerProviderStateMixin {
   late List<AnimationController> _controllers;
   late List<Animation<double>> _animations;
 
   @override
   void initState() {
     super.initState();
-    
+
     final items = BottomNavigationConfig.getNavigationItems(context);
     _controllers = List.generate(
       items.length,
@@ -411,13 +415,13 @@ class _EnhancedBottomNavigationBarState extends State<EnhancedBottomNavigationBa
         vsync: this,
       ),
     );
-    
+
     _animations = _controllers.map((controller) {
       return Tween<double>(begin: 1.0, end: 0.8).animate(
         CurvedAnimation(parent: controller, curve: Curves.easeInOut),
       );
     }).toList();
-    
+
     // Initialize the current tab as active
     if (widget.currentIndex < _controllers.length) {
       _controllers[widget.currentIndex].forward();
@@ -435,7 +439,7 @@ class _EnhancedBottomNavigationBarState extends State<EnhancedBottomNavigationBa
   @override
   void didUpdateWidget(EnhancedBottomNavigationBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (oldWidget.currentIndex != widget.currentIndex) {
       // Animate tab change
       if (oldWidget.currentIndex < _controllers.length) {
@@ -463,14 +467,14 @@ class _EnhancedBottomNavigationBarState extends State<EnhancedBottomNavigationBa
       // Add haptic feedback
       // HapticFeedback.lightImpact();
     }
-    
+
     // Animate the tapped item
     if (index < _controllers.length) {
       _controllers[index].forward().then((_) {
         _controllers[index].reverse();
       });
     }
-    
+
     widget.onTap(index);
   }
 }

@@ -35,7 +35,8 @@ class Goal {
       userId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '',
       title: json['title']?.toString(),
       description: json['description']?.toString(),
-      targetType: json['target_type']?.toString() ?? json['targetType']?.toString(),
+      targetType:
+          json['target_type']?.toString() ?? json['targetType']?.toString(),
       targetValue: json['target_value'] ?? json['targetValue'],
       unit: json['unit']?.toString(),
       status: json['status']?.toString(),

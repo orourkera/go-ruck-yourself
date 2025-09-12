@@ -9,22 +9,22 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 class RuckLikeButton extends StatefulWidget {
   /// ID of the ruck session (nullable to handle missing data)
   final int? ruckId;
-  
+
   /// Initial like count (optional)
   final int initialLikeCount;
-  
+
   /// Initial like state (optional)
   final bool initialIsLiked;
-  
+
   /// Whether to show the like count
   final bool showCount;
-  
+
   /// Size of the button
   final double size;
-  
+
   /// Whether to animate the button when pressed
   final bool animate;
-  
+
   /// Callback when like status changes
   final Function(bool isLiked)? onLikeChanged;
 
@@ -48,7 +48,7 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  
+
   bool _isLiked = false;
   int _likeCount = 0;
   bool _isLoading = false;
@@ -56,16 +56,16 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
   @override
   void initState() {
     super.initState();
-    
+
     _isLiked = widget.initialIsLiked;
     _likeCount = widget.initialLikeCount;
-    
+
     // Setup animation controller
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
-    
+
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(begin: 1.0, end: 1.3),
@@ -76,7 +76,7 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
         weight: 50,
       ),
     ]).animate(_animationController);
-    
+
     // Check like status on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.ruckId != null) {
@@ -93,11 +93,11 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
 
   void _handleLikeTap() {
     if (_isLoading) return; // Prevent multiple taps
-    
+
     if (widget.animate) {
       _animationController.forward(from: 0.0);
     }
-    
+
     // Add null check to prevent TypeError when ruckId is null
     if (widget.ruckId != null) {
       context.read<SocialBloc>().add(ToggleRuckLike(widget.ruckId!));
@@ -112,13 +112,13 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
     if (widget.ruckId == null) {
       return const SizedBox.shrink();
     }
-    
+
     return BlocConsumer<SocialBloc, SocialState>(
       listenWhen: (previous, current) {
         // Listen only for states related to likes
-        return current is LikesLoaded || 
-               current is LikeActionCompleted || 
-               current is LikeActionError;
+        return current is LikesLoaded ||
+            current is LikeActionCompleted ||
+            current is LikeActionError;
       },
       listener: (context, state) {
         if (state is LikesLoaded && state.ruckId == widget.ruckId) {
@@ -127,17 +127,18 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
             _likeCount = state.likes.length;
             _isLoading = false;
           });
-          
+
           if (widget.onLikeChanged != null) {
             widget.onLikeChanged!(_isLiked);
           }
-        } else if (state is LikeActionCompleted && state.ruckId == widget.ruckId) {
+        } else if (state is LikeActionCompleted &&
+            state.ruckId == widget.ruckId) {
           setState(() {
             _isLiked = state.isLiked;
             // We'll update the count when LikesLoaded comes in
             _isLoading = false;
           });
-          
+
           if (widget.onLikeChanged != null) {
             widget.onLikeChanged!(_isLiked);
           }
@@ -149,7 +150,7 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
           setState(() {
             _isLoading = false;
           });
-          
+
           // Show error
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -164,11 +165,12 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
         if (state is LikesLoaded && state.ruckId == widget.ruckId) {
           _isLiked = state.userHasLiked;
           _likeCount = state.likes.length;
-        } else if (state is LikeActionCompleted && state.ruckId == widget.ruckId) {
+        } else if (state is LikeActionCompleted &&
+            state.ruckId == widget.ruckId) {
           _isLiked = state.isLiked;
           // Like count will be updated when LikesLoaded comes in
         }
-        
+
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -195,7 +197,7 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
                         ),
                       )
                     : Image.asset(
-                        _isLiked 
+                        _isLiked
                             ? 'assets/images/tactical_ruck_like_icon_active.png'
                             : 'assets/images/tactical_ruck_like_icon_transparent.png',
                         width: widget.size,
@@ -203,7 +205,7 @@ class _RuckLikeButtonState extends State<RuckLikeButton>
                       ),
               ),
             ),
-            
+
             // Like count
             if (widget.showCount) ...[
               const SizedBox(width: 4),

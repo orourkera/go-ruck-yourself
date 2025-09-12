@@ -10,7 +10,7 @@ class PasswordResetScreen extends StatefulWidget {
   final String? token;
   final String? accessToken;
   final String? refreshToken;
-  
+
   const PasswordResetScreen({
     super.key,
     this.token,
@@ -41,12 +41,12 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       final token = widget.accessToken ?? widget.token;
       if (token != null) {
         context.read<AuthBloc>().add(
-          AuthPasswordResetConfirmed(
-            token: token,
-            newPassword: _passwordController.text,
-            refreshToken: widget.refreshToken,
-          ),
-        );
+              AuthPasswordResetConfirmed(
+                token: token,
+                newPassword: _passwordController.text,
+                refreshToken: widget.refreshToken,
+              ),
+            );
       }
     }
   }
@@ -70,7 +70,8 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
           } else if (state is PasswordResetSuccess) {
             StyledSnackBar.show(
               context: context,
-              message: 'Password reset successfully! Please log in with your new password.',
+              message:
+                  'Password reset successfully! Please log in with your new password.',
               type: SnackBarType.success,
             );
             // Redirect to login screen after a short delay
@@ -98,16 +99,16 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                   Text(
                     'Create New Password',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'Please enter your new password below',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                          color: Colors.grey[600],
+                        ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
@@ -118,7 +119,9 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                     obscureText: _obscurePassword,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -144,7 +147,9 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                     obscureText: _obscureConfirmPassword,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                        _obscureConfirmPassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {

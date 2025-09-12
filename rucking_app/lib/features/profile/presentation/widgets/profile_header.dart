@@ -33,10 +33,12 @@ class ProfileHeader extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Center(
-            child: Text(profile.username, style: Theme.of(context).textTheme.headlineMedium),
+            child: Text(profile.username,
+                style: Theme.of(context).textTheme.headlineMedium),
           ),
           if (profile.isPrivateProfile && !isOwnProfile)
-            Text('This profile is private', style: TextStyle(color: Colors.grey)),
+            Text('This profile is private',
+                style: TextStyle(color: Colors.grey)),
           if (!isOwnProfile) ...[
             SizedBox(height: 16),
             FollowButton(
@@ -48,4 +50,4 @@ class ProfileHeader extends StatelessWidget {
       ),
     );
   }
-} 
+}

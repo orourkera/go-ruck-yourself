@@ -37,7 +37,8 @@ class UserCoachingPlan extends Equatable {
       startDate: DateTime.parse(json['start_date'] as String),
       currentWeek: json['current_week'] as int,
       currentStatus: json['current_status'] as String,
-      planModifications: Map<String, dynamic>.from(json['plan_modifications'] ?? {}),
+      planModifications:
+          Map<String, dynamic>.from(json['plan_modifications'] ?? {}),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       template: json['coaching_plan_templates'] != null
@@ -93,7 +94,8 @@ class UserCoachingPlan extends Equatable {
   int get weeksElapsed {
     final now = DateTime.now();
     final daysDiff = now.difference(startDate).inDays;
-    return ((daysDiff / 7).floor() + 1).clamp(1, template?.durationWeeks ?? 999);
+    return ((daysDiff / 7).floor() + 1)
+        .clamp(1, template?.durationWeeks ?? 999);
   }
 
   /// Calculate progress percentage

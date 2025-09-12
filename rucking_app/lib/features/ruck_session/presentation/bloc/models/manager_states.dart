@@ -298,8 +298,10 @@ class UploadState extends SessionManagerState {
   }) {
     return UploadState(
       isUploading: isUploading ?? this.isUploading,
-      pendingLocationPoints: pendingLocationPoints ?? this.pendingLocationPoints,
-      pendingHeartRateSamples: pendingHeartRateSamples ?? this.pendingHeartRateSamples,
+      pendingLocationPoints:
+          pendingLocationPoints ?? this.pendingLocationPoints,
+      pendingHeartRateSamples:
+          pendingHeartRateSamples ?? this.pendingHeartRateSamples,
       lastUploadTime: lastUploadTime ?? this.lastUploadTime,
       errorMessage: errorMessage,
     );
@@ -488,16 +490,21 @@ class DiagnosticsState extends SessionManagerState {
       lastReportTime: lastReportTime ?? this.lastReportTime,
       memoryUsageMb: memoryUsageMb ?? this.memoryUsageMb,
       locationUpdatesCount: locationUpdatesCount ?? this.locationUpdatesCount,
-      heartRateUpdatesCount: heartRateUpdatesCount ?? this.heartRateUpdatesCount,
-      locationUpdatesPerMinute: locationUpdatesPerMinute ?? this.locationUpdatesPerMinute,
-      heartRateUpdatesPerMinute: heartRateUpdatesPerMinute ?? this.heartRateUpdatesPerMinute,
+      heartRateUpdatesCount:
+          heartRateUpdatesCount ?? this.heartRateUpdatesCount,
+      locationUpdatesPerMinute:
+          locationUpdatesPerMinute ?? this.locationUpdatesPerMinute,
+      heartRateUpdatesPerMinute:
+          heartRateUpdatesPerMinute ?? this.heartRateUpdatesPerMinute,
       apiFailureRate: apiFailureRate ?? this.apiFailureRate,
       avgApiLatency: avgApiLatency ?? this.avgApiLatency,
       worstGpsAccuracy: worstGpsAccuracy ?? this.worstGpsAccuracy,
       gpsAccuracyWarnings: gpsAccuracyWarnings ?? this.gpsAccuracyWarnings,
       pauseCount: pauseCount ?? this.pauseCount,
-      backgroundTransitions: backgroundTransitions ?? this.backgroundTransitions,
-      foregroundTransitions: foregroundTransitions ?? this.foregroundTransitions,
+      backgroundTransitions:
+          backgroundTransitions ?? this.backgroundTransitions,
+      foregroundTransitions:
+          foregroundTransitions ?? this.foregroundTransitions,
       errorMessage: errorMessage,
     );
   }
@@ -591,8 +598,10 @@ class MemoryPressureState extends SessionManagerState {
       lastCheckTime: lastCheckTime ?? this.lastCheckTime,
       currentLocationMode: currentLocationMode ?? this.currentLocationMode,
       lastModeChange: lastModeChange ?? this.lastModeChange,
-      isAdaptiveUploadActive: isAdaptiveUploadActive ?? this.isAdaptiveUploadActive,
-      adaptiveUploadInterval: adaptiveUploadInterval ?? this.adaptiveUploadInterval,
+      isAdaptiveUploadActive:
+          isAdaptiveUploadActive ?? this.isAdaptiveUploadActive,
+      adaptiveUploadInterval:
+          adaptiveUploadInterval ?? this.adaptiveUploadInterval,
       errorMessage: errorMessage,
     );
   }

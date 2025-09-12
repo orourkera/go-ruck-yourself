@@ -13,17 +13,18 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
   Future<Either<Failure, Duel>> call(CreateDuelParams params) async {
     // First check if user already has an active or pending duel
     final userDuelsResult = await repository.getDuels(userParticipating: true);
-    
+
     final hasActiveDuel = userDuelsResult.fold(
-      (failure) => false, // If we can't fetch, allow create (server will handle)
-      (duels) => duels.any((duel) => 
-        (duel.status.name == 'active' || duel.status.name == 'pending') &&
-        duel.status.name != 'cancelled'
-      ),
+      (failure) =>
+          false, // If we can't fetch, allow create (server will handle)
+      (duels) => duels.any((duel) =>
+          (duel.status.name == 'active' || duel.status.name == 'pending') &&
+          duel.status.name != 'cancelled'),
     );
-    
+
     if (hasActiveDuel) {
-      return Left(ValidationFailure('You can only participate in one duel at a time. Please complete or withdraw from your current duel first.'));
+      return Left(ValidationFailure(
+          'You can only participate in one duel at a time. Please complete or withdraw from your current duel first.'));
     }
 
     // Validate parameters
@@ -36,21 +37,24 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
     }
 
     if (params.timeframeHours <= 0 || params.timeframeHours > 24 * 30) {
-      return Left(ValidationFailure('Timeframe must be between 1 hour and 30 days'));
+      return Left(
+          ValidationFailure('Timeframe must be between 1 hour and 30 days'));
     }
 
     if (params.maxParticipants < 2 || params.maxParticipants > 50) {
-      return Left(ValidationFailure('Max participants must be between 2 and 50'));
+      return Left(
+          ValidationFailure('Max participants must be between 2 and 50'));
     }
-    
+
     // Validate min participants
     if (params.minParticipants < 2) {
       return Left(ValidationFailure('Minimum participants must be at least 2'));
     }
     if (params.minParticipants > params.maxParticipants) {
-      return Left(ValidationFailure('Minimum participants cannot exceed maximum participants'));
+      return Left(ValidationFailure(
+          'Minimum participants cannot exceed maximum participants'));
     }
-    
+
     // Validate start mode
     final validStartModes = ['auto', 'manual'];
     if (!validStartModes.contains(params.startMode)) {
@@ -58,7 +62,12 @@ class CreateDuel implements UseCase<Duel, CreateDuelParams> {
     }
 
     // Validate challenge type
-    final validChallengeTypes = ['distance', 'time', 'elevation', 'power_points'];
+    final validChallengeTypes = [
+      'distance',
+      'time',
+      'elevation',
+      'power_points'
+    ];
     if (!validChallengeTypes.contains(params.challengeType)) {
       return Left(ValidationFailure('Invalid challenge type'));
     }

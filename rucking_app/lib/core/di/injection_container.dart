@@ -11,92 +11,92 @@ import 'package:dio/dio.dart';
 /// Simple stub storage service for DI
 class _StubStorageService implements StorageService {
   final Map<String, dynamic> _storage = {};
-  
+
   @override
   Future<void> setString(String key, String value) async {
     _storage[key] = value;
   }
-  
+
   @override
   Future<String?> getString(String key) async {
     return _storage[key];
   }
-  
+
   @override
   Future<void> setBool(String key, bool value) async {
     _storage[key] = value;
   }
-  
+
   @override
   Future<bool> getBool(String key, {bool defaultValue = false}) async {
     return _storage[key] ?? defaultValue;
   }
-  
+
   @override
   Future<void> setInt(String key, int value) async {
     _storage[key] = value;
   }
-  
+
   @override
   Future<int> getInt(String key, {int defaultValue = 0}) async {
     return _storage[key] ?? defaultValue;
   }
-  
+
   @override
   Future<void> setDouble(String key, double value) async {
     _storage[key] = value;
   }
-  
+
   @override
   Future<double> getDouble(String key, {double defaultValue = 0.0}) async {
     return _storage[key] ?? defaultValue;
   }
-  
+
   @override
   Future<void> setObject(String key, Map<String, dynamic> value) async {
     _storage[key] = value;
   }
-  
+
   @override
   Future<Map<String, dynamic>?> getObject(String key) async {
     return _storage[key];
   }
-  
+
   @override
   Future<void> setSecureString(String key, String value) async {
     _storage['secure_$key'] = value;
   }
-  
+
   @override
   Future<String?> getSecureString(String key) async {
     return _storage['secure_$key'];
   }
-  
+
   @override
   Future<String?> getAuthToken() async {
     return _storage['secure_auth_token'];
   }
-  
+
   @override
   Future<bool> hasKey(String key) async {
     return _storage.containsKey(key);
   }
-  
+
   @override
   Future<Set<String>> getAllKeys() async {
     return _storage.keys.toSet();
   }
-  
+
   @override
   Future<void> remove(String key) async {
     _storage.remove(key);
   }
-  
+
   @override
   Future<void> removeSecure(String key) async {
     _storage.remove('secure_$key');
   }
-  
+
   @override
   Future<void> clear() async {
     _storage.clear();

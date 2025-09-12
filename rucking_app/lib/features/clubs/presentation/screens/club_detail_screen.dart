@@ -90,7 +90,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             } else if (state is ClubsError) {
               return _buildErrorState(state.message);
             }
-            
+
             return const SizedBox.shrink();
           },
         ),
@@ -102,7 +102,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   List<Widget> _buildAppBarActions() {
     // Always include share button if club details are loaded
     List<Widget> actions = [];
-    
+
     if (_clubDetails != null) {
       actions.add(
         IconButton(
@@ -112,10 +112,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         ),
       );
     }
-    
+
     // Show different menu options based on user role
     final List<PopupMenuEntry<String>> menuItems = [];
-    
+
     if (_clubDetails?.club.userRole == 'admin') {
       // Admin menu items
       menuItems.addAll([
@@ -135,7 +135,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             children: [
               Icon(Icons.delete, color: Colors.red),
               SizedBox(width: 8),
-              Text('Delete Club', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
+              Text('Delete Club',
+                  style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
             ],
           ),
         ),
@@ -149,13 +150,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             children: [
               Icon(Icons.exit_to_app, color: Colors.red),
               SizedBox(width: 8),
-              Text('Leave Club', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
+              Text('Leave Club',
+                  style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
             ],
           ),
         ),
       );
     }
-    
+
     // Add the three-dot menu if there are items
     if (menuItems.isNotEmpty) {
       actions.add(
@@ -174,7 +176,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         ),
       );
     }
-    
+
     return actions;
   }
 
@@ -194,7 +196,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             _buildClubStats(clubDetails),
             const SizedBox(height: 24),
             _buildMembersSection(clubDetails),
-            if (clubDetails.club.userRole == 'admin' && clubDetails.pendingRequests.isNotEmpty) ...[
+            if (clubDetails.club.userRole == 'admin' &&
+                clubDetails.pendingRequests.isNotEmpty) ...[
               const SizedBox(height: 24),
               _buildPendingRequestsSection(clubDetails),
             ],
@@ -233,20 +236,25 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                       Row(
                         children: [
                           Icon(
-                            clubDetails.club.isPublic ? Icons.public : Icons.lock,
+                            clubDetails.club.isPublic
+                                ? Icons.public
+                                : Icons.lock,
                             size: 16,
                             color: AppColors.textDarkSecondary,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            clubDetails.club.isPublic ? 'Public Club' : 'Private Club',
+                            clubDetails.club.isPublic
+                                ? 'Public Club'
+                                : 'Private Club',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: AppColors.textDarkSecondary,
                             ),
                           ),
                         ],
                       ),
-                      if (clubDetails.club.location != null && clubDetails.club.location!.isNotEmpty) ...[
+                      if (clubDetails.club.location != null &&
+                          clubDetails.club.location!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -274,7 +282,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 ),
               ],
             ),
-            if (clubDetails.club.description != null && clubDetails.club.description!.isNotEmpty) ...[
+            if (clubDetails.club.description != null &&
+                clubDetails.club.description!.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
                 clubDetails.club.description!,
@@ -368,8 +377,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   }
 
   Widget _buildMemberTile(ClubMember member, ClubDetails clubDetails) {
-    final canManageMember = clubDetails.club.userRole == 'admin' && 
-                           member.role != 'admin';
+    final canManageMember =
+        clubDetails.club.userRole == 'admin' && member.role != 'admin';
 
     return ListTile(
       leading: UserAvatar(
@@ -384,7 +393,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
       subtitle: Text(
         member.role.toUpperCase(),
         style: AppTextStyles.bodySmall.copyWith(
-          color: member.role == 'admin' ? Theme.of(context).primaryColor : AppColors.textDarkSecondary,
+          color: member.role == 'admin'
+              ? Theme.of(context).primaryColor
+              : AppColors.textDarkSecondary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -411,7 +422,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             children: [
               const Icon(Icons.upgrade),
               const SizedBox(width: 8),
-              Text(member.role == 'member' ? 'Promote to Admin' : 'Demote to Member'),
+              Text(member.role == 'member'
+                  ? 'Promote to Admin'
+                  : 'Demote to Member'),
             ],
           ),
         ),
@@ -421,7 +434,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
             children: [
               Icon(Icons.remove_circle, color: Colors.red),
               SizedBox(width: 8),
-              Text('Remove Member', style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
+              Text('Remove Member',
+                  style: AppTextStyles.bodyMedium.copyWith(color: Colors.red)),
             ],
           ),
         ),
@@ -592,7 +606,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
   void _showPromoteMemberDialog(ClubMember member) {
     final newRole = member.role == 'member' ? 'admin' : 'member';
     final action = member.role == 'member' ? 'promote' : 'demote';
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -656,7 +670,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Leave Club'),
-          content: Text('Are you sure you want to leave ${_clubDetails!.club.name}?'),
+          content: Text(
+              'Are you sure you want to leave ${_clubDetails!.club.name}?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -733,9 +748,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Club stats section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -763,9 +778,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Action buttons section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -774,24 +789,28 @@ class _ClubDetailScreenState extends State<ClubDetailScreen> {
                 SkeletonLine(width: 100, height: 40),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Members section
             SkeletonLine(width: 100, height: 20),
             const SizedBox(height: 16),
-            
+
             // Member list
-            ...List.generate(3, (index) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  SkeletonCircle(size: 40),
-                  const SizedBox(width: 12),
-                  Expanded(child: SkeletonLine(width: double.infinity, height: 16)),
-                ],
-              ),
-            )),
+            ...List.generate(
+                3,
+                (index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          SkeletonCircle(size: 40),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: SkeletonLine(
+                                  width: double.infinity, height: 16)),
+                        ],
+                      ),
+                    )),
           ],
         ),
       ),

@@ -10,12 +10,13 @@ part 'health_state.dart';
 class HealthBloc extends Bloc<HealthEvent, HealthState> {
   final HealthService healthService;
 
-  HealthBloc({required this.healthService, String? userId}) : super(HealthInitial()) {
+  HealthBloc({required this.healthService, String? userId})
+      : super(HealthInitial()) {
     // Set the user ID if provided
     if (userId != null && userId.isNotEmpty) {
       healthService.setUserId(userId);
     }
-    
+
     on<CheckHealthIntegrationAvailability>(_onCheckAvailability);
     on<RequestHealthAuthorization>(_onRequestAuthorization);
     on<WriteHealthData>(_onWriteHealthData);
@@ -34,7 +35,8 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     if (isAvailable) {
       final hasSeenIntro = await healthService.hasSeenIntro();
       final hasWatch = await healthService.hasAppleWatch();
-      emit(HealthAvailable(hasSeenIntro: hasSeenIntro, hasAppleWatch: hasWatch));
+      emit(
+          HealthAvailable(hasSeenIntro: hasSeenIntro, hasAppleWatch: hasWatch));
     } else {
       emit(HealthUnavailable());
     }
@@ -60,7 +62,8 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
       event.startTime,
       event.endTime,
     );
-    debugPrint('[HealthBloc] writeHealthData → $success'); // Added debug logging
+    debugPrint(
+        '[HealthBloc] writeHealthData → $success'); // Added debug logging
     emit(HealthDataWriteStatus(success: success));
   }
 
@@ -96,22 +99,20 @@ class HealthBloc extends Bloc<HealthEvent, HealthState> {
     Emitter<HealthState> emit,
   ) async {
     await healthService.setHasAppleWatch(event.hasWatch);
-    
+
     // Update the state - get current seen intro status
     final hasSeenIntro = await healthService.hasSeenIntro();
-    
+
     if (state is HealthAvailable) {
       emit(HealthAvailable(
-        hasSeenIntro: hasSeenIntro, 
-        hasAppleWatch: event.hasWatch
-      ));
+          hasSeenIntro: hasSeenIntro, hasAppleWatch: event.hasWatch));
     }
-    
+
     // Mark intro as seen
     await healthService.setHasSeenIntro();
     emit(const HealthIntroShown());
   }
-  
+
   Future<void> _onDisableHealthIntegration(
     DisableHealthIntegration event,
     Emitter<HealthState> emit,

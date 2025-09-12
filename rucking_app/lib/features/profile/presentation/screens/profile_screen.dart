@@ -26,6 +26,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:rucking_app/core/utils/push_notification_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/features/gear/presentation/widgets/profile_gear_sections.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -43,7 +44,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const double kgToLbs = 2.20462;
   static const double cmToInches = 0.393701;
 
-  Widget _buildCountColumn(BuildContext context, {required String label, required int count, VoidCallback? onTap}) {
+  Widget _buildCountColumn(BuildContext context,
+      {required String label, required int count, VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -51,7 +53,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Text(
             count.toString(),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
@@ -82,9 +87,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           } else if (state is Unauthenticated) {
             Navigator.of(context).pushNamedAndRemoveUntil(
-                '/login',
-                (route) => false,
-              );
+              '/login',
+              (route) => false,
+            );
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(
@@ -93,12 +98,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (state is Authenticated) {
               _currentUser = state.user;
             }
-            
+
             // Always use current user if available, even during loading
             if (_currentUser != null) {
               final user = _currentUser!;
               _selectedUnit ??= user.preferMetric ? 'Metric' : 'Standard';
-              String initials = user.username.isNotEmpty ? _getInitials(user.username) : '';
+              String initials =
+                  user.username.isNotEmpty ? _getInitials(user.username) : '';
 
               String weightDisplay = 'Not set';
               if (user.weightKg != null) {
@@ -121,9 +127,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Determine if we're in lady mode
               final bool isLadyMode = user.gender == 'female';
-              final Color primaryColor = isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
-              final bool isDark = Theme.of(context).brightness == Brightness.dark;
-              
+              final Color primaryColor =
+                  isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+              final bool isDark =
+                  Theme.of(context).brightness == Brightness.dark;
+
               return Scaffold(
                 appBar: AppBar(
                   title: const Text('Profile'),
@@ -154,8 +162,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 20),
                         // Avatar + follower/following counts row
                         BlocProvider<PublicProfileBloc>(
-                          create: (_) => GetIt.instance<PublicProfileBloc>()..add(LoadPublicProfile(user.userId)),
-                          child: BlocBuilder<PublicProfileBloc, PublicProfileState>(
+                          create: (_) => GetIt.instance<PublicProfileBloc>()
+                            ..add(LoadPublicProfile(user.userId)),
+                          child: BlocBuilder<PublicProfileBloc,
+                              PublicProfileState>(
                             builder: (context, pState) {
                               int followers = 0;
                               int following = 0;
@@ -172,26 +182,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       if (profileState is AvatarUploadSuccess) {
                                         StyledSnackBar.showSuccess(
                                           context: context,
-                                          message: 'Avatar updated successfully!',
+                                          message:
+                                              'Avatar updated successfully!',
                                         );
-                                      } else if (profileState is AvatarUploadFailure) {
+                                      } else if (profileState
+                                          is AvatarUploadFailure) {
                                         StyledSnackBar.showError(
                                           context: context,
-                                          message: 'Failed to upload avatar: \\${profileState.error}',
+                                          message:
+                                              'Failed to upload avatar: \\${profileState.error}',
                                         );
                                       }
                                     },
-                                    child: BlocBuilder<ProfileBloc, ProfileState>(
+                                    child:
+                                        BlocBuilder<ProfileBloc, ProfileState>(
                                       builder: (context, profileState) {
                                         return EditableUserAvatar(
                                           avatarUrl: user.avatarUrl,
                                           username: user.username,
                                           size: 100,
-                                          isLoading: profileState is AvatarUploading,
+                                          isLoading:
+                                              profileState is AvatarUploading,
                                           onEditPressed: () async {
-                                            final imageFile = await ImagePickerUtils.pickProfileImage(context);
+                                            final imageFile =
+                                                await ImagePickerUtils
+                                                    .pickProfileImage(context);
                                             if (imageFile != null && mounted) {
-                                              context.read<ProfileBloc>().add(UploadAvatar(imageFile));
+                                              context
+                                                  .read<ProfileBloc>()
+                                                  .add(UploadAvatar(imageFile));
                                             }
                                           },
                                         );
@@ -201,13 +220,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   const SizedBox(width: 24),
                                   Expanded(
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
                                       children: [
-                                        _buildCountColumn(context, label: 'Followers', count: followers, onTap: () {
-                                          Navigator.pushNamed(context, '/profile/${user.userId}/followers');
+                                        _buildCountColumn(context,
+                                            label: 'Followers',
+                                            count: followers, onTap: () {
+                                          Navigator.pushNamed(context,
+                                              '/profile/${user.userId}/followers');
                                         }),
-                                        _buildCountColumn(context, label: 'Following', count: following, onTap: () {
-                                          Navigator.pushNamed(context, '/profile/${user.userId}/following');
+                                        _buildCountColumn(context,
+                                            label: 'Following',
+                                            count: following, onTap: () {
+                                          Navigator.pushNamed(context,
+                                              '/profile/${user.userId}/following');
                                         }),
                                       ],
                                     ),
@@ -223,15 +249,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           user.username,
                           style: AppTextStyles.headlineMedium.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                            color: isDark
+                                ? const Color(0xFF728C69)
+                                : AppColors.textDark,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           user.email,
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: isDark 
-                                ? const Color(0xFF728C69).withOpacity(0.8) 
+                            color: isDark
+                                ? const Color(0xFF728C69).withOpacity(0.8)
                                 : AppColors.textDarkSecondary,
                           ),
                         ),
@@ -248,9 +276,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _buildClickableItem(
                               icon: Icons.local_fire_department_outlined,
                               label: 'Advanced Calorie Tracking',
-                              subtitle: 'Birthdate, resting/max HR, method selection',
+                              subtitle:
+                                  'Birthdate, resting/max HR, method selection',
                               onTap: () {
-                                Navigator.pushNamed(context, '/advanced_calorie_settings');
+                                Navigator.pushNamed(
+                                    context, '/advanced_calorie_settings');
                               },
                             ),
                             const Divider(),
@@ -275,7 +305,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   MaterialPageRoute(
                                     builder: (context) => BlocProvider(
                                       create: (context) => HealthBloc(
-                                        healthService: GetIt.instance<HealthService>(),
+                                        healthService:
+                                            GetIt.instance<HealthService>(),
                                       ),
                                       child: const HealthIntegrationIntroScreen(
                                         navigateToHome: false,
@@ -291,9 +322,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               label: 'Units',
                               trailing: DropdownButton<String>(
                                 value: _selectedUnit,
-                                dropdownColor: isDark ? Theme.of(context).cardColor : null,
+                                dropdownColor:
+                                    isDark ? Theme.of(context).cardColor : null,
                                 style: TextStyle(
-                                  color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                                  color: isDark
+                                      ? const Color(0xFF728C69)
+                                      : AppColors.textDark,
                                 ),
                                 onChanged: (newValue) {
                                   if (newValue != null) {
@@ -311,7 +345,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           child: Text(
                                             value,
                                             style: TextStyle(
-                                              color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                                              color: isDark
+                                                  ? const Color(0xFF728C69)
+                                                  : AppColors.textDark,
                                             ),
                                           ),
                                         ))
@@ -323,17 +359,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.timer_off_outlined,
                               label: 'Skip Countdown',
                               trailing: FutureBuilder<bool>(
-                                future: SharedPreferences.getInstance().then((p) => p.getBool('skip_countdown') ?? false),
+                                future: SharedPreferences.getInstance().then(
+                                    (p) =>
+                                        p.getBool('skip_countdown') ?? false),
                                 builder: (context, snapshot) {
                                   final current = snapshot.data ?? false;
                                   return Switch(
                                     value: current,
-                                    activeColor: isDark 
+                                    activeColor: isDark
                                         ? const Color(0xFF728C69)
-                                        : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                        : (isLadyMode
+                                            ? AppColors.ladyPrimary
+                                            : AppColors.primary),
                                     onChanged: (value) async {
-                                      final prefs = await SharedPreferences.getInstance();
-                                      await prefs.setBool('skip_countdown', value);
+                                      final prefs =
+                                          await SharedPreferences.getInstance();
+                                      await prefs.setBool(
+                                          'skip_countdown', value);
                                       setState(() {});
                                     },
                                   );
@@ -345,17 +387,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.directions_walk,
                               label: 'Live Step Tracking',
                               trailing: FutureBuilder<bool>(
-                                future: SharedPreferences.getInstance().then((p) => p.getBool('live_step_tracking') ?? true),
+                                future: SharedPreferences.getInstance().then(
+                                    (p) =>
+                                        p.getBool('live_step_tracking') ??
+                                        true),
                                 builder: (context, snapshot) {
                                   final current = snapshot.data ?? false;
                                   return Switch(
                                     value: current,
-                                    activeColor: isDark 
+                                    activeColor: isDark
                                         ? const Color(0xFF728C69)
-                                        : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                        : (isLadyMode
+                                            ? AppColors.ladyPrimary
+                                            : AppColors.primary),
                                     onChanged: (value) async {
-                                      final prefs = await SharedPreferences.getInstance();
-                                      await prefs.setBool('live_step_tracking', value);
+                                      final prefs =
+                                          await SharedPreferences.getInstance();
+                                      await prefs.setBool(
+                                          'live_step_tracking', value);
                                       setState(() {});
                                     },
                                   );
@@ -367,23 +416,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.fitness_center_outlined,
                               label: 'VO2 Max Protection',
                               trailing: FutureBuilder<bool>(
-                                future: SharedPreferences.getInstance().then((p) => p.getBool('vo2_max_protection') ?? false),
+                                future: SharedPreferences.getInstance().then(
+                                    (p) =>
+                                        p.getBool('vo2_max_protection') ??
+                                        false),
                                 builder: (context, snapshot) {
                                   final current = snapshot.data ?? false;
                                   return Switch(
                                     value: current,
-                                    activeColor: isDark 
+                                    activeColor: isDark
                                         ? const Color(0xFF728C69)
-                                        : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                        : (isLadyMode
+                                            ? AppColors.ladyPrimary
+                                            : AppColors.primary),
                                     onChanged: (value) async {
-                                      final prefs = await SharedPreferences.getInstance();
-                                      await prefs.setBool('vo2_max_protection', value);
+                                      final prefs =
+                                          await SharedPreferences.getInstance();
+                                      await prefs.setBool(
+                                          'vo2_max_protection', value);
                                       setState(() {});
-                                      
+
                                       // Show informational message
                                       StyledSnackBar.show(
                                         context: context,
-                                        message: value 
+                                        message: value
                                             ? 'VO2 Max Protection enabled - workouts saved as "Other" in HealthKit'
                                             : 'VO2 Max Protection disabled - workouts saved as "Hiking" in HealthKit',
                                         type: SnackBarType.normal,
@@ -399,15 +455,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               label: 'Allow Ruck Sharing',
                               trailing: Switch(
                                 value: user.allowRuckSharing,
-                                activeColor: isDark 
+                                activeColor: isDark
                                     ? const Color(0xFF728C69)
-                                    : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                    : (isLadyMode
+                                        ? AppColors.ladyPrimary
+                                        : AppColors.primary),
                                 onChanged: (value) {
                                   context.read<AuthBloc>().add(
-                                    AuthUpdateProfileRequested(
-                                      allowRuckSharing: value,
-                                    ),
-                                  );
+                                        AuthUpdateProfileRequested(
+                                          allowRuckSharing: value,
+                                        ),
+                                      );
                                 },
                               ),
                             ),
@@ -416,7 +474,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.notifications_outlined,
                               label: 'Notification Settings',
                               onTap: () {
-                                Navigator.pushNamed(context, '/notification_settings');
+                                Navigator.pushNamed(
+                                    context, '/notification_settings');
                               },
                             ),
                             // Test push notification buttons hidden after confirming backend works
@@ -454,6 +513,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
+                        // Gear sections (Owned / Wishlist)
+                        ProfileGearSections(userId: user.userId),
+                        const SizedBox(height: 24),
                         _buildSection(
                           title: 'About',
                           children: [
@@ -471,7 +533,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const PrivacyPolicyScreen()),
                                 );
                               },
                             ),
@@ -482,7 +546,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const TermsOfServiceScreen()),
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const TermsOfServiceScreen()),
                                 );
                               },
                             ),
@@ -491,7 +557,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.article_outlined,
                               label: 'Terms of Use (EULA)',
                               onTap: () async {
-                                final url = Uri.parse('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
+                                final url = Uri.parse(
+                                    'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
                                 if (await canLaunchUrl(url)) {
                                   await launchUrl(url);
                                 }
@@ -504,7 +571,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (context) => const FeedbackFormScreen()),
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const FeedbackFormScreen()),
                                 );
                               },
                             ),
@@ -546,21 +615,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           label: const Text('Manage Subscription'),
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 50),
-                            backgroundColor: isDark 
+                            backgroundColor: isDark
                                 ? const Color(0xFF728C69)
-                                : (isLadyMode ? AppColors.ladyPrimary : AppColors.primary),
+                                : (isLadyMode
+                                    ? AppColors.ladyPrimary
+                                    : AppColors.primary),
                             foregroundColor: Colors.white,
-                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            textStyle: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () async {
-                            final url = Uri.parse(Theme.of(context).platform == TargetPlatform.iOS
+                            final url = Uri.parse(Theme.of(context).platform ==
+                                    TargetPlatform.iOS
                                 ? 'https://apps.apple.com/account/subscriptions'
                                 : 'https://play.google.com/store/account/subscriptions');
                             if (await canLaunchUrl(url)) {
                               await launchUrl(url);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Could not open subscription management page.')),
+                                const SnackBar(
+                                    content: Text(
+                                        'Could not open subscription management page.')),
                               );
                             }
                           },
@@ -570,7 +645,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           text: 'Logout',
                           icon: Icons.logout,
                           color: AppColors.error,
-                          onPressed: () => _showLogoutConfirmationDialog(context),
+                          onPressed: () =>
+                              _showLogoutConfirmationDialog(context),
                         ),
                         const SizedBox(height: 32),
                         FutureBuilder<PackageInfo>(
@@ -580,7 +656,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               return Text(
                                 'Version ${snapshot.data!.version} (${snapshot.data!.buildNumber})',
                                 style: AppTextStyles.bodySmall.copyWith(
-                                  color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                                  color: isDark
+                                      ? const Color(0xFF728C69).withOpacity(0.8)
+                                      : AppColors.textDarkSecondary,
                                 ),
                               );
                             } else {
@@ -648,7 +726,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(
               subtitle,
               style: AppTextStyles.bodyMedium.copyWith(
-                color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                color: isDark
+                    ? const Color(0xFF728C69).withOpacity(0.8)
+                    : AppColors.textDarkSecondary,
               ),
             ),
             const SizedBox(height: 8),
@@ -674,11 +754,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(
-            icon, 
-            color: isDark ? const Color(0xFF728C69) : AppColors.primary, 
-            size: 24
-          ),
+          Icon(icon,
+              color: isDark ? const Color(0xFF728C69) : AppColors.primary,
+              size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -687,14 +765,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   label,
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: isDark ? const Color(0xFF728C69).withOpacity(0.8) : AppColors.textDarkSecondary,
+                    color: isDark
+                        ? const Color(0xFF728C69).withOpacity(0.8)
+                        : AppColors.textDarkSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: AppTextStyles.bodyLarge.copyWith(
-                    color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                    color:
+                        isDark ? const Color(0xFF728C69) : AppColors.textDark,
                   ),
                 ),
               ],
@@ -716,11 +797,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(
-            icon, 
-            color: isDark ? const Color(0xFF728C69) : AppColors.primary, 
-            size: 24
-          ),
+          Icon(icon,
+              color: isDark ? const Color(0xFF728C69) : AppColors.primary,
+              size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -751,11 +830,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Icon(
-              icon, 
-              color: isDark ? const Color(0xFF728C69) : AppColors.primary, 
-              size: 24
-            ),
+            Icon(icon,
+                color: isDark ? const Color(0xFF728C69) : AppColors.primary,
+                size: 24),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -764,7 +841,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     label,
                     style: AppTextStyles.bodyLarge.copyWith(
-                      color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                      color:
+                          isDark ? const Color(0xFF728C69) : AppColors.textDark,
                     ),
                   ),
                   if (subtitle != null) ...[
@@ -772,17 +850,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Text(
                       subtitle!,
                       style: AppTextStyles.bodySmall.copyWith(
-                        color: isDark ? const Color(0xFF728C69).withOpacity(0.7) : AppColors.textDarkSecondary,
+                        color: isDark
+                            ? const Color(0xFF728C69).withOpacity(0.7)
+                            : AppColors.textDarkSecondary,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right, 
-              color: isDark ? const Color(0xFF728C69).withOpacity(0.6) : Colors.grey
-            ),
+            Icon(Icons.chevron_right,
+                color: isDark
+                    ? const Color(0xFF728C69).withOpacity(0.6)
+                    : Colors.grey),
           ],
         ),
       ),
@@ -848,7 +928,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                      border:
+                          Border.all(color: Colors.grey.shade300, width: 0.5),
                     ),
                     child: const Icon(
                       Icons.medical_services,
@@ -866,12 +947,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     'HealthKit Integration',
                     style: AppTextStyles.bodyLarge.copyWith(
-                      color: isDark ? const Color(0xFF728C69) : AppColors.textDark,
+                      color:
+                          isDark ? const Color(0xFF728C69) : AppColors.textDark,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
                       color: Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -889,10 +972,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right, 
-              color: isDark ? const Color(0xFF728C69).withOpacity(0.6) : Colors.grey
-            ),
+            Icon(Icons.chevron_right,
+                color: isDark
+                    ? const Color(0xFF728C69).withOpacity(0.6)
+                    : Colors.grey),
           ],
         ),
       ),
@@ -936,9 +1019,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showCustomAboutDialog(BuildContext context) async {
     final packageInfo = await PackageInfo.fromPlatform();
-    
+
     if (!context.mounted) return;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1014,19 +1097,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         final activeSessionStorage = GetIt.instance<ActiveSessionStorage>();
         await activeSessionStorage.clearSessionData();
-        
+
         if (context.mounted) {
           StyledSnackBar.showSuccess(
-            context: context, 
-            message: 'Session storage cleared successfully'
-          );
+              context: context,
+              message: 'Session storage cleared successfully');
         }
       } catch (e) {
         if (context.mounted) {
           StyledSnackBar.showError(
-            context: context, 
-            message: 'Failed to clear storage: $e'
-          );
+              context: context, message: 'Failed to clear storage: $e');
         }
       }
     }
@@ -1037,7 +1117,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (name.isEmpty) return '';
     List<String> nameParts = name.split(' ');
     String initials = '';
-    if (nameParts.length > 1 && nameParts[0].isNotEmpty && nameParts[1].isNotEmpty) {
+    if (nameParts.length > 1 &&
+        nameParts[0].isNotEmpty &&
+        nameParts[1].isNotEmpty) {
       initials = nameParts[0][0] + nameParts[1][0];
     } else if (nameParts.isNotEmpty && nameParts[0].isNotEmpty) {
       initials = nameParts[0][0];

@@ -8,59 +8,61 @@ import 'package:rucking_app/features/ruck_session/domain/repositories/session_re
 /// Service for handling session editing operations
 class SessionEditingService {
   final SessionRepository _sessionRepository;
-  
+
   SessionEditingService(this._sessionRepository);
-  
+
   /// Crop a session to a new end time by removing all data after the specified time
   Future<RuckSession> cropSession(
     RuckSession originalSession,
     DateTime newEndTime,
   ) async {
     try {
-      AppLogger.info('[SESSION_EDITING] Cropping session ${originalSession.id} to $newEndTime');
-      
+      AppLogger.info(
+          '[SESSION_EDITING] Cropping session ${originalSession.id} to $newEndTime');
+
       // Validate the new end time
       if (newEndTime.isBefore(originalSession.startTime)) {
         throw ArgumentError('New end time cannot be before session start time');
       }
-      
+
       if (newEndTime.isAfter(originalSession.endTime)) {
         throw ArgumentError('New end time cannot be after original end time');
       }
-      
+
       // Calculate new duration
       final newDuration = newEndTime.difference(originalSession.startTime);
-      
+
       // Filter location points
       final originalLocationPoints = originalSession.locationPoints ?? [];
-      final filteredLocationPoints = originalLocationPoints
-          .where((pointData) {
-            // Handle both Map and LocationPoint formats
-            DateTime pointTime;
-            if (pointData is Map<String, dynamic>) {
-              pointTime = DateTime.parse(pointData['timestamp'] as String);
-            } else if (pointData is LocationPoint) {
-              pointTime = pointData.timestamp;
-            } else {
-              // Skip unknown format
-              return false;
-            }
-            return pointTime.isBefore(newEndTime) || pointTime.isAtSameMomentAs(newEndTime);
-          })
-          .toList();
-      
+      final filteredLocationPoints = originalLocationPoints.where((pointData) {
+        // Handle both Map and LocationPoint formats
+        DateTime pointTime;
+        if (pointData is Map<String, dynamic>) {
+          pointTime = DateTime.parse(pointData['timestamp'] as String);
+        } else if (pointData is LocationPoint) {
+          pointTime = pointData.timestamp;
+        } else {
+          // Skip unknown format
+          return false;
+        }
+        return pointTime.isBefore(newEndTime) ||
+            pointTime.isAtSameMomentAs(newEndTime);
+      }).toList();
+
       // Filter heart rate samples
       final filteredHeartRateSamples = (originalSession.heartRateSamples ?? [])
-          .where((sample) => sample.timestamp.isBefore(newEndTime) || 
-                           sample.timestamp.isAtSameMomentAs(newEndTime))
+          .where((sample) =>
+              sample.timestamp.isBefore(newEndTime) ||
+              sample.timestamp.isAtSameMomentAs(newEndTime))
           .toList();
-      
+
       // Filter splits
       final filteredSplits = (originalSession.splits ?? [])
-          .where((split) => split.timestamp.isBefore(newEndTime) || 
-                          split.timestamp.isAtSameMomentAs(newEndTime))
+          .where((split) =>
+              split.timestamp.isBefore(newEndTime) ||
+              split.timestamp.isAtSameMomentAs(newEndTime))
           .toList();
-      
+
       // Recalculate session metrics
       final newMetrics = await _recalculateSessionMetrics(
         originalSession: originalSession,
@@ -70,7 +72,7 @@ class SessionEditingService {
         filteredHeartRateSamples: filteredHeartRateSamples,
         filteredSplits: filteredSplits,
       );
-      
+
       // Create updated session
       final updatedSession = originalSession.copyWith(
         endTime: newEndTime,
@@ -87,19 +89,18 @@ class SessionEditingService {
         splits: filteredSplits,
         locationPoints: filteredLocationPoints,
       );
-      
+
       // Save to repository
       await _sessionRepository.updateSession(updatedSession);
-      
+
       AppLogger.info('[SESSION_EDITING] Session cropped successfully');
       return updatedSession;
-      
     } catch (e) {
       AppLogger.error('[SESSION_EDITING] Error cropping session', exception: e);
       rethrow;
     }
   }
-  
+
   /// Detect potentially problematic segments in a session
   Future<List<SuspiciousSegment>> detectSuspiciousSegments(
     RuckSession session,
@@ -107,16 +108,16 @@ class SessionEditingService {
     try {
       final segments = <SuspiciousSegment>[];
       final locationPoints = session.locationPoints ?? [];
-      
+
       if (locationPoints.isEmpty) return segments;
-      
+
       // Analyze location points for suspicious activity
       DateTime? lastPointTime;
       LocationPoint? lastPoint;
-      
+
       for (final pointData in locationPoints) {
         LocationPoint? point;
-        
+
         // Handle different point formats
         if (pointData is Map<String, dynamic>) {
           try {
@@ -127,19 +128,20 @@ class SessionEditingService {
         } else if (pointData is LocationPoint) {
           point = pointData;
         }
-        
+
         if (point == null) continue;
-        
+
         // Check for speed-based anomalies
         if (point.speed != null && point.speed! > 0) {
           final speedKmh = point.speed! * 3.6; // Convert m/s to km/h
-          
+
           // Flag very fast movement (likely vehicular)
           if (speedKmh > 20.0) {
             segments.add(SuspiciousSegment(
               startTime: point.timestamp,
               endTime: point.timestamp,
-              reason: 'Very fast movement (${speedKmh.toStringAsFixed(1)} km/h)',
+              reason:
+                  'Very fast movement (${speedKmh.toStringAsFixed(1)} km/h)',
               confidence: 0.9,
               speedKmh: speedKmh,
               type: SuspiciousSegmentType.vehicularMovement,
@@ -157,7 +159,7 @@ class SessionEditingService {
             ));
           }
         }
-        
+
         // Check for long idle periods
         if (lastPointTime != null) {
           final timeDiff = point.timestamp.difference(lastPointTime!);
@@ -171,39 +173,41 @@ class SessionEditingService {
             ));
           }
         }
-        
+
         lastPointTime = point.timestamp;
         lastPoint = point;
       }
-      
-      AppLogger.info('[SESSION_EDITING] Detected ${segments.length} suspicious segments');
+
+      AppLogger.info(
+          '[SESSION_EDITING] Detected ${segments.length} suspicious segments');
       return segments;
-      
     } catch (e) {
-      AppLogger.error('[SESSION_EDITING] Error detecting suspicious segments', exception: e);
+      AppLogger.error('[SESSION_EDITING] Error detecting suspicious segments',
+          exception: e);
       return [];
     }
   }
-  
+
   /// Suggest optimal end time based on suspicious segments
   DateTime? suggestOptimalEndTime(
     RuckSession session,
     List<SuspiciousSegment> suspiciousSegments,
   ) {
     if (suspiciousSegments.isEmpty) return null;
-    
+
     // Find the earliest suspicious segment that suggests session should end
     DateTime? suggestedEndTime;
-    
+
     for (final segment in suspiciousSegments) {
       if (segment.type == SuspiciousSegmentType.vehicularMovement ||
           segment.type == SuspiciousSegmentType.longIdle) {
-        if (suggestedEndTime == null || segment.startTime.isBefore(suggestedEndTime)) {
+        if (suggestedEndTime == null ||
+            segment.startTime.isBefore(suggestedEndTime)) {
           suggestedEndTime = segment.startTime;
         }
       }
     }
-    
+
     // Make sure suggested end time is reasonable (at least 5 minutes into session)
     if (suggestedEndTime != null) {
       final minEndTime = session.startTime.add(const Duration(minutes: 5));
@@ -211,10 +215,10 @@ class SessionEditingService {
         suggestedEndTime = minEndTime;
       }
     }
-    
+
     return suggestedEndTime;
   }
-  
+
   /// Recalculate session metrics for a cropped session
   Future<SessionMetrics> _recalculateSessionMetrics({
     required RuckSession originalSession,
@@ -229,13 +233,13 @@ class SessionEditingService {
       double distance = 0.0;
       double elevationGain = 0.0;
       double elevationLoss = 0.0;
-      
+
       if (filteredLocationPoints.length >= 2) {
         LocationPoint? previousPoint;
-        
+
         for (final pointData in filteredLocationPoints) {
           LocationPoint? point;
-          
+
           if (pointData is Map<String, dynamic>) {
             try {
               point = LocationPoint.fromJson(pointData);
@@ -245,13 +249,13 @@ class SessionEditingService {
           } else if (pointData is LocationPoint) {
             point = pointData;
           }
-          
+
           if (point == null) continue;
-          
+
           if (previousPoint != null) {
             // Calculate distance
             distance += _calculateDistance(previousPoint, point);
-            
+
             // Calculate elevation changes
             final elevationDiff = point.elevation - previousPoint.elevation;
             if (elevationDiff > 0) {
@@ -260,35 +264,40 @@ class SessionEditingService {
               elevationLoss += elevationDiff.abs();
             }
           }
-          
+
           previousPoint = point;
         }
       }
-      
+
       // Convert distance from meters to kilometers
       distance = distance / 1000.0;
-      
+
       // Calculate calories (basic estimation)
       const double baseCaloriesPerHour = 400.0;
       final double weightFactor = originalSession.ruckWeightKg / 20.0;
-      final double durationHours = newDuration.inMilliseconds / (1000 * 60 * 60);
-      final int caloriesBurned = ((baseCaloriesPerHour + (weightFactor * 50)) * durationHours).round();
-      
+      final double durationHours =
+          newDuration.inMilliseconds / (1000 * 60 * 60);
+      final int caloriesBurned =
+          ((baseCaloriesPerHour + (weightFactor * 50)) * durationHours).round();
+
       // Calculate average pace
-      final double averagePace = distance > 0 ? (newDuration.inSeconds / 60) / distance : 0.0;
-      
+      final double averagePace =
+          distance > 0 ? (newDuration.inSeconds / 60) / distance : 0.0;
+
       // Calculate heart rate statistics
       int? avgHeartRate;
       int? maxHeartRate;
       int? minHeartRate;
-      
+
       if (filteredHeartRateSamples.isNotEmpty) {
-        final heartRates = filteredHeartRateSamples.map((s) => s.heartRate).toList();
-        avgHeartRate = (heartRates.reduce((a, b) => a + b) / heartRates.length).round();
+        final heartRates =
+            filteredHeartRateSamples.map((s) => s.heartRate).toList();
+        avgHeartRate =
+            (heartRates.reduce((a, b) => a + b) / heartRates.length).round();
         maxHeartRate = heartRates.reduce((a, b) => a > b ? a : b);
         minHeartRate = heartRates.reduce((a, b) => a < b ? a : b);
       }
-      
+
       return SessionMetrics(
         distance: distance,
         elevationGain: elevationGain,
@@ -299,21 +308,23 @@ class SessionEditingService {
         maxHeartRate: maxHeartRate,
         minHeartRate: minHeartRate,
       );
-      
     } catch (e) {
-      AppLogger.error('[SESSION_EDITING] Error recalculating metrics', exception: e);
+      AppLogger.error('[SESSION_EDITING] Error recalculating metrics',
+          exception: e);
       rethrow;
     }
   }
-  
+
   /// Calculate distance between two location points using Haversine formula
   double _calculateDistance(LocationPoint p1, LocationPoint p2) {
     const double earthRadius = 6371000; // Earth's radius in meters
-    
+
     final double lat1Rad = p1.latitude * (3.14159265359 / 180);
     final double lat2Rad = p2.latitude * (3.14159265359 / 180);
-    final double deltaLatRad = (p2.latitude - p1.latitude) * (3.14159265359 / 180);
-    final double deltaLonRad = (p2.longitude - p1.longitude) * (3.14159265359 / 180);
+    final double deltaLatRad =
+        (p2.latitude - p1.latitude) * (3.14159265359 / 180);
+    final double deltaLonRad =
+        (p2.longitude - p1.longitude) * (3.14159265359 / 180);
 
     final double a = (deltaLatRad / 2) * (deltaLatRad / 2) +
         lat1Rad * lat2Rad * (deltaLonRad / 2) * (deltaLonRad / 2);
@@ -331,7 +342,7 @@ class SuspiciousSegment {
   final double confidence; // 0.0 to 1.0
   final double? speedKmh;
   final SuspiciousSegmentType type;
-  
+
   SuspiciousSegment({
     required this.startTime,
     required this.endTime,
@@ -360,7 +371,7 @@ class SessionMetrics {
   final int? avgHeartRate;
   final int? maxHeartRate;
   final int? minHeartRate;
-  
+
   SessionMetrics({
     required this.distance,
     required this.elevationGain,

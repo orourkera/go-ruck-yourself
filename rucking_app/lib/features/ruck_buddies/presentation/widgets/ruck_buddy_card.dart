@@ -52,7 +52,8 @@ class RuckBuddyCard extends StatefulWidget {
   State<RuckBuddyCard> createState() => _RuckBuddyCardState();
 }
 
-class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveClientMixin {
+class _RuckBuddyCardState extends State<RuckBuddyCard>
+    with AutomaticKeepAliveClientMixin {
   /// Formats a completed date to a full date and time string
   ///
   /// Format: "Jan 17, 2025 4:30 PM"
@@ -61,13 +62,14 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
 
     return DateFormat('MMM d, yyyy h:mm a').format(completedAt);
   }
+
   int? _likeCount;
   bool _isLiked = false;
   bool _isProcessingLike = false;
   List<RuckPhoto> _photos = [];
   double _calculatedPace = 0.0;
   int? _ruckId;
-  int? _commentCount;  // Track comment count locally
+  int? _commentCount; // Track comment count locally
   SocialRepository? _socialRepository;
 
   @override
@@ -76,74 +78,91 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
   @override
   void initState() {
     super.initState();
-    
+
     _ruckId = int.tryParse(widget.ruckBuddy.id);
-    
+
     // Get social repository instance
     try {
       _socialRepository = GetIt.instance<SocialRepository>();
     } catch (e) {
-      developer.log('[SOCIAL_DEBUG] Could not get SocialRepository from GetIt: $e', name: 'RuckBuddyCard');
+      developer.log(
+          '[SOCIAL_DEBUG] Could not get SocialRepository from GetIt: $e',
+          name: 'RuckBuddyCard');
     }
-    
+
     // Use the social data from widget.ruckBuddy directly (now included in API response)
     _likeCount = widget.ruckBuddy.likeCount ?? 0;
     _commentCount = widget.ruckBuddy.commentCount ?? 0;
     _isLiked = widget.ruckBuddy.isLikedByCurrentUser ?? false;
-    
+
     // Update social repository cache with initial values to ensure consistency
     if (_ruckId != null && _socialRepository != null) {
-      _socialRepository!.updateCacheWithInitialValues(_ruckId!, _isLiked, _likeCount!);
+      _socialRepository!
+          .updateCacheWithInitialValues(_ruckId!, _isLiked, _likeCount!);
     }
-    
-    developer.log('[SOCIAL_DEBUG] Initialized RuckBuddyCard with API data for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
-    
+
+    developer.log(
+        '[SOCIAL_DEBUG] Initialized RuckBuddyCard with API data for ruck $_ruckId: likes=$_likeCount, isLiked=$_isLiked',
+        name: 'RuckBuddyCard');
+
     // Ensure heart state is synced when card first appears
     if (_ruckId != null) {
       try {
         context.read<SocialBloc>().add(CheckRuckLikeStatus(_ruckId!));
-        developer.log('[SOCIAL_DEBUG] Dispatched CheckRuckLikeStatus on init for ruckId: $_ruckId', name: 'RuckBuddyCard');
+        developer.log(
+            '[SOCIAL_DEBUG] Dispatched CheckRuckLikeStatus on init for ruckId: $_ruckId',
+            name: 'RuckBuddyCard');
       } catch (e) {
-        developer.log('[SOCIAL_DEBUG] Failed to dispatch CheckRuckLikeStatus on init: $e', name: 'RuckBuddyCard');
+        developer.log(
+            '[SOCIAL_DEBUG] Failed to dispatch CheckRuckLikeStatus on init: $e',
+            name: 'RuckBuddyCard');
       }
     }
-    
+
     // Request photos for this ruck if we have an ID
     if (_ruckId != null) {
       try {
         final activeSessionBloc = context.read<ActiveSessionBloc>();
         activeSessionBloc.add(FetchSessionPhotosRequested(_ruckId.toString()));
-        developer.log('[PHOTO_DEBUG] RuckBuddyCard requested photos for ruckId: $_ruckId', name: 'RuckBuddyCard');
+        developer.log(
+            '[PHOTO_DEBUG] RuckBuddyCard requested photos for ruckId: $_ruckId',
+            name: 'RuckBuddyCard');
       } catch (e) {
-        developer.log('[PHOTO_DEBUG] Error requesting photos in RuckBuddyCard: $e', name: 'RuckBuddyCard');
+        developer.log(
+            '[PHOTO_DEBUG] Error requesting photos in RuckBuddyCard: $e',
+            name: 'RuckBuddyCard');
       }
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_ruckId != null && mounted) {
         // Calculate pace from distance and duration
-        if (widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
+        if (widget.ruckBuddy.distanceKm > 0 &&
+            widget.ruckBuddy.durationSeconds > 0) {
           if (mounted) {
             setState(() {
-              _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
+              _calculatedPace = widget.ruckBuddy.durationSeconds /
+                  widget.ruckBuddy.distanceKm;
             });
           }
         }
       }
     });
   }
-  
+
   @override
   void didUpdateWidget(RuckBuddyCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Only fetch photos when the ruck buddy actually changes, not during scroll rebuilds
     if (oldWidget.ruckBuddy.id != widget.ruckBuddy.id) {
-      developer.log('[PHOTO_DEBUG] RuckBuddy ID changed from ${oldWidget.ruckBuddy.id} to ${widget.ruckBuddy.id} - updating photos', name: 'RuckBuddyCard');
-      
+      developer.log(
+          '[PHOTO_DEBUG] RuckBuddy ID changed from ${oldWidget.ruckBuddy.id} to ${widget.ruckBuddy.id} - updating photos',
+          name: 'RuckBuddyCard');
+
       // Update the ruckId
       _ruckId = int.tryParse(widget.ruckBuddy.id);
-      
+
       if (_ruckId != null) {
         try {
           // 0. Sync local social fields from new widget data
@@ -155,37 +174,52 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             _commentCount = newCommentCount;
             _isLiked = newIsLiked;
           });
-          developer.log('[SOCIAL_DEBUG] didUpdateWidget synced from widget for ruckId: $_ruckId → likes=$_likeCount, comments=$_commentCount, isLiked=$_isLiked', name: 'RuckBuddyCard');
-          
+          developer.log(
+              '[SOCIAL_DEBUG] didUpdateWidget synced from widget for ruckId: $_ruckId → likes=$_likeCount, comments=$_commentCount, isLiked=$_isLiked',
+              name: 'RuckBuddyCard');
+
           // Seed repository cache (marked stale) so UI shows something immediately but still refreshes
           if (_socialRepository != null) {
-            _socialRepository!.updateCacheWithInitialValues(_ruckId!, _isLiked, _likeCount ?? 0);
+            _socialRepository!.updateCacheWithInitialValues(
+                _ruckId!, _isLiked, _likeCount ?? 0);
           }
 
           // 1. Force update photos from the widget if available
-          if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
+          if (widget.ruckBuddy.photos != null &&
+              widget.ruckBuddy.photos!.isNotEmpty) {
             setState(() {
               _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
             });
-            developer.log('[PHOTO_DEBUG] Updated photos from widget data for ruckId: $_ruckId', name: 'RuckBuddyCard');
+            developer.log(
+                '[PHOTO_DEBUG] Updated photos from widget data for ruckId: $_ruckId',
+                name: 'RuckBuddyCard');
           }
-          
+
           // 2. Only request fresh photos if no photos are already cached
           if (_photos.isEmpty) {
             final activeSessionBloc = context.read<ActiveSessionBloc>();
-            activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
-            developer.log('[PHOTO_DEBUG] RuckBuddyCard requested photos for new ruckId: $_ruckId', name: 'RuckBuddyCard');
+            activeSessionBloc
+                .add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
+            developer.log(
+                '[PHOTO_DEBUG] RuckBuddyCard requested photos for new ruckId: $_ruckId',
+                name: 'RuckBuddyCard');
           }
-          
+
           // 3. Re-check like status to sync heart state after ID change
           try {
             context.read<SocialBloc>().add(CheckRuckLikeStatus(_ruckId!));
-            developer.log('[SOCIAL_DEBUG] Dispatched CheckRuckLikeStatus after ID change for ruckId: $_ruckId', name: 'RuckBuddyCard');
+            developer.log(
+                '[SOCIAL_DEBUG] Dispatched CheckRuckLikeStatus after ID change for ruckId: $_ruckId',
+                name: 'RuckBuddyCard');
           } catch (e) {
-            developer.log('[SOCIAL_DEBUG] Failed to dispatch CheckRuckLikeStatus after ID change: $e', name: 'RuckBuddyCard');
+            developer.log(
+                '[SOCIAL_DEBUG] Failed to dispatch CheckRuckLikeStatus after ID change: $e',
+                name: 'RuckBuddyCard');
           }
         } catch (e) {
-          developer.log('[PHOTO_DEBUG] Error handling photos in RuckBuddyCard.didUpdateWidget: $e', name: 'RuckBuddyCard');
+          developer.log(
+              '[PHOTO_DEBUG] Error handling photos in RuckBuddyCard.didUpdateWidget: $e',
+              name: 'RuckBuddyCard');
         }
       }
     }
@@ -206,144 +240,181 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
             originalFilename: photo['original_filename'],
             contentType: photo['content_type'],
             size: photo['size'],
-            createdAt: photo['created_at'] != null 
-                ? DateTime.parse(photo['created_at']) 
+            createdAt: photo['created_at'] != null
+                ? DateTime.parse(photo['created_at'])
                 : DateTime.now(),
             url: photo['url'],
             thumbnailUrl: photo['thumbnail_url'],
           );
           result.add(ruckPhoto);
         } catch (e) {
-          developer.log('[PHOTO_DEBUG] Error converting photo to RuckPhoto: $e', name: 'RuckBuddyCard');
+          developer.log('[PHOTO_DEBUG] Error converting photo to RuckPhoto: $e',
+              name: 'RuckBuddyCard');
         }
       }
     }
     return result;
   }
 
-  List<String> _getProcessedPhotoUrls(List<dynamic> photos, {bool addCacheBuster = false}) {
+  List<String> _getProcessedPhotoUrls(List<dynamic> photos,
+      {bool addCacheBuster = false}) {
     // Only add cache buster when explicitly requested (e.g., after photo upload/delete)
     // This preserves normal caching behavior for better performance
     final shouldBustCache = addCacheBuster; // Only when explicitly requested
-    
+
     // Use a smaller cache value to prevent numerical overflow issues
-    final cacheValue = (DateTime.now().millisecondsSinceEpoch % 1000000); // Keep it under 1M
-    
-    return photos.map((photo) {
-      String? url;
-      if (photo is RuckPhoto) {
-        url = photo.url;
-      } else if (photo is Map) {
-        url = photo['url'] ?? photo['thumbnail_url'];
-      }
-      return url is String && url.isNotEmpty 
-          ? (shouldBustCache ? '$url?cache=$cacheValue' : url) 
-          : '';
-    }).where((url) => url.isNotEmpty).toList();
+    final cacheValue =
+        (DateTime.now().millisecondsSinceEpoch % 1000000); // Keep it under 1M
+
+    return photos
+        .map((photo) {
+          String? url;
+          if (photo is RuckPhoto) {
+            url = photo.url;
+          } else if (photo is Map) {
+            url = photo['url'] ?? photo['thumbnail_url'];
+          }
+          return url is String && url.isNotEmpty
+              ? (shouldBustCache ? '$url?cache=$cacheValue' : url)
+              : '';
+        })
+        .where((url) => url.isNotEmpty)
+        .toList();
   }
 
   /// Process photos to return both full URLs and thumbnail URLs for progressive loading
-  List<Map<String, String?>> _getProcessedPhotoData(List<dynamic> photos, {bool addCacheBuster = false}) {
+  List<Map<String, String?>> _getProcessedPhotoData(List<dynamic> photos,
+      {bool addCacheBuster = false}) {
     final shouldBustCache = addCacheBuster;
     final cacheValue = (DateTime.now().millisecondsSinceEpoch % 1000000);
-    
-    return photos.map((photo) {
-      String? fullUrl;
-      String? thumbnailUrl;
-      
-      if (photo is RuckPhoto) {
-        fullUrl = photo.url;
-        thumbnailUrl = photo.thumbnailUrl;
-      } else if (photo is Map) {
-        fullUrl = photo['url'];
-        thumbnailUrl = photo['thumbnail_url'];
-      }
-      
-      // Apply cache buster if requested
-      if (shouldBustCache && fullUrl != null && fullUrl.isNotEmpty) {
-        fullUrl = '$fullUrl?cache=$cacheValue';
-      }
-      if (shouldBustCache && thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-        thumbnailUrl = '$thumbnailUrl?cache=$cacheValue';
-      }
-      
-      return {
-        'fullUrl': fullUrl,
-        'thumbnailUrl': thumbnailUrl,
-      };
-    }).where((data) => 
-      data['fullUrl'] != null && data['fullUrl']!.isNotEmpty
-    ).toList();
+
+    return photos
+        .map((photo) {
+          String? fullUrl;
+          String? thumbnailUrl;
+
+          if (photo is RuckPhoto) {
+            fullUrl = photo.url;
+            thumbnailUrl = photo.thumbnailUrl;
+          } else if (photo is Map) {
+            fullUrl = photo['url'];
+            thumbnailUrl = photo['thumbnail_url'];
+          }
+
+          // Apply cache buster if requested
+          if (shouldBustCache && fullUrl != null && fullUrl.isNotEmpty) {
+            fullUrl = '$fullUrl?cache=$cacheValue';
+          }
+          if (shouldBustCache &&
+              thumbnailUrl != null &&
+              thumbnailUrl.isNotEmpty) {
+            thumbnailUrl = '$thumbnailUrl?cache=$cacheValue';
+          }
+
+          return {
+            'fullUrl': fullUrl,
+            'thumbnailUrl': thumbnailUrl,
+          };
+        })
+        .where((data) => data['fullUrl'] != null && data['fullUrl']!.isNotEmpty)
+        .toList();
   }
 
   void _handleLikeTap() {
     if (_isProcessingLike || _ruckId == null) return;
 
     try {
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: _handleLikeTap started for ruckId: $_ruckId', name: 'RuckBuddyCard');
-      
+      developer.log(
+          '[SOCIAL_DEBUG] RuckBuddyCard: _handleLikeTap started for ruckId: $_ruckId',
+          name: 'RuckBuddyCard');
+
       // Store previous state for potential revert
       final previousLikedState = _isLiked;
       final previousLikeCount = _likeCount ?? 0;
-      
+
       // Optimistically update UI immediately for instant feedback
       final newLikedState = !_isLiked;
-      final newLikeCount = newLikedState ? previousLikeCount + 1 : (previousLikeCount - 1).clamp(0, 999999);
-      
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Before optimistic update - liked: $previousLikedState, count: $previousLikeCount', name: 'RuckBuddyCard');
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: After optimistic calculation - liked: $newLikedState, count: $newLikeCount', name: 'RuckBuddyCard');
-      
+      final newLikeCount = newLikedState
+          ? previousLikeCount + 1
+          : (previousLikeCount - 1).clamp(0, 999999);
+
+      developer.log(
+          '[SOCIAL_DEBUG] RuckBuddyCard: Before optimistic update - liked: $previousLikedState, count: $previousLikeCount',
+          name: 'RuckBuddyCard');
+      developer.log(
+          '[SOCIAL_DEBUG] RuckBuddyCard: After optimistic calculation - liked: $newLikedState, count: $newLikeCount',
+          name: 'RuckBuddyCard');
+
       // Update UI state immediately - this should be instant
       setState(() {
         _isLiked = newLikedState;
         _likeCount = newLikeCount;
         _isProcessingLike = true;
-        developer.log('[SOCIAL_DEBUG] RuckBuddyCard: setState completed - UI should show liked: $newLikedState, count: $newLikeCount', name: 'RuckBuddyCard');
+        developer.log(
+            '[SOCIAL_DEBUG] RuckBuddyCard: setState completed - UI should show liked: $newLikedState, count: $newLikeCount',
+            name: 'RuckBuddyCard');
       });
-      
+
       // Send event to SocialBloc (async, won't block UI)
       // Double-check that _ruckId is not null before using it
       if (_ruckId != null) {
         context.read<SocialBloc>().add(ToggleRuckLike(_ruckId!));
-        developer.log('[SOCIAL_DEBUG] RuckBuddyCard: ToggleRuckLike event sent to SocialBloc for ruckId: $_ruckId', name: 'RuckBuddyCard');
+        developer.log(
+            '[SOCIAL_DEBUG] RuckBuddyCard: ToggleRuckLike event sent to SocialBloc for ruckId: $_ruckId',
+            name: 'RuckBuddyCard');
       } else {
-        developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Cannot toggle like - _ruckId is null (failed to parse "${widget.ruckBuddy.id}")', name: 'RuckBuddyCard');
+        developer.log(
+            '[SOCIAL_DEBUG] RuckBuddyCard: Cannot toggle like - _ruckId is null (failed to parse "${widget.ruckBuddy.id}")',
+            name: 'RuckBuddyCard');
         // Reset processing state since we can't proceed
         setState(() => _isProcessingLike = false);
         return;
       }
       // Do not prematurely reset _isProcessingLike here; it will be reset
       // in Bloc listener upon LikeActionCompleted or LikeActionError to avoid races
-      
     } catch (e) {
       // Reset processing state on any error
       if (mounted) {
         setState(() => _isProcessingLike = false);
       }
-      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error in _handleLikeTap: $e', name: 'RuckBuddyCard');
+      developer.log('[SOCIAL_DEBUG] RuckBuddyCard: Error in _handleLikeTap: $e',
+          name: 'RuckBuddyCard');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
+
     // Calculate pace if not already done
-    if (_calculatedPace == 0.0 && widget.ruckBuddy.distanceKm > 0 && widget.ruckBuddy.durationSeconds > 0) {
-      _calculatedPace = widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
+    if (_calculatedPace == 0.0 &&
+        widget.ruckBuddy.distanceKm > 0 &&
+        widget.ruckBuddy.durationSeconds > 0) {
+      _calculatedPace =
+          widget.ruckBuddy.durationSeconds / widget.ruckBuddy.distanceKm;
     }
 
     // Determine if metric system is preferred from AuthBloc state
     final authState = context.watch<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true; // Default to true or handle appropriately
+    final bool preferMetric = authState is Authenticated
+        ? authState.user.preferMetric
+        : true; // Default to true or handle appropriately
 
-    final String formattedPace = MeasurementUtils.formatPace(_calculatedPace, metric: preferMetric);
-    final String formattedDistance = MeasurementUtils.formatDistance(widget.ruckBuddy.distanceKm, metric: preferMetric);
-    final String formattedDuration = MeasurementUtils.formatDuration(Duration(seconds: widget.ruckBuddy.durationSeconds.round()));
-    final String formattedElevation = MeasurementUtils.formatElevation(widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM, metric: preferMetric);
-    final String formattedCalories = '${widget.ruckBuddy.caloriesBurned.round()} kcal';
+    final String formattedPace =
+        MeasurementUtils.formatPace(_calculatedPace, metric: preferMetric);
+    final String formattedDistance = MeasurementUtils.formatDistance(
+        widget.ruckBuddy.distanceKm,
+        metric: preferMetric);
+    final String formattedDuration = MeasurementUtils.formatDuration(
+        Duration(seconds: widget.ruckBuddy.durationSeconds.round()));
+    final String formattedElevation = MeasurementUtils.formatElevation(
+        widget.ruckBuddy.elevationGainM, widget.ruckBuddy.elevationLossM,
+        metric: preferMetric);
+    final String formattedCalories =
+        '${widget.ruckBuddy.caloriesBurned.round()} kcal';
     // Debug: Log weight value and formatted output
-    print('🎒 [UI_WEIGHT_DEBUG] RuckBuddyCard: ruckWeightKg = ${widget.ruckBuddy.ruckWeightKg}, preferMetric=$preferMetric');
+    print(
+        '🎒 [UI_WEIGHT_DEBUG] RuckBuddyCard: ruckWeightKg = ${widget.ruckBuddy.ruckWeightKg}, preferMetric=$preferMetric');
     final String formattedWeight = widget.ruckBuddy.ruckWeightKg <= 0.0
         ? 'HIKE'
         : MeasurementUtils.formatWeightForChip(
@@ -355,16 +426,19 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
       listener: (context, state) {
         // Listen for photo loading completion
         if (state is SessionPhotosLoadedForId) {
-          print('[PHOTO_DEBUG] RuckBuddyCard received SessionPhotosLoadedForId - sessionId: ${state.sessionId}, ruckBuddyId: ${widget.ruckBuddy.id}, photos: ${state.photos.length}');
-          
+          print(
+              '[PHOTO_DEBUG] RuckBuddyCard received SessionPhotosLoadedForId - sessionId: ${state.sessionId}, ruckBuddyId: ${widget.ruckBuddy.id}, photos: ${state.photos.length}');
+
           // Ensure both IDs are compared as strings
           if (state.sessionId.toString() == widget.ruckBuddy.id.toString()) {
             setState(() {
               _photos = _convertToRuckPhotos(state.photos);
-              print('[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionPhotosLoadedForId: ${_photos.length} photos for ruckId: ${widget.ruckBuddy.id}');
+              print(
+                  '[PHOTO_DEBUG] RuckBuddyCard updated photos from SessionPhotosLoadedForId: ${_photos.length} photos for ruckId: ${widget.ruckBuddy.id}');
             });
           } else {
-            print('[PHOTO_DEBUG] RuckBuddyCard sessionId mismatch - expected: ${widget.ruckBuddy.id}, got: ${state.sessionId}');
+            print(
+                '[PHOTO_DEBUG] RuckBuddyCard sessionId mismatch - expected: ${widget.ruckBuddy.id}, got: ${state.sessionId}');
           }
         }
       },
@@ -375,7 +449,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
           if (state is LikeStatusChecked && state.ruckId == _ruckId) {
             // Avoid overriding optimistic UI while processing a like toggle
             if (_isProcessingLike) {
-              print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) ignoring LikeStatusChecked during processing');
+              print(
+                  '[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) ignoring LikeStatusChecked during processing');
             } else {
               // Only update if values actually differ (prevents flicker)
               final bool likedChanged = _isLiked != state.isLiked;
@@ -383,45 +458,53 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
               if (likedChanged || countChanged) {
                 setState(() {
                   _isLiked = state.isLiked;
-                  _likeCount = state.likeCount; 
-                  print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) applied LikeStatusChecked - liked: ${state.isLiked}, count: ${state.likeCount}');
+                  _likeCount = state.likeCount;
+                  print(
+                      '[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) applied LikeStatusChecked - liked: ${state.isLiked}, count: ${state.likeCount}');
                 });
               }
             }
           }
-          
+
           // Handle successful like action completion - only update if significantly different
           if (state is LikeActionCompleted && state.ruckId == _ruckId) {
             setState(() {
               _isProcessingLike = false;
               // Only update if there's a significant discrepancy (server correction)
-              final countDifference = (state.likeCount - (_likeCount ?? 0)).abs();
+              final countDifference =
+                  (state.likeCount - (_likeCount ?? 0)).abs();
               if (countDifference > 1 || _isLiked != state.isLiked) {
                 _isLiked = state.isLiked;
                 _likeCount = state.likeCount;
-                print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}');
+                print(
+                    '[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server correction - liked: ${state.isLiked}, count: ${state.likeCount}');
               } else {
-                print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed');
+                print(
+                    '[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) server confirmed optimistic update - no change needed');
               }
             });
           }
-          
+
           if (state is CommentsLoaded && state.ruckId == _ruckId.toString()) {
             setState(() {
               _commentCount = state.comments.length;
-              print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded');
+              print(
+                  '[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) updated _commentCount to ${state.comments.length} from CommentsLoaded');
             });
           }
-          
+
           if (state is LikeActionError && state.ruckId == _ruckId) {
             // Revert optimistic update on error
             setState(() {
               _isProcessingLike = false;
               _isLiked = !_isLiked; // Revert optimistic change
-              _likeCount = _isLiked ? (_likeCount ?? 0) + 1 : (_likeCount ?? 1) - 1; // Revert count
+              _likeCount = _isLiked
+                  ? (_likeCount ?? 0) + 1
+                  : (_likeCount ?? 1) - 1; // Revert count
               if (_likeCount! < 0) _likeCount = 0;
             });
-            print('[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}');
+            print(
+                '[SOCIAL_DEBUG] RuckBuddyCard (ruckId: $_ruckId) reverted optimistic update due to error: ${state.message}');
           }
         },
         builder: (context, socialState) {
@@ -440,49 +523,59 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
               borderRadius: BorderRadius.circular(12),
             ),
             child: InkWell(
-              onTap: widget.onTap ?? () async {
-                // Use await to wait for navigation to complete
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => RuckBuddyDetailScreen(
-                      ruckBuddy: widget.ruckBuddy,
-                    ),
-                  ),
-                );
-                
-                // When returning from detail screen, explicitly refresh photos
-                if (mounted && _ruckId != null) {
-                  print('[PHOTO_DEBUG] Returned from detail screen for ruckId: $_ruckId - refreshing photos');
-                  try {
-                    // 1. Clear existing photos from state to force a fresh view
-                    setState(() {
-                      _photos = [];
-                    });
-                    
-                    // 2. Request new photos - first try direct update from ruckBuddy
-                    if (widget.ruckBuddy.photos != null && widget.ruckBuddy.photos!.isNotEmpty) {
-                      setState(() {
-                        _photos = List<RuckPhoto>.from(widget.ruckBuddy.photos!);
-                        print('[PHOTO_DEBUG] Directly updated photos from widget after return: ${_photos.length}');
-                      });
+              onTap: widget.onTap ??
+                  () async {
+                    // Use await to wait for navigation to complete
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RuckBuddyDetailScreen(
+                          ruckBuddy: widget.ruckBuddy,
+                        ),
+                      ),
+                    );
+
+                    // When returning from detail screen, explicitly refresh photos
+                    if (mounted && _ruckId != null) {
+                      print(
+                          '[PHOTO_DEBUG] Returned from detail screen for ruckId: $_ruckId - refreshing photos');
+                      try {
+                        // 1. Clear existing photos from state to force a fresh view
+                        setState(() {
+                          _photos = [];
+                        });
+
+                        // 2. Request new photos - first try direct update from ruckBuddy
+                        if (widget.ruckBuddy.photos != null &&
+                            widget.ruckBuddy.photos!.isNotEmpty) {
+                          setState(() {
+                            _photos =
+                                List<RuckPhoto>.from(widget.ruckBuddy.photos!);
+                            print(
+                                '[PHOTO_DEBUG] Directly updated photos from widget after return: ${_photos.length}');
+                          });
+                        }
+
+                        // 3. Also request fresh photos from API through ActiveSessionBloc
+                        // This is a belt-and-suspenders approach to ensure we get photos
+                        final activeSessionBloc =
+                            context.read<ActiveSessionBloc>();
+
+                        // Clear any existing photos to force a clean fetch
+                        activeSessionBloc.add(
+                            ClearSessionPhotos(ruckId: widget.ruckBuddy.id));
+
+                        // Then request new ones
+                        activeSessionBloc.add(
+                            FetchSessionPhotosRequested(widget.ruckBuddy.id));
+                        print(
+                            '[PHOTO_DEBUG] Requested fresh photos from API after return');
+                      } catch (e) {
+                        print(
+                            '[PHOTO_DEBUG] Error refreshing photos after return: $e');
+                      }
                     }
-                    
-                    // 3. Also request fresh photos from API through ActiveSessionBloc
-                    // This is a belt-and-suspenders approach to ensure we get photos
-                    final activeSessionBloc = context.read<ActiveSessionBloc>();
-                    
-                    // Clear any existing photos to force a clean fetch
-                    activeSessionBloc.add(ClearSessionPhotos(ruckId: widget.ruckBuddy.id));
-                    
-                    // Then request new ones
-                    activeSessionBloc.add(FetchSessionPhotosRequested(widget.ruckBuddy.id));
-                    print('[PHOTO_DEBUG] Requested fresh photos from API after return');
-                  } catch (e) {
-                    print('[PHOTO_DEBUG] Error refreshing photos after return: $e');
-                  }
-                }
-              },
+                  },
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -499,14 +592,16 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.ruckBuddy.user?.username ?? 'Anonymous Rucker',
+                                widget.ruckBuddy.user?.username ??
+                                    'Anonymous Rucker',
                                 style: AppTextStyles.bodyLarge.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                _formatCompletedDate(widget.ruckBuddy.completedAt),
+                                _formatCompletedDate(
+                                    widget.ruckBuddy.completedAt),
                                 style: AppTextStyles.bodySmall.copyWith(
                                   color: Colors.grey[600],
                                 ),
@@ -516,7 +611,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                         ),
                         // Distance stat in header - with green background tile
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             color: Theme.of(context).primaryColor,
                             borderRadius: BorderRadius.circular(12),
@@ -530,45 +626,51 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Unified Media Carousel (photos + map)
                     Builder(builder: (context) {
                       // Create list of media items (map first, then photos)
                       List<MediaCarouselItem> mediaItems = [];
-                      
+
                       // Add map as the first item
                       mediaItems.add(MediaCarouselItem.map(
                         locationPoints: widget.ruckBuddy.locationPoints,
                         ruckWeightKg: widget.ruckBuddy.ruckWeightKg,
                       ));
-                      
+
                       // Add photos after the map
-                      final processedPhotoData = _getProcessedPhotoData(_photos, addCacheBuster: false);
-                      for (Map<String, String?> photoData in processedPhotoData) {
-                        print('[MEDIA_DEBUG] Photo URL: ${photoData['fullUrl']}, Thumbnail: ${photoData['thumbnailUrl']}');
+                      final processedPhotoData = _getProcessedPhotoData(_photos,
+                          addCacheBuster: false);
+                      for (Map<String, String?> photoData
+                          in processedPhotoData) {
+                        print(
+                            '[MEDIA_DEBUG] Photo URL: ${photoData['fullUrl']}, Thumbnail: ${photoData['thumbnailUrl']}');
                         mediaItems.add(MediaCarouselItem.photo(
                           photoData['fullUrl'] ?? '',
                           thumbnailUrl: photoData['thumbnailUrl'],
                         ));
                       }
-                      
-                      print('[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedPhotoData.length} photos)');
-                      
+
+                      print(
+                          '[MEDIA_DEBUG] Building media carousel with ${mediaItems.length} items (1 map + ${processedPhotoData.length} photos)');
+
                       return Stack(
                         children: [
                           MediaCarousel(
                             mediaItems: mediaItems,
                             height: 200, // Updated to 200px tall
-                            initialPage: processedPhotoData.isNotEmpty ? 1 : 0, // Start at first photo if photos exist
+                            initialPage: processedPhotoData.isNotEmpty
+                                ? 1
+                                : 0, // Start at first photo if photos exist
                             onPhotoTap: (index) {
                               // Only handle photo taps, skip map items
                               final photoUrls = mediaItems
                                   .where((item) => item.type == MediaType.photo)
                                   .map((item) => item.photoUrl!)
                                   .toList();
-                              
+
                               if (photoUrls.isNotEmpty) {
                                 Navigator.push(
                                   context,
@@ -581,7 +683,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                 );
                               }
                             },
-                            ruckBuddyId: widget.ruckBuddy.id, // Add ruckBuddyId parameter
+                            ruckBuddyId: widget
+                                .ruckBuddy.id, // Add ruckBuddyId parameter
                           ),
                           if (widget.ruckBuddy.firstRuck)
                             Positioned(
@@ -590,7 +693,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                               child: Builder(
                                 builder: (context) {
                                   const double badgeSize = 72; // logical pixels
-                                  final double dpr = MediaQuery.of(context).devicePixelRatio;
+                                  final double dpr =
+                                      MediaQuery.of(context).devicePixelRatio;
                                   final int decodeW = (badgeSize * dpr).round();
                                   final int decodeH = (badgeSize * dpr).round();
                                   return Image.asset(
@@ -608,9 +712,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                         ],
                       );
                     }),
-                    
+
                     const SizedBox(height: 10),
-                    
+
                     // Stats in a 2x2 grid layout
                     Column(
                       children: [
@@ -635,9 +739,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                             ),
                           ],
                         ),
-                        
+
                         const SizedBox(height: 5),
-                        
+
                         // Second row: Pace and Calories
                         Row(
                           children: [
@@ -661,9 +765,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Social interactions
                     Row(
                       mainAxisAlignment: MainAxisAlignment.start,
@@ -672,15 +776,17 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: _isProcessingLike ? null : () {
-                              HapticFeedback.selectionClick();
-                              
-                              if (widget.onLikeTap != null) {
-                                widget.onLikeTap!();
-                              } else {
-                                _handleLikeTap();
-                              }
-                            },
+                            onTap: _isProcessingLike
+                                ? null
+                                : () {
+                                    HapticFeedback.selectionClick();
+
+                                    if (widget.onLikeTap != null) {
+                                      widget.onLikeTap!();
+                                    } else {
+                                      _handleLikeTap();
+                                    }
+                                  },
                             borderRadius: BorderRadius.circular(24),
                             child: Padding(
                               padding: const EdgeInsets.all(4.0),
@@ -688,16 +794,17 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                 children: [
                                   AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 150),
-                                    transitionBuilder: (Widget child, Animation<double> animation) {
+                                    transitionBuilder: (Widget child,
+                                        Animation<double> animation) {
                                       return ScaleTransition(
                                         scale: animation,
                                         child: child,
                                       );
                                     },
                                     child: Image.asset(
-                                      _isLiked 
-                                        ? 'assets/images/tactical_ruck_like_icon_active.png'
-                                        : 'assets/images/tactical_ruck_like_icon_transparent.png',
+                                      _isLiked
+                                          ? 'assets/images/tactical_ruck_like_icon_active.png'
+                                          : 'assets/images/tactical_ruck_like_icon_transparent.png',
                                       key: ValueKey(_isLiked),
                                       width: 48,
                                       height: 48,
@@ -710,7 +817,9 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                                       '${_likeCount ?? 0}',
                                       key: ValueKey(_likeCount),
                                       style: AppTextStyles.titleMedium.copyWith(
-                                        color: isDarkMode ? Colors.white : Colors.black,
+                                        color: isDarkMode
+                                            ? Colors.white
+                                            : Colors.black,
                                       ),
                                     ),
                                   ),
@@ -728,7 +837,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                               MaterialPageRoute(
                                 builder: (context) => RuckBuddyDetailScreen(
                                   ruckBuddy: widget.ruckBuddy,
-                                  focusComment: true, // Auto-focus the comment input field
+                                  focusComment:
+                                      true, // Auto-focus the comment input field
                                 ),
                               ),
                             );
@@ -744,7 +854,8 @@ class _RuckBuddyCardState extends State<RuckBuddyCard> with AutomaticKeepAliveCl
                               Text(
                                 '${_commentCount ?? 0}',
                                 style: AppTextStyles.titleMedium.copyWith(
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color:
+                                      isDarkMode ? Colors.white : Colors.black,
                                 ),
                               ),
                             ],
@@ -881,7 +992,7 @@ class MediaCarouselItem {
   // Factory constructor for photo items
   factory MediaCarouselItem.photo(String photoUrl, {String? thumbnailUrl}) {
     return MediaCarouselItem._(
-      type: MediaType.photo, 
+      type: MediaType.photo,
       photoUrl: photoUrl,
       thumbnailUrl: thumbnailUrl,
     );
@@ -921,7 +1032,7 @@ class MediaCarousel extends StatefulWidget {
   State<MediaCarousel> createState() => _MediaCarouselState();
 }
 
-class _MediaCarouselState extends State<MediaCarousel> 
+class _MediaCarouselState extends State<MediaCarousel>
     with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late PageController _pageController;
   int _currentPage = 0;
@@ -935,7 +1046,7 @@ class _MediaCarouselState extends State<MediaCarousel>
     super.initState();
     _pageController = PageController(initialPage: widget.initialPage);
     _currentPage = widget.initialPage;
-    
+
     // Start background preloading after a short delay to prioritize first photo
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -945,7 +1056,7 @@ class _MediaCarouselState extends State<MediaCarousel>
       }
     });
   }
-  
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -955,7 +1066,7 @@ class _MediaCarouselState extends State<MediaCarousel>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
+
     if (widget.mediaItems.isEmpty) {
       return SizedBox(
         height: widget.height,
@@ -980,7 +1091,9 @@ class _MediaCarouselState extends State<MediaCarousel>
                 controller: _pageController,
                 itemCount: widget.mediaItems.length,
                 onPageChanged: (int index) {
-                  if (mounted && index >= 0 && index < widget.mediaItems.length) {
+                  if (mounted &&
+                      index >= 0 &&
+                      index < widget.mediaItems.length) {
                     setState(() {
                       _currentPage = index;
                     });
@@ -988,9 +1101,11 @@ class _MediaCarouselState extends State<MediaCarousel>
                 },
                 itemBuilder: (context, index) {
                   final item = widget.mediaItems[index];
-                  
+
                   if (item.type == MediaType.map) {
-                    return _RouteMapPreview(locationPoints: item.locationPoints, ruckWeightKg: item.ruckWeightKg);
+                    return _RouteMapPreview(
+                        locationPoints: item.locationPoints,
+                        ruckWeightKg: item.ruckWeightKg);
                   } else {
                     return GestureDetector(
                       onTap: () {
@@ -1011,7 +1126,8 @@ class _MediaCarouselState extends State<MediaCarousel>
                           topRight: Radius.circular(12),
                         ), // Rounded top corners to match Card
                         child: StableCachedImage(
-                          key: ValueKey('${widget.ruckBuddyId}_${item.photoUrl}'), // Unique across cards
+                          key: ValueKey(
+                              '${widget.ruckBuddyId}_${item.photoUrl}'), // Unique across cards
                           imageUrl: item.photoUrl!,
                           thumbnailUrl: item.thumbnailUrl,
                           fit: BoxFit.cover,
@@ -1029,16 +1145,22 @@ class _MediaCarouselState extends State<MediaCarousel>
                 top: 0,
                 width: 1,
                 height: 1,
-                child: (_shouldPreloadRemaining && widget.mediaItems.length > 1 && mounted)
+                child: (_shouldPreloadRemaining &&
+                        widget.mediaItems.length > 1 &&
+                        mounted)
                     ? Container(
                         width: 1,
                         height: 1,
                         child: Stack(
                           children: widget.mediaItems
-                              .where((item) => item.type == MediaType.photo && item.photoUrl != null)
-                              .skip(1) // Skip first photo (already visible), only preload remaining
+                              .where((item) =>
+                                  item.type == MediaType.photo &&
+                                  item.photoUrl != null)
+                              .skip(
+                                  1) // Skip first photo (already visible), only preload remaining
                               .map((item) => StableCachedImage(
-                                    key: ValueKey('${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
+                                    key: ValueKey(
+                                        '${widget.ruckBuddyId}_preload_${item.photoUrl}'), // Unique across cards
                                     imageUrl: item.photoUrl!,
                                     thumbnailUrl: item.thumbnailUrl,
                                     width: 1,
@@ -1090,7 +1212,7 @@ class _RouteMapPreview extends StatefulWidget {
     required this.locationPoints,
     this.ruckWeightKg,
   });
-  
+
   @override
   State<_RouteMapPreview> createState() => _RouteMapPreviewState();
 }
@@ -1100,18 +1222,18 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
   FlutterMap? _cachedMapWidget;
   List<LatLng>? _cachedRoutePoints;
   late final Key _mapKey;
-  
+
   @override
   void initState() {
     super.initState();
     _mapKey = UniqueKey();
   }
-  
+
   // Helper method to compare route points for equality
   bool _areRoutePointsEqual(List<LatLng> list1, List<LatLng> list2) {
     if (list1.length != list2.length) return false;
     for (int i = 0; i < list1.length; i++) {
-      if (list1[i].latitude != list2[i].latitude || 
+      if (list1[i].latitude != list2[i].latitude ||
           list1[i].longitude != list2[i].longitude) {
         return false;
       }
@@ -1132,8 +1254,10 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
 
   LatLng _getRouteCenter(List<LatLng> points) {
     if (points.isEmpty) return LatLng(40.421, -3.678);
-    double avgLat = points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
-    double avgLng = points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
+    double avgLat =
+        points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length;
+    double avgLng =
+        points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length;
     return LatLng(avgLat, avgLng);
   }
 
@@ -1141,15 +1265,19 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
     if (points.isEmpty) return 16.0;
     if (points.length == 1) return 17.5;
 
-    double minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-    double maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-    double minLng = points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-    double maxLng = points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+    double minLat =
+        points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    double maxLat =
+        points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    double minLng =
+        points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    double maxLng =
+        points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
 
     // Add some padding (20% on each side)
     double latPadding = (maxLat - minLat) * 0.2;
     double lngPadding = (maxLng - minLng) * 0.2;
-    
+
     minLat -= latPadding;
     maxLat += latPadding;
     minLng -= lngPadding;
@@ -1181,15 +1309,17 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
 
     return zoom;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final routePoints = _getRoutePoints();
-    print('🗺️ [MAP_WEIGHT_DEBUG] Map overlay: ruckWeightKg = ${widget.ruckWeightKg}');
+    print(
+        '🗺️ [MAP_WEIGHT_DEBUG] Map overlay: ruckWeightKg = ${widget.ruckWeightKg}');
     // Read user preference from AuthBloc for proper unit conversion
     final authState = context.watch<AuthBloc>().state;
-    final bool preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    final String weightText = widget.ruckWeightKg != null 
+    final bool preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    final String weightText = widget.ruckWeightKg != null
         ? (widget.ruckWeightKg! <= 0.0
             ? 'HIKE'
             : MeasurementUtils.formatWeightForChip(
@@ -1209,12 +1339,16 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
             Container(
               height: 200, // Match the MediaCarousel height
               width: double.infinity,
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.grey[200],
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey[900]
+                  : Colors.grey[200],
               child: Center(
                 child: Icon(
                   Icons.map_outlined,
                   size: 48,
-                  color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[600] : Colors.grey[400],
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[600]
+                      : Colors.grey[400],
                 ),
               ),
             ),
@@ -1224,7 +1358,8 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
               right: 10,
               child: widget.ruckWeightKg != null
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: AppColors.secondary,
                         borderRadius: BorderRadius.circular(15),
@@ -1245,8 +1380,8 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
     }
 
     // Only rebuild the map if the route points have changed
-    if (_cachedMapWidget == null || 
-        _cachedRoutePoints == null || 
+    if (_cachedMapWidget == null ||
+        _cachedRoutePoints == null ||
         !_areRoutePointsEqual(_cachedRoutePoints!, routePoints)) {
       _cachedRoutePoints = List.from(routePoints);
       _cachedMapWidget = FlutterMap(
@@ -1254,7 +1389,8 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
         options: MapOptions(
           initialCenter: _getRouteCenter(routePoints),
           initialZoom: _getFitZoom(routePoints),
-          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+          interactionOptions:
+              const InteractionOptions(flags: InteractiveFlag.none),
         ),
         children: [
           SafeTileLayer(
@@ -1296,7 +1432,8 @@ class _RouteMapPreviewState extends State<_RouteMapPreview> {
             right: 10,
             child: widget.ruckWeightKg != null
                 ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.secondary,
                       borderRadius: BorderRadius.circular(15),

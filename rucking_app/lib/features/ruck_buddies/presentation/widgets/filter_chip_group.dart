@@ -26,7 +26,8 @@ class FilterChipGroup extends StatelessWidget {
             const SizedBox(width: 8),
             _buildFilterChip('closest', 'Closest', Icons.location_on),
             const SizedBox(width: 8),
-            _buildFilterChip('calories', 'Most Calories', Icons.local_fire_department),
+            _buildFilterChip(
+                'calories', 'Most Calories', Icons.local_fire_department),
             const SizedBox(width: 8),
             _buildFilterChip('distance', 'Furthest', Icons.straighten),
             const SizedBox(width: 8),
@@ -41,7 +42,7 @@ class FilterChipGroup extends StatelessWidget {
 
   Widget _buildFilterChip(String value, String label, IconData icon) {
     final bool isSelected = selectedFilter == value;
-    
+
     // Check for lady mode
     return Builder(
       builder: (context) {
@@ -50,15 +51,17 @@ class FilterChipGroup extends StatelessWidget {
         try {
           final authBloc = BlocProvider.of<AuthBloc>(context);
           if (authBloc.state is Authenticated) {
-            isLadyMode = (authBloc.state as Authenticated).user.gender == 'female';
+            isLadyMode =
+                (authBloc.state as Authenticated).user.gender == 'female';
           }
         } catch (e) {
           // Default to standard mode if error
         }
-        
+
         // Use lady color for female users
-        final Color accentColor = isLadyMode ? AppColors.ladyPrimary : AppColors.secondary;
-        
+        final Color accentColor =
+            isLadyMode ? AppColors.ladyPrimary : AppColors.secondary;
+
         return FilterChip(
           avatar: Icon(
             icon,

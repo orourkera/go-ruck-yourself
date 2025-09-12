@@ -22,6 +22,6 @@ void initAchievementFeature(GetIt sl) {
 
   // Bloc
   sl.registerFactory(() => AchievementBloc(
-    achievementRepository: sl(),
-  ));
+        achievementRepository: sl(),
+      ));
 }

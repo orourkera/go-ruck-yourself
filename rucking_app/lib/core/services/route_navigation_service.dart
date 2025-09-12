@@ -4,7 +4,7 @@ import 'package:rucking_app/core/models/route.dart';
 import 'package:rucking_app/core/models/location_point.dart';
 
 /// **Route Navigation Service**
-/// 
+///
 /// Advanced turn guidance and navigation instructions for route following
 /// with voice prompts, distance calculations, and turn detection.
 class RouteNavigationService {
@@ -12,46 +12,50 @@ class RouteNavigationService {
   static const double _instructionPreviewDistance = 100.0; // meters
   static const double _instructionExecuteDistance = 25.0; // meters
   static const double _recalculationThreshold = 50.0; // meters off route
-  
+
   final Route _route;
   final StreamController<NavigationInstruction> _instructionController;
-  
+
   // Navigation state
   int _currentInstructionIndex = 0;
   List<NavigationInstruction> _instructions = [];
   NavigationInstruction? _currentInstruction;
   NavigationInstruction? _nextInstruction;
   bool _hasPreviewedCurrentInstruction = false;
-  
-  RouteNavigationService(this._route) 
-      : _instructionController = StreamController<NavigationInstruction>.broadcast() {
+
+  RouteNavigationService(this._route)
+      : _instructionController =
+            StreamController<NavigationInstruction>.broadcast() {
     _generateNavigationInstructions();
   }
-  
+
   /// 📢 **Navigation Instructions Stream**
-  Stream<NavigationInstruction> get instructions => _instructionController.stream;
-  
+  Stream<NavigationInstruction> get instructions =>
+      _instructionController.stream;
+
   /// 🎯 **Process Location Update**
-  /// 
+  ///
   /// Analyze current position and provide navigation guidance
-  void updateLocation(double latitude, double longitude, {
+  void updateLocation(
+    double latitude,
+    double longitude, {
     double? bearing,
     double? accuracy,
   }) {
     if (_instructions.isEmpty) return;
-    
+
     // Find current position relative to instructions
     _updateCurrentInstruction(latitude, longitude);
-    
+
     // Check if we need to issue instruction
     _checkInstructionTiming(latitude, longitude);
-    
+
     // Handle off-route scenarios
     _handleOffRouteNavigation(latitude, longitude);
   }
-  
+
   /// 🗺️ **Generate Navigation Instructions**
-  /// 
+  ///
   /// Analyze route and create turn-by-turn instructions
   void _generateNavigationInstructions() {
     if (_route.elevationPoints.length < 3) {
@@ -91,10 +95,10 @@ class RouteNavigationService {
       ];
       return;
     }
-    
+
     _instructions = [];
     double accumulatedDistance = 0.0;
-    
+
     // Start instruction
     _instructions.add(NavigationInstruction(
       id: 'start',
@@ -112,40 +116,49 @@ class RouteNavigationService {
       bearing: _calculateInitialBearing(),
       icon: 'start',
     ));
-    
+
     // Analyze route for turns and significant direction changes
     for (int i = 1; i < _route.elevationPoints.length - 1; i++) {
       final previous = _route.elevationPoints[i - 1];
       final current = _route.elevationPoints[i];
       final next = _route.elevationPoints[i + 1];
-      
+
       // Skip if any point has null coordinates
-      if (previous.latitude == null || previous.longitude == null ||
-          current.latitude == null || current.longitude == null ||
-          next.latitude == null || next.longitude == null) {
+      if (previous.latitude == null ||
+          previous.longitude == null ||
+          current.latitude == null ||
+          current.longitude == null ||
+          next.latitude == null ||
+          next.longitude == null) {
         continue;
       }
-      
+
       // Calculate distance to this point
       accumulatedDistance += _calculateHaversineDistance(
-        previous.latitude!, previous.longitude!,
-        current.latitude!, current.longitude!,
+        previous.latitude!,
+        previous.longitude!,
+        current.latitude!,
+        current.longitude!,
       );
-      
+
       // Calculate bearings
       final incomingBearing = _calculateBearing(
-        previous.latitude!, previous.longitude!,
-        current.latitude!, current.longitude!,
+        previous.latitude!,
+        previous.longitude!,
+        current.latitude!,
+        current.longitude!,
       );
       final outgoingBearing = _calculateBearing(
-        current.latitude!, current.longitude!,
-        next.latitude!, next.longitude!,
+        current.latitude!,
+        current.longitude!,
+        next.latitude!,
+        next.longitude!,
       );
-      
+
       // Detect turn
       final turnAngle = _calculateTurnAngle(incomingBearing, outgoingBearing);
       final turnType = _classifyTurn(turnAngle);
-      
+
       if (turnType != TurnType.straight) {
         final currentLocation = LocationPoint(
           latitude: current.latitude!,
@@ -154,12 +167,11 @@ class RouteNavigationService {
           timestamp: DateTime.now(),
           accuracy: 5.0,
         );
-        final instruction = _createTurnInstruction(
-          i, turnType, turnAngle, currentLocation, accumulatedDistance, outgoingBearing
-        );
+        final instruction = _createTurnInstruction(i, turnType, turnAngle,
+            currentLocation, accumulatedDistance, outgoingBearing);
         _instructions.add(instruction);
       }
-      
+
       // Check for POI instructions
       final currentLocation = LocationPoint(
         latitude: current.latitude!,
@@ -168,12 +180,13 @@ class RouteNavigationService {
         timestamp: DateTime.now(),
         accuracy: 5.0,
       );
-      final poiInstruction = _checkForPOIInstruction(currentLocation, accumulatedDistance);
+      final poiInstruction =
+          _checkForPOIInstruction(currentLocation, accumulatedDistance);
       if (poiInstruction != null) {
         _instructions.add(poiInstruction);
       }
     }
-    
+
     // Finish instruction
     _instructions.add(NavigationInstruction(
       id: 'finish',
@@ -191,11 +204,11 @@ class RouteNavigationService {
       bearing: null,
       icon: 'finish',
     ));
-    
+
     // Sort by distance
     _instructions.sort((a, b) => a.distance.compareTo(b.distance));
   }
-  
+
   /// 🔄 **Create Turn Instruction**
   NavigationInstruction _createTurnInstruction(
     int index,
@@ -208,7 +221,7 @@ class RouteNavigationService {
     final turnText = _getTurnText(turnType, turnAngle);
     final voiceText = _getTurnVoiceText(turnType, turnAngle);
     final icon = _getTurnIcon(turnType);
-    
+
     return NavigationInstruction(
       id: 'turn_$index',
       type: InstructionType.turn,
@@ -222,16 +235,20 @@ class RouteNavigationService {
       turnAngle: turnAngle,
     );
   }
-  
+
   /// 🏛️ **Check for POI Instruction**
-  NavigationInstruction? _checkForPOIInstruction(LocationPoint location, double distance) {
+  NavigationInstruction? _checkForPOIInstruction(
+      LocationPoint location, double distance) {
     for (final poi in _route.pointsOfInterest) {
       final poiDistance = _calculateHaversineDistance(
-        location.latitude, location.longitude,
-        poi.latitude, poi.longitude,
+        location.latitude,
+        location.longitude,
+        poi.latitude,
+        poi.longitude,
       );
-      
-      if (poiDistance <= 25.0) { // Within 25 meters of POI
+
+      if (poiDistance <= 25.0) {
+        // Within 25 meters of POI
         return NavigationInstruction(
           id: 'poi_${poi.name.replaceAll(' ', '_').toLowerCase()}',
           type: InstructionType.waypoint,
@@ -247,34 +264,35 @@ class RouteNavigationService {
     }
     return null;
   }
-  
+
   /// 📍 **Update Current Instruction**
   void _updateCurrentInstruction(double latitude, double longitude) {
     final currentLocation = LocationPoint(
-      latitude: latitude, 
-      longitude: longitude, 
-      elevation: 0.0, 
-      timestamp: DateTime.now(), 
-      accuracy: 5.0
-    );
-    
+        latitude: latitude,
+        longitude: longitude,
+        elevation: 0.0,
+        timestamp: DateTime.now(),
+        accuracy: 5.0);
+
     // Find the instruction we should be focusing on
     NavigationInstruction? bestInstruction;
     double closestDistance = double.infinity;
-    
+
     for (int i = _currentInstructionIndex; i < _instructions.length; i++) {
       final instruction = _instructions[i];
       final distanceToInstruction = _calculateHaversineDistance(
-        latitude, longitude,
-        instruction.location.latitude, instruction.location.longitude,
+        latitude,
+        longitude,
+        instruction.location.latitude,
+        instruction.location.longitude,
       );
-      
+
       if (distanceToInstruction < closestDistance) {
         closestDistance = distanceToInstruction;
         bestInstruction = instruction;
         _currentInstructionIndex = i;
       }
-      
+
       // If we're past this instruction, move to next
       if (distanceToInstruction > _instructionExecuteDistance * 2) {
         continue;
@@ -282,25 +300,26 @@ class RouteNavigationService {
         break;
       }
     }
-    
+
     _currentInstruction = bestInstruction;
     _nextInstruction = _currentInstructionIndex < _instructions.length - 1
         ? _instructions[_currentInstructionIndex + 1]
         : null;
   }
-  
+
   /// ⏱️ **Check Instruction Timing**
   void _checkInstructionTiming(double latitude, double longitude) {
     if (_currentInstruction == null) return;
-    
+
     final distanceToInstruction = _calculateHaversineDistance(
-      latitude, longitude,
+      latitude,
+      longitude,
       _currentInstruction!.location.latitude,
       _currentInstruction!.location.longitude,
     );
-    
+
     // Preview instruction
-    if (distanceToInstruction <= _instructionPreviewDistance && 
+    if (distanceToInstruction <= _instructionPreviewDistance &&
         !_hasPreviewedCurrentInstruction) {
       _hasPreviewedCurrentInstruction = true;
       _emitInstruction(_currentInstruction!.copyWith(
@@ -308,18 +327,18 @@ class RouteNavigationService {
         distanceToInstruction: distanceToInstruction,
       ));
     }
-    
+
     // Execute instruction
     if (distanceToInstruction <= _instructionExecuteDistance) {
       _emitInstruction(_currentInstruction!.copyWith(
         phase: InstructionPhase.execute,
         distanceToInstruction: distanceToInstruction,
       ));
-      
+
       // Move to next instruction
       _currentInstructionIndex++;
       _hasPreviewedCurrentInstruction = false;
-      
+
       if (_currentInstructionIndex < _instructions.length) {
         _currentInstruction = _instructions[_currentInstructionIndex];
       } else {
@@ -327,13 +346,13 @@ class RouteNavigationService {
       }
     }
   }
-  
+
   /// 🛣️ **Handle Off-Route Navigation**
   void _handleOffRouteNavigation(double latitude, double longitude) {
     // Find closest point on route
     final closestResult = _findClosestPointOnRoute(latitude, longitude);
     final distanceToRoute = closestResult['distance'] as double;
-    
+
     if (distanceToRoute > _recalculationThreshold) {
       // Emit off-route instruction
       _emitInstruction(NavigationInstruction(
@@ -343,12 +362,11 @@ class RouteNavigationService {
         voiceText: 'You are off route. Return to the planned path.',
         distance: 0.0,
         location: LocationPoint(
-      latitude: latitude, 
-      longitude: longitude, 
-      elevation: 0.0, 
-      timestamp: DateTime.now(), 
-      accuracy: 5.0
-    ),
+            latitude: latitude,
+            longitude: longitude,
+            elevation: 0.0,
+            timestamp: DateTime.now(),
+            accuracy: 5.0),
         bearing: _calculateBearingToRoute(latitude, longitude),
         icon: 'return',
         distanceToInstruction: distanceToRoute,
@@ -356,24 +374,24 @@ class RouteNavigationService {
       ));
     }
   }
-  
+
   /// 🎯 **Find Closest Point on Route**
-  Map<String, dynamic> _findClosestPointOnRoute(double latitude, double longitude) {
+  Map<String, dynamic> _findClosestPointOnRoute(
+      double latitude, double longitude) {
     if (_route.elevationPoints.isEmpty) {
       return {'distance': double.infinity, 'index': 0, 'point': null};
     }
-    
+
     double minDistance = double.infinity;
     int closestIndex = 0;
     LocationPoint? closestPoint;
-    
+
     for (int i = 0; i < _route.elevationPoints.length; i++) {
       final point = _route.elevationPoints[i];
       if (point.latitude == null || point.longitude == null) continue;
       final distance = _calculateHaversineDistance(
-        latitude, longitude, point.latitude!, point.longitude!
-      );
-      
+          latitude, longitude, point.latitude!, point.longitude!);
+
       if (distance < minDistance) {
         minDistance = distance;
         closestIndex = i;
@@ -386,52 +404,58 @@ class RouteNavigationService {
         );
       }
     }
-    
-    return {'distance': minDistance, 'index': closestIndex, 'point': closestPoint};
+
+    return {
+      'distance': minDistance,
+      'index': closestIndex,
+      'point': closestPoint
+    };
   }
-  
+
   /// 🧭 **Calculate Bearing to Route**
   double _calculateBearingToRoute(double latitude, double longitude) {
     final closestResult = _findClosestPointOnRoute(latitude, longitude);
     final closestPoint = closestResult['point'] as LocationPoint?;
-    
+
     if (closestPoint == null) return 0.0;
-    
+
     return _calculateBearing(
-      latitude, longitude,
-      closestPoint.latitude, closestPoint.longitude,
+      latitude,
+      longitude,
+      closestPoint.latitude,
+      closestPoint.longitude,
     );
   }
-  
+
   /// 📐 **Calculate Bearing**
   double _calculateBearing(double lat1, double lon1, double lat2, double lon2) {
     final dLon = (lon2 - lon1) * (math.pi / 180);
     final lat1Rad = lat1 * (math.pi / 180);
     final lat2Rad = lat2 * (math.pi / 180);
-    
+
     final y = math.sin(dLon) * math.cos(lat2Rad);
     final x = math.cos(lat1Rad) * math.sin(lat2Rad) -
         math.sin(lat1Rad) * math.cos(lat2Rad) * math.cos(dLon);
-    
+
     final bearing = math.atan2(y, x) * (180 / math.pi);
     return (bearing + 360) % 360;
   }
-  
+
   /// 🔄 **Calculate Turn Angle**
   double _calculateTurnAngle(double incomingBearing, double outgoingBearing) {
     double turnAngle = outgoingBearing - incomingBearing;
-    
+
     // Normalize to -180 to 180
     while (turnAngle > 180) turnAngle -= 360;
     while (turnAngle < -180) turnAngle += 360;
-    
+
     return turnAngle;
   }
-  
+
   /// 🔄 **Classify Turn**
   TurnType _classifyTurn(double turnAngle) {
     final absoluteAngle = turnAngle.abs();
-    
+
     if (absoluteAngle < _turnDetectionThreshold) {
       return TurnType.straight;
     } else if (absoluteAngle <= 45) {
@@ -442,7 +466,7 @@ class RouteNavigationService {
       return turnAngle > 0 ? TurnType.sharpLeft : TurnType.sharpRight;
     }
   }
-  
+
   /// 📝 **Get Turn Text**
   String _getTurnText(TurnType turnType, double turnAngle) {
     switch (turnType) {
@@ -464,7 +488,7 @@ class RouteNavigationService {
         return 'Make a U-turn';
     }
   }
-  
+
   /// 🔊 **Get Turn Voice Text**
   String _getTurnVoiceText(TurnType turnType, double turnAngle) {
     switch (turnType) {
@@ -486,7 +510,7 @@ class RouteNavigationService {
         return 'Make a U-turn when possible';
     }
   }
-  
+
   /// 🎨 **Get Turn Icon**
   String _getTurnIcon(TurnType turnType) {
     switch (turnType) {
@@ -508,62 +532,67 @@ class RouteNavigationService {
         return 'u_turn_left';
     }
   }
-  
+
   /// 📏 **Calculate Route Distance**
   double _calculateTotalRouteDistance() {
     if (_route.elevationPoints.length < 2) return 0.0;
-    
+
     double totalDistance = 0.0;
     for (int i = 0; i < _route.elevationPoints.length - 1; i++) {
       final current = _route.elevationPoints[i];
       final next = _route.elevationPoints[i + 1];
-      if (current.latitude != null && current.longitude != null &&
-          next.latitude != null && next.longitude != null) {
-        totalDistance += _calculateHaversineDistance(
-          current.latitude!, current.longitude!, next.latitude!, next.longitude!
-        );
+      if (current.latitude != null &&
+          current.longitude != null &&
+          next.latitude != null &&
+          next.longitude != null) {
+        totalDistance += _calculateHaversineDistance(current.latitude!,
+            current.longitude!, next.latitude!, next.longitude!);
       }
     }
     return totalDistance;
   }
-  
+
   /// 🧭 **Calculate Initial Bearing**
   double _calculateInitialBearing() {
     if (_route.elevationPoints.length < 2) return 0.0;
-    
+
     final start = _route.elevationPoints[0];
     final second = _route.elevationPoints[1];
-    
-    if (start.latitude == null || start.longitude == null ||
-        second.latitude == null || second.longitude == null) {
+
+    if (start.latitude == null ||
+        start.longitude == null ||
+        second.latitude == null ||
+        second.longitude == null) {
       return 0.0;
     }
-    
+
     return _calculateBearing(
-      start.latitude!, start.longitude!, second.latitude!, second.longitude!
-    );
+        start.latitude!, start.longitude!, second.latitude!, second.longitude!);
   }
-  
+
   /// 📐 **Calculate Haversine Distance**
-  double _calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateHaversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // Earth's radius in meters
-    
+
     final dLat = (lat2 - lat1) * (math.pi / 180);
     final dLon = (lon2 - lon1) * (math.pi / 180);
-    
+
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
-    
+        math.cos(lat1 * (math.pi / 180)) *
+            math.cos(lat2 * (math.pi / 180)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
-  
+
   /// 📢 **Emit Instruction**
   void _emitInstruction(NavigationInstruction instruction) {
     _instructionController.add(instruction);
   }
-  
+
   /// 🔄 **Reset Navigation**
   void reset() {
     _currentInstructionIndex = 0;
@@ -571,22 +600,22 @@ class RouteNavigationService {
     _nextInstruction = null;
     _hasPreviewedCurrentInstruction = false;
   }
-  
+
   /// 🗑️ **Dispose Resources**
   void dispose() {
     _instructionController.close();
   }
-  
+
   /// 📋 **Get All Instructions**
   List<NavigationInstruction> getAllInstructions() {
     return List.unmodifiable(_instructions);
   }
-  
+
   /// 📍 **Get Current Instruction**
   NavigationInstruction? getCurrentInstruction() {
     return _currentInstruction;
   }
-  
+
   /// ➡️ **Get Next Instruction**
   NavigationInstruction? getNextInstruction() {
     return _nextInstruction;
@@ -608,7 +637,7 @@ class NavigationInstruction {
   final String? waypointName;
   final InstructionPhase phase;
   final double? distanceToInstruction;
-  
+
   const NavigationInstruction({
     required this.id,
     required this.type,
@@ -624,7 +653,7 @@ class NavigationInstruction {
     this.phase = InstructionPhase.pending,
     this.distanceToInstruction,
   });
-  
+
   NavigationInstruction copyWith({
     InstructionPhase? phase,
     double? distanceToInstruction,
@@ -642,7 +671,8 @@ class NavigationInstruction {
       turnAngle: turnAngle,
       waypointName: waypointName,
       phase: phase ?? this.phase,
-      distanceToInstruction: distanceToInstruction ?? this.distanceToInstruction,
+      distanceToInstruction:
+          distanceToInstruction ?? this.distanceToInstruction,
     );
   }
 }
@@ -671,8 +701,8 @@ enum TurnType {
 
 /// ⏱️ **Instruction Phases**
 enum InstructionPhase {
-  pending,   // Not yet relevant
-  preview,   // Show preview (100m away)
-  execute,   // Execute instruction (25m away)
+  pending, // Not yet relevant
+  preview, // Show preview (100m away)
+  execute, // Execute instruction (25m away)
   completed, // Instruction completed
 }

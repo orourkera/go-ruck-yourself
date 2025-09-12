@@ -299,10 +299,12 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: widget.isJoining ? null : () {
-          HapticFeedback.vibrate();
-          widget.onJoin?.call();
-        },
+        onPressed: widget.isJoining
+            ? null
+            : () {
+                HapticFeedback.vibrate();
+                widget.onJoin?.call();
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
@@ -420,7 +422,9 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
     // If duel is active, show time remaining
     if (widget.duel.isActive) {
       final timeRemaining = widget.duel.timeRemaining;
-      if (timeRemaining == null || timeRemaining.isNegative || timeRemaining == Duration.zero) {
+      if (timeRemaining == null ||
+          timeRemaining.isNegative ||
+          timeRemaining == Duration.zero) {
         return 'Time expired';
       }
 
@@ -461,13 +465,19 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
 
   String _getLocationText() {
     final parts = <String>[];
-    if (widget.duel.creatorCity != null && widget.duel.creatorCity != 'Unknown') parts.add(widget.duel.creatorCity!);
-    if (widget.duel.creatorState != null && widget.duel.creatorState != 'Unknown') parts.add(widget.duel.creatorState!);
+    if (widget.duel.creatorCity != null && widget.duel.creatorCity != 'Unknown')
+      parts.add(widget.duel.creatorCity!);
+    if (widget.duel.creatorState != null &&
+        widget.duel.creatorState != 'Unknown')
+      parts.add(widget.duel.creatorState!);
     return parts.join(', ');
   }
 
   bool _shouldShowLocation() {
-    return (widget.duel.creatorCity != null && widget.duel.creatorCity != 'Unknown') || (widget.duel.creatorState != null && widget.duel.creatorState != 'Unknown');
+    return (widget.duel.creatorCity != null &&
+            widget.duel.creatorCity != 'Unknown') ||
+        (widget.duel.creatorState != null &&
+            widget.duel.creatorState != 'Unknown');
   }
 
   double _calculateTopProgress() {
@@ -482,7 +492,7 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
 
   String _getWinnerText() {
     if (widget.duel.winnerId == null) return 'No winner';
-    
+
     // Find the winner participant
     final winnerParticipant = widget.participants.firstWhere(
       (p) => p.userId == widget.duel.winnerId,
@@ -497,7 +507,7 @@ class _DuelInfoCardState extends State<DuelInfoCard> {
         updatedAt: DateTime.now(),
       ),
     );
-    
+
     // Return just the username (no "won!" text)
     if (widget.currentUserId == widget.duel.winnerId) {
       return 'You';

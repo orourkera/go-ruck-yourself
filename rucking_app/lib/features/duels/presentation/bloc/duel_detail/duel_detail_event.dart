@@ -57,7 +57,8 @@ class UpdateDuelProgress extends DuelDetailEvent {
   });
 
   @override
-  List<Object> get props => [duelId, participantId, sessionId, contributionValue];
+  List<Object> get props =>
+      [duelId, participantId, sessionId, contributionValue];
 }
 
 class StartDuelManually extends DuelDetailEvent {

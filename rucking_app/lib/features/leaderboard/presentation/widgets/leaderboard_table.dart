@@ -50,13 +50,17 @@ class LeaderboardTable extends StatelessWidget {
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(vertical: 2),
           decoration: BoxDecoration(
-            color: _getRowColor(context, user, rank, isUpdating && user.isCurrentlyRucking),
-            borderRadius: showOnlyFixed 
-                ? const BorderRadius.only(topLeft: Radius.circular(8), bottomLeft: Radius.circular(8))
-                : showOnlyStats 
-                    ? const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8))
+            color: _getRowColor(
+                context, user, rank, isUpdating && user.isCurrentlyRucking),
+            borderRadius: showOnlyFixed
+                ? const BorderRadius.only(
+                    topLeft: Radius.circular(8), bottomLeft: Radius.circular(8))
+                : showOnlyStats
+                    ? const BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8))
                     : BorderRadius.circular(8),
-            border: user.isCurrentUser 
+            border: user.isCurrentUser
                 ? Border.all(color: Theme.of(context).primaryColor, width: 2)
                 : null,
             boxShadow: user.isCurrentUser && !showOnlyStats
@@ -72,12 +76,18 @@ class LeaderboardTable extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: showOnlyFixed 
-                  ? const BorderRadius.only(topLeft: Radius.circular(8), bottomLeft: Radius.circular(8))
-                  : showOnlyStats 
-                      ? const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8))
+              borderRadius: showOnlyFixed
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      bottomLeft: Radius.circular(8))
+                  : showOnlyStats
+                      ? const BorderRadius.only(
+                          topRight: Radius.circular(8),
+                          bottomRight: Radius.circular(8))
                       : BorderRadius.circular(8),
-              onTap: showOnlyFixed ? () => _navigateToProfile(context, user) : null,
+              onTap: showOnlyFixed
+                  ? () => _navigateToProfile(context, user)
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: _buildRowContent(context, user, rank),
@@ -95,7 +105,8 @@ class LeaderboardTable extends StatelessWidget {
   }
 
   /// Build row content based on display mode
-  Widget _buildRowContent(BuildContext context, LeaderboardUserModel user, int rank) {
+  Widget _buildRowContent(
+      BuildContext context, LeaderboardUserModel user, int rank) {
     if (showOnlyFixed) {
       // Only show fixed columns (rank + user)
       return Row(
@@ -108,11 +119,15 @@ class LeaderboardTable extends StatelessWidget {
       // Only show stats columns
       return Row(
         children: [
-          _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 100, isPowerPoints: true),
-          _buildStatColumn(user.stats.totalRucks.toString(), width: 80, isRucks: true),
+          _buildStatColumn(_formatPowerPoints(user.stats.powerPoints),
+              width: 100, isPowerPoints: true),
+          _buildStatColumn(user.stats.totalRucks.toString(),
+              width: 80, isRucks: true),
           _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
-          _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
-          _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
+          _buildStatColumn(_formatElevation(user.stats.elevationGainMeters),
+              width: 100),
+          _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()),
+              width: 100),
         ],
       );
     } else {
@@ -129,7 +144,7 @@ class LeaderboardTable extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // STATS SECTION - let's keep it simple for now
           Expanded(
             child: SingleChildScrollView(
@@ -138,11 +153,18 @@ class LeaderboardTable extends StatelessWidget {
                 width: 480, // total width of stats columns (80 + 4*100)
                 child: Row(
                   children: [
-                    _buildStatColumn(user.stats.totalRucks.toString(), width: 80, isRucks: true),
-                    _buildStatColumn(_formatDistance(user.stats.distanceKm), width: 100),
-                    _buildStatColumn(_formatElevation(user.stats.elevationGainMeters), width: 100),
-                    _buildStatColumn(_formatCalories(user.stats.caloriesBurned.round()), width: 100),
-                    _buildStatColumn(_formatPowerPoints(user.stats.powerPoints), width: 100, isPowerPoints: true),
+                    _buildStatColumn(user.stats.totalRucks.toString(),
+                        width: 80, isRucks: true),
+                    _buildStatColumn(_formatDistance(user.stats.distanceKm),
+                        width: 100),
+                    _buildStatColumn(
+                        _formatElevation(user.stats.elevationGainMeters),
+                        width: 100),
+                    _buildStatColumn(
+                        _formatCalories(user.stats.caloriesBurned.round()),
+                        width: 100),
+                    _buildStatColumn(_formatPowerPoints(user.stats.powerPoints),
+                        width: 100, isPowerPoints: true),
                   ],
                 ),
               ),
@@ -203,11 +225,13 @@ class LeaderboardTable extends StatelessWidget {
                   if (user.isCurrentlyRucking) ...[
                     const SizedBox(height: 2),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.green.withOpacity(0.3)),
+                        border:
+                            Border.all(color: Colors.green.withOpacity(0.3)),
                       ),
                       child: Text(
                         'LIVE',
@@ -281,13 +305,18 @@ class LeaderboardTable extends StatelessWidget {
   }
 
   /// Build stat column
-  Widget _buildStatColumn(String value, {required double width, bool isPowerPoints = false, bool isRucks = false}) {
+  Widget _buildStatColumn(String value,
+      {required double width,
+      bool isPowerPoints = false,
+      bool isRucks = false}) {
     return SizedBox(
       width: width,
       child: Text(
         value,
         style: TextStyle(
-          fontWeight: isRucks ? FontWeight.w900 : FontWeight.w600, // Extra bold for rucks
+          fontWeight: isRucks
+              ? FontWeight.w900
+              : FontWeight.w600, // Extra bold for rucks
           fontSize: 16, // Increased from 13 to make values bigger
           color: isPowerPoints ? Colors.amber.shade700 : null,
         ),
@@ -298,7 +327,8 @@ class LeaderboardTable extends StatelessWidget {
   }
 
   /// Get row background color
-  Color _getRowColor(BuildContext context, LeaderboardUserModel user, int rank, bool isUpdating) {
+  Color _getRowColor(BuildContext context, LeaderboardUserModel user, int rank,
+      bool isUpdating) {
     if (user.isCurrentUser) {
       return Theme.of(context).primaryColor.withOpacity(0.05);
     } else if (rank <= 3) {
@@ -312,20 +342,28 @@ class LeaderboardTable extends StatelessWidget {
   /// Get rank emoji for top 3
   String _getRankEmoji(int rank) {
     switch (rank) {
-      case 1: return '🥇';
-      case 2: return '🥈';
-      case 3: return '🥉';
-      default: return '';
+      case 1:
+        return '🥇';
+      case 2:
+        return '🥈';
+      case 3:
+        return '🥉';
+      default:
+        return '';
     }
   }
 
   /// Get medal color for top 3
   Color _getMedalColor(int rank) {
     switch (rank) {
-      case 1: return const Color(0xFFFFD700);
-      case 2: return const Color(0xFFC0C0C0);
-      case 3: return const Color(0xFFCD7F32);
-      default: return Colors.grey;
+      case 1:
+        return const Color(0xFFFFD700);
+      case 2:
+        return const Color(0xFFC0C0C0);
+      case 3:
+        return const Color(0xFFCD7F32);
+      default:
+        return Colors.grey;
     }
   }
 

@@ -41,7 +41,8 @@ class PlanPersonalization {
       trainingDaysPerWeek: trainingDaysPerWeek ?? this.trainingDaysPerWeek,
       preferredDays: preferredDays ?? this.preferredDays,
       challenges: challenges ?? this.challenges,
-      minimumSessionMinutes: minimumSessionMinutes ?? this.minimumSessionMinutes,
+      minimumSessionMinutes:
+          minimumSessionMinutes ?? this.minimumSessionMinutes,
       unloadedOk: unloadedOk ?? this.unloadedOk,
       streakTargetDays: streakTargetDays ?? this.streakTargetDays,
       streakTargetRucks: streakTargetRucks ?? this.streakTargetRucks,
@@ -80,19 +81,21 @@ class PlanPersonalization {
   }
 
   bool get isComplete {
-    return why != null && why!.isNotEmpty &&
-           successDefinition != null &&
-           trainingDaysPerWeek != null &&
-           preferredDays != null && preferredDays!.isNotEmpty &&
-           challenges != null &&
-           minimumSessionMinutes != null &&
-           unloadedOk != null;
+    return why != null &&
+        why!.isNotEmpty &&
+        successDefinition != null &&
+        trainingDaysPerWeek != null &&
+        preferredDays != null &&
+        preferredDays!.isNotEmpty &&
+        challenges != null &&
+        minimumSessionMinutes != null &&
+        unloadedOk != null;
   }
 
   // Suggested responses
   static const whySuggestions = [
     'Energy',
-    'Confidence', 
+    'Confidence',
     'Pass an event',
     'Stress relief',
     'Weight loss',
@@ -111,7 +114,7 @@ class PlanPersonalization {
 
   static const weekdays = [
     'Monday',
-    'Tuesday', 
+    'Tuesday',
     'Wednesday',
     'Thursday',
     'Friday',

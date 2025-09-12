@@ -10,15 +10,15 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 class AIAudioService {
   static const Duration _fadeOutDuration = Duration(milliseconds: 500);
   static const Duration _fadeInDuration = Duration(milliseconds: 500);
-  
+
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
   bool _isPlaying = false;
-  
+
   /// Initialize the audio service
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     try {
       // Configure audio player
       await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
@@ -40,10 +40,9 @@ class AIAudioService {
           ),
         ),
       );
-      
+
       _isInitialized = true;
       AppLogger.info('[AI_AUDIO] Service initialized');
-      
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Initialization failed: $e');
     }
@@ -62,19 +61,22 @@ class AIAudioService {
     try {
       // Prevent overlapping playbacks
       if (_isPlaying) {
-        AppLogger.warning('[AI_AUDIO] Playback in progress, stopping previous playback to avoid overlap');
+        AppLogger.warning(
+            '[AI_AUDIO] Playback in progress, stopping previous playback to avoid overlap');
         await stop();
       }
       _isPlaying = true;
 
-      AppLogger.info('[AI_AUDIO] Playing cheerleader audio (${audioBytes.length} bytes)');
-      
+      AppLogger.info(
+          '[AI_AUDIO] Playing cheerleader audio (${audioBytes.length} bytes)');
+
       // If no audio bytes provided, skip playback (no TTS fallback)
       if (audioBytes.isEmpty) {
-        AppLogger.info('[AI_AUDIO] No audio bytes provided, skipping playback (TTS disabled)');
+        AppLogger.info(
+            '[AI_AUDIO] No audio bytes provided, skipping playback (TTS disabled)');
         return false;
       }
-      
+
       // Try to play the synthesized audio first
       AppLogger.info('[AI_AUDIO] Attempting to play ElevenLabs audio...');
       final success = await _playAudioBytes(audioBytes);
@@ -82,10 +84,10 @@ class AIAudioService {
         AppLogger.info('[AI_AUDIO] ElevenLabs audio played successfully');
         return true;
       }
-      
-      AppLogger.warning('[AI_AUDIO] ElevenLabs audio playback failed, no fallback (TTS disabled)');
+
+      AppLogger.warning(
+          '[AI_AUDIO] ElevenLabs audio playback failed, no fallback (TTS disabled)');
       return false;
-      
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Playback failed: $e');
       return false;
@@ -99,22 +101,23 @@ class AIAudioService {
     try {
       // Create temporary file for audio playback
       final tempDir = await getTemporaryDirectory();
-      final audioFile = File('${tempDir.path}/ai_cheerleader_${DateTime.now().millisecondsSinceEpoch}.mp3');
-      
+      final audioFile = File(
+          '${tempDir.path}/ai_cheerleader_${DateTime.now().millisecondsSinceEpoch}.mp3');
+
       // Write audio bytes to temporary file
       await audioFile.writeAsBytes(audioBytes);
-      
+
       // Set up completion listener BEFORE starting playback
       final completer = Completer<bool>();
       late StreamSubscription subscription;
-      
+
       subscription = _audioPlayer.onPlayerComplete.listen((_) {
         subscription.cancel();
         // Clean up temporary file
         audioFile.deleteSync();
         completer.complete(true);
       });
-      
+
       // Set timeout for playback
       Timer(const Duration(seconds: 30), () {
         if (!completer.isCompleted) {
@@ -123,12 +126,11 @@ class AIAudioService {
           completer.complete(false);
         }
       });
-      
+
       // Play the audio file AFTER setting up listeners
       await _audioPlayer.play(DeviceFileSource(audioFile.path));
-      
+
       return await completer.future;
-      
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Audio bytes playback failed: $e');
       return false;

@@ -57,7 +57,8 @@ class BackgroundLocationService {
         // Don't rethrow - this prevents app crashes from background service issues
       }
     } else {
-      debugPrint('iOS: Background location handled by system - no custom service needed');
+      debugPrint(
+          'iOS: Background location handled by system - no custom service needed');
       // On iOS, explicitly return without any native calls
       return;
     }
@@ -78,8 +79,11 @@ class BackgroundLocationService {
         debugPrint('Background location tracking stopped');
       } on PlatformException catch (e) {
         // Handle specific background service restriction errors
-        if (e.code == 'error' && e.message?.contains('BackgroundServiceStartNotAllowedException') == true) {
-          debugPrint('Background service restriction - cannot stop service while in background');
+        if (e.code == 'error' &&
+            e.message?.contains('BackgroundServiceStartNotAllowedException') ==
+                true) {
+          debugPrint(
+              'Background service restriction - cannot stop service while in background');
           // Don't rethrow - this is expected behavior on Android 8.0+
           return;
         }
@@ -90,7 +94,8 @@ class BackgroundLocationService {
         // Don't rethrow - this prevents app crashes from background service issues
       }
     } else {
-      debugPrint('iOS: Background location handled by system - no custom service needed');
+      debugPrint(
+          'iOS: Background location handled by system - no custom service needed');
       // On iOS, explicitly return without any native calls
       return;
     }

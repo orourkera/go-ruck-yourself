@@ -40,7 +40,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   late MapController _mapController;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
+
   bool _isLoading = true;
   int _selectedWaypointIndex = -1;
   MapViewType _currentViewType = MapViewType.standard;
@@ -57,7 +57,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-    
+
     // Simulate loading delay and start animation
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
@@ -80,9 +80,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     return Container(
       height: widget.height ?? (widget.isHeroImage ? double.infinity : 300),
       decoration: BoxDecoration(
-        borderRadius: widget.isHeroImage 
-            ? null 
-            : BorderRadius.circular(12),
+        borderRadius: widget.isHeroImage ? null : BorderRadius.circular(12),
         boxShadow: widget.isHeroImage
             ? null
             : [
@@ -94,23 +92,22 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
               ],
       ),
       child: ClipRRect(
-        borderRadius: widget.isHeroImage 
-            ? BorderRadius.zero 
-            : BorderRadius.circular(12),
+        borderRadius:
+            widget.isHeroImage ? BorderRadius.zero : BorderRadius.circular(12),
         child: Stack(
           children: [
             // Map content
             _isLoading ? _buildLoadingMap() : _buildMap(),
-            
+
             // Loading overlay
             if (_isLoading) _buildLoadingOverlay(),
-            
+
             // Map controls
             if (widget.showControls && !_isLoading) _buildMapControls(),
-            
+
             // Info overlay
             if (widget.showOverlay && !widget.isHeroImage) _buildInfoOverlay(),
-            
+
             // Tap overlay for non-interactive maps
             if (!widget.isInteractive && widget.onTap != null)
               Positioned.fill(
@@ -136,13 +133,11 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
           initialCenter: _getRouteCenter(),
           initialZoom: _getOptimalZoom(),
           interactionOptions: InteractionOptions(
-            flags: widget.isInteractive 
-                ? InteractiveFlag.all 
+            flags: widget.isInteractive
+                ? InteractiveFlag.all
                 : InteractiveFlag.none,
           ),
-          onTap: widget.onTap != null 
-              ? (_, __) => widget.onTap!() 
-              : null,
+          onTap: widget.onTap != null ? (_, __) => widget.onTap!() : null,
           minZoom: 8,
           maxZoom: 18,
         ),
@@ -152,7 +147,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
             style: _getMapStyle(),
             retinaMode: false,
           ),
-          
+
           // Route polyline
           PolylineLayer(
             polylines: [
@@ -166,18 +161,18 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
               ),
             ],
           ),
-          
+
           // Start/End markers
           MarkerLayer(
             markers: _buildRouteMarkers(),
           ),
-          
+
           // Points of Interest markers
           if (widget.route.pointsOfInterest.isNotEmpty)
             MarkerLayer(
               markers: _buildPOIMarkers(),
             ),
-          
+
           // Waypoint markers (for interactive mode)
           if (widget.isInteractive && _selectedWaypointIndex >= 0)
             MarkerLayer(
@@ -207,7 +202,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
               ),
             ),
           ),
-          
+
           // Loading route placeholder
           Center(
             child: Container(
@@ -298,9 +293,9 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
               ],
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Zoom controls
           Container(
             decoration: BoxDecoration(
@@ -343,9 +338,9 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
               ],
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Fit bounds button
           Container(
             decoration: BoxDecoration(
@@ -429,7 +424,8 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          _formatElevation(context, widget.route.elevationGainM!),
+                          _formatElevation(
+                              context, widget.route.elevationGainM!),
                           style: AppTextStyles.bodySmall.copyWith(
                             color: Colors.white.withOpacity(0.8),
                           ),
@@ -440,7 +436,6 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
                 ],
               ),
             ),
-            
             if (widget.onTap != null)
               Icon(
                 Icons.open_in_full,
@@ -456,9 +451,9 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   List<Marker> _buildRouteMarkers() {
     final points = _getRoutePoints();
     if (points.isEmpty) return [];
-    
+
     final markers = <Marker>[];
-    
+
     // Start marker
     markers.add(
       Marker(
@@ -472,13 +467,13 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         ),
       ),
     );
-    
+
     // End marker (if different from start)
     if (points.length > 1) {
       final lastPoint = points.last;
       final firstPoint = points.first;
-      
-      if (lastPoint.latitude != firstPoint.latitude || 
+
+      if (lastPoint.latitude != firstPoint.latitude ||
           lastPoint.longitude != firstPoint.longitude) {
         markers.add(
           Marker(
@@ -494,7 +489,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         );
       }
     }
-    
+
     return markers;
   }
 
@@ -516,8 +511,9 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
 
   Marker _buildSelectedWaypointMarker() {
     final points = _getRoutePoints();
-    if (_selectedWaypointIndex >= points.length) return Marker(point: points.first, child: Container());
-    
+    if (_selectedWaypointIndex >= points.length)
+      return Marker(point: points.first, child: Container());
+
     return Marker(
       point: points[_selectedWaypointIndex],
       width: 32,
@@ -599,7 +595,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         final polylinePoints = <LatLng>[];
         final coordinates = widget.route.routePolyline!.split(';');
         debugPrint('Split coordinates count: ${coordinates.length}');
-        
+
         for (final coord in coordinates) {
           final parts = coord.trim().split(',');
           if (parts.length == 2) {
@@ -608,13 +604,15 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
             if (lat != null && lng != null) {
               polylinePoints.add(LatLng(lat, lng));
             } else {
-              debugPrint('Failed to parse coordinate: $coord -> lat: $lat, lng: $lng');
+              debugPrint(
+                  'Failed to parse coordinate: $coord -> lat: $lat, lng: $lng');
             }
           } else {
-            debugPrint('Invalid coordinate format: $coord (parts: ${parts.length})');
+            debugPrint(
+                'Invalid coordinate format: $coord (parts: ${parts.length})');
           }
         }
-        
+
         debugPrint('Successfully parsed ${polylinePoints.length} points');
         if (polylinePoints.isNotEmpty) {
           debugPrint('First point: ${polylinePoints.first}');
@@ -629,12 +627,12 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     } else {
       debugPrint('No polyline data available, using fallback');
     }
-    
+
     // Fallback: Create basic route points from start/end coordinates
     final points = <LatLng>[
       LatLng(widget.route.startLatitude, widget.route.startLongitude),
     ];
-    
+
     // Add any elevation points if available
     if (widget.route.elevationPoints.isNotEmpty) {
       for (final point in widget.route.elevationPoints) {
@@ -643,15 +641,16 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
         }
       }
     }
-    
+
     // Add end point if different from start
     if (widget.route.endLatitude != null && widget.route.endLongitude != null) {
-      final endPoint = LatLng(widget.route.endLatitude!, widget.route.endLongitude!);
+      final endPoint =
+          LatLng(widget.route.endLatitude!, widget.route.endLongitude!);
       if (points.isEmpty || points.last != endPoint) {
         points.add(endPoint);
       }
     }
-    
+
     return points;
   }
 
@@ -660,15 +659,15 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
     if (points.isEmpty) {
       return const LatLng(37.7749, -122.4194); // Default to SF
     }
-    
+
     double totalLat = 0;
     double totalLng = 0;
-    
+
     for (final point in points) {
       totalLat += point.latitude;
       totalLng += point.longitude;
     }
-    
+
     return LatLng(
       totalLat / points.length,
       totalLng / points.length,
@@ -678,28 +677,31 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   double _getOptimalZoom() {
     final points = _getRoutePoints();
     if (points.length < 2) return 13.0;
-    
+
     // Calculate bounds and determine appropriate zoom level
     double minLat = points.first.latitude;
     double maxLat = points.first.latitude;
     double minLng = points.first.longitude;
     double maxLng = points.first.longitude;
-    
+
     for (final point in points) {
       minLat = minLat < point.latitude ? minLat : point.latitude;
       maxLat = maxLat > point.latitude ? maxLat : point.latitude;
       minLng = minLng < point.longitude ? minLng : point.longitude;
       maxLng = maxLng > point.longitude ? maxLng : point.longitude;
     }
-    
+
     final latDiff = maxLat - minLat;
     final lngDiff = maxLng - minLng;
     final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
-    
+
     // Balanced zoom to show full route with good detail
-    if (maxDiff > 0.1) return 9.5;  // Better balance between visibility and detail
-    if (maxDiff > 0.05) return 11.5; // Better balance between visibility and detail
-    if (maxDiff > 0.01) return 13.5; // Better balance between visibility and detail
+    if (maxDiff > 0.1)
+      return 9.5; // Better balance between visibility and detail
+    if (maxDiff > 0.05)
+      return 11.5; // Better balance between visibility and detail
+    if (maxDiff > 0.01)
+      return 13.5; // Better balance between visibility and detail
     return 15.0; // Better balance for small routes
   }
 
@@ -743,19 +745,19 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   void _fitRouteBounds() {
     final points = _getRoutePoints();
     if (points.isEmpty) return;
-    
+
     double minLat = points.first.latitude;
     double maxLat = points.first.latitude;
     double minLng = points.first.longitude;
     double maxLng = points.first.longitude;
-    
+
     for (final point in points) {
       minLat = minLat < point.latitude ? minLat : point.latitude;
       maxLat = maxLat > point.latitude ? maxLat : point.latitude;
       minLng = minLng < point.longitude ? minLng : point.longitude;
       maxLng = maxLng > point.longitude ? maxLng : point.longitude;
     }
-    
+
     _mapController.fitCamera(
       CameraFit.bounds(
         bounds: LatLngBounds(
@@ -789,7 +791,8 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
             ],
             if (poi.distanceFromStartKm > 0) ...[
               const SizedBox(height: 8),
-              Text('${poi.distanceFromStartKm.toStringAsFixed(1)} km from start'),
+              Text(
+                  '${poi.distanceFromStartKm.toStringAsFixed(1)} km from start'),
             ],
           ],
         ),
@@ -806,15 +809,18 @@ class _RouteMapPreviewState extends State<RouteMapPreview>
   /// Format distance using user's metric preference
   String _formatDistance(BuildContext context, double distanceKm) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   /// Format elevation using user's metric preference
   String _formatElevation(BuildContext context, double elevationM) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM,
+        metric: preferMetric);
   }
 }
 

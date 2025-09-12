@@ -31,14 +31,14 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   ETAData? _currentETA;
   List<ETAData> _alternativeETAs = [];
 
   @override
   void initState() {
     super.initState();
-    
+
     _pulseController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
@@ -50,7 +50,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
       parent: _pulseController,
       curve: Curves.easeInOut,
     ));
-    
+
     _pulseController.repeat(reverse: true);
     _calculateETAs();
   }
@@ -64,7 +64,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
   @override
   void didUpdateWidget(ETADisplayWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.activeSession != oldWidget.activeSession ||
         widget.plannedRoute != oldWidget.plannedRoute) {
       _calculateETAs();
@@ -73,7 +73,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
 
   void _calculateETAs() {
     _currentETA = _calculateETA(widget.calculationMethod);
-    
+
     if (widget.showAlternativeETAs) {
       _alternativeETAs = [
         if (widget.calculationMethod != ETACalculationMethod.currentPace)
@@ -111,24 +111,24 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
         children: [
           // Header
           _buildHeader(),
-          
+
           const SizedBox(height: 16),
-          
+
           // Main ETA display
           _buildMainETA(),
-          
+
           // Confidence indicator
           if (widget.showConfidenceIndicator) ...[
             const SizedBox(height: 12),
             _buildConfidenceIndicator(),
           ],
-          
+
           // Detailed breakdown
           if (widget.showDetailedBreakdown) ...[
             const SizedBox(height: 16),
             _buildDetailedBreakdown(),
           ],
-          
+
           // Alternative ETAs
           if (widget.showAlternativeETAs && _alternativeETAs.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -191,7 +191,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
             ),
           ),
         ),
-        
+
         // Calculation method indicator
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -213,7 +213,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
 
   Widget _buildMainETA() {
     final eta = _currentETA!;
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -255,9 +255,9 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
               ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Time remaining
           Text(
             'in ${_formatDuration(eta.timeRemaining)}',
@@ -265,9 +265,9 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
               color: AppColors.textSecondary,
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Distance and pace info
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -317,7 +317,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
 
   Widget _buildConfidenceIndicator() {
     final confidence = _currentETA!.confidence;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -352,7 +352,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
 
   Widget _buildDetailedBreakdown() {
     final eta = _currentETA!;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -363,25 +363,21 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
           ),
         ),
         const SizedBox(height: 8),
-        
         _buildBreakdownItem(
           'Current Position',
           '${eta.completedDistance.toStringAsFixed(1)} mi completed',
           Icons.location_on,
         ),
-        
         _buildBreakdownItem(
           'Current Pace',
           '${eta.currentPace.toStringAsFixed(1)} mph',
           Icons.speed,
         ),
-        
         _buildBreakdownItem(
           'Time Elapsed',
           _formatDuration(eta.elapsedTime),
           Icons.access_time,
         ),
-        
         if (eta.elevationRemaining > 0)
           _buildBreakdownItem(
             'Elevation Remaining',
@@ -433,7 +429,6 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
           ),
         ),
         const SizedBox(height: 8),
-        
         ..._alternativeETAs.map((eta) {
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -465,7 +460,6 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
                     ],
                   ),
                 ),
-                
                 Text(
                   _formatDuration(eta.timeRemaining),
                   style: AppTextStyles.body2.copyWith(
@@ -485,16 +479,16 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
   ETAData? _calculateETA(ETACalculationMethod method) {
     final session = widget.activeSession;
     final route = widget.plannedRoute;
-    
+
     if (session.distance == null || session.elapsedTime == null) {
       return null;
     }
-    
+
     final completedDistance = session.distance!;
     final elapsedTime = session.elapsedTime!;
     final totalDistance = route?.distance ?? completedDistance;
     final distanceRemaining = totalDistance - completedDistance;
-    
+
     if (distanceRemaining <= 0) {
       return ETAData(
         estimatedArrivalTime: DateTime.now(),
@@ -509,37 +503,37 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
         elevationRemaining: 0,
       );
     }
-    
+
     double paceForCalculation;
     double confidence;
-    
+
     switch (method) {
       case ETACalculationMethod.currentPace:
         paceForCalculation = _calculateCurrentPace();
         confidence = _calculateCurrentPaceConfidence();
         break;
-        
+
       case ETACalculationMethod.averagePace:
         paceForCalculation = completedDistance / elapsedTime.inHours;
         confidence = _calculateAveragePaceConfidence();
         break;
-        
+
       case ETACalculationMethod.movingAverage:
         paceForCalculation = _calculateMovingAveragePace();
         confidence = _calculateMovingAverageConfidence();
         break;
-        
+
       case ETACalculationMethod.adaptive:
         paceForCalculation = _calculateAdaptivePace();
         confidence = _calculateAdaptiveConfidence();
         break;
     }
-    
+
     final hoursRemaining = distanceRemaining / paceForCalculation;
     final timeRemaining = Duration(
       milliseconds: (hoursRemaining * 3600 * 1000).round(),
     );
-    
+
     return ETAData(
       estimatedArrivalTime: DateTime.now().add(timeRemaining),
       timeRemaining: timeRemaining,
@@ -560,7 +554,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
     // you'd use recent location points
     final session = widget.activeSession;
     if (session.distance == null || session.elapsedTime == null) return 0.0;
-    
+
     return session.distance! / session.elapsedTime!.inHours;
   }
 
@@ -570,7 +564,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
     final currentPace = _calculateCurrentPace();
     final session = widget.activeSession;
     final averagePace = session.distance! / session.elapsedTime!.inHours;
-    
+
     return (currentPace * 0.7) + (averagePace * 0.3);
   }
 
@@ -578,25 +572,27 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
     // Adaptive algorithm that considers terrain, fatigue, etc.
     final movingAverage = _calculateMovingAveragePace();
     final route = widget.plannedRoute;
-    
+
     // Apply terrain adjustments if we have elevation data
     if (route?.elevationProfile.isNotEmpty == true) {
       final elevationRemaining = _calculateElevationRemaining();
-      final elevationFactor = 1.0 - (elevationRemaining / 1000 * 0.1); // 10% slower per 1000ft
+      final elevationFactor =
+          1.0 - (elevationRemaining / 1000 * 0.1); // 10% slower per 1000ft
       return movingAverage * elevationFactor.clamp(0.5, 1.0);
     }
-    
+
     return movingAverage;
   }
 
   double _calculateElevationRemaining() {
     final route = widget.plannedRoute;
     if (route?.elevationProfile.isEmpty != false) return 0.0;
-    
+
     // This is simplified - would need current position on route
-    final completedRatio = (widget.activeSession.distance ?? 0) / route!.distance;
+    final completedRatio =
+        (widget.activeSession.distance ?? 0) / route!.distance;
     final totalElevationGain = route.elevationGain ?? 0;
-    
+
     return totalElevationGain * (1.0 - completedRatio).clamp(0.0, 1.0);
   }
 
@@ -608,7 +604,8 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
   double _calculateAveragePaceConfidence() {
     // Higher confidence for average pace over longer distances
     final completedDistance = widget.activeSession.distance ?? 0;
-    return (completedDistance / 5.0).clamp(0.3, 0.9); // Max confidence at 5+ miles
+    return (completedDistance / 5.0)
+        .clamp(0.3, 0.9); // Max confidence at 5+ miles
   }
 
   double _calculateMovingAverageConfidence() {
@@ -670,7 +667,7 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
     final minute = dateTime.minute.toString().padLeft(2, '0');
     final period = hour >= 12 ? 'PM' : 'AM';
     final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    
+
     return '$displayHour:$minute $period';
   }
 
@@ -678,17 +675,17 @@ class _ETADisplayWidgetState extends State<ETADisplayWidget>
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final etaDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-    
+
     if (etaDate == today) return 'Today';
     if (etaDate == today.add(const Duration(days: 1))) return 'Tomorrow';
-    
+
     return '${dateTime.month}/${dateTime.day}';
   }
 
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     }

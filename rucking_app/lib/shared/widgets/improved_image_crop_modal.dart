@@ -10,9 +10,9 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Enum to define crop shape options
 enum CropShape {
-  circle,     // For profile pictures
-  square,     // For square crops
-  rectangle,  // For banner images and rectangular crops
+  circle, // For profile pictures
+  square, // For square crops
+  rectangle, // For banner images and rectangular crops
 }
 
 /// An improved modal for cropping images with better UX
@@ -21,7 +21,7 @@ class ImprovedImageCropModal extends StatefulWidget {
   final String title;
   final double aspectRatio;
   final CropShape cropShape;
-  
+
   const ImprovedImageCropModal({
     super.key,
     required this.imageFile,
@@ -37,13 +37,13 @@ class ImprovedImageCropModal extends StatefulWidget {
 class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
   final GlobalKey _cropKey = GlobalKey();
   final TransformationController _controller = TransformationController();
-  
+
   late ui.Image _image;
   bool _imageLoaded = false;
   late Size _screenSize;
   late double _cropWidth;
   late double _cropHeight;
-  
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +51,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
     debugPrint('🖼️ [CROP] Image file: ${widget.imageFile.path}');
     debugPrint('🖼️ [CROP] Aspect ratio: ${widget.aspectRatio}');
     debugPrint('🖼️ [CROP] Crop shape: ${widget.cropShape}');
-    
+
     // Delay loading the image slightly to ensure the widget is fully built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       debugPrint('🖼️ [CROP] PostFrameCallback - starting image load');
@@ -70,15 +70,16 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
     try {
       debugPrint('🖼️ [CROP] Starting to load image: ${widget.imageFile.path}');
       debugPrint('🖼️ [CROP] File exists: ${await widget.imageFile.exists()}');
-      
+
       final bytes = await widget.imageFile.readAsBytes();
       debugPrint('🖼️ [CROP] Read ${bytes.length} bytes from file');
-      
+
       final codec = await ui.instantiateImageCodec(bytes);
       final frameInfo = await codec.getNextFrame();
-      
-      debugPrint('🖼️ [CROP] Image loaded: ${frameInfo.image.width}x${frameInfo.image.height}');
-      
+
+      debugPrint(
+          '🖼️ [CROP] Image loaded: ${frameInfo.image.width}x${frameInfo.image.height}');
+
       if (mounted) {
         setState(() {
           _image = frameInfo.image;
@@ -98,7 +99,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
     } catch (e, stackTrace) {
       debugPrint('❌ [CROP] Error loading image: $e');
       debugPrint('❌ [CROP] Stack trace: $stackTrace');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -113,11 +114,11 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
 
   void _fitImageToCropArea() {
     if (!_imageLoaded) return;
-    
+
     // Get the actual rendered size of the image
     final imageAspectRatio = _image.width / _image.height;
     final screenAspectRatio = _screenSize.width / _screenSize.height;
-    
+
     // Calculate the actual image display size when using BoxFit.cover
     double displayWidth, displayHeight;
     if (imageAspectRatio > screenAspectRatio) {
@@ -129,34 +130,34 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
       displayWidth = _screenSize.width;
       displayHeight = displayWidth / imageAspectRatio;
     }
-    
+
     // Calculate scale to make crop area fill properly
     final cropAspectRatio = widget.aspectRatio;
     double scale;
-    
+
     if (cropAspectRatio > imageAspectRatio) {
       // Crop is wider than image - scale to fill crop width
       scale = _cropWidth / displayWidth;
     } else {
-      // Crop is taller than image - scale to fill crop height  
+      // Crop is taller than image - scale to fill crop height
       scale = _cropHeight / displayHeight;
     }
-    
+
     // Ensure we have a reasonable minimum scale
     scale = math.max(scale, 0.3);
-    
+
     // Calculate centering offsets to center the crop area
     final scaledWidth = displayWidth * scale;
     final scaledHeight = displayHeight * scale;
-    
+
     final offsetX = (_screenSize.width - scaledWidth) / 2;
     final offsetY = (_screenSize.height - scaledHeight) / 2;
-    
+
     // Apply transformation
     final matrix = Matrix4.identity()
       ..translate(offsetX, offsetY)
       ..scale(scale);
-    
+
     setState(() {
       _controller.value = matrix;
     });
@@ -175,16 +176,16 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
   @override
   Widget build(BuildContext context) {
     debugPrint('🖼️ [CROP] Building crop modal - _imageLoaded: $_imageLoaded');
-    
+
     _screenSize = MediaQuery.of(context).size;
     _cropWidth = _screenSize.width * 0.8;
-    _cropHeight = widget.cropShape == CropShape.rectangle 
-        ? _cropWidth / widget.aspectRatio 
+    _cropHeight = widget.cropShape == CropShape.rectangle
+        ? _cropWidth / widget.aspectRatio
         : _cropWidth;
-    
+
     debugPrint('🖼️ [CROP] Screen size: $_screenSize');
     debugPrint('🖼️ [CROP] Crop dimensions: ${_cropWidth}x$_cropHeight');
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -200,7 +201,8 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
                 panEnabled: true,
                 scaleEnabled: true,
                 constrained: false,
-                boundaryMargin: EdgeInsets.all(_screenSize.width * 1.5), // More room to pan
+                boundaryMargin:
+                    EdgeInsets.all(_screenSize.width * 1.5), // More room to pan
                 child: Image.file(
                   widget.imageFile,
                   fit: BoxFit.contain,
@@ -217,12 +219,13 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
                   const SizedBox(height: 16),
                   Text(
                     'Loading image...',
-                    style: AppTextStyles.bodyLarge.copyWith(color: Colors.white),
+                    style:
+                        AppTextStyles.bodyLarge.copyWith(color: Colors.white),
                   ),
                 ],
               ),
             ),
-          
+
           // Crop overlay (non-interactive)
           IgnorePointer(
             child: Container(
@@ -231,7 +234,8 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
               child: CustomPaint(
                 painter: CropOverlayPainter(
                   cropRect: Rect.fromCenter(
-                    center: Offset(_screenSize.width / 2, _screenSize.height / 2),
+                    center:
+                        Offset(_screenSize.width / 2, _screenSize.height / 2),
                     width: _cropWidth,
                     height: _cropHeight,
                   ),
@@ -240,7 +244,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
               ),
             ),
           ),
-          
+
           // Top app bar with proper status bar handling
           Positioned(
             top: 60, // Move header down significantly from the top
@@ -267,8 +271,10 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                    onPressed: () => Navigator.of(context).pop(null), // Explicitly return null on close
+                    icon:
+                        const Icon(Icons.close, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.of(context)
+                        .pop(null), // Explicitly return null on close
                   ),
                   Expanded(
                     child: Text(
@@ -294,7 +300,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
               ),
             ),
           ),
-          
+
           // Bottom controls
           Positioned(
             bottom: 120, // Move save button down significantly from the bottom
@@ -308,25 +314,29 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
                   ElevatedButton.icon(
                     onPressed: _resetCrop,
                     icon: const Icon(Icons.refresh, color: Colors.white),
-                    label: const Text('Reset', style: TextStyle(color: Colors.white)),
+                    label: const Text('Reset',
+                        style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black.withOpacity(0.7),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: _fitImageToCropArea,
                     icon: const Icon(Icons.fit_screen, color: Colors.white),
-                    label: const Text('Fit', style: TextStyle(color: Colors.white)),
+                    label: const Text('Fit',
+                        style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black.withOpacity(0.7),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(25),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
                     ),
                   ),
                 ],
@@ -340,45 +350,47 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
 
   Future<void> _cropAndSave() async {
     File? resultFile;
-    
+
     try {
       debugPrint('🖼️ Starting _cropAndSave...');
       debugPrint('🖼️ _imageLoaded: $_imageLoaded');
       debugPrint('🖼️ _cropKey.currentContext: ${_cropKey.currentContext}');
-      
+
       if (!_imageLoaded) {
         debugPrint('❌ Image not loaded, aborting crop');
         _returnResult(null);
         return;
       }
-      
+
       if (_cropKey.currentContext == null) {
         debugPrint('❌ Crop key context is null, aborting crop');
         _returnResult(null);
         return;
       }
-      
+
       // Capture the entire transformed image from RepaintBoundary
-      final RenderRepaintBoundary boundary = 
+      final RenderRepaintBoundary boundary =
           _cropKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      
+
       debugPrint('🖼️ Found boundary, capturing image...');
-      
+
       // Get the full screen image with all transformations applied
       final ui.Image fullScreenImage = await boundary.toImage(pixelRatio: 3.0);
-      
-      debugPrint('🖼️ Captured full screen image: ${fullScreenImage.width}x${fullScreenImage.height}');
-      
+
+      debugPrint(
+          '🖼️ Captured full screen image: ${fullScreenImage.width}x${fullScreenImage.height}');
+
       // Calculate the exact crop area coordinates on the captured image
       final double pixelRatio = 3.0; // Same as used above
       final cropRect = Rect.fromCenter(
-        center: Offset(_screenSize.width / 2 * pixelRatio, _screenSize.height / 2 * pixelRatio),
+        center: Offset(_screenSize.width / 2 * pixelRatio,
+            _screenSize.height / 2 * pixelRatio),
         width: _cropWidth * pixelRatio,
         height: _cropHeight * pixelRatio,
       );
-      
+
       debugPrint('🖼️ Crop rect: $cropRect');
-      
+
       // Ensure crop rect is within image bounds
       final clampedCropRect = Rect.fromLTRB(
         math.max(0, cropRect.left),
@@ -386,26 +398,28 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
         math.min(fullScreenImage.width.toDouble(), cropRect.right),
         math.min(fullScreenImage.height.toDouble(), cropRect.bottom),
       );
-      
+
       debugPrint('🖼️ Clamped crop rect: $clampedCropRect');
-      
+
       // Ensure the crop rect has valid dimensions
       if (clampedCropRect.width <= 0 || clampedCropRect.height <= 0) {
-        debugPrint('❌ Invalid crop dimensions: ${clampedCropRect.width}x${clampedCropRect.height}');
+        debugPrint(
+            '❌ Invalid crop dimensions: ${clampedCropRect.width}x${clampedCropRect.height}');
         _returnResult(null);
         return;
       }
-      
+
       // Create the final cropped image
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
-      
+
       // Set the destination size to the crop area dimensions
       final outputWidth = _cropWidth * pixelRatio;
       final outputHeight = _cropHeight * pixelRatio;
-      
-      debugPrint('🖼️ Output size: ${outputWidth.toInt()}x${outputHeight.toInt()}');
-      
+
+      debugPrint(
+          '🖼️ Output size: ${outputWidth.toInt()}x${outputHeight.toInt()}');
+
       // Draw only the crop area from the full image
       canvas.drawImageRect(
         fullScreenImage,
@@ -413,32 +427,36 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
         Rect.fromLTWH(0, 0, outputWidth, outputHeight),
         Paint(),
       );
-      
+
       // Finalize the cropped image
       final picture = recorder.endRecording();
-      final croppedImage = await picture.toImage(outputWidth.toInt(), outputHeight.toInt());
-      
-      debugPrint('🖼️ Created cropped image: ${croppedImage.width}x${croppedImage.height}');
-      
+      final croppedImage =
+          await picture.toImage(outputWidth.toInt(), outputHeight.toInt());
+
+      debugPrint(
+          '🖼️ Created cropped image: ${croppedImage.width}x${croppedImage.height}');
+
       // Convert to bytes and save
-      final ByteData? byteData = await croppedImage.toByteData(format: ui.ImageByteFormat.png);
-      
+      final ByteData? byteData =
+          await croppedImage.toByteData(format: ui.ImageByteFormat.png);
+
       if (byteData != null) {
         debugPrint('🖼️ Converting to bytes...');
         final Uint8List pngBytes = byteData.buffer.asUint8List();
-        
+
         final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/cropped_image_${DateTime.now().millisecondsSinceEpoch}.png');
+        final tempFile = File(
+            '${tempDir.path}/cropped_image_${DateTime.now().millisecondsSinceEpoch}.png');
         await tempFile.writeAsBytes(pngBytes);
-        
+
         // Verify the file was written successfully
         final fileExists = await tempFile.exists();
         final fileSize = await tempFile.length();
-        
+
         debugPrint('✅ Cropped image saved to: ${tempFile.path}');
         debugPrint('✅ File exists: $fileExists');
         debugPrint('✅ File size: $fileSize bytes');
-        
+
         if (fileExists && fileSize > 0) {
           resultFile = tempFile;
         } else {
@@ -454,7 +472,7 @@ class _ImprovedImageCropModalState extends State<ImprovedImageCropModal> {
       _returnResult(resultFile);
     }
   }
-  
+
   void _returnResult(File? file) {
     if (mounted) {
       Navigator.of(context).pop(file);
@@ -477,8 +495,7 @@ class CropOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     // Draw overlay with hole for crop area
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+    final path = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
     if (cropShape == CropShape.circle) {
       path.addOval(cropRect);

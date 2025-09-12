@@ -9,9 +9,9 @@ class RouteMapPainter extends CustomPainter {
   final double strokeWidth;
   final bool simplifyRoute;
   final double epsilon;
-  
+
   /// Creates a route map painter
-  /// 
+  ///
   /// [locationPoints] - The GPS points to draw
   /// [routeColor] - The color of the route line
   /// [strokeWidth] - The width of the route line
@@ -24,14 +24,16 @@ class RouteMapPainter extends CustomPainter {
     this.simplifyRoute = true,
     this.epsilon = 0.00005, // Default simplification tolerance
   });
-  
+
   /// Simplifies a list of location points using the Ramer-Douglas-Peucker algorithm
   /// Returns a reduced list of points while maintaining the shape of the route
-  List<LocationPoint> _simplifyRoute(List<LocationPoint> points, double epsilon) {
+  List<LocationPoint> _simplifyRoute(
+      List<LocationPoint> points, double epsilon) {
     // If we have 2 or fewer points, simplification is not possible
     if (points.length <= 2) return List.from(points);
-    
-    double _perpendicularDistance(LocationPoint p, LocationPoint start, LocationPoint end) {
+
+    double _perpendicularDistance(
+        LocationPoint p, LocationPoint start, LocationPoint end) {
       // Convert to simple x,y coordinates for simplicity
       double x = p.longitude;
       double y = p.latitude;
@@ -39,20 +41,20 @@ class RouteMapPainter extends CustomPainter {
       double y1 = start.latitude;
       double x2 = end.longitude;
       double y2 = end.latitude;
-      
+
       // Line length
       double dx = x2 - x1;
       double dy = y2 - y1;
       double lineLengthSquared = dx * dx + dy * dy;
-      
+
       // If start and end are the same point
       if (lineLengthSquared == 0) {
         return sqrt(pow(x - x1, 2) + pow(y - y1, 2));
       }
-      
+
       // Calculate perpendicular distance
       double t = ((x - x1) * dx + (y - y1) * dy) / lineLengthSquared;
-      
+
       if (t < 0) {
         // Point is beyond start of line
         return sqrt(pow(x - x1, 2) + pow(y - y1, 2));
@@ -61,18 +63,18 @@ class RouteMapPainter extends CustomPainter {
         // Point is beyond end of line
         return sqrt(pow(x - x2, 2) + pow(y - y2, 2));
       }
-      
+
       // Perpendicular distance formula
       double px = x1 + t * dx;
       double py = y1 + t * dy;
       return sqrt(pow(x - px, 2) + pow(y - py, 2));
     }
-    
+
     // Find the point with the maximum distance
     double dmax = 0;
     int index = 0;
     int end = points.length - 1;
-    
+
     for (int i = 1; i < end; i++) {
       double d = _perpendicularDistance(points[i], points[0], points[end]);
       if (d > dmax) {
@@ -80,14 +82,16 @@ class RouteMapPainter extends CustomPainter {
         dmax = d;
       }
     }
-    
+
     // If max distance is greater than epsilon, recursively simplify
     List<LocationPoint> resultPoints = [];
     if (dmax > epsilon) {
       // Recursive call
-      List<LocationPoint> firstSegment = _simplifyRoute(points.sublist(0, index + 1), epsilon);
-      List<LocationPoint> secondSegment = _simplifyRoute(points.sublist(index), epsilon);
-      
+      List<LocationPoint> firstSegment =
+          _simplifyRoute(points.sublist(0, index + 1), epsilon);
+      List<LocationPoint> secondSegment =
+          _simplifyRoute(points.sublist(index), epsilon);
+
       // Build the result list
       resultPoints = firstSegment.sublist(0, firstSegment.length - 1);
       resultPoints.addAll(secondSegment);
@@ -95,7 +99,7 @@ class RouteMapPainter extends CustomPainter {
       // Just return the endpoints
       resultPoints = [points[0], points[end]];
     }
-    
+
     return resultPoints;
   }
 
@@ -137,7 +141,7 @@ class RouteMapPainter extends CustomPainter {
     final latRange = maxLat - minLat;
     final lngRange = maxLng - minLng;
     final padding = 0.1; // 10% padding
-    
+
     minLat -= latRange * padding;
     maxLat += latRange * padding;
     minLng -= lngRange * padding;
@@ -150,7 +154,8 @@ class RouteMapPainter extends CustomPainter {
     for (final point in pointsToUse) {
       // Convert lat/lng to canvas coordinates
       final x = ((point.longitude - minLng) / (maxLng - minLng)) * size.width;
-      final y = size.height - (((point.latitude - minLat) / (maxLat - minLat)) * size.height);
+      final y = size.height -
+          (((point.latitude - minLat) / (maxLat - minLat)) * size.height);
 
       if (isFirst) {
         path.moveTo(x, y);

@@ -22,7 +22,8 @@ class AffiliateDisclosure extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor ?? theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        color: backgroundColor ??
+            theme.colorScheme.surfaceVariant.withOpacity(0.6),
         borderRadius: borderRadius ?? BorderRadius.circular(8),
       ),
       child: Text(
@@ -32,4 +33,3 @@ class AffiliateDisclosure extends StatelessWidget {
     );
   }
 }
-

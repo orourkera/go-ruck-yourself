@@ -24,16 +24,19 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
 
   Future<void> _sendFeedback() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _isSending = true; });
+    setState(() {
+      _isSending = true;
+    });
     final body = _feedbackController.text;
     final recipient = 'rory@getrucky.com';
     final subject = 'App Feedback';
     final emailUri = Uri(
       scheme: 'mailto',
       path: recipient,
-      query: 'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
+      query:
+          'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
     );
-    
+
     try {
       if (await canLaunchUrl(emailUri)) {
         await launchUrl(emailUri);
@@ -57,7 +60,9 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
         );
       }
     }
-    setState(() { _isSending = false; });
+    setState(() {
+      _isSending = false;
+    });
   }
 
   @override
@@ -75,7 +80,8 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('We value your feedback!', style: AppTextStyles.headlineMedium),
+              Text('We value your feedback!',
+                  style: AppTextStyles.headlineMedium),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _feedbackController,

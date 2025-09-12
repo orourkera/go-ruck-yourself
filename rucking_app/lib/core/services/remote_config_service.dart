@@ -3,19 +3,20 @@ import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// 🔧 Firebase Remote Config Service for Dynamic Feature Flags
-/// 
+///
 /// Provides centralized management of remote feature flags with:
 /// - ✅ Instant remote toggle capability (no app deployment needed)
 /// - ✅ Gradual rollout support (percentage-based activation)
-/// - ✅ A/B testing capabilities  
+/// - ✅ A/B testing capabilities
 /// - ✅ Emergency kill switches
 /// - ✅ Fallback to hardcoded defaults if remote config fails
-/// 
+///
 /// SAFETY: All flags have safe hardcoded defaults that preserve current behavior
 class RemoteConfigService {
   static RemoteConfigService? _instance;
-  static RemoteConfigService get instance => _instance ??= RemoteConfigService._();
-  
+  static RemoteConfigService get instance =>
+      _instance ??= RemoteConfigService._();
+
   RemoteConfigService._();
 
   FirebaseRemoteConfig? _remoteConfig;
@@ -27,16 +28,17 @@ class RemoteConfigService {
     if (_isInitialized) return;
 
     try {
-      AppLogger.info('🔧 [REMOTE_CONFIG] Initializing Firebase Remote Config...');
-      
+      AppLogger.info(
+          '🔧 [REMOTE_CONFIG] Initializing Firebase Remote Config...');
+
       _remoteConfig = FirebaseRemoteConfig.instance;
-      
+
       // Configure settings
       await _remoteConfig!.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
-        minimumFetchInterval: kDebugMode 
-          ? const Duration(minutes: 1)  // Fast refresh in debug
-          : const Duration(hours: 1),   // 1 hour in production
+        minimumFetchInterval: kDebugMode
+            ? const Duration(minutes: 1) // Fast refresh in debug
+            : const Duration(hours: 1), // 1 hour in production
       ));
 
       // Set default values (must match hardcoded defaults)
@@ -44,12 +46,13 @@ class RemoteConfigService {
 
       // Fetch and activate
       await _fetchAndActivate();
-      
+
       _isInitialized = true;
-      AppLogger.info('✅ [REMOTE_CONFIG] Successfully initialized with ${_remoteConfig!.getAll().length} parameters');
-      
+      AppLogger.info(
+          '✅ [REMOTE_CONFIG] Successfully initialized with ${_remoteConfig!.getAll().length} parameters');
     } catch (e, stackTrace) {
-      AppLogger.error('❌ [REMOTE_CONFIG] Failed to initialize: $e', stackTrace: stackTrace);
+      AppLogger.error('❌ [REMOTE_CONFIG] Failed to initialize: $e',
+          stackTrace: stackTrace);
       _fetchFailed = true;
       _isInitialized = false;
     }
@@ -70,7 +73,9 @@ class RemoteConfigService {
 
   /// Get the AI Goals system prompt (full text)
   String getAIGoalSystemPrompt() {
-    return getString('ai_goal_system_prompt', fallback: '''You are an expert AI coach helping users set, track, and evaluate rucking goals.
+    return getString('ai_goal_system_prompt',
+        fallback:
+            '''You are an expert AI coach helping users set, track, and evaluate rucking goals.
 Your job:
 - Interpret user intent and preferences from structured inputs (user profile, history, unit preferences)
 - Propose clear, safe, and measurable rucking goals
@@ -87,7 +92,9 @@ Guidelines:
 
   /// Get the AI Notification system prompt (full text) used for goal-related push copy
   String getAINotificationSystemPrompt() {
-    return getString('ai_notification_system_prompt', fallback: '''You are a concise, motivational copywriter for rucking goal notifications.
+    return getString('ai_notification_system_prompt',
+        fallback:
+            '''You are a concise, motivational copywriter for rucking goal notifications.
 Given structured context (goal details, progress deltas, streaks, time-of-day), craft short push messages:
 - Max ~90 characters ideal, 120 hard limit
 - Positive, actionable, non-repetitive
@@ -98,7 +105,9 @@ Given structured context (goal details, progress deltas, streaks, time-of-day), 
 
   /// Get the AI Cheerleader system prompt
   String getAICheerleaderSystemPrompt() {
-    return getString('ai_cheerleader_system_prompt', fallback: '''You are an enthusiastic AI cheerleader for rucking workouts. 
+    return getString('ai_cheerleader_system_prompt',
+        fallback:
+            '''You are an enthusiastic AI cheerleader for rucking workouts. 
 Analyze the provided context JSON: 
 - 'current_session': Real-time stats like distance, pace, duration.
 - 'historical': Past rucks, splits, achievements, user profile, notifications, and ai_cheerleader_history (your previous messages to this user).
@@ -107,27 +116,29 @@ Generate personalized, motivational messages. Reference historical trends (e.g.,
 
   /// Get the AI Cheerleader user prompt template
   String getAICheerleaderUserPromptTemplate() {
-    return getString('ai_cheerleader_user_prompt_template', fallback: 'Context data:\n{context}\nGenerate encouragement for this ongoing ruck session.');
+    return getString('ai_cheerleader_user_prompt_template',
+        fallback:
+            'Context data:\n{context}\nGenerate encouragement for this ongoing ruck session.');
   }
 
   /// Fetch latest config from Firebase and activate
   Future<void> _fetchAndActivate() async {
     try {
       AppLogger.info('🔄 [REMOTE_CONFIG] Fetching latest configuration...');
-      
+
       final bool updated = await _remoteConfig!.fetchAndActivate();
-      
+
       if (updated) {
         AppLogger.info('✅ [REMOTE_CONFIG] Configuration updated successfully');
         _logActiveFlags();
       } else {
         AppLogger.info('ℹ️ [REMOTE_CONFIG] Configuration already up to date');
       }
-      
+
       _fetchFailed = false;
-      
     } catch (e, stackTrace) {
-      AppLogger.warning('⚠️ [REMOTE_CONFIG] Failed to fetch, using cached/default values: $e\n$stackTrace');
+      AppLogger.warning(
+          '⚠️ [REMOTE_CONFIG] Failed to fetch, using cached/default values: $e\n$stackTrace');
       _fetchFailed = true;
     }
   }
@@ -138,45 +149,50 @@ Generate personalized, motivational messages. Reference historical trends (e.g.,
       // Auth Feature Flags (match feature_flags.dart defaults)
       'use_simplified_auth': kDebugMode,
       'use_direct_supabase_signin': kDebugMode,
-      'use_direct_supabase_signup': kDebugMode, 
+      'use_direct_supabase_signup': kDebugMode,
       'use_automatic_token_refresh': kDebugMode,
       'use_supabase_auth_listener': kDebugMode,
-      
+
       // Safety flags (always enabled)
       'enable_fallback_to_legacy_auth': true,
       'enable_auth_debug_logging': kDebugMode,
-      
+
       // Profile management (always enabled)
       'keep_custom_profile_management': true,
       'keep_avatar_upload_processing': true,
       'keep_mailjet_integration': true,
-      
+
       // Rollout controls
-      'auth_rollout_percentage': kDebugMode ? 100 : 0, // 0% in production initially
+      'auth_rollout_percentage':
+          kDebugMode ? 100 : 0, // 0% in production initially
       'emergency_disable_all_flags': false,
 
       // AI Cheerleader feature flags
-      'ai_cheerleader_manual_trigger': kDebugMode, // Enable in debug for testing
-      
+      'ai_cheerleader_manual_trigger':
+          kDebugMode, // Enable in debug for testing
+
       // AI Goals / Prompt selection
       // Use a version number to select the server-side system prompt.
       // This avoids shipping full prompt text from client while still enabling
       // dynamic changes via Remote Config.
       'ai_goal_prompt_version': 1,
       'ai_notification_prompt_version': 1,
-      
+
       // AI Cheerleader Prompts (full text stored in Remote Config)
-      'ai_cheerleader_system_prompt': '''You are an enthusiastic AI cheerleader for rucking workouts. 
+      'ai_cheerleader_system_prompt':
+          '''You are an enthusiastic AI cheerleader for rucking workouts. 
 Analyze the provided context and generate personalized, motivational messages. 
 Focus on the user's current performance, progress, and achievements.
 Be encouraging, positive, and action-oriented.
 Vary your encouragement style and avoid repetition.
 Reference specific stats when relevant (pace, distance, heart rate, etc.).''',
-      
-      'ai_cheerleader_user_prompt_template': 'Context data:\n{context}\nGenerate encouragement for this ongoing ruck session.',
-      
+
+      'ai_cheerleader_user_prompt_template':
+          'Context data:\n{context}\nGenerate encouragement for this ongoing ruck session.',
+
       // AI Goals & Notifications Prompts (full text stored in Remote Config)
-      'ai_goal_system_prompt': '''You are an expert AI coach helping users set, track, and evaluate rucking goals.
+      'ai_goal_system_prompt':
+          '''You are an expert AI coach helping users set, track, and evaluate rucking goals.
 Your job:
 - Interpret user intent and preferences from structured inputs (user profile, history, unit preferences)
 - Propose clear, safe, and measurable rucking goals
@@ -189,7 +205,8 @@ Guidelines:
 - Prefer progressive overload and sustainable schedules
 - Provide concise titles and clear descriptions
 ''',
-      'ai_notification_system_prompt': '''You are a concise, motivational copywriter for rucking goal notifications.
+      'ai_notification_system_prompt':
+          '''You are a concise, motivational copywriter for rucking goal notifications.
 Given structured context (goal details, progress deltas, streaks, time-of-day), craft short push messages:
 - Max ~90 characters ideal, 120 hard limit
 - Positive, actionable, non-repetitive
@@ -202,7 +219,7 @@ Given structured context (goal details, progress deltas, streaks, time-of-day), 
   /// Log currently active flags for debugging
   void _logActiveFlags() {
     if (!_isInitialized) return;
-    
+
     AppLogger.info('📊 [REMOTE_CONFIG] Active feature flags:');
     final flags = getAuthFeatureFlags();
     flags.forEach((key, value) {
@@ -222,7 +239,8 @@ Given structured context (goal details, progress deltas, streaks, time-of-day), 
       'use_direct_supabase_signup': getBool('use_direct_supabase_signup'),
       'use_automatic_token_refresh': getBool('use_automatic_token_refresh'),
       'use_supabase_auth_listener': getBool('use_supabase_auth_listener'),
-      'enable_fallback_to_legacy_auth': getBool('enable_fallback_to_legacy_auth'),
+      'enable_fallback_to_legacy_auth':
+          getBool('enable_fallback_to_legacy_auth'),
       'enable_auth_debug_logging': getBool('enable_auth_debug_logging'),
     };
   }
@@ -230,37 +248,45 @@ Given structured context (goal details, progress deltas, streaks, time-of-day), 
   /// Get boolean flag value with fallback to default
   bool getBool(String key, {bool? fallback}) {
     if (!_isInitialized || _remoteConfig == null || _fetchFailed) {
-      final defaultValue = _getDefaultValues()[key] as bool? ?? fallback ?? false;
-      AppLogger.debug('🔧 [REMOTE_CONFIG] Using default value for $key: $defaultValue (not initialized or fetch failed)');
+      final defaultValue =
+          _getDefaultValues()[key] as bool? ?? fallback ?? false;
+      AppLogger.debug(
+          '🔧 [REMOTE_CONFIG] Using default value for $key: $defaultValue (not initialized or fetch failed)');
       return defaultValue;
     }
 
     try {
       final value = _remoteConfig!.getBool(key);
-      
+
       // Check for emergency disable
       if (getBoolDirect('emergency_disable_all_flags')) {
-        AppLogger.warning('🚨 [REMOTE_CONFIG] Emergency flag disable active - returning false for $key');
+        AppLogger.warning(
+            '🚨 [REMOTE_CONFIG] Emergency flag disable active - returning false for $key');
         return false;
       }
-      
+
       // Check rollout percentage for auth flags
-      if (key.startsWith('use_') && key.contains('auth') || key.contains('supabase')) {
-        final rolloutPercentage = getInt('auth_rollout_percentage', fallback: 0);
+      if (key.startsWith('use_') && key.contains('auth') ||
+          key.contains('supabase')) {
+        final rolloutPercentage =
+            getInt('auth_rollout_percentage', fallback: 0);
         if (rolloutPercentage < 100) {
           final shouldEnable = _isUserInRollout(rolloutPercentage);
           if (!shouldEnable) {
-            AppLogger.debug('🎲 [REMOTE_CONFIG] User not in rollout for $key (${rolloutPercentage}%)');
+            AppLogger.debug(
+                '🎲 [REMOTE_CONFIG] User not in rollout for $key (${rolloutPercentage}%)');
             return false;
           }
         }
       }
-      
+
       AppLogger.debug('🔧 [REMOTE_CONFIG] $key: $value');
       return value;
     } catch (e) {
-      final defaultValue = _getDefaultValues()[key] as bool? ?? fallback ?? false;
-      AppLogger.warning('⚠️ [REMOTE_CONFIG] Error getting $key, using default: $defaultValue ($e)');
+      final defaultValue =
+          _getDefaultValues()[key] as bool? ?? fallback ?? false;
+      AppLogger.warning(
+          '⚠️ [REMOTE_CONFIG] Error getting $key, using default: $defaultValue ($e)');
       return defaultValue;
     }
   }
@@ -308,7 +334,7 @@ Given structured context (goal details, progress deltas, streaks, time-of-day), 
   bool _isUserInRollout(int percentage) {
     if (percentage >= 100) return true;
     if (percentage <= 0) return false;
-    
+
     // Simple hash-based distribution (consistent per user/device)
     // In production, you might use user ID or device ID for more precise control
     final hash = DateTime.now().millisecondsSinceEpoch.hashCode;
@@ -333,7 +359,7 @@ Given structured context (goal details, progress deltas, streaks, time-of-day), 
 
   /// Get initialization status
   bool get isInitialized => _isInitialized;
-  
+
   /// Get fetch status
   bool get hasFetchFailed => _fetchFailed;
 

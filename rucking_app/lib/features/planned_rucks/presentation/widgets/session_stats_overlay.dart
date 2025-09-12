@@ -40,7 +40,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   late AnimationController _slideController;
   late Animation<double> _slideAnimation;
   late Animation<Color?> _updateAnimation;
-  
+
   bool _isExpanded = false;
   StatsDisplayMode _currentMode = StatsDisplayMode.essential;
   Map<StatType, StatData> _currentStats = {};
@@ -49,24 +49,24 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   @override
   void initState() {
     super.initState();
-    
+
     _currentMode = widget.displayMode;
-    
+
     _updateController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _slideAnimation = CurvedAnimation(
       parent: _slideController,
       curve: Curves.easeInOut,
     );
-    
+
     _updateAnimation = ColorTween(
       begin: Colors.transparent,
       end: AppColors.primary.withOpacity(0.1),
@@ -74,9 +74,9 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
       parent: _updateController,
       curve: Curves.easeInOut,
     ));
-    
+
     _calculateStats();
-    
+
     // Auto-update stats every second if live updates are enabled
     if (widget.showLiveUpdates) {
       _startLiveUpdates();
@@ -93,11 +93,11 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   @override
   void didUpdateWidget(SessionStatsOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.activeSession != oldWidget.activeSession) {
       _updateStats();
     }
-    
+
     if (widget.displayMode != oldWidget.displayMode) {
       setState(() {
         _currentMode = widget.displayMode;
@@ -119,7 +119,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   void _updateStats() {
     _previousStats = Map.from(_currentStats);
     _calculateStats();
-    
+
     // Trigger update animation if values changed
     if (_hasStatsChanged()) {
       _updateController.forward().then((_) {
@@ -131,7 +131,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   void _calculateStats() {
     final session = widget.activeSession;
     final route = widget.plannedRoute;
-    
+
     _currentStats = {
       // Time stats
       StatType.elapsedTime: StatData(
@@ -139,35 +139,42 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
         numericValue: (session.elapsedTime?.inSeconds ?? 0).toDouble(),
         unit: '',
         trend: _calculateTrend(StatType.elapsedTime),
-        comparison: widget.showComparisons ? _getComparison(StatType.elapsedTime) : null,
+        comparison: widget.showComparisons
+            ? _getComparison(StatType.elapsedTime)
+            : null,
       ),
-      
+
       // Distance stats
       StatType.distance: StatData(
         value: '${(session.distance ?? 0.0).toStringAsFixed(2)}',
         numericValue: session.distance ?? 0.0,
         unit: 'mi',
         trend: _calculateTrend(StatType.distance),
-        comparison: widget.showComparisons ? _getComparison(StatType.distance) : null,
+        comparison:
+            widget.showComparisons ? _getComparison(StatType.distance) : null,
       ),
-      
+
       // Pace stats
       StatType.currentPace: StatData(
         value: _calculateCurrentPace(),
         numericValue: _calculateCurrentPaceNumeric(),
         unit: '/mi',
         trend: _calculateTrend(StatType.currentPace),
-        comparison: widget.showComparisons ? _getComparison(StatType.currentPace) : null,
+        comparison: widget.showComparisons
+            ? _getComparison(StatType.currentPace)
+            : null,
       ),
-      
+
       StatType.averagePace: StatData(
         value: _calculateAveragePace(),
         numericValue: _calculateAveragePaceNumeric(),
         unit: '/mi',
         trend: _calculateTrend(StatType.averagePace),
-        comparison: widget.showComparisons ? _getComparison(StatType.averagePace) : null,
+        comparison: widget.showComparisons
+            ? _getComparison(StatType.averagePace)
+            : null,
       ),
-      
+
       // Elevation stats
       if (session.elevationGain != null)
         StatType.elevationGain: StatData(
@@ -175,18 +182,21 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
           numericValue: session.elevationGain!,
           unit: 'ft',
           trend: _calculateTrend(StatType.elevationGain),
-          comparison: widget.showComparisons ? _getComparison(StatType.elevationGain) : null,
+          comparison: widget.showComparisons
+              ? _getComparison(StatType.elevationGain)
+              : null,
         ),
-      
+
       // Calories (estimated)
       StatType.calories: StatData(
         value: '${_estimateCalories().toInt()}',
         numericValue: _estimateCalories(),
         unit: 'cal',
         trend: _calculateTrend(StatType.calories),
-        comparison: widget.showComparisons ? _getComparison(StatType.calories) : null,
+        comparison:
+            widget.showComparisons ? _getComparison(StatType.calories) : null,
       ),
-      
+
       // Progress stats
       if (route != null)
         StatType.progress: StatData(
@@ -194,9 +204,10 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
           numericValue: _calculateProgress() * 100,
           unit: '%',
           trend: _calculateTrend(StatType.progress),
-          comparison: widget.showComparisons ? _getComparison(StatType.progress) : null,
+          comparison:
+              widget.showComparisons ? _getComparison(StatType.progress) : null,
         ),
-      
+
       // ETA (if route available)
       if (route != null && widget.showPredictions)
         StatType.eta: StatData(
@@ -231,13 +242,13 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
             children: [
               // Header with mode selector
               _buildHeader(),
-              
+
               // Main stats display
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 child: _buildStatsContent(),
               ),
-              
+
               // Expanded details
               if (_isExpanded) _buildExpandedDetails(),
             ],
@@ -271,9 +282,9 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
               color: AppColors.primary,
             ),
           ),
-          
+
           const Spacer(),
-          
+
           // Mode selector
           if (widget.allowCustomization)
             PopupMenuButton<StatsDisplayMode>(
@@ -307,7 +318,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
                 ),
               ],
             ),
-          
+
           // Expand/collapse button
           IconButton(
             onPressed: _toggleExpanded,
@@ -327,7 +338,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
 
   Widget _buildStatsContent() {
     final statsToShow = _getStatsForMode(_currentMode);
-    
+
     return AnimatedBuilder(
       animation: _updateAnimation,
       builder: (context, child) {
@@ -342,7 +353,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
 
   Widget _buildStatsGrid(List<StatType> statTypes) {
     final columns = _getColumnCount();
-    
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -356,9 +367,9 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
       itemBuilder: (context, index) {
         final statType = statTypes[index];
         final statData = _currentStats[statType];
-        
+
         if (statData == null) return const SizedBox.shrink();
-        
+
         return _buildStatCard(statType, statData);
       },
     );
@@ -395,9 +406,9 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
                 ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Stat value
           Expanded(
             child: Column(
@@ -429,9 +440,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
                     ],
                   ],
                 ),
-                
                 const SizedBox(height: 2),
-                
                 Text(
                   _getStatLabel(type),
                   style: AppTextStyles.caption.copyWith(
@@ -442,7 +451,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
               ],
             ),
           ),
-          
+
           // Comparison (if available)
           if (data.comparison != null) ...[
             const SizedBox(height: 4),
@@ -478,31 +487,32 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Additional details
           _buildDetailRow('Session ID', widget.activeSession.id ?? 'N/A'),
           _buildDetailRow('Started', _formatStartTime()),
           _buildDetailRow('Status', widget.activeSession.status.value),
-          
+
           if (widget.plannedRoute != null) ...[
             _buildDetailRow('Route', widget.plannedRoute!.name),
-            _buildDetailRow('Total Distance', '${widget.plannedRoute!.distance.toStringAsFixed(1)} mi'),
+            _buildDetailRow('Total Distance',
+                '${widget.plannedRoute!.distance.toStringAsFixed(1)} mi'),
           ],
-          
+
           // Performance metrics
           const SizedBox(height: 12),
-          
+
           Text(
             'Performance',
             style: AppTextStyles.subtitle2.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           _buildPerformanceMetrics(),
         ],
       ),
@@ -539,7 +549,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   Widget _buildPerformanceMetrics() {
     final efficiency = _calculateEfficiency();
     final consistency = _calculateConsistency();
-    
+
     return Column(
       children: [
         _buildMetricBar('Efficiency', efficiency, AppColors.success),
@@ -585,7 +595,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     if (widget.customStatTypes != null) {
       return widget.customStatTypes!;
     }
-    
+
     switch (mode) {
       case StatsDisplayMode.minimal:
         return [StatType.elapsedTime, StatType.distance];
@@ -714,7 +724,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     }
@@ -726,44 +736,44 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     // Simplified for demo
     final distance = widget.activeSession.distance ?? 0.0;
     final duration = widget.activeSession.elapsedTime ?? Duration.zero;
-    
+
     if (distance <= 0 || duration.inSeconds <= 0) return '--:--';
-    
+
     final paceSeconds = duration.inSeconds / distance;
     final minutes = (paceSeconds / 60).floor();
     final seconds = (paceSeconds % 60).floor();
-    
+
     return '${minutes}:${seconds.toString().padLeft(2, '0')}';
   }
 
   double _calculateCurrentPaceNumeric() {
     final distance = widget.activeSession.distance ?? 0.0;
     final duration = widget.activeSession.elapsedTime ?? Duration.zero;
-    
+
     if (distance <= 0 || duration.inSeconds <= 0) return 0.0;
-    
+
     return duration.inSeconds / distance;
   }
 
   String _calculateAveragePace() {
     final distance = widget.activeSession.distance ?? 0.0;
     final duration = widget.activeSession.elapsedTime ?? Duration.zero;
-    
+
     if (distance <= 0 || duration.inSeconds <= 0) return '--:--';
-    
+
     final paceSeconds = duration.inSeconds / distance;
     final minutes = (paceSeconds / 60).floor();
     final seconds = (paceSeconds % 60).floor();
-    
+
     return '${minutes}:${seconds.toString().padLeft(2, '0')}';
   }
 
   double _calculateAveragePaceNumeric() {
     final distance = widget.activeSession.distance ?? 0.0;
     final duration = widget.activeSession.elapsedTime ?? Duration.zero;
-    
+
     if (distance <= 0 || duration.inSeconds <= 0) return 0.0;
-    
+
     return duration.inSeconds / distance;
   }
 
@@ -772,43 +782,44 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     final distance = widget.activeSession.distance ?? 0.0;
     final duration = widget.activeSession.elapsedTime ?? Duration.zero;
     const baseCaloriesPerMile = 100.0; // Approximate for rucking
-    
+
     return distance * baseCaloriesPerMile;
   }
 
   double _calculateProgress() {
     if (widget.plannedRoute == null) return 0.0;
-    
+
     final completed = widget.activeSession.distance ?? 0.0;
     final total = widget.plannedRoute!.distance;
-    
+
     return total > 0 ? completed / total : 0.0;
   }
 
   String _calculateETA() {
     // Simplified ETA calculation
     if (widget.plannedRoute == null) return '--:--';
-    
-    final remaining = widget.plannedRoute!.distance - (widget.activeSession.distance ?? 0.0);
+
+    final remaining =
+        widget.plannedRoute!.distance - (widget.activeSession.distance ?? 0.0);
     final currentPaceNumeric = _calculateCurrentPaceNumeric();
-    
+
     if (remaining <= 0 || currentPaceNumeric <= 0) return 'Arrived';
-    
+
     final etaSeconds = remaining * currentPaceNumeric;
     final eta = DateTime.now().add(Duration(seconds: etaSeconds.round()));
-    
+
     return '${eta.hour}:${eta.minute.toString().padLeft(2, '0')}';
   }
 
   StatTrend _calculateTrend(StatType statType) {
     final current = _currentStats[statType];
     final previous = _previousStats[statType];
-    
+
     if (current == null || previous == null) return StatTrend.neutral;
-    
+
     final diff = current.numericValue - previous.numericValue;
     const threshold = 0.01; // Minimum change to register as trend
-    
+
     if (diff > threshold) return StatTrend.up;
     if (diff < -threshold) return StatTrend.down;
     return StatTrend.neutral;
@@ -818,7 +829,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     // This would compare against planned route, personal bests, etc.
     // Simplified for demo
     if (widget.plannedRoute == null) return null;
-    
+
     switch (statType) {
       case StatType.currentPace:
         return 'vs target';
@@ -832,7 +843,8 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   bool _hasStatsChanged() {
     for (final entry in _currentStats.entries) {
       final previous = _previousStats[entry.key];
-      if (previous == null || entry.value.numericValue != previous.numericValue) {
+      if (previous == null ||
+          entry.value.numericValue != previous.numericValue) {
         return true;
       }
     }
@@ -842,10 +854,10 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
   String _formatStartTime() {
     final startTime = widget.activeSession.startTime;
     if (startTime == null) return 'Unknown';
-    
+
     final now = DateTime.now();
     final difference = now.difference(startTime);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {
@@ -859,9 +871,9 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     // Simplified efficiency calculation
     final planned = widget.plannedRoute?.distance ?? 0.0;
     final actual = widget.activeSession.distance ?? 0.0;
-    
+
     if (planned <= 0) return 0.8; // Default efficiency
-    
+
     return math.min(1.0, actual / planned);
   }
 
@@ -875,7 +887,7 @@ class _SessionStatsOverlayState extends State<SessionStatsOverlay>
     setState(() {
       _isExpanded = !_isExpanded;
     });
-    
+
     if (_isExpanded) {
       _slideController.forward();
     } else {

@@ -38,7 +38,7 @@ class CreateSessionScreen extends StatefulWidget {
   final String? routeName;
   final dynamic routeData;
   final String? plannedRuckId;
-  
+
   const CreateSessionScreen({
     Key? key,
     this.eventId,
@@ -62,19 +62,21 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   final ScrollController _weightScrollController = ScrollController();
 
   double _ruckWeight = AppConfig.defaultRuckWeight;
-  double _displayRuckWeight = 0.0; // Will be set in kg or lbs based on preference
+  double _displayRuckWeight =
+      0.0; // Will be set in kg or lbs based on preference
   int? _plannedDuration; // Default is now empty
   bool _preferMetric = false; // Default to standard
-  
+
   // Controller and flag for custom ruck weight input
-  final TextEditingController _customRuckWeightController = TextEditingController();
+  final TextEditingController _customRuckWeightController =
+      TextEditingController();
   bool _showCustomRuckWeightInput = false;
-  
+
   // Add loading state variable
   bool _isCreating = false;
   bool _isLoading = true;
   double _selectedRuckWeight = 0.0;
-  
+
   // Event context state variables
   String? _eventId;
   String? _eventTitle;
@@ -82,15 +84,20 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   late final VoidCallback _durationListener;
 
   bool _isOfflineMode = false;
-  
+
   // Coaching plan data
   Map<String, dynamic>? _coachingPlan;
   Map<String, dynamic>? _nextSession;
-  final TextEditingController _offlineDurationMinutesController = TextEditingController();
-  final TextEditingController _offlineDurationSecondsController = TextEditingController();
-  final TextEditingController _offlineDistanceController = TextEditingController();
-  final TextEditingController _offlineElevationGainController = TextEditingController();
-  final TextEditingController _offlineElevationLossController = TextEditingController();
+  final TextEditingController _offlineDurationMinutesController =
+      TextEditingController();
+  final TextEditingController _offlineDurationSecondsController =
+      TextEditingController();
+  final TextEditingController _offlineDistanceController =
+      TextEditingController();
+  final TextEditingController _offlineElevationGainController =
+      TextEditingController();
+  final TextEditingController _offlineElevationLossController =
+      TextEditingController();
 
   // AI Cheerleader state variables
   bool _aiCheerleaderEnabled = false;
@@ -99,7 +106,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
 
   /// Loads preferences and last used values (ruck weight and duration)
   Future<void> _loadDefaults() async {
-    setState(() { _isLoading = true; });
+    setState(() {
+      _isLoading = true;
+    });
     try {
       final prefs = await SharedPreferences.getInstance();
       // Do not override _preferMetric if it will be set by AuthBloc
@@ -108,54 +117,62 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       }
 
       // Load last used weight (KG)
-      double lastWeightKg = prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
+      double lastWeightKg =
+          prefs.getDouble('lastRuckWeightKg') ?? AppConfig.defaultRuckWeight;
       _ruckWeight = lastWeightKg;
-      _selectedRuckWeight = lastWeightKg; // Ensure selectedRuckWeight is synced with ruckWeight
-      
+      _selectedRuckWeight =
+          lastWeightKg; // Ensure selectedRuckWeight is synced with ruckWeight
+
       // Update display weight based on preference
       if (_preferMetric) {
         _displayRuckWeight = _ruckWeight;
       } else {
         _displayRuckWeight = _ruckWeight * AppConfig.kgToLbs;
       }
-      
+
       // Load coaching plan data for recommendations
       await _loadCoachingPlanData();
-      
-      
-      
+
       // Load last used duration (might be null if not previously set)
       int? lastDurationMinutes = prefs.getInt('lastSessionDurationMinutes');
       _plannedDuration = lastDurationMinutes;
       if (lastDurationMinutes != null) {
         _durationController.text = lastDurationMinutes.toString();
       }
-      
+
       // Load user's body weight (if previously saved)
       String? lastUserWeight = prefs.getString('lastUserWeight');
       if (lastUserWeight != null && lastUserWeight.isNotEmpty) {
         _userWeightController.text = lastUserWeight;
       }
-      
+
       // Load AI Cheerleader preferences
       _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? false;
-      
-      // Validate saved personality exists in current options
-      final savedPersonality = prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
-      const availablePersonalities = [
-        'Supportive Friend', 'Drill Sergeant', 'Southern Redneck',
-        'Yoga Instructor', 'British Butler', 'Sports Commentator', 
-        'Cowboy/Cowgirl', 'Nature Lover', 'Burt Reynolds', 'Tom Selleck'
-      ];
-      
-      _aiCheerleaderPersonality = availablePersonalities.contains(savedPersonality) 
-        ? savedPersonality 
-        : 'Supportive Friend';
-        
-      _aiCheerleaderExplicitContent = prefs.getBool('aiCheerleaderExplicitContent') ?? false;
 
+      // Validate saved personality exists in current options
+      final savedPersonality =
+          prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
+      const availablePersonalities = [
+        'Supportive Friend',
+        'Drill Sergeant',
+        'Southern Redneck',
+        'Yoga Instructor',
+        'British Butler',
+        'Sports Commentator',
+        'Cowboy/Cowgirl',
+        'Nature Lover',
+        'Burt Reynolds',
+        'Tom Selleck'
+      ];
+
+      _aiCheerleaderPersonality =
+          availablePersonalities.contains(savedPersonality)
+              ? savedPersonality
+              : 'Supportive Friend';
+
+      _aiCheerleaderExplicitContent =
+          prefs.getBool('aiCheerleaderExplicitContent') ?? false;
     } catch (e) {
-      
       // Fallback to defaults on error
       _ruckWeight = AppConfig.defaultRuckWeight;
       _durationController.text = '30'; // Default duration on error
@@ -169,7 +186,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           setState(() {
             // Force synchronization
             _selectedRuckWeight = _ruckWeight;
-            
           });
         }
       });
@@ -180,27 +196,29 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Future<void> _saveLastWeight(double weightKg) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('lastRuckWeightKg', weightKg);
-    
   }
 
   /// Load coaching plan data for session recommendations
   Future<void> _loadCoachingPlanData() async {
     try {
       final apiClient = GetIt.instance<ApiClient>();
-      
+
       // Fetch active coaching plan
       final planResponse = await apiClient.get('/user-coaching-plans/active');
       if (planResponse.isNotEmpty) {
         _coachingPlan = planResponse;
-        
+
         // Fetch next session recommendations
-        final progressResponse = await apiClient.get('/user-coaching-plans/${_coachingPlan!['id']}/progress');
-        if (progressResponse != null && progressResponse['nextSession'] != null) {
+        final progressResponse = await apiClient
+            .get('/user-coaching-plans/${_coachingPlan!['id']}/progress');
+        if (progressResponse != null &&
+            progressResponse['nextSession'] != null) {
           _nextSession = progressResponse['nextSession'];
         }
       }
     } catch (e) {
-      AppLogger.info('[CREATE_SESSION] No active coaching plan or error loading: $e');
+      AppLogger.info(
+          '[CREATE_SESSION] No active coaching plan or error loading: $e');
       // Silently continue - coaching plan recommendations are optional
     }
   }
@@ -215,7 +233,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         final recommendedWeightKg = (_nextSession!['weight_kg'] as double);
         _ruckWeight = recommendedWeightKg;
         _selectedRuckWeight = recommendedWeightKg;
-        
+
         // Update display weight based on preference
         if (_preferMetric) {
           _displayRuckWeight = recommendedWeightKg;
@@ -243,14 +261,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Future<void> _saveLastDuration(int durationMinutes) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('lastSessionDurationMinutes', durationMinutes);
-    
   }
-  
+
   /// Saves the user's body weight to SharedPreferences
   Future<void> _saveUserWeight(String weight) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('lastUserWeight', weight);
-    
   }
 
   /// Creates and starts a new ruck session
@@ -271,22 +287,24 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         });
         return;
       }
-      
+
       // Check location permissions BEFORE starting session creation
       try {
         final locationService = GetIt.instance<LocationService>();
         bool hasPermission = await locationService.hasLocationPermission();
-        
+
         if (!hasPermission) {
           // Try to request permission with context for disclosure dialog
-          hasPermission = await locationService.requestLocationPermission(context: context);
+          hasPermission =
+              await locationService.requestLocationPermission(context: context);
         }
-        
+
         if (!hasPermission) {
           if (!mounted) return;
           StyledSnackBar.showError(
             context: context,
-            message: 'Location permission is required for ruck tracking. Please enable location access in Settings.',
+            message:
+                'Location permission is required for ruck tracking. Please enable location access in Settings.',
             duration: const Duration(seconds: 5),
           );
           if (mounted) {
@@ -296,9 +314,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           }
           return;
         }
-        
+
         AppLogger.info('Location permissions verified before session creation');
-        
+
         // Check health permissions early to prevent permission pop-ups during session
         final healthService = GetIt.instance<HealthService>();
         try {
@@ -306,16 +324,18 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           bool isHealthAvailable = await healthService.isHealthDataAvailable();
           if (isHealthAvailable) {
             AppLogger.info('Health data available, requesting permissions...');
-            
+
             // Request health permissions now instead of during session
             bool healthAuthorized = await healthService.requestAuthorization();
             if (!healthAuthorized) {
-              AppLogger.warning('Health permissions denied, continuing without health integration');
+              AppLogger.warning(
+                  'Health permissions denied, continuing without health integration');
               // Don't block session creation, just warn the user
               if (mounted) {
                 StyledSnackBar.showError(
                   context: context,
-                  message: 'Health permissions denied. Heart rate monitoring will be unavailable.',
+                  message:
+                      'Health permissions denied. Heart rate monitoring will be unavailable.',
                   duration: const Duration(seconds: 3),
                 );
               }
@@ -329,16 +349,18 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           AppLogger.warning('Failed to check health permissions: $e');
           // Don't block session creation if health check fails
         }
-        
+
         // Check battery optimization status for Android background location
         if (!mounted) return;
         if (Theme.of(context).platform == TargetPlatform.android) {
           try {
             // Use the proper modal dialog to explain and request battery optimization permissions
-            final batteryOptimizationGranted = await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
-            
+            final batteryOptimizationGranted = await BatteryOptimizationService
+                .ensureBackgroundExecutionPermissions(context: context);
+
             if (!batteryOptimizationGranted) {
-              AppLogger.info('Battery optimization permissions not granted, continuing anyway');
+              AppLogger.info(
+                  'Battery optimization permissions not granted, continuing anyway');
               // Don't block session creation - just log the status
             } else {
               AppLogger.info('Battery optimization permissions granted');
@@ -353,7 +375,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         if (mounted) {
           StyledSnackBar.showError(
             context: context,
-            message: 'Unable to verify location permissions. Please check your device settings.',
+            message:
+                'Unable to verify location permissions. Please check your device settings.',
             duration: const Duration(seconds: 4),
           );
           setState(() {
@@ -362,295 +385,335 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
         return;
       }
-        // Set loading state immediately
-        if (!mounted) return;
-        setState(() {
-          _isCreating = true;
-        });
+      // Set loading state immediately
+      if (!mounted) return;
+      setState(() {
+        _isCreating = true;
+      });
 
+      try {
+        // Weight is stored internally in KG
+        // Double check the conversion for standard (imperial) weights is correct
+        double weightForApiKg = _ruckWeight;
+
+        // Debug log the exact weight being saved
+        AppLogger.debug(
+            'Creating session with ruck weight: ${weightForApiKg.toStringAsFixed(2)} kg');
+        AppLogger.debug(
+            'Original selection was: ${_displayRuckWeight} ${_preferMetric ? "kg" : "lbs"}');
+
+        // Prepare request data for creation
+        Map<String, dynamic> createRequestData = {
+          'ruck_weight_kg': weightForApiKg,
+          'is_manual': false, // Regular active sessions are not manual
+        };
+
+        // Add event context if creating session for an event
+        if (_eventId != null) {
+          createRequestData['event_id'] = _eventId;
+          createRequestData['session_type'] = 'event_ruck';
+        }
+
+        // Add route context if creating session from a planned route
+        if (widget.routeId != null) {
+          createRequestData['route_id'] = widget.routeId;
+          createRequestData['session_type'] = 'route_ruck';
+          if (widget.plannedRuckId != null) {
+            createRequestData['planned_ruck_id'] = widget.plannedRuckId;
+          }
+        }
+
+        // Add user's weight (required)
+        final userWeightRaw = _userWeightController.text;
+        if (userWeightRaw.isEmpty) {
+          throw Exception(
+              sessionUserWeightRequired); // Use centralized error message
+        }
+        double userWeightKg = _preferMetric
+            ? double.parse(userWeightRaw)
+            : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
+        createRequestData['weight_kg'] = userWeightKg;
+
+        // --- Ensure planned duration is included ---
+        if (_plannedDuration != null && _plannedDuration! > 0) {
+          createRequestData['planned_duration_minutes'] = _plannedDuration;
+        }
+        // --- End planned duration addition ---
+
+        // --- Add user_id for Supabase RLS ---
+        createRequestData['user_id'] = authState.user.userId;
+        // --- End user_id ---
+
+        // ---- Step 1: Create session in the backend ----
+
+        final apiClient = GetIt.instance<ApiClient>();
+
+        // Try to create online session first, but handle active sessions
         try {
-          // Weight is stored internally in KG
-          // Double check the conversion for standard (imperial) weights is correct
-          double weightForApiKg = _ruckWeight;
-          
-          // Debug log the exact weight being saved
-          AppLogger.debug('Creating session with ruck weight: ${weightForApiKg.toStringAsFixed(2)} kg');
-          AppLogger.debug('Original selection was: ${_displayRuckWeight} ${_preferMetric ? "kg" : "lbs"}');
-          
-          // Prepare request data for creation
-          Map<String, dynamic> createRequestData = {
-            'ruck_weight_kg': weightForApiKg,
-            'is_manual': false, // Regular active sessions are not manual
-          };
-          
-          // Add event context if creating session for an event
-          if (_eventId != null) {
-            createRequestData['event_id'] = _eventId;
-            createRequestData['session_type'] = 'event_ruck';
-          }
-          
-          // Add route context if creating session from a planned route
-          if (widget.routeId != null) {
-            createRequestData['route_id'] = widget.routeId;
-            createRequestData['session_type'] = 'route_ruck';
-            if (widget.plannedRuckId != null) {
-              createRequestData['planned_ruck_id'] = widget.plannedRuckId;
-            }
-          }
-          
-          // Add user's weight (required)
-          final userWeightRaw = _userWeightController.text;
-          if (userWeightRaw.isEmpty) {
-              throw Exception(sessionUserWeightRequired); // Use centralized error message
-          }
-          double userWeightKg = _preferMetric 
-              ? double.parse(userWeightRaw) 
-              : double.parse(userWeightRaw) / 2.20462; // Convert lbs to kg
-          createRequestData['weight_kg'] = userWeightKg;
-          
-          // --- Ensure planned duration is included ---
-          if (_plannedDuration != null && _plannedDuration! > 0) {
-            createRequestData['planned_duration_minutes'] = _plannedDuration;
-          }
-          // --- End planned duration addition ---
-          
-          // --- Add user_id for Supabase RLS ---
-          createRequestData['user_id'] = authState.user.userId;
-          // --- End user_id ---
-          
-          // ---- Step 1: Create session in the backend ----
-          
-          final apiClient = GetIt.instance<ApiClient>();
-          
-          // Try to create online session first, but handle active sessions
-          try {
-            AppLogger.info('Attempting to create online session...');
-            final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(seconds: 30)); // Increased from 10s for better reliability
+          AppLogger.info('Attempting to create online session...');
+          final createResponse = await apiClient
+              .post('/rucks', createRequestData)
+              .timeout(Duration(
+                  seconds: 30)); // Increased from 10s for better reliability
 
-            if (!mounted) return;
-            
-            // Check if response indicates an active session exists
-            if (createResponse != null && createResponse['has_active_session'] == true) {
-              // Show dialog to handle existing active session
-              setState(() { _isCreating = false; });
-              
-              final choice = await showDialog<String>(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => ActiveSessionDialog(
-                  activeSession: createResponse,
-                  onContinueExisting: () => Navigator.of(context).pop('continue'),
-                  onCancel: () => Navigator.of(context).pop('cancel'),
-                ),
-              );
-              
-              if (choice == 'cancel' || !mounted) {
-                return;
-              } else if (choice == 'continue') {
-                // Continue with existing session - navigate to active session
-                ruckId = createResponse['id'].toString();
-                AppLogger.info('🔄 Continuing existing session: $ruckId');
-                // Removed force_new option - users must complete or continue existing sessions
-              }
-            } else {
-              // Normal session creation
-              if (createResponse == null || createResponse['id'] == null) {
-                throw Exception('Invalid response from server when creating session');
-              }
-              
-              ruckId = createResponse['id'].toString();
-              AppLogger.info('✅ Created online session: $ruckId');
-            }
-          } catch (e) {
-            // Any error (network, timeout, etc.) immediately goes to offline mode
-            AppLogger.warning('Failed to create online session, proceeding offline: $e');
-            
-            // Create offline session ID
-            ruckId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
-            AppLogger.info('🔄 Created offline session: $ruckId');
-          }
-          
-          // Save the used weight (always in KG) to SharedPreferences on success
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setDouble('lastRuckWeightKg', weightForApiKg);
-
-          // Save the user's entered body weight
-          _saveUserWeight(_userWeightController.text);
-          
-          // Save duration if entered
-          if (_durationController.text.isNotEmpty) {
-            int duration = int.parse(_durationController.text);
-            _plannedDuration = duration;
-            await _saveLastDuration(duration);
-          }
-          
-          // Perform session preparation/validation without resetting _ruckWeight or _displayRuckWeight
-          // Log current state for debugging
-          
-
-          
-          // Delay and then navigate without resetting chip state
-          await Future.delayed(Duration(milliseconds: 500));
-          // Convert planned duration (minutes) to seconds; null means no planned duration
-          final int? plannedDuration = _plannedDuration != null ? _plannedDuration! * 60 : null;
-          
-          // Parse route data if available
-          List<latlong.LatLng>? plannedRoute;
-          double? plannedRouteDistance;
-          int? plannedRouteDuration;
-          
-          if (widget.routeData != null) {
-            try {
-              AppLogger.info('Route data received: ${widget.routeData}');
-              
-              // Parse route polyline into LatLng points
-              if (widget.routeData['route_polyline'] != null) {
-                final polylineString = widget.routeData['route_polyline'] as String;
-                AppLogger.info('Route polyline string: $polylineString');
-                AppLogger.info('Polyline string length: ${polylineString.length}');
-                
-                plannedRoute = _parsePolylineToLatLng(polylineString);
-                AppLogger.info('Parsed ${plannedRoute.length} route points for session navigation');
-                
-                if (plannedRoute.isNotEmpty) {
-                  AppLogger.info('First route point: ${plannedRoute.first}');
-                  AppLogger.info('Last route point: ${plannedRoute.last}');
-                } else {
-                  AppLogger.warning('No route points parsed from polyline!');
-                }
-              } else {
-                AppLogger.warning('Route polyline is null in routeData!');
-              }
-              
-              // Extract route distance (in km)
-              if (widget.routeData['distance_km'] != null) {
-                plannedRouteDistance = (widget.routeData['distance_km'] as num).toDouble();
-                AppLogger.info('Route distance: ${plannedRouteDistance}km');
-              }
-              
-              // Extract estimated duration (in minutes)
-              if (widget.routeData['estimated_duration_minutes'] != null) {
-                plannedRouteDuration = (widget.routeData['estimated_duration_minutes'] as num).toInt();
-                AppLogger.info('Estimated route duration: ${plannedRouteDuration} minutes');
-              }
-            } catch (e) {
-              AppLogger.warning('Failed to parse route data for session: $e');
-            }
-          }
-          
-          // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
-          AppLogger.info('🚀 [CREATE_SESSION] Creating session args:');
-          AppLogger.info('🚀 [CREATE_SESSION]   plannedRoute length: ${plannedRoute?.length ?? 0}');
-          AppLogger.info('🚀 [CREATE_SESSION]   plannedRouteDistance: $plannedRouteDistance');
-          AppLogger.info('🚀 [CREATE_SESSION]   plannedRouteDuration: $plannedRouteDuration');
-          
-          debugPrint('🚀🚀🚀 [CREATE_SESSION DEBUG] About to create ActiveSessionArgs with planned route:');
-          debugPrint('🚀🚀🚀 Route points: ${plannedRoute?.length ?? 0} points');
-          debugPrint('🚀🚀🚀 Route distance: $plannedRouteDistance');
-          debugPrint('🚀🚀🚀 Route duration: $plannedRouteDuration');
-          
-          // Debug: Log first few route points if available
-          if (plannedRoute != null && plannedRoute!.isNotEmpty) {
-            AppLogger.info('  First route point: ${plannedRoute!.first}');
-            if (plannedRoute!.length > 1) {
-              AppLogger.info('  Last route point: ${plannedRoute!.last}');
-            }
-          } else {
-            AppLogger.warning('  No planned route points available!');
-          }
-          
-          AppLogger.sessionCompletion('Creating session with event context', context: {
-            'event_id': _eventId,
-            'event_title': _eventTitle,
-            'ruck_weight_kg': _ruckWeight,
-            'planned_duration_seconds': plannedDuration,
-          });
-          
-          // Session was already created earlier in the function - ruckId should be set
-          if (ruckId == null) {
-            throw Exception('Session ID was not created properly');
-          }
-          AppLogger.error('[CREATE_SESSION] 🔥 USING EXISTING SESSION ID: $ruckId');
-          
-          final sessionArgs = ActiveSessionArgs(
-            ruckWeight: _ruckWeight,
-            userWeightKg: userWeightKg, // Pass the calculated userWeightKg (double)
-            notes: null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
-            plannedDuration: plannedDuration,
-            eventId: _eventId, // Use _eventId from route arguments, not widget.eventId
-            plannedRoute: plannedRoute, // Pass the parsed route points
-            plannedRouteDistance: plannedRouteDistance, // Pass route distance
-            plannedRouteDuration: plannedRouteDuration, // Pass route duration
-            aiCheerleaderEnabled: _aiCheerleaderEnabled, // AI Cheerleader toggle
-            aiCheerleaderPersonality: _aiCheerleaderPersonality, // Selected personality
-            aiCheerleaderExplicitContent: _aiCheerleaderExplicitContent, // Explicit language preference
-            sessionId: ruckId, // Pass the created session ID to prevent duplicate creation
-          );
-          
-          // CRITICAL DEBUG: Print the actual args being created
-          print('🔥🔥🔥 [CREATE_SESSION] ActiveSessionArgs created with:');
-          print('🔥🔥🔥   sessionId: $ruckId');
-          print('🔥🔥🔥   plannedRoute: ${sessionArgs.plannedRoute?.length ?? 0} points');
-          print('🔥🔥🔥   plannedRouteDistance: ${sessionArgs.plannedRouteDistance}');
-          print('🔥🔥🔥   plannedRouteDuration: ${sessionArgs.plannedRouteDuration}');
-          if (sessionArgs.plannedRoute != null && sessionArgs.plannedRoute!.isNotEmpty) {
-            print('🔥🔥🔥   First route point: ${sessionArgs.plannedRoute!.first}');
-          }
-          
-          // Navigate to CountdownPage which will handle the countdown and transition
           if (!mounted) return;
-          // Read skip countdown preference
-          bool skipCountdown = false;
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            skipCountdown = prefs.getBool('skip_countdown') ?? false;
-          } catch (_) {}
 
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => skipCountdown
-                  ? InstantStartPage(args: sessionArgs)
-                  : CountdownPage(args: sessionArgs),
-            ),
-          );
-        } catch (e) {
-          
-          if (mounted) {
-            StyledSnackBar.showError(
-              context: context,
-              message: e.toString().contains(sessionUserWeightRequired)
-                ? sessionUserWeightRequired
-                : 'Failed to create/start session: $e',
-              duration: const Duration(seconds: 3),
-            );
-            // Only set creating to false on error, success leads to navigation
+          // Check if response indicates an active session exists
+          if (createResponse != null &&
+              createResponse['has_active_session'] == true) {
+            // Show dialog to handle existing active session
             setState(() {
               _isCreating = false;
             });
+
+            final choice = await showDialog<String>(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => ActiveSessionDialog(
+                activeSession: createResponse,
+                onContinueExisting: () => Navigator.of(context).pop('continue'),
+                onCancel: () => Navigator.of(context).pop('cancel'),
+              ),
+            );
+
+            if (choice == 'cancel' || !mounted) {
+              return;
+            } else if (choice == 'continue') {
+              // Continue with existing session - navigate to active session
+              ruckId = createResponse['id'].toString();
+              AppLogger.info('🔄 Continuing existing session: $ruckId');
+              // Removed force_new option - users must complete or continue existing sessions
+            }
+          } else {
+            // Normal session creation
+            if (createResponse == null || createResponse['id'] == null) {
+              throw Exception(
+                  'Invalid response from server when creating session');
+            }
+
+            ruckId = createResponse['id'].toString();
+            AppLogger.info('✅ Created online session: $ruckId');
           }
-        } 
+        } catch (e) {
+          // Any error (network, timeout, etc.) immediately goes to offline mode
+          AppLogger.warning(
+              'Failed to create online session, proceeding offline: $e');
+
+          // Create offline session ID
+          ruckId = 'offline_${DateTime.now().millisecondsSinceEpoch}';
+          AppLogger.info('🔄 Created offline session: $ruckId');
+        }
+
+        // Save the used weight (always in KG) to SharedPreferences on success
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setDouble('lastRuckWeightKg', weightForApiKg);
+
+        // Save the user's entered body weight
+        _saveUserWeight(_userWeightController.text);
+
+        // Save duration if entered
+        if (_durationController.text.isNotEmpty) {
+          int duration = int.parse(_durationController.text);
+          _plannedDuration = duration;
+          await _saveLastDuration(duration);
+        }
+
+        // Perform session preparation/validation without resetting _ruckWeight or _displayRuckWeight
+        // Log current state for debugging
+
+        // Delay and then navigate without resetting chip state
+        await Future.delayed(Duration(milliseconds: 500));
+        // Convert planned duration (minutes) to seconds; null means no planned duration
+        final int? plannedDuration =
+            _plannedDuration != null ? _plannedDuration! * 60 : null;
+
+        // Parse route data if available
+        List<latlong.LatLng>? plannedRoute;
+        double? plannedRouteDistance;
+        int? plannedRouteDuration;
+
+        if (widget.routeData != null) {
+          try {
+            AppLogger.info('Route data received: ${widget.routeData}');
+
+            // Parse route polyline into LatLng points
+            if (widget.routeData['route_polyline'] != null) {
+              final polylineString =
+                  widget.routeData['route_polyline'] as String;
+              AppLogger.info('Route polyline string: $polylineString');
+              AppLogger.info(
+                  'Polyline string length: ${polylineString.length}');
+
+              plannedRoute = _parsePolylineToLatLng(polylineString);
+              AppLogger.info(
+                  'Parsed ${plannedRoute.length} route points for session navigation');
+
+              if (plannedRoute.isNotEmpty) {
+                AppLogger.info('First route point: ${plannedRoute.first}');
+                AppLogger.info('Last route point: ${plannedRoute.last}');
+              } else {
+                AppLogger.warning('No route points parsed from polyline!');
+              }
+            } else {
+              AppLogger.warning('Route polyline is null in routeData!');
+            }
+
+            // Extract route distance (in km)
+            if (widget.routeData['distance_km'] != null) {
+              plannedRouteDistance =
+                  (widget.routeData['distance_km'] as num).toDouble();
+              AppLogger.info('Route distance: ${plannedRouteDistance}km');
+            }
+
+            // Extract estimated duration (in minutes)
+            if (widget.routeData['estimated_duration_minutes'] != null) {
+              plannedRouteDuration =
+                  (widget.routeData['estimated_duration_minutes'] as num)
+                      .toInt();
+              AppLogger.info(
+                  'Estimated route duration: ${plannedRouteDuration} minutes');
+            }
+          } catch (e) {
+            AppLogger.warning('Failed to parse route data for session: $e');
+          }
+        }
+
+        // Create session args that will be passed to both CountdownPage and later to ActiveSessionPage
+        AppLogger.info('🚀 [CREATE_SESSION] Creating session args:');
+        AppLogger.info(
+            '🚀 [CREATE_SESSION]   plannedRoute length: ${plannedRoute?.length ?? 0}');
+        AppLogger.info(
+            '🚀 [CREATE_SESSION]   plannedRouteDistance: $plannedRouteDistance');
+        AppLogger.info(
+            '🚀 [CREATE_SESSION]   plannedRouteDuration: $plannedRouteDuration');
+
+        debugPrint(
+            '🚀🚀🚀 [CREATE_SESSION DEBUG] About to create ActiveSessionArgs with planned route:');
+        debugPrint('🚀🚀🚀 Route points: ${plannedRoute?.length ?? 0} points');
+        debugPrint('🚀🚀🚀 Route distance: $plannedRouteDistance');
+        debugPrint('🚀🚀🚀 Route duration: $plannedRouteDuration');
+
+        // Debug: Log first few route points if available
+        if (plannedRoute != null && plannedRoute!.isNotEmpty) {
+          AppLogger.info('  First route point: ${plannedRoute!.first}');
+          if (plannedRoute!.length > 1) {
+            AppLogger.info('  Last route point: ${plannedRoute!.last}');
+          }
+        } else {
+          AppLogger.warning('  No planned route points available!');
+        }
+
+        AppLogger.sessionCompletion('Creating session with event context',
+            context: {
+              'event_id': _eventId,
+              'event_title': _eventTitle,
+              'ruck_weight_kg': _ruckWeight,
+              'planned_duration_seconds': plannedDuration,
+            });
+
+        // Session was already created earlier in the function - ruckId should be set
+        if (ruckId == null) {
+          throw Exception('Session ID was not created properly');
+        }
+        AppLogger.error(
+            '[CREATE_SESSION] 🔥 USING EXISTING SESSION ID: $ruckId');
+
+        final sessionArgs = ActiveSessionArgs(
+          ruckWeight: _ruckWeight,
+          userWeightKg:
+              userWeightKg, // Pass the calculated userWeightKg (double)
+          notes:
+              null, // Set to null, assuming no dedicated notes input for session args here. Adjust if a notes field exists.
+          plannedDuration: plannedDuration,
+          eventId:
+              _eventId, // Use _eventId from route arguments, not widget.eventId
+          plannedRoute: plannedRoute, // Pass the parsed route points
+          plannedRouteDistance: plannedRouteDistance, // Pass route distance
+          plannedRouteDuration: plannedRouteDuration, // Pass route duration
+          aiCheerleaderEnabled: _aiCheerleaderEnabled, // AI Cheerleader toggle
+          aiCheerleaderPersonality:
+              _aiCheerleaderPersonality, // Selected personality
+          aiCheerleaderExplicitContent:
+              _aiCheerleaderExplicitContent, // Explicit language preference
+          sessionId:
+              ruckId, // Pass the created session ID to prevent duplicate creation
+        );
+
+        // CRITICAL DEBUG: Print the actual args being created
+        print('🔥🔥🔥 [CREATE_SESSION] ActiveSessionArgs created with:');
+        print('🔥🔥🔥   sessionId: $ruckId');
+        print(
+            '🔥🔥🔥   plannedRoute: ${sessionArgs.plannedRoute?.length ?? 0} points');
+        print(
+            '🔥🔥🔥   plannedRouteDistance: ${sessionArgs.plannedRouteDistance}');
+        print(
+            '🔥🔥🔥   plannedRouteDuration: ${sessionArgs.plannedRouteDuration}');
+        if (sessionArgs.plannedRoute != null &&
+            sessionArgs.plannedRoute!.isNotEmpty) {
+          print(
+              '🔥🔥🔥   First route point: ${sessionArgs.plannedRoute!.first}');
+        }
+
+        // Navigate to CountdownPage which will handle the countdown and transition
+        if (!mounted) return;
+        // Read skip countdown preference
+        bool skipCountdown = false;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          skipCountdown = prefs.getBool('skip_countdown') ?? false;
+        } catch (_) {}
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => skipCountdown
+                ? InstantStartPage(args: sessionArgs)
+                : CountdownPage(args: sessionArgs),
+          ),
+        );
+      } catch (e) {
+        if (mounted) {
+          StyledSnackBar.showError(
+            context: context,
+            message: e.toString().contains(sessionUserWeightRequired)
+                ? sessionUserWeightRequired
+                : 'Failed to create/start session: $e',
+            duration: const Duration(seconds: 3),
+          );
+          // Only set creating to false on error, success leads to navigation
+          setState(() {
+            _isCreating = false;
+          });
+        }
+      }
     }
   }
 
   void _saveOfflineRuck() async {
     if (_formKey.currentState!.validate()) {
-      setState(() { _isCreating = true; });
+      setState(() {
+        _isCreating = true;
+      });
       try {
         final authState = context.read<AuthBloc>().state;
         if (authState is! Authenticated) throw Exception('Must be logged in');
 
-        double userWeightKg = double.tryParse(_userWeightController.text) ?? 70.0;
+        double userWeightKg =
+            double.tryParse(_userWeightController.text) ?? 70.0;
         if (!_preferMetric) userWeightKg /= 2.20462;
 
         final minutes = int.parse(_offlineDurationMinutesController.text);
-        final seconds = int.tryParse(_offlineDurationSecondsController.text) ?? 0;
+        final seconds =
+            int.tryParse(_offlineDurationSecondsController.text) ?? 0;
         final duration = Duration(minutes: minutes, seconds: seconds);
         final distance = double.parse(_offlineDistanceController.text);
         final distanceKm = _preferMetric ? distance : distance * 1.60934;
         final paceMinPerKm = duration.inSeconds / distanceKm;
-        final calories = _calculateCalories(duration.inSeconds, distanceKm, _ruckWeight, userWeightKg);
-        double elevationGainM = double.tryParse(_offlineElevationGainController.text) ?? 0.0;
-        double elevationLossM = double.tryParse(_offlineElevationLossController.text) ?? 0.0;
+        final calories = _calculateCalories(
+            duration.inSeconds, distanceKm, _ruckWeight, userWeightKg);
+        double elevationGainM =
+            double.tryParse(_offlineElevationGainController.text) ?? 0.0;
+        double elevationLossM =
+            double.tryParse(_offlineElevationLossController.text) ?? 0.0;
         if (!_preferMetric) {
           elevationGainM *= 0.3048;
           elevationLossM *= 0.3048;
@@ -691,21 +754,27 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
               elevationLoss: elevationLossM,
               ruckWeight: _ruckWeight,
               isManual: true,
-              aiCompletionInsight: null, // Manual sessions don't have AI insights
+              aiCompletionInsight:
+                  null, // Manual sessions don't have AI insights
             ),
           ),
         );
       } catch (e) {
-        StyledSnackBar.showError(context: context, message: 'Failed to save offline ruck: $e');
+        StyledSnackBar.showError(
+            context: context, message: 'Failed to save offline ruck: $e');
       } finally {
-        setState(() { _isCreating = false; });
+        setState(() {
+          _isCreating = false;
+        });
       }
     }
   }
 
-  double _calculateCalories(int durationSeconds, double distanceKm, double ruckWeightKg, double userWeightKg) {
+  double _calculateCalories(int durationSeconds, double distanceKm,
+      double ruckWeightKg, double userWeightKg) {
     final paceMinPerKm = (durationSeconds / 60) / distanceKm;
-    double metValue = paceMinPerKm <= 8 ? 8.0 : (paceMinPerKm <= 12 ? 6.5 : 5.0);
+    double metValue =
+        paceMinPerKm <= 8 ? 8.0 : (paceMinPerKm <= 12 ? 6.5 : 5.0);
     final timeHours = durationSeconds / 3600.0;
     return metValue * (userWeightKg + ruckWeightKg) * timeHours;
   }
@@ -723,10 +792,11 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   void initState() {
     super.initState();
     // Log the metric preference to verify it's set correctly
-    
+
     _loadDefaults();
-    _selectedRuckWeight = _ruckWeight; // initialize with default selected weight
-    
+    _selectedRuckWeight =
+        _ruckWeight; // initialize with default selected weight
+
     // Extract event and route context from constructor parameters
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Use constructor parameters instead of route arguments
@@ -734,22 +804,25 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       final eventTitle = widget.eventTitle;
       final routeId = widget.routeId;
       final routeName = widget.routeName;
-      
-      print('📋 Create session screen received constructor args: eventId=$eventId, eventTitle=$eventTitle, routeId=$routeId, routeName=$routeName');
-      
+
+      print(
+          '📋 Create session screen received constructor args: eventId=$eventId, eventTitle=$eventTitle, routeId=$routeId, routeName=$routeName');
+
       if (eventId != null && eventTitle != null) {
         setState(() {
           _eventId = eventId;
           _eventTitle = eventTitle;
         });
-        print('📋 Set event context: _eventId = $_eventId, _eventTitle = $_eventTitle');
+        print(
+            '📋 Set event context: _eventId = $_eventId, _eventTitle = $_eventTitle');
       } else if (routeId != null && routeName != null) {
-        print('📋 Set route context: routeId = $routeId, routeName = $routeName');
+        print(
+            '📋 Set route context: routeId = $routeId, routeName = $routeName');
       } else {
         print('📋 No event or route arguments provided');
       }
     });
-    
+
     // Load metric preference and **body weight** from AuthBloc state
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
@@ -767,33 +840,31 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           }
         }
         // Update display weight based on new preference
-        _displayRuckWeight = _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
-        
+        _displayRuckWeight =
+            _preferMetric ? _ruckWeight : (_ruckWeight * AppConfig.kgToLbs);
       });
-      
+
       // Ensure the last ruck weight is loaded and set as selected
       _loadLastRuckWeight();
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelectedWeight());
-    _durationFocusNode.addListener(() {
-    });
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _scrollToSelectedWeight());
+    _durationFocusNode.addListener(() {});
     // Restore last selected ruck weight and ensure UI reflects it
     SharedPreferences.getInstance().then((prefs) {
       final lastWeightKg = prefs.getDouble('lastRuckWeightKg');
       if (lastWeightKg != null) {
         setState(() {
           _ruckWeight = lastWeightKg;
-          _displayRuckWeight = _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
+          _displayRuckWeight =
+              _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
           // Explicitly log to verify state update
-          
         });
         // Force a UI rebuild to ensure the chip is selected
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToSelectedWeight();
         });
-      } else {
-        
-      }
+      } else {}
     });
     // Attach listener after controllers are ready
     _durationListener = () {
@@ -813,16 +884,18 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   }
 
   void _scrollToSelectedWeight() {
-    final List<double> currentWeightOptions = _preferMetric 
-        ? AppConfig.metricWeightOptions 
+    final List<double> currentWeightOptions = _preferMetric
+        ? AppConfig.metricWeightOptions
         : AppConfig.standardWeightOptions;
     final selectedIndex = currentWeightOptions.indexWhere((w) {
       final weightInKg = _preferMetric ? w : w / AppConfig.kgToLbs;
-      return (weightInKg - _selectedRuckWeight).abs() < (_preferMetric ? 0.01 : 0.1);
+      return (weightInKg - _selectedRuckWeight).abs() <
+          (_preferMetric ? 0.01 : 0.1);
     });
     if (selectedIndex != -1 && _weightScrollController.hasClients) {
       // Width of each chip item including separator spacing
-      const double itemExtent = 60.0; // 52 chip + 8 separator – keep in sync with separatorBuilder
+      const double itemExtent =
+          60.0; // 52 chip + 8 separator – keep in sync with separatorBuilder
 
       double offset;
       if (selectedIndex == currentWeightOptions.length - 1) {
@@ -854,8 +927,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       setState(() {
         _ruckWeight = lastWeightKg;
         _selectedRuckWeight = lastWeightKg;
-        _displayRuckWeight = _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
-        
+        _displayRuckWeight =
+            _preferMetric ? lastWeightKg : (lastWeightKg * AppConfig.kgToLbs);
       });
     }
   }
@@ -874,7 +947,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Snaps the current weight to the nearest predefined weight option
   void _snapToNearestWeight() {
     List<double> weightOptions = [];
-    
+
     if (_preferMetric) {
       // Metric options (kg)
       weightOptions = AppConfig.metricWeightOptions;
@@ -882,22 +955,22 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       // Imperial options (lbs)
       weightOptions = AppConfig.standardWeightOptions;
     }
-    
+
     // Find the nearest weight option
     double? closestOption;
     double minDifference = double.infinity;
-    
+
     for (var option in weightOptions) {
       final optionInKg = _preferMetric ? option : option / AppConfig.kgToLbs;
       // Use a slightly more forgiving comparison for imperial weights due to conversion rounding
       final difference = (optionInKg - _ruckWeight).abs();
-      
+
       if (difference < minDifference) {
         minDifference = difference;
         closestOption = option;
       }
     }
-    
+
     if (closestOption != null) {
       setState(() {
         if (_preferMetric) {
@@ -909,57 +982,71 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         }
         // Make sure _selectedRuckWeight is also updated
         _selectedRuckWeight = _ruckWeight;
-        
-        
       });
     }
   }
 
   Widget _buildWeightChip(double weightValue, bool isMetric) {
-    double weightInKg = isMetric ? weightValue : weightValue / AppConfig.kgToLbs;
+    double weightInKg =
+        isMetric ? weightValue : weightValue / AppConfig.kgToLbs;
     final bool isSelected = isMetric
         ? (weightInKg - _selectedRuckWeight).abs() < 0.01
         : (weightInKg - _selectedRuckWeight).abs() < 0.1;
-    
-    
+
     return ChoiceChip(
       label: Container(
         height: 36,
         alignment: Alignment.center,
         child: Text(
-          (weightValue == 0 && isSelected) ? 'HIKE' : (isMetric ? (weightValue == 0 ? '0 kg' : '${weightValue.toStringAsFixed(1)} kg') : (weightValue == 0 ? '0 lbs' : '${weightValue.round()} lbs')),
+          (weightValue == 0 && isSelected)
+              ? 'HIKE'
+              : (isMetric
+                  ? (weightValue == 0
+                      ? '0 kg'
+                      : '${weightValue.toStringAsFixed(1)} kg')
+                  : (weightValue == 0
+                      ? '0 lbs'
+                      : '${weightValue.round()} lbs')),
           textAlign: TextAlign.center,
           style: AppTextStyles.statValue.copyWith(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : (isSelected ? Colors.white : Colors.black),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : (isSelected ? Colors.white : Colors.black),
             height: 1.0,
           ),
         ),
       ),
       selected: isSelected,
       onSelected: (selected) {
-      if (selected) {
-        HapticFeedback.heavyImpact();
-        setState(() {
-          // Store the correctly converted weight in kg for the API
-          _selectedRuckWeight = weightInKg;
-          _ruckWeight = weightInKg;
-          // Store the display weight in the user's preferred unit
-          _displayRuckWeight = weightValue;
-          
-          AppLogger.debug('Selected weight chip: ${weightValue} ${isMetric ? "kg" : "lbs"}');
-          AppLogger.debug('Converted to: ${_ruckWeight.toStringAsFixed(2)} kg for storage');
-        });
-      }
-    },
+        if (selected) {
+          HapticFeedback.heavyImpact();
+          setState(() {
+            // Store the correctly converted weight in kg for the API
+            _selectedRuckWeight = weightInKg;
+            _ruckWeight = weightInKg;
+            // Store the display weight in the user's preferred unit
+            _displayRuckWeight = weightValue;
+
+            AppLogger.debug(
+                'Selected weight chip: ${weightValue} ${isMetric ? "kg" : "lbs"}');
+            AppLogger.debug(
+                'Converted to: ${_ruckWeight.toStringAsFixed(2)} kg for storage');
+          });
+        }
+      },
       selectedColor: Theme.of(context).primaryColor,
       backgroundColor: isSelected
-        ? Theme.of(context).primaryColor
-        : (Theme.of(context).brightness == Brightness.dark ? AppColors.error : AppColors.backgroundLight),
+          ? Theme.of(context).primaryColor
+          : (Theme.of(context).brightness == Brightness.dark
+              ? AppColors.error
+              : AppColors.backgroundLight),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
       labelStyle: TextStyle(
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : null,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : null,
         fontWeight: FontWeight.bold,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
@@ -969,19 +1056,19 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Parse route polyline string into LatLng coordinates
   List<latlong.LatLng> _parsePolylineToLatLng(String polylineString) {
     final List<latlong.LatLng> coordinates = [];
-    
+
     try {
       // Expect polyline format: "lat1,lng1;lat2,lng2;lat3,lng3"
       final points = polylineString.split(';');
-      
+
       for (final point in points) {
         if (point.trim().isEmpty) continue;
-        
+
         final coords = point.split(',');
         if (coords.length == 2) {
           final lat = double.tryParse(coords[0].trim());
           final lng = double.tryParse(coords[1].trim());
-          
+
           if (lat != null && lng != null) {
             coordinates.add(latlong.LatLng(lat, lng));
           }
@@ -990,7 +1077,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
     } catch (e) {
       AppLogger.error('Error parsing polyline: $e');
     }
-    
+
     return coordinates;
   }
 
@@ -998,11 +1085,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   Widget build(BuildContext context) {
     final String weightUnit = _preferMetric ? 'kg' : 'lbs';
     // Determine the correct list for the chips
-    final List<double> currentWeightOptions = _preferMetric 
-        ? AppConfig.metricWeightOptions 
+    final List<double> currentWeightOptions = _preferMetric
+        ? AppConfig.metricWeightOptions
         : AppConfig.standardWeightOptions;
-    
-    
+
     final keyboardActionsConfig = KeyboardActionsConfig(
       actions: [
         KeyboardActionsItem(
@@ -1010,10 +1096,10 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           toolbarButtons: [
             (node) => TextButton(
                   onPressed: () {
-                  HapticFeedback.heavyImpact();
-                  node.unfocus();
-                  if (!_isCreating) _createSession();
-                },
+                    HapticFeedback.heavyImpact();
+                    node.unfocus();
+                    if (!_isCreating) _createSession();
+                  },
                   child: const Text('Done'),
                 ),
           ],
@@ -1021,10 +1107,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       ],
       nextFocus: false,
     );
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_eventTitle != null ? 'Start Event Ruck' : widget.routeName != null ? 'Start Route Ruck' : 'New Ruck Session'),
+        title: Text(_eventTitle != null
+            ? 'Start Event Ruck'
+            : widget.routeName != null
+                ? 'Start Route Ruck'
+                : 'New Ruck Session'),
         centerTitle: true,
       ),
       body: KeyboardActions(
@@ -1045,7 +1135,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      border:
+                          Border.all(color: AppColors.primary.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
@@ -1080,7 +1171,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     ),
                   ),
                 ],
-                
+
                 // Route banner if creating session for a route
                 if (widget.routeName != null) ...[
                   Container(
@@ -1090,7 +1181,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      border:
+                          Border.all(color: AppColors.primary.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
@@ -1125,14 +1217,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     ),
                   ),
                 ],
-                
+
                 // Section title
                 Text(
                   'Session Details',
                   style: AppTextStyles.titleLarge, // headline6 -> titleLarge
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Coaching plan recommendations
                 PlanSessionRecommendations(
                   coachingPlan: _coachingPlan,
@@ -1140,17 +1232,21 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   preferMetric: _preferMetric,
                   onUseRecommended: _applyCoachingRecommendations,
                 ),
-                
+
                 // Quick ruck weight selection
                 Text(
                   'Ruck Weight ($weightUnit)',
-                  style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold), // subtitle1 -> titleMedium
+                  style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold), // subtitle1 -> titleMedium
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Weight is used to calculate calories burned during your ruck',
-                  style: AppTextStyles.bodySmall.copyWith( // caption -> bodySmall
-                    color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    // caption -> bodySmall
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Color(0xFF728C69)
+                        : AppColors.textDarkSecondary,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1169,7 +1265,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                             final weightValue = currentWeightOptions[index];
                             return _buildWeightChip(weightValue, _preferMetric);
                           },
-                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 8),
                         ),
                 ),
                 const SizedBox(height: 8),
@@ -1184,7 +1281,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     ),
                     onPressed: () {
                       setState(() {
-                        _showCustomRuckWeightInput = !_showCustomRuckWeightInput;
+                        _showCustomRuckWeightInput =
+                            !_showCustomRuckWeightInput;
                         if (!_showCustomRuckWeightInput) {
                           // Clear any entered custom weight when hiding
                           _customRuckWeightController.clear();
@@ -1192,7 +1290,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                       });
                     },
                     child: Text(
-                      _showCustomRuckWeightInput ? 'Hide custom weight' : 'Enter custom weight',
+                      _showCustomRuckWeightInput
+                          ? 'Hide custom weight'
+                          : 'Enter custom weight',
                       style: AppTextStyles.bodySmall.copyWith(
                         decoration: TextDecoration.underline,
                       ),
@@ -1205,13 +1305,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     controller: _customRuckWeightController,
                     label: 'Custom Ruck Weight ($weightUnit)',
                     hint: 'e.g. 37.5',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     prefixIcon: Icons.fitness_center_outlined,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                     ],
                     validator: (value) {
-                      if (!_showCustomRuckWeightInput) return null; // Skip if not shown
+                      if (!_showCustomRuckWeightInput)
+                        return null; // Skip if not shown
                       if (value == null || value.isEmpty) {
                         return 'Please enter a weight';
                       }
@@ -1239,13 +1341,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   ),
                 ],
                 const SizedBox(height: 32),
-                
+
                 // User weight field (optional)
                 CustomTextField(
                   controller: _userWeightController,
                   label: 'Your Weight ($weightUnit)',
                   hint: 'Enter your weight',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   prefixIcon: Icons.monitor_weight_outlined,
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
@@ -1264,7 +1367,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Planned duration field
                 CustomTextField(
                   controller: _durationController,
@@ -1293,7 +1396,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                         _plannedDuration = null;
                       } else {
                         final parsed = int.tryParse(value);
-                        _plannedDuration = (parsed != null && parsed > 0) ? parsed : null;
+                        _plannedDuration =
+                            (parsed != null && parsed > 0) ? parsed : null;
                       }
                     });
                   },
@@ -1303,7 +1407,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   },
                 ),
                 const SizedBox(height: 32),
-                
+
                 // AI Cheerleader Controls
                 Card(
                   elevation: 2,
@@ -1326,11 +1430,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // AI Cheerleader Toggle
                         SwitchListTile(
                           title: const Text('Enable AI Cheerleader'),
-                          subtitle: const Text('Get motivational messages during your ruck'),
+                          subtitle: const Text(
+                              'Get motivational messages during your ruck'),
                           value: _aiCheerleaderEnabled,
                           onChanged: (bool value) async {
                             setState(() {
@@ -1342,7 +1447,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                           },
                           contentPadding: EdgeInsets.zero,
                         ),
-                        
+
                         // Personality Dropdown (only shown when enabled)
                         if (_aiCheerleaderEnabled) ...[
                           const SizedBox(height: 8),
@@ -1351,19 +1456,40 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Personality',
                               border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'Supportive Friend', child: Text('Supportive Friend (F)')),
-                              DropdownMenuItem(value: 'Drill Sergeant', child: Text('Drill Sergeant (M)')),
-                              DropdownMenuItem(value: 'Southern Redneck', child: Text('Southern Redneck (M)')),
-                              DropdownMenuItem(value: 'Yoga Instructor', child: Text('Yoga Instructor (F)')),
-                              DropdownMenuItem(value: 'British Butler', child: Text('British Butler (M)')),
-                              DropdownMenuItem(value: 'Sports Commentator', child: Text('Sports Commentator (M)')),
-                              DropdownMenuItem(value: 'Cowboy/Cowgirl', child: Text('Cowboy (M)')),
-                              DropdownMenuItem(value: 'Nature Lover', child: Text('Nature Lover (F)')),
-                              DropdownMenuItem(value: 'Burt Reynolds', child: Text('Burt Reynolds (M)')),
-                              DropdownMenuItem(value: 'Tom Selleck', child: Text('Tom Selleck (M)')),
+                              DropdownMenuItem(
+                                  value: 'Supportive Friend',
+                                  child: Text('Supportive Friend (F)')),
+                              DropdownMenuItem(
+                                  value: 'Drill Sergeant',
+                                  child: Text('Drill Sergeant (M)')),
+                              DropdownMenuItem(
+                                  value: 'Southern Redneck',
+                                  child: Text('Southern Redneck (M)')),
+                              DropdownMenuItem(
+                                  value: 'Yoga Instructor',
+                                  child: Text('Yoga Instructor (F)')),
+                              DropdownMenuItem(
+                                  value: 'British Butler',
+                                  child: Text('British Butler (M)')),
+                              DropdownMenuItem(
+                                  value: 'Sports Commentator',
+                                  child: Text('Sports Commentator (M)')),
+                              DropdownMenuItem(
+                                  value: 'Cowboy/Cowgirl',
+                                  child: Text('Cowboy (M)')),
+                              DropdownMenuItem(
+                                  value: 'Nature Lover',
+                                  child: Text('Nature Lover (F)')),
+                              DropdownMenuItem(
+                                  value: 'Burt Reynolds',
+                                  child: Text('Burt Reynolds (M)')),
+                              DropdownMenuItem(
+                                  value: 'Tom Selleck',
+                                  child: Text('Tom Selleck (M)')),
                             ],
                             onChanged: (String? newValue) async {
                               if (newValue != null) {
@@ -1371,26 +1497,31 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                                   _aiCheerleaderPersonality = newValue;
                                 });
                                 // Save preference immediately
-                                final prefs = await SharedPreferences.getInstance();
-                                await prefs.setString('aiCheerleaderPersonality', newValue);
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                await prefs.setString(
+                                    'aiCheerleaderPersonality', newValue);
                               }
                             },
                           ),
-                          
+
                           const SizedBox(height: 8),
-                          
+
                           // Explicit Content Toggle
                           SwitchListTile(
                             title: const Text('Explicit Language'),
-                            subtitle: const Text('Allow stronger language for intense motivation'),
+                            subtitle: const Text(
+                                'Allow stronger language for intense motivation'),
                             value: _aiCheerleaderExplicitContent,
                             onChanged: (bool value) async {
                               setState(() {
                                 _aiCheerleaderExplicitContent = value;
                               });
                               // Save preference immediately
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool('aiCheerleaderExplicitContent', value);
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              await prefs.setBool(
+                                  'aiCheerleaderExplicitContent', value);
                             },
                             contentPadding: EdgeInsets.zero,
                           ),
@@ -1400,7 +1531,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 if (_isOfflineMode) ...[
                   const SizedBox(height: 16),
                   CustomTextField(
@@ -1408,7 +1539,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     label: 'Duration Minutes',
                     hint: 'e.g. 45',
                     keyboardType: TextInputType.number,
-                    validator: (value) => value?.isEmpty ?? true ? 'Minutes required' : null,
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Minutes required' : null,
                   ),
                   const SizedBox(height: 8),
                   CustomTextField(
@@ -1419,7 +1551,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     validator: (value) {
                       if (value?.isEmpty ?? true) return null;
                       final sec = int.tryParse(value!);
-                      return (sec == null || sec < 0 || sec >= 60) ? '0-59' : null;
+                      return (sec == null || sec < 0 || sec >= 60)
+                          ? '0-59'
+                          : null;
                     },
                   ),
                   const SizedBox(height: 16),
@@ -1427,38 +1561,44 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                     controller: _offlineDistanceController,
                     label: 'Distance (${_preferMetric ? 'km' : 'miles'})',
                     hint: 'e.g. ${_preferMetric ? '5.0' : '3.1'}',
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) => value?.isEmpty ?? true ? 'Distance is required' : null,
+                    keyboardType:
+                        TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Distance is required' : null,
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _offlineElevationGainController,
-                    label: 'Elevation Gain (${_preferMetric ? 'meters' : 'feet'}) - Optional',
+                    label:
+                        'Elevation Gain (${_preferMetric ? 'meters' : 'feet'}) - Optional',
                     hint: 'e.g. ${_preferMetric ? '100' : '328'}',
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        TextInputType.numberWithOptions(decimal: true),
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _offlineElevationLossController,
-                    label: 'Elevation Loss (${_preferMetric ? 'meters' : 'feet'}) - Optional',
+                    label:
+                        'Elevation Loss (${_preferMetric ? 'meters' : 'feet'}) - Optional',
                     hint: 'e.g. ${_preferMetric ? '100' : '328'}',
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        TextInputType.numberWithOptions(decimal: true),
                   ),
                 ],
                 const SizedBox(height: 32),
-                
+
                 // Start session button - orange and full width
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.play_arrow),
                     label: Text(
-                      _isOfflineMode ? 'SAVE OFFLINE RUCK' : 'START SESSION', 
-                      style: AppTextStyles.labelLarge.copyWith( // button -> labelLarge
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      )
-                    ),
+                        _isOfflineMode ? 'SAVE OFFLINE RUCK' : 'START SESSION',
+                        style: AppTextStyles.labelLarge.copyWith(
+                          // button -> labelLarge
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        )),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.secondary,
                       foregroundColor: Colors.white,
@@ -1467,7 +1607,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _isOfflineMode ? _saveOfflineRuck : _createSession,
+                    onPressed:
+                        _isOfflineMode ? _saveOfflineRuck : _createSession,
                   ),
                 ),
                 Center(
@@ -1484,7 +1625,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                         }
                       });
                     },
-                    child: Text(_isOfflineMode ? 'Cancel' : 'Record Offline Ruck', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                    child: Text(
+                        _isOfflineMode ? 'Cancel' : 'Record Offline Ruck',
+                        style: TextStyle(fontSize: 14, color: Colors.grey)),
                   ),
                 ),
               ],

@@ -94,8 +94,10 @@ class PlannedRuckLoaded extends PlannedRuckState {
       upcomingRucks: upcomingRucks ?? this.upcomingRucks,
       overdueRucks: overdueRucks ?? this.overdueRucks,
       completedRucks: completedRucks ?? this.completedRucks,
-      selectedRuck: clearSelectedRuck ? null : (selectedRuck ?? this.selectedRuck),
-      statusFilter: clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+      selectedRuck:
+          clearSelectedRuck ? null : (selectedRuck ?? this.selectedRuck),
+      statusFilter:
+          clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
       searchQuery: clearSearchQuery ? null : (searchQuery ?? this.searchQuery),
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       isRefreshing: isRefreshing ?? this.isRefreshing,
@@ -116,7 +118,8 @@ class PlannedRuckLoaded extends PlannedRuckState {
     if (searchQuery?.isNotEmpty == true) {
       final query = searchQuery!.toLowerCase();
       filtered = filtered.where((ruck) {
-        final nameMatch = ruck.route?.name.toLowerCase().contains(query) ?? false;
+        final nameMatch =
+            ruck.route?.name.toLowerCase().contains(query) ?? false;
         final notesMatch = ruck.notes?.toLowerCase().contains(query) ?? false;
         return nameMatch || notesMatch;
       }).toList();
@@ -128,11 +131,12 @@ class PlannedRuckLoaded extends PlannedRuckState {
   /// Get planned rucks grouped by status
   Map<PlannedRuckStatus, List<PlannedRuck>> get plannedRucksByStatus {
     final grouped = <PlannedRuckStatus, List<PlannedRuck>>{};
-    
+
     for (final status in PlannedRuckStatus.values) {
-      grouped[status] = plannedRucks.where((ruck) => ruck.status == status).toList();
+      grouped[status] =
+          plannedRucks.where((ruck) => ruck.status == status).toList();
     }
-    
+
     return grouped;
   }
 
@@ -141,26 +145,30 @@ class PlannedRuckLoaded extends PlannedRuckState {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
-    
+
     return plannedRucks.where((ruck) {
-      final ruckDate = DateTime(ruck.plannedDate.year, ruck.plannedDate.month, ruck.plannedDate.day);
+      final ruckDate = DateTime(
+          ruck.plannedDate.year, ruck.plannedDate.month, ruck.plannedDate.day);
       return ruckDate.isAfter(startOfWeek.subtract(const Duration(days: 1))) &&
-             ruckDate.isBefore(endOfWeek.add(const Duration(days: 1)));
+          ruckDate.isBefore(endOfWeek.add(const Duration(days: 1)));
     }).toList();
   }
 
   /// Get completion rate for completed rucks
   double get completionRate {
     if (plannedRucks.isEmpty) return 0.0;
-    
-    final completedCount = plannedRucks.where((ruck) => ruck.status == PlannedRuckStatus.completed).length;
+
+    final completedCount = plannedRucks
+        .where((ruck) => ruck.status == PlannedRuckStatus.completed)
+        .length;
     return completedCount / plannedRucks.length;
   }
 
   /// Check if there are any urgent/overdue rucks
   bool get hasUrgentRucks {
-    return overdueRucks.isNotEmpty || 
-           plannedRucks.any((ruck) => ruck.isToday && ruck.status == PlannedRuckStatus.planned);
+    return overdueRucks.isNotEmpty ||
+        plannedRucks.any(
+            (ruck) => ruck.isToday && ruck.status == PlannedRuckStatus.planned);
   }
 }
 

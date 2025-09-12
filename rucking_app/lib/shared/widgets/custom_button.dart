@@ -8,37 +8,37 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 class CustomButton extends StatelessWidget {
   /// Text to display on the button
   final String text;
-  
+
   /// Called when button is pressed
   final VoidCallback? onPressed;
-  
+
   /// Whether the button should display a loading indicator
   final bool isLoading;
-  
+
   /// Icon to display before text (optional)
   final IconData? icon;
-  
+
   /// Button color (defaults to primary color)
   final Color? color;
-  
+
   /// Text color (defaults to white)
   final Color? textColor;
-  
+
   /// Width of the button (defaults to maximum width)
   final double? width;
-  
+
   /// Height of the button (defaults to 56)
   final double height;
-  
+
   /// Border radius of the button (defaults to 8)
   final double borderRadius;
-  
+
   /// Elevation of the button (defaults to 0)
   final double elevation;
-  
+
   /// Whether the button is outlined (defaults to false)
   final bool isOutlined;
-  
+
   /// Creates a new custom button
   const CustomButton({
     Key? key,
@@ -67,11 +67,12 @@ class CustomButton extends StatelessWidget {
     } catch (e) {
       // If can't access AuthBloc, continue with default colors
     }
-    
+
     // Use lady colors for female users if no explicit color is provided
-    final buttonColor = color ?? (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
+    final buttonColor =
+        color ?? (isLadyMode ? AppColors.ladyPrimary : AppColors.primary);
     final buttonTextColor = textColor ?? Colors.white;
-    
+
     if (isOutlined) {
       return SizedBox(
         width: width,
@@ -88,7 +89,7 @@ class CustomButton extends StatelessWidget {
         ),
       );
     }
-    
+
     return SizedBox(
       width: width,
       height: height,
@@ -116,12 +117,14 @@ class CustomButton extends StatelessWidget {
         child: CircularProgressIndicator(
           strokeWidth: 2,
           valueColor: AlwaysStoppedAnimation<Color>(
-            isOutlined ? (isLadyMode ? AppColors.ladyPrimary : AppColors.primary) : Colors.white,
+            isOutlined
+                ? (isLadyMode ? AppColors.ladyPrimary : AppColors.primary)
+                : Colors.white,
           ),
         ),
       );
     }
-    
+
     if (icon != null) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -141,7 +144,7 @@ class CustomButton extends StatelessWidget {
         ],
       );
     }
-    
+
     return Text(
       text,
       style: AppTextStyles.labelLarge.copyWith(
@@ -149,4 +152,4 @@ class CustomButton extends StatelessWidget {
       ),
     );
   }
-} 
+}

@@ -110,8 +110,9 @@ class DuelProgressChart extends StatelessWidget {
         final index = entry.key;
         final participant = entry.value;
         final isLeader = index == 0;
-        final progress = (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
-        
+        final progress =
+            (participant.currentValue / duel.targetValue).clamp(0.0, 1.0);
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: _buildParticipantProgressBar(
@@ -132,7 +133,7 @@ class DuelProgressChart extends StatelessWidget {
     bool isLeader,
   ) {
     final isCompleted = progress >= 1.0;
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -194,7 +195,8 @@ class DuelProgressChart extends StatelessWidget {
               ),
               if (isCompleted)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.green,
                     borderRadius: BorderRadius.circular(10),
@@ -224,8 +226,11 @@ class DuelProgressChart extends StatelessWidget {
             value: progress,
             backgroundColor: Colors.grey[200],
             valueColor: AlwaysStoppedAnimation<Color>(
-              isCompleted ? Colors.green : 
-              isLeader ? AppColors.accent : AppColors.primary,
+              isCompleted
+                  ? Colors.green
+                  : isLeader
+                      ? AppColors.accent
+                      : AppColors.primary,
             ),
             minHeight: 6,
           ),
@@ -243,10 +248,8 @@ class DuelProgressChart extends StatelessWidget {
   }
 
   Widget _buildWinnerInfo() {
-    final winner = participants
-        .where((p) => p.id == duel.winnerId)
-        .firstOrNull;
-    
+    final winner = participants.where((p) => p.id == duel.winnerId).firstOrNull;
+
     if (winner == null) return const SizedBox.shrink();
 
     return Container(

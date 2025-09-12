@@ -16,7 +16,7 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final config = _getStatusConfig(status);
-    
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 6 : 8,
@@ -134,7 +134,7 @@ String getStatusDisplayText(String? status) {
   if (status == null || status.isEmpty) {
     return 'Unknown';
   }
-  
+
   switch (status.toLowerCase()) {
     case 'planned':
     case 'upcoming':

@@ -15,7 +15,8 @@ PlatformException _createConnectionError(String channelName) {
   );
 }
 
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse(
+    {Object? result, PlatformException? error, bool empty = false}) {
   if (empty) {
     return <Object?>[];
   }
@@ -24,7 +25,6 @@ List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty
   }
   return <Object?>[error.code, error.message, error.details];
 }
-
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -58,7 +58,14 @@ abstract class RuckingApi {
   Future<bool> startSessionOnWatch(double ruckWeight);
 
   /// Update session metrics on the watch (Flutter -> native)
-  Future<bool> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss);
+  Future<bool> updateSessionOnWatch(
+      double distance,
+      double duration,
+      double pace,
+      bool isPaused,
+      double calories,
+      double elevationGain,
+      double elevationLoss);
 
   /// Pause an active session from the watch
   Future<bool> pauseSessionFromWatch();
@@ -67,48 +74,62 @@ abstract class RuckingApi {
   Future<bool> resumeSessionFromWatch();
 
   /// End the current session from the watch
-  Future<bool> endSessionFromWatch(int duration, double distance, double calories);
+  Future<bool> endSessionFromWatch(
+      int duration, double distance, double calories);
 
   /// Update heart rate from the watch
   Future<bool> updateHeartRateFromWatch(double heartRate);
 
-  static void setUp(RuckingApi? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  static void setUp(
+    RuckingApi? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix =
+        messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch was null.');
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final double? arg_ruckWeight = (args[0] as double?);
           assert(arg_ruckWeight != null,
               'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.startSessionFromWatch was null, expected non-null double.');
           try {
-            final bool output = await api.startSessionFromWatch(arg_ruckWeight!);
+            final bool output =
+                await api.startSessionFromWatch(arg_ruckWeight!);
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.startSessionOnWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.startSessionOnWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.startSessionOnWatch was null.');
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.startSessionOnWatch was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final double? arg_ruckWeight = (args[0] as double?);
           assert(arg_ruckWeight != null,
@@ -118,22 +139,26 @@ abstract class RuckingApi {
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null.');
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final double? arg_distance = (args[0] as double?);
           assert(arg_distance != null,
@@ -157,19 +182,30 @@ abstract class RuckingApi {
           assert(arg_elevationLoss != null,
               'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateSessionOnWatch was null, expected non-null double.');
           try {
-            final bool output = await api.updateSessionOnWatch(arg_distance!, arg_duration!, arg_pace!, arg_isPaused!, arg_calories!, arg_elevationGain!, arg_elevationLoss!);
+            final bool output = await api.updateSessionOnWatch(
+                arg_distance!,
+                arg_duration!,
+                arg_pace!,
+                arg_isPaused!,
+                arg_calories!,
+                arg_elevationGain!,
+                arg_elevationLoss!);
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.pauseSessionFromWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.pauseSessionFromWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
@@ -180,15 +216,19 @@ abstract class RuckingApi {
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.resumeSessionFromWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.resumeSessionFromWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
@@ -199,22 +239,26 @@ abstract class RuckingApi {
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch was null.');
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final int? arg_duration = (args[0] as int?);
           assert(arg_duration != null,
@@ -226,37 +270,44 @@ abstract class RuckingApi {
           assert(arg_calories != null,
               'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.endSessionFromWatch was null, expected non-null double.');
           try {
-            final bool output = await api.endSessionFromWatch(arg_duration!, arg_distance!, arg_calories!);
+            final bool output = await api.endSessionFromWatch(
+                arg_duration!, arg_distance!, arg_calories!);
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
     }
     {
-      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch$messageChannelSuffix', pigeonChannelCodec,
+      final BasicMessageChannel<
+          Object?> pigeonVar_channel = BasicMessageChannel<
+              Object?>(
+          'dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch$messageChannelSuffix',
+          pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch was null.');
+              'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch was null.');
           final List<Object?> args = (message as List<Object?>?)!;
           final double? arg_heartRate = (args[0] as double?);
           assert(arg_heartRate != null,
               'Argument for dev.flutter.pigeon.rucking_app.RuckingApi.updateHeartRateFromWatch was null, expected non-null double.');
           try {
-            final bool output = await api.updateHeartRateFromWatch(arg_heartRate!);
+            final bool output =
+                await api.updateHeartRateFromWatch(arg_heartRate!);
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+                error: PlatformException(code: 'error', message: e.toString()));
           }
         });
       }
@@ -269,9 +320,11 @@ class FlutterRuckingApi {
   /// Constructor for [FlutterRuckingApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  FlutterRuckingApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+  FlutterRuckingApi(
+      {BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
       : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+        pigeonVar_messageChannelSuffix =
+            messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
@@ -279,14 +332,32 @@ class FlutterRuckingApi {
   final String pigeonVar_messageChannelSuffix;
 
   /// Update session metrics on the watch
-  Future<void> updateSessionOnWatch(double distance, double duration, double pace, bool isPaused, double calories, double elevationGain, double elevationLoss) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+  Future<void> updateSessionOnWatch(
+      double distance,
+      double duration,
+      double pace,
+      bool isPaused,
+      double calories,
+      double elevationGain,
+      double elevationLoss) async {
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.updateSessionOnWatch$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[distance, duration, pace, isPaused, calories, elevationGain, elevationLoss]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel
+        .send(<Object?>[
+      distance,
+      duration,
+      pace,
+      isPaused,
+      calories,
+      elevationGain,
+      elevationLoss
+    ]);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -304,13 +375,16 @@ class FlutterRuckingApi {
 
   /// Start a session on the watch
   Future<void> startSessionOnWatch(double ruckWeight) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.startSessionOnWatch$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.startSessionOnWatch$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[ruckWeight]);
+    final Future<Object?> pigeonVar_sendFuture =
+        pigeonVar_channel.send(<Object?>[ruckWeight]);
     final List<Object?>? pigeonVar_replyList =
         await pigeonVar_sendFuture as List<Object?>?;
     if (pigeonVar_replyList == null) {
@@ -328,8 +402,10 @@ class FlutterRuckingApi {
 
   /// Pause a session on the watch
   Future<void> pauseSessionOnWatch() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.pauseSessionOnWatch$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.pauseSessionOnWatch$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -352,8 +428,10 @@ class FlutterRuckingApi {
 
   /// Resume a session on the watch
   Future<void> resumeSessionOnWatch() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.resumeSessionOnWatch$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.resumeSessionOnWatch$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
@@ -376,8 +454,10 @@ class FlutterRuckingApi {
 
   /// End a session on the watch
   Future<void> endSessionOnWatch() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.endSessionOnWatch$pigeonVar_messageChannelSuffix';
-    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+    final String pigeonVar_channelName =
+        'dev.flutter.pigeon.rucking_app.FlutterRuckingApi.endSessionOnWatch$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel =
+        BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,

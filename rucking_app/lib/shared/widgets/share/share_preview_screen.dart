@@ -63,7 +63,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   late PageController _thumbnailController;
   int _currentBackgroundIndex = 0;
   late List<ShareBackgroundOption> _backgroundOptions;
-  
+
   // Color overlay options for swiping
   final List<Map<String, dynamic>> _colorOverlays = [
     {
@@ -97,7 +97,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
       'opacity': 0.3,
     },
   ];
-  
+
   int _currentOverlayIndex = 0;
 
   @override
@@ -217,7 +217,9 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
               child: Text(
                 'SHARE',
                 style: AppTextStyles.labelLarge.copyWith(
-                  color: widget.isLadyMode ? AppColors.ladyPrimary : AppColors.primary,
+                  color: widget.isLadyMode
+                      ? AppColors.ladyPrimary
+                      : AppColors.primary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -249,7 +251,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                 ],
               ),
             ),
-            
+
             // Background thumbnails
             SizedBox(
               height: 60,
@@ -277,7 +279,9 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: index == _currentBackgroundIndex
-                              ? (widget.isLadyMode ? AppColors.ladyPrimary : AppColors.primary)
+                              ? (widget.isLadyMode
+                                  ? AppColors.ladyPrimary
+                                  : AppColors.primary)
                               : Colors.transparent,
                           width: 2,
                         ),
@@ -291,7 +295,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                 },
               ),
             ),
-            
+
             // Second: Color overlay selector
             Padding(
               padding: const EdgeInsets.only(top: 12, left: 16, bottom: 4),
@@ -314,7 +318,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                 ],
               ),
             ),
-            
+
             // Color overlay options
             SizedBox(
               height: 40,
@@ -334,25 +338,29 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _colorOverlays[index]['overlay'] == Colors.transparent
+                        color: _colorOverlays[index]['overlay'] ==
+                                Colors.transparent
                             ? Colors.grey.withOpacity(0.3)
                             : _colorOverlays[index]['overlay'].withOpacity(0.7),
                         border: Border.all(
                           color: index == _currentOverlayIndex
-                              ? (widget.isLadyMode ? AppColors.ladyPrimary : AppColors.primary)
+                              ? (widget.isLadyMode
+                                  ? AppColors.ladyPrimary
+                                  : AppColors.primary)
                               : Colors.transparent,
                           width: 2,
                         ),
                       ),
                       child: index == 0
-                          ? const Icon(Icons.not_interested, color: Colors.white54, size: 20)
+                          ? const Icon(Icons.not_interested,
+                              color: Colors.white54, size: 20)
                           : null,
                     ),
                   );
                 },
               ),
             ),
-            
+
             // Third: The actual share card preview (takes most space)
             Expanded(
               child: PageView.builder(
@@ -367,13 +375,14 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                   return Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Center(
-                      child: _buildShareCardWithBackground(_backgroundOptions[index]),
+                      child: _buildShareCardWithBackground(
+                          _backgroundOptions[index]),
                     ),
                   );
                 },
               ),
             ),
-            
+
             // Loading indicator during sharing
             if (_isSharing)
               const Padding(
@@ -395,13 +404,16 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
         if (details.primaryVelocity! > 0) {
           // Swipe right - previous overlay
           setState(() {
-            _currentOverlayIndex = (_currentOverlayIndex - 1) % _colorOverlays.length;
-            if (_currentOverlayIndex < 0) _currentOverlayIndex = _colorOverlays.length - 1;
+            _currentOverlayIndex =
+                (_currentOverlayIndex - 1) % _colorOverlays.length;
+            if (_currentOverlayIndex < 0)
+              _currentOverlayIndex = _colorOverlays.length - 1;
           });
         } else if (details.primaryVelocity! < 0) {
           // Swipe left - next overlay
           setState(() {
-            _currentOverlayIndex = (_currentOverlayIndex + 1) % _colorOverlays.length;
+            _currentOverlayIndex =
+                (_currentOverlayIndex + 1) % _colorOverlays.length;
           });
         }
       },
@@ -433,7 +445,8 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                 width: 1080, // Match share card dimensions
                 height: 1080,
                 color: _colorOverlays[_currentOverlayIndex]['overlay']
-                    .withOpacity(_colorOverlays[_currentOverlayIndex]['opacity']),
+                    .withOpacity(
+                        _colorOverlays[_currentOverlayIndex]['opacity']),
               ),
             ),
           ],
@@ -441,7 +454,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
       ),
     );
   }
-  
+
   Widget _buildBackgroundThumbnail(ShareBackgroundOption option) {
     switch (option.type) {
       case ShareBackgroundType.map:
@@ -449,13 +462,13 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
           color: const Color(0xFF1E3A8A), // Dark blue background for map
           child: const Center(
             child: Icon(
-              Icons.map_outlined, 
+              Icons.map_outlined,
               color: Colors.white,
               size: 24,
             ),
           ),
         );
-        
+
       case ShareBackgroundType.photo:
         if (option.imageUrl != null) {
           return Image.network(
@@ -469,7 +482,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
         return const Center(
           child: Icon(Icons.image, color: Colors.white),
         );
-        
+
       case ShareBackgroundType.colorVariation:
         if (option.primaryColor != null && option.secondaryColor != null) {
           return Container(
@@ -486,7 +499,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
           );
         }
         return Container(color: option.primaryColor ?? Colors.grey);
-        
+
       case ShareBackgroundType.defaultGradient:
       default:
         return Container(
@@ -508,7 +521,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
 
     try {
       final selectedBackground = _backgroundOptions[_currentBackgroundIndex];
-      
+
       await ShareService.shareSessionCard(
         context: context,
         session: widget.session,
@@ -516,9 +529,10 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
         backgroundImageUrl: selectedBackground.imageUrl,
         achievements: widget.achievements,
         isLadyMode: widget.isLadyMode,
-        backgroundOption: selectedBackground, // Pass the selected background option
+        backgroundOption:
+            selectedBackground, // Pass the selected background option
       );
-      
+
       if (mounted) {
         StyledSnackBar.show(
           context: context,
@@ -529,7 +543,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
       }
     } catch (e) {
       AppLogger.error('Failed to share session: $e', exception: e);
-      
+
       if (mounted) {
         StyledSnackBar.show(
           context: context,

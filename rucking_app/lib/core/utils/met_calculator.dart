@@ -4,9 +4,9 @@ import 'dart:math' as math;
 /// Utility class for calculating calories burned using METs (Metabolic Equivalent of Task)
 class MetCalculator {
   /// Calculate calories burned using METs formula
-  /// 
+  ///
   /// The formula is: Calories = MET value × Weight (kg) × Duration (hours)
-  /// 
+  ///
   /// Parameters:
   /// - [weightKg]: User's weight in kilograms (body weight + ruck weight)
   /// - [durationMinutes]: Duration of the activity in minutes
@@ -18,16 +18,16 @@ class MetCalculator {
   }) {
     // Convert duration to hours
     final double durationHours = durationMinutes / 60.0;
-    
+
     // Apply MET formula
     final calories = metValue * weightKg * durationHours;
-    
+
     // Ensure calories are not negative
     return calories > 0 ? calories : 0.0;
   }
-  
+
   /// Calculate MET value for rucking activity based on grade (slope)
-  /// 
+  ///
   /// Parameters:
   /// - [speedMph]: Speed in miles per hour
   /// - [grade]: Grade/slope percentage (elevation change / horizontal distance × 100)
@@ -54,7 +54,7 @@ class MetCalculator {
     } else {
       baseMet = 6.0; // Very fast walking / jogging
     }
-    
+
     // Adjust MET based on grade
     double gradeAdjustment = 0.0;
     if (grade > 0) {
@@ -73,28 +73,29 @@ class MetCalculator {
         gradeAdjustment = (absGrade - 10) * 0.15;
       }
     }
-    
+
     // Adjust for load (ruck weight)
     double loadAdjustment = 0.0;
     if (ruckWeightLbs > 0) {
       // Simplified formula: ~0.05 MET per pound of weight (more impact at higher weights)
-      loadAdjustment = math.min(ruckWeightLbs * 0.05, 5.0); // Cap at 5.0 additional METs
+      loadAdjustment =
+          math.min(ruckWeightLbs * 0.05, 5.0); // Cap at 5.0 additional METs
     }
-    
+
     // Calculate final MET
     double finalMet = baseMet + gradeAdjustment + loadAdjustment;
-    
+
     // Ensure MET is reasonable (between 2.0 and 15.0)
     finalMet = finalMet.clamp(2.0, 15.0);
-    
+
     debugPrint('MET Calculation: Speed=${speedMph.toStringAsFixed(2)}mph, ' +
-              'Grade=${grade.toStringAsFixed(1)}%, RuckWeight=${ruckWeightLbs.toStringAsFixed(1)}lbs, ' +
-              'BaseMET=$baseMet, GradeAdj=${gradeAdjustment.toStringAsFixed(2)}, ' +
-              'LoadAdj=${loadAdjustment.toStringAsFixed(2)}, Final=${finalMet.toStringAsFixed(2)}');
-    
+        'Grade=${grade.toStringAsFixed(1)}%, RuckWeight=${ruckWeightLbs.toStringAsFixed(1)}lbs, ' +
+        'BaseMET=$baseMet, GradeAdj=${gradeAdjustment.toStringAsFixed(2)}, ' +
+        'LoadAdj=${loadAdjustment.toStringAsFixed(2)}, Final=${finalMet.toStringAsFixed(2)}');
+
     return finalMet;
   }
-  
+
   /// Calculate calories burned using heart rate-based formula (per sample)
   /// (ACSM/Keytel et al. equations)
   ///
@@ -115,26 +116,33 @@ class MetCalculator {
     for (int i = 1; i < heartRateSamples.length; i++) {
       final prev = heartRateSamples[i - 1];
       final curr = heartRateSamples[i];
-      final durationMinutes = curr.timestamp.difference(prev.timestamp).inSeconds / 60.0;
+      final durationMinutes =
+          curr.timestamp.difference(prev.timestamp).inSeconds / 60.0;
       final hr = curr.bpm;
       double cals;
       if (gender == 'female') {
-        cals = ((-20.4022 + (0.4472 * hr) - (0.1263 * weightKg) + (0.074 * age)) / 4.184) * durationMinutes;
+        cals =
+            ((-20.4022 + (0.4472 * hr) - (0.1263 * weightKg) + (0.074 * age)) /
+                    4.184) *
+                durationMinutes;
       } else {
-        cals = ((-55.0969 + (0.6309 * hr) + (0.1988 * weightKg) + (0.2017 * age)) / 4.184) * durationMinutes;
+        cals =
+            ((-55.0969 + (0.6309 * hr) + (0.1988 * weightKg) + (0.2017 * age)) /
+                    4.184) *
+                durationMinutes;
       }
       if (cals > 0) totalCalories += cals;
     }
     return totalCalories;
   }
-  
+
   /// Convert km/h to mph
   static double kmhToMph(double kmh) {
     return kmh * 0.621371;
   }
-  
+
   /// Calculate grade percentage from elevation change and distance
-  /// 
+  ///
   /// Parameters:
   /// - [elevationChangeMeters]: Change in elevation (positive for uphill, negative for downhill)
   /// - [distanceMeters]: Horizontal distance covered
@@ -144,7 +152,7 @@ class MetCalculator {
     required double distanceMeters,
   }) {
     if (distanceMeters <= 0) return 0;
-    
+
     // Calculate grade percentage
     return (elevationChangeMeters / distanceMeters) * 100;
   }
@@ -172,7 +180,8 @@ class MetCalculator {
     String? gender,
     double terrainMultiplier = 1.0, // Default to pavement baseline
     String calorieMethod = 'fusion', // 'mechanical' | 'hr' | 'fusion'
-    List<dynamic>? heartRateSamples, // expects objects with bpm:int and timestamp:DateTime
+    List<dynamic>?
+        heartRateSamples, // expects objects with bpm:int and timestamp:DateTime
     int age = 30,
     bool activeOnly = false,
     double? temperatureCelsius,
@@ -184,22 +193,26 @@ class MetCalculator {
     if (distanceKm <= 0.01 && (elevationGain + elevationLoss) <= 10.0) {
       // Resting metabolic rate: ~1.2 MET * weight * time (not including ruck weight when stationary)
       final restingCalories = 1.2 * userWeightKg * (elapsedSeconds / 3600.0);
-      
+
       // If activeOnly is enabled, subtract resting energy to get only active calories
       if (activeOnly && elapsedSeconds > 0) {
         final durationHours = elapsedSeconds / 3600.0;
-        final bmrPerHour = _estimateBmrKcalPerDay(weightKg: userWeightKg, age: age, gender: gender ?? 'male') / 24.0;
+        final bmrPerHour = _estimateBmrKcalPerDay(
+                weightKg: userWeightKg, age: age, gender: gender ?? 'male') /
+            24.0;
         final restingKcal = bmrPerHour * durationHours;
-        final activeCalories = (restingCalories - restingKcal).clamp(0.0, double.infinity);
+        final activeCalories =
+            (restingCalories - restingKcal).clamp(0.0, double.infinity);
         return activeCalories;
       }
-      
+
       return restingCalories;
     }
-    
+
     // Calculate average speed (km/h)
     double durationHours = elapsedSeconds / 3600.0;
-    double avgSpeedKmh = (durationHours > 0) ? (distanceKm / durationHours) : 0.0;
+    double avgSpeedKmh =
+        (durationHours > 0) ? (distanceKm / durationHours) : 0.0;
     double avgSpeedMph = kmhToMph(avgSpeedKmh);
 
     // Estimate an effective grade using uphill-only elevation gain to avoid
@@ -253,10 +266,11 @@ class MetCalculator {
     // Important: MET already includes load via ruckWeightLbs adjustment above.
     // To avoid double-counting, use BODY WEIGHT ONLY here.
     final baseCalories = calculateCaloriesBurned(
-      weightKg: userWeightKg,
-      durationMinutes: elapsedSeconds / 60.0,
-      metValue: metValue,
-    ) * terrainMultiplier;
+          weightKg: userWeightKg,
+          durationMinutes: elapsedSeconds / 60.0,
+          metValue: metValue,
+        ) *
+        terrainMultiplier;
 
     // Choose method - only Fusion gets weather adjustments
     if (calorieMethod == 'mechanical') {
@@ -273,7 +287,8 @@ class MetCalculator {
     if (hrCalories > 0) {
       // Estimate HR coverage: assume downsample ~20s between saved samples
       final expectedSamples = (elapsedSeconds / 20.0).clamp(1.0, 1e9);
-      final coverage = (heartRateSamples!.length / expectedSamples).clamp(0.0, 1.0);
+      final coverage =
+          (heartRateSamples!.length / expectedSamples).clamp(0.0, 1.0);
       // Reduce HR dominance for load carriage activities to avoid inflation
       // HR weight range: 0.3 → 0.6 based on coverage
       final wHr = (0.3 + 0.3 * coverage).clamp(0.3, 0.6);
@@ -282,7 +297,8 @@ class MetCalculator {
     }
 
     // Apply weather and terrain adjustments to both for apples-to-apples capping
-    final mechAdjusted = mechanicalCalories * weatherMultiplier * terrainMultiplier;
+    final mechAdjusted =
+        mechanicalCalories * weatherMultiplier * terrainMultiplier;
     fusion *= weatherMultiplier * terrainMultiplier;
 
     // Cap fusion within ±15% of adjusted mechanical to prevent runaway inflation/deflation
@@ -296,7 +312,9 @@ class MetCalculator {
     // Subtract resting energy if activeOnly enabled
     if (activeOnly && elapsedSeconds > 0) {
       final durationHours = elapsedSeconds / 3600.0;
-      final bmrPerHour = _estimateBmrKcalPerDay(weightKg: userWeightKg, age: age, gender: gender ?? 'male') / 24.0;
+      final bmrPerHour = _estimateBmrKcalPerDay(
+              weightKg: userWeightKg, age: age, gender: gender ?? 'male') /
+          24.0;
       final restingKcal = bmrPerHour * durationHours;
       fusion = (fusion - restingKcal).clamp(0.0, double.infinity);
     }
@@ -338,13 +356,16 @@ class MetCalculator {
     if (windSpeedKmh != null && windSpeedKmh > 10 && speedKmh > 3.0) {
       // Keep small at typical ruck speeds
       final windFactor = (windSpeedKmh - 10) / 40.0; // 0-1 for 10-50 km/h
-      final speedFactor = (speedKmh / 6.0).clamp(0.0, 1.0); // normalize to ~6 km/h
+      final speedFactor =
+          (speedKmh / 6.0).clamp(0.0, 1.0); // normalize to ~6 km/h
       final windAdjustment = windFactor * speedFactor * 0.04; // Up to 4%
       multiplier *= (1.0 + windAdjustment.clamp(0.0, 0.04));
     }
 
     // Humidity adjustments (affects cooling efficiency; mild)
-    if (humidity != null && temperatureCelsius != null && temperatureCelsius > 20) {
+    if (humidity != null &&
+        temperatureCelsius != null &&
+        temperatureCelsius > 20) {
       if (humidity > 80) {
         multiplier *= 1.02; // 2%
       } else if (humidity > 70) {
@@ -371,7 +392,8 @@ class MetCalculator {
     required int elapsedSeconds,
   }) {
     // Convert units
-    final v = (speedKmh / 3.6).clamp(0.0, 3.0); // m/s typical walking speeds up to ~3 m/s
+    final v = (speedKmh / 3.6)
+        .clamp(0.0, 3.0); // m/s typical walking speeds up to ~3 m/s
     final W = userWeightKg;
     final L = ruckWeightKg;
     final G = gradePct; // percent
@@ -382,25 +404,28 @@ class MetCalculator {
     // Ensure safe division
     final lw = (W > 0) ? (L / W) : 0.0;
     final termLoad = 2.0 * (W + L) * (lw * lw);
-    final termSpeedGrade = eta * (W + L) * (1.5 * v * v + 0.35 * v * G.clamp(-20.0, 30.0));
+    final termSpeedGrade =
+        eta * (W + L) * (1.5 * v * v + 0.35 * v * G.clamp(-20.0, 30.0));
     double M = 1.5 * W + termLoad + termSpeedGrade; // Watts
 
     // GORUCK-inspired load ratio adjustment to address Pandolf underestimation
     // Research shows 12-33% underestimation, but need to be more conservative for civilian rucking
     final loadRatio = lw; // L/W ratio (0.0 to ~0.33 for reasonable loads)
     final speedMph = speedKmh * 0.621371;
-    
+
     // Calculate adjustment factor based on load ratio and speed
     // Reduced from military research values to better match civilian rucking reality
     double adjustmentFactor = 1.0;
     if (loadRatio > 0 && speedMph > 2.0) {
       // Base adjustment scales with load ratio (0-15% at max, reduced from 27%)
-      final baseAdjustment = math.min(loadRatio * 0.45, 0.15); // Cap at 15% instead of 27%
+      final baseAdjustment =
+          math.min(loadRatio * 0.45, 0.15); // Cap at 15% instead of 27%
       // Speed factor: more adjustment at higher speeds (research shows this)
-      final speedFactor = math.min((speedMph - 2.0) / 2.0, 1.0); // 0-1 factor for 2-4mph+
+      final speedFactor =
+          math.min((speedMph - 2.0) / 2.0, 1.0); // 0-1 factor for 2-4mph+
       adjustmentFactor = 1.0 + (baseAdjustment * speedFactor);
     }
-    
+
     // Apply the research-based adjustment
     M = M * adjustmentFactor;
 

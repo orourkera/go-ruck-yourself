@@ -149,7 +149,7 @@ class DuelCard extends StatelessWidget {
 
   Widget _buildProgressBar(BuildContext context) {
     final progress = _calculateProgress();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -178,7 +178,9 @@ class DuelCard extends StatelessWidget {
           value: progress,
           backgroundColor: Colors.grey[200],
           valueColor: AlwaysStoppedAnimation<Color>(
-            progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
+            progress >= 1.0
+                ? Colors.green
+                : Theme.of(context).colorScheme.secondary,
           ),
         ),
       ],
@@ -216,14 +218,17 @@ class DuelCard extends StatelessWidget {
           SizedBox(
             height: 38, // Increased from 32
             child: ElevatedButton(
-              onPressed: showJoinButton ? () {
-                HapticFeedback.vibrate();
-                onJoin?.call();
-              } : null,
+              onPressed: showJoinButton
+                  ? () {
+                      HapticFeedback.vibrate();
+                      onJoin?.call();
+                    }
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20), // Increased from 16
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20), // Increased from 16
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -282,24 +287,26 @@ class DuelCard extends StatelessWidget {
 
   String _getLocationText() {
     final parts = <String>[];
-    if (duel.creatorCity != null && duel.creatorCity != 'Unknown') parts.add(duel.creatorCity!);
-    if (duel.creatorState != null && duel.creatorState != 'Unknown') parts.add(duel.creatorState!);
+    if (duel.creatorCity != null && duel.creatorCity != 'Unknown')
+      parts.add(duel.creatorCity!);
+    if (duel.creatorState != null && duel.creatorState != 'Unknown')
+      parts.add(duel.creatorState!);
     return parts.join(', ');
   }
 
   double _calculateProgress() {
     if (participants.isEmpty) return 0.0;
-    
+
     final maxProgress = participants
         .map((DuelParticipant p) => p.currentValue / duel.targetValue)
         .reduce((a, b) => a > b ? a : b);
-    
+
     return maxProgress.clamp(0.0, 1.0);
   }
 
   String _getTimeInfo() {
     final now = DateTime.now();
-    
+
     if (duel.endsAt != null) {
       final timeLeft = duel.endsAt!.difference(now);
       if (timeLeft.isNegative) {
@@ -312,7 +319,7 @@ class DuelCard extends StatelessWidget {
         return '${timeLeft.inMinutes}m left';
       }
     }
-    
+
     // Convert hours to days for better readability
     if (duel.timeframeHours >= 24) {
       final days = (duel.timeframeHours / 24).round();
@@ -324,7 +331,7 @@ class DuelCard extends StatelessWidget {
 
   String _getWinnerText(BuildContext context) {
     if (duel.winnerId == null) return 'No winner';
-    
+
     // Find the winner participant
     final winnerParticipant = participants.firstWhere(
       (p) => p.userId == duel.winnerId,
@@ -339,7 +346,7 @@ class DuelCard extends StatelessWidget {
         updatedAt: DateTime.now(),
       ),
     );
-    
+
     // Get current user ID
     String? currentUserId;
     try {
@@ -350,7 +357,7 @@ class DuelCard extends StatelessWidget {
     } catch (e) {
       // Handle error if context is not available
     }
-    
+
     // Return personalized text
     if (currentUserId == duel.winnerId) {
       return 'You won!';
@@ -360,12 +367,14 @@ class DuelCard extends StatelessWidget {
   }
 
   bool _shouldShowJoinButton() {
-    return onJoin != null && 
-           (duel.status == DuelStatus.pending || duel.status == DuelStatus.active) &&
-           participants.length < duel.maxParticipants;
+    return onJoin != null &&
+        (duel.status == DuelStatus.pending ||
+            duel.status == DuelStatus.active) &&
+        participants.length < duel.maxParticipants;
   }
 
   bool _shouldShowLocation() {
-    return (duel.creatorCity != null && duel.creatorCity != 'Unknown') || (duel.creatorState != null && duel.creatorState != 'Unknown');
+    return (duel.creatorCity != null && duel.creatorCity != 'Unknown') ||
+        (duel.creatorState != null && duel.creatorState != 'Unknown');
   }
 }

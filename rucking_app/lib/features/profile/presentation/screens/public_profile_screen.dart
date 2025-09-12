@@ -19,7 +19,8 @@ class PublicProfileScreen extends StatefulWidget {
   _PublicProfileScreenState createState() => _PublicProfileScreenState();
 }
 
-class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTickerProviderStateMixin {
+class _PublicProfileScreenState extends State<PublicProfileScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
   @override
@@ -42,7 +43,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
       body: BlocBuilder<PublicProfileBloc, PublicProfileState>(
         builder: (context, state) {
           if (state is PublicProfileLoading) return ProfileSkeleton();
-          if (state is PublicProfileError) return Center(child: Text(state.message));
+          if (state is PublicProfileError)
+            return Center(child: Text(state.message));
           if (state is PublicProfileLoaded) {
             return SingleChildScrollView(
               child: Padding(
@@ -70,13 +72,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                                 context,
                                 label: 'Followers',
                                 count: state.stats?.followersCount ?? 0,
-                                onTap: () => Navigator.pushNamed(context, '/profile/${state.profile.id}/followers'),
+                                onTap: () => Navigator.pushNamed(context,
+                                    '/profile/${state.profile.id}/followers'),
                               ),
                               _buildCountColumn(
                                 context,
                                 label: 'Following',
                                 count: state.stats?.followingCount ?? 0,
-                                onTap: () => Navigator.pushNamed(context, '/profile/${state.profile.id}/following'),
+                                onTap: () => Navigator.pushNamed(context,
+                                    '/profile/${state.profile.id}/following'),
                               ),
                             ],
                           ),
@@ -100,10 +104,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          context.read<PublicProfileBloc>().add(ToggleFollow(widget.userId));
+                          context
+                              .read<PublicProfileBloc>()
+                              .add(ToggleFollow(widget.userId));
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: state.isFollowing ? Colors.grey : AppColors.primary,
+                          backgroundColor: state.isFollowing
+                              ? Colors.grey
+                              : AppColors.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -126,7 +134,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                             preferMetric = authState.user.preferMetric;
                             print('DEBUG: User preferMetric = $preferMetric');
                           } else {
-                            print('DEBUG: User not authenticated, defaulting to metric');
+                            print(
+                                'DEBUG: User not authenticated, defaulting to metric');
                           }
                           return ProfileStatsGrid(
                             stats: state.stats ?? UserProfileStats.empty(),
@@ -135,7 +144,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                         },
                       ),
                       const SizedBox(height: 24),
-                      TabBar(controller: _tabController, tabs: [Tab(text: 'Stats'), Tab(text: 'Clubs'), Tab(text: 'Recent')]),
+                      TabBar(controller: _tabController, tabs: [
+                        Tab(text: 'Stats'),
+                        Tab(text: 'Clubs'),
+                        Tab(text: 'Recent')
+                      ]),
                       SizedBox(
                         height: 300,
                         child: TabBarView(
@@ -157,7 +170,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                               const SizedBox(height: 16),
                               Text(
                                 'This profile is private',
-                                style: AppTextStyles.titleMedium.copyWith(color: Colors.grey),
+                                style: AppTextStyles.titleMedium
+                                    .copyWith(color: Colors.grey),
                               ),
                             ],
                           ),
@@ -174,7 +188,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
     );
   }
 
-  Widget _buildCountColumn(BuildContext context, {required String label, required int count, VoidCallback? onTap}) {
+  Widget _buildCountColumn(BuildContext context,
+      {required String label, required int count, VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -182,7 +197,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
         children: [
           Text(
             count.toString(),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
@@ -192,21 +210,34 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
 
   Widget _buildStatsTab(UserProfileStats? stats) {
     if (stats == null) return Center(child: Text('No stats available'));
-    
+
     // Get current user's metric preference from AuthBloc
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     print('DEBUG: _buildStatsTab preferMetric = $preferMetric');
-    
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           _buildStatRow('Total Rucks', stats.totalRucks.toString()),
-          _buildStatRow('Total Distance', MeasurementUtils.formatDistance(stats.totalDistanceKm, metric: preferMetric)),
-          _buildStatRow('Total Duration', MeasurementUtils.formatDuration(Duration(seconds: stats.totalDurationSeconds))),
-          _buildStatRow('Calories Burned', MeasurementUtils.formatCalories(stats.totalCaloriesBurned.toInt())),
-          _buildStatRow('Elevation Gain', MeasurementUtils.formatSingleElevation(stats.totalElevationGainM, metric: preferMetric)),
+          _buildStatRow(
+              'Total Distance',
+              MeasurementUtils.formatDistance(stats.totalDistanceKm,
+                  metric: preferMetric)),
+          _buildStatRow(
+              'Total Duration',
+              MeasurementUtils.formatDuration(
+                  Duration(seconds: stats.totalDurationSeconds))),
+          _buildStatRow(
+              'Calories Burned',
+              MeasurementUtils.formatCalories(
+                  stats.totalCaloriesBurned.toInt())),
+          _buildStatRow(
+              'Elevation Gain',
+              MeasurementUtils.formatSingleElevation(stats.totalElevationGainM,
+                  metric: preferMetric)),
           _buildStatRow('Duels Won', stats.duelsWon.toString()),
           _buildStatRow('Events Completed', stats.eventsCompleted.toString()),
         ],
@@ -221,7 +252,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: AppTextStyles.bodyMedium),
-          Text(value, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+          Text(value,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -231,14 +264,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
     if (clubs == null || clubs.isEmpty) {
       return Center(child: Text('No clubs joined'));
     }
-    
+
     return ListView.builder(
       itemCount: clubs.length,
       itemBuilder: (context, index) {
         final club = clubs[index];
         return ListTile(
           title: Text(club['name']?.toString() ?? 'Unknown Club'),
-          subtitle: Text('${club['memberCount'] ?? club['member_count'] ?? 0} members'),
+          subtitle: Text(
+              '${club['memberCount'] ?? club['member_count'] ?? 0} members'),
         );
       },
     );
@@ -252,12 +286,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
           children: [
             Icon(Icons.directions_run, size: 48, color: Colors.grey[400]),
             SizedBox(height: 16),
-            Text('No recent rucks', style: AppTextStyles.bodyMedium.copyWith(color: Colors.grey[600])),
+            Text('No recent rucks',
+                style:
+                    AppTextStyles.bodyMedium.copyWith(color: Colors.grey[600])),
           ],
         ),
       );
     }
-    
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
       itemCount: recentRucks.length,
@@ -279,7 +315,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
                     ),
                     if (ruck['power_points'] != null)
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -341,7 +378,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
       children: [
         Icon(icon, size: 16, color: Colors.grey[600]),
         SizedBox(width: 6),
-        Text(value, style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[700])),
+        Text(value,
+            style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[700])),
       ],
     );
   }
@@ -352,11 +390,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
       final date = DateTime.parse(dateTime);
       final now = DateTime.now();
       final difference = now.difference(date).inDays;
-      
+
       if (difference == 0) return 'Today';
       if (difference == 1) return 'Yesterday';
       if (difference < 7) return '${difference} days ago';
-      
+
       return '${date.day}/${date.month}/${date.year}';
     } catch (e) {
       return 'Ruck Session';
@@ -364,39 +402,53 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> with SingleTi
   }
 
   String _formatDistance(dynamic distance) {
-    if (distance == null) return MeasurementUtils.formatDistance(0.0, metric: true);
-    final distanceKm = distance is double ? distance : double.tryParse(distance.toString()) ?? 0.0;
-    
+    if (distance == null)
+      return MeasurementUtils.formatDistance(0.0, metric: true);
+    final distanceKm = distance is double
+        ? distance
+        : double.tryParse(distance.toString()) ?? 0.0;
+
     // Get current user's metric preference from AuthBloc
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    print('DEBUG: _formatDistance preferMetric = $preferMetric for distance $distanceKm');
-    
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    print(
+        'DEBUG: _formatDistance preferMetric = $preferMetric for distance $distanceKm');
+
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   String _formatDuration(dynamic duration) {
     if (duration == null) return MeasurementUtils.formatDuration(Duration.zero);
-    final durationSeconds = duration is int ? duration : int.tryParse(duration.toString()) ?? 0;
-    
+    final durationSeconds =
+        duration is int ? duration : int.tryParse(duration.toString()) ?? 0;
+
     return MeasurementUtils.formatDuration(Duration(seconds: durationSeconds));
   }
 
   String _formatElevation(dynamic elevation) {
-    if (elevation == null) return MeasurementUtils.formatSingleElevation(0.0, metric: true);
-    final elevationM = elevation is double ? elevation : double.tryParse(elevation.toString()) ?? 0.0;
-    
+    if (elevation == null)
+      return MeasurementUtils.formatSingleElevation(0.0, metric: true);
+    final elevationM = elevation is double
+        ? elevation
+        : double.tryParse(elevation.toString()) ?? 0.0;
+
     // Get current user's metric preference from AuthBloc
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    print('DEBUG: _formatElevation preferMetric = $preferMetric for elevation $elevationM');
-    
-    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    print(
+        'DEBUG: _formatElevation preferMetric = $preferMetric for elevation $elevationM');
+
+    return MeasurementUtils.formatSingleElevation(elevationM,
+        metric: preferMetric);
   }
 
   String _formatCalories(dynamic calories) {
     if (calories == null) return '${MeasurementUtils.formatCalories(0)} cal';
-    final caloriesValue = calories is double ? calories : double.tryParse(calories.toString()) ?? 0.0;
+    final caloriesValue = calories is double
+        ? calories
+        : double.tryParse(calories.toString()) ?? 0.0;
     return '${MeasurementUtils.formatCalories(caloriesValue.toInt())} cal';
   }
-} 
+}

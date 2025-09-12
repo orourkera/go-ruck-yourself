@@ -21,7 +21,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
   bool _isPublic = true;
   String _duelType = 'Distance';
   double _targetValue = 10.0;
-  
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -51,7 +51,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Description field
           TextFormField(
             controller: _descriptionController,
@@ -62,7 +62,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
             maxLines: 3,
           ),
           const SizedBox(height: 16),
-          
+
           // Duel Type Dropdown
           DropdownButtonFormField<String>(
             value: _duelType,
@@ -85,7 +85,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Target field
           TextFormField(
             initialValue: _targetValue.toString(),
@@ -109,7 +109,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // End Date Picker
           ListTile(
             title: const Text('End Date'),
@@ -132,7 +132,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Public/Private Toggle
           SwitchListTile(
             title: const Text('Public Challenge'),
@@ -148,7 +148,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
             },
           ),
           const SizedBox(height: 24),
-          
+
           // Submit Button
           CustomButton(
             text: 'CREATE DUEL',
@@ -161,7 +161,8 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
                         // description: _descriptionController.text, // Removed - not supported by backend yet
                         challengeType: _duelType,
                         targetValue: _targetValue,
-                        timeframeHours: (_endDate.difference(DateTime.now()).inHours),
+                        timeframeHours:
+                            (_endDate.difference(DateTime.now()).inHours),
                         maxParticipants: 10, // Default value
                         minParticipants: 2, // Default value
                         startMode: 'auto', // Default value
@@ -178,7 +179,7 @@ class _CreateDuelFormState extends State<CreateDuelForm> {
       ),
     );
   }
-  
+
   String _getSuffixForDuelType(String duelType) {
     switch (duelType) {
       case 'Distance':

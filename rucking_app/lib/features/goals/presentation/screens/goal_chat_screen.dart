@@ -20,7 +20,8 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
   bool _loading = false;
   String? _error;
   final List<_ChatTurn> _turns = <_ChatTurn>[];
-  Map<String, dynamic>? _userHistory; // optional: AI cheerleader history/context
+  Map<String, dynamic>?
+      _userHistory; // optional: AI cheerleader history/context
 
   @override
   void initState() {
@@ -30,7 +31,8 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
 
   Future<void> _loadUserHistory() async {
     try {
-      final hist = await _api.getAICheerleaderUserHistory(rucksLimit: 15, achievementsLimit: 25);
+      final hist = await _api.getAICheerleaderUserHistory(
+          rucksLimit: 15, achievementsLimit: 25);
       if (mounted) {
         setState(() {
           _userHistory = hist;
@@ -69,7 +71,8 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
         draftMap = Map<String, dynamic>.from(parsed['draft'] as Map);
       } else if (parsed['draft_goal'] is Map) {
         draftMap = Map<String, dynamic>.from(parsed['draft_goal'] as Map);
-      } else if (parsed is Map<String, dynamic> && parsed.containsKey('metric')) {
+      } else if (parsed is Map<String, dynamic> &&
+          parsed.containsKey('metric')) {
         // Some servers may return the draft object directly
         draftMap = Map<String, dynamic>.from(parsed);
       }
@@ -102,7 +105,8 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
       } else {
         // No draft returned (clarification). Keep chat open for user to refine
         if (assistantMessage == null && needsClarification) {
-          _turns.add(_ChatTurn.assistantText('Can you add more detail, like units or timeframe?'));
+          _turns.add(_ChatTurn.assistantText(
+              'Can you add more detail, like units or timeframe?'));
         }
         setState(() {});
       }
@@ -167,7 +171,8 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
                   if (_error != null && index == _turns.length) {
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                      child: Text(_error!,
+                          style: const TextStyle(color: Colors.red)),
                     );
                   }
                   if (_turns.isEmpty) {
@@ -221,7 +226,8 @@ class _GoalChatScreenState extends State<GoalChatScreen> {
                             const SizedBox(height: 8),
                             _DraftSummary(draft: turn.draft ?? const {}),
                             const SizedBox(height: 4),
-                            const Text('Submit again to refine your intent, or confirm in the sheet.'),
+                            const Text(
+                                'Submit again to refine your intent, or confirm in the sheet.'),
                           ],
                         ),
                       ),

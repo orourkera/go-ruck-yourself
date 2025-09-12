@@ -16,7 +16,8 @@ class ImportProgressIndicator extends StatefulWidget {
   });
 
   @override
-  State<ImportProgressIndicator> createState() => _ImportProgressIndicatorState();
+  State<ImportProgressIndicator> createState() =>
+      _ImportProgressIndicatorState();
 }
 
 class _ImportProgressIndicatorState extends State<ImportProgressIndicator>
@@ -67,9 +68,9 @@ class _ImportProgressIndicatorState extends State<ImportProgressIndicator>
               _buildDeterminateProgress()
             else
               _buildIndeterminateProgress(),
-            
+
             const SizedBox(height: 12),
-            
+
             // Progress message
             Text(
               widget.message,
@@ -79,7 +80,7 @@ class _ImportProgressIndicatorState extends State<ImportProgressIndicator>
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             // Progress percentage
             if (widget.progress != null) ...[
               const SizedBox(height: 4),
@@ -144,7 +145,8 @@ class SteppedProgressIndicator extends StatefulWidget {
   });
 
   @override
-  State<SteppedProgressIndicator> createState() => _SteppedProgressIndicatorState();
+  State<SteppedProgressIndicator> createState() =>
+      _SteppedProgressIndicatorState();
 }
 
 class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
@@ -165,7 +167,7 @@ class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _progressAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -173,7 +175,7 @@ class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
       parent: _progressController,
       curve: Curves.easeInOut,
     ));
-    
+
     _pulseAnimation = Tween<double>(
       begin: 0.8,
       end: 1.2,
@@ -233,19 +235,20 @@ class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
                   child: CircularProgressIndicator(
                     value: _progressAnimation.value,
                     backgroundColor: AppColors.primary.withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppColors.primary),
                     strokeWidth: 6,
                   ),
                 ),
               );
             },
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Current step
           Text(
-            widget.currentStep < widget.steps.length 
+            widget.currentStep < widget.steps.length
                 ? widget.steps[widget.currentStep]
                 : 'Complete',
             style: AppTextStyles.titleMedium.copyWith(
@@ -254,9 +257,9 @@ class _SteppedProgressIndicatorState extends State<SteppedProgressIndicator>
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Step counter
           Text(
             'Step ${widget.currentStep + 1} of ${widget.steps.length}',
@@ -385,7 +388,7 @@ class _IconProgressIndicatorState extends State<IconProgressIndicator>
   @override
   Widget build(BuildContext context) {
     final color = widget.color ?? AppColors.primary;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -395,7 +398,9 @@ class _IconProgressIndicatorState extends State<IconProgressIndicator>
             animation: _rotationAnimation,
             builder: (context, child) {
               return Transform.rotate(
-                angle: widget.isAnimating ? _rotationAnimation.value * 2 * 3.14159 : 0,
+                angle: widget.isAnimating
+                    ? _rotationAnimation.value * 2 * 3.14159
+                    : 0,
                 child: Icon(
                   widget.icon,
                   size: 48,

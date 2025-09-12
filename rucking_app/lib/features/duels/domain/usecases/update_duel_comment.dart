@@ -4,18 +4,19 @@ import '../../../../core/usecases/usecase.dart';
 import '../entities/duel_comment.dart';
 import '../repositories/duels_repository.dart';
 
-class UpdateDuelComment implements UseCase<DuelComment, UpdateDuelCommentParams> {
+class UpdateDuelComment
+    implements UseCase<DuelComment, UpdateDuelCommentParams> {
   final DuelsRepository repository;
 
   UpdateDuelComment(this.repository);
 
   @override
-  Future<Either<Failure, DuelComment>> call(UpdateDuelCommentParams params) async {
+  Future<Either<Failure, DuelComment>> call(
+      UpdateDuelCommentParams params) async {
     return await repository.updateDuelComment(
-      duelId: params.duelId,
-      commentId: params.commentId,
-      content: params.content
-    );
+        duelId: params.duelId,
+        commentId: params.commentId,
+        content: params.content);
   }
 }
 

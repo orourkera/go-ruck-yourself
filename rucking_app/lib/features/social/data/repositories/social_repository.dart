@@ -13,20 +13,22 @@ import 'package:rucking_app/core/error/exceptions.dart';
 class SocialRepository {
   final http.Client _httpClient;
   final AuthService _authService;
-  
+
   // Cache for social data to prevent repeated API calls
   final Map<int, bool> _likeStatusCache = {};
   final Map<int, int> _likeCountCache = {};
   final Map<String, List<RuckComment>> _commentsCache = {};
   final Map<int, DateTime> _likeCacheTimestamps = {};
   final Map<String, DateTime> _commentsCacheTimestamps = {};
-  
+
   // Cache expiration in seconds - increased to 5 minutes for better performance
   static const int _cacheExpirationSeconds = 300; // 5 minutes cache
-  
+
   // Getters for cached data - these provide immediate access to cached values without network calls
-  bool? getCachedLikeStatus(int? ruckId) => ruckId == null ? null : _likeStatusCache[ruckId];
-  int? getCachedLikeCount(int? ruckId) => ruckId == null ? null : _likeCountCache[ruckId];
+  bool? getCachedLikeStatus(int? ruckId) =>
+      ruckId == null ? null : _likeStatusCache[ruckId];
+  int? getCachedLikeCount(int? ruckId) =>
+      ruckId == null ? null : _likeCountCache[ruckId];
   List<RuckComment>? getCachedComments(String ruckId) => _commentsCache[ruckId];
 
   /// Clear cached comments for a specific ruck to force refresh
@@ -59,16 +61,16 @@ class SocialRepository {
     _likeCountCache[ruckId] = likeCount;
     // Mark as stale on purpose so the next check fetches fresh status from backend.
     // This prevents UI-seeded values (which may be stale) from blocking refresh for 5 minutes.
-    _likeCacheTimestamps[ruckId] = DateTime.now().subtract(const Duration(seconds: _cacheExpirationSeconds + 1));
+    _likeCacheTimestamps[ruckId] = DateTime.now()
+        .subtract(const Duration(seconds: _cacheExpirationSeconds + 1));
   }
 
   /// Constructor
   SocialRepository({
     required http.Client httpClient,
     required AuthService authService,
-  }) : 
-    _httpClient = httpClient,
-    _authService = authService;
+  })  : _httpClient = httpClient,
+        _authService = authService;
 
   /// Get the JWT token for authorization using AuthService
   Future<String?> get _authToken async {
@@ -91,7 +93,7 @@ class SocialRepository {
       if (token == null) {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
-      
+
       final response = await _httpClient.get(
         Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId'),
         headers: {
@@ -116,7 +118,8 @@ class SocialRepository {
         return []; // Return empty list for 404
       } else {
         throw ServerException(
-            message: 'Failed to get likes: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to get likes: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
@@ -167,11 +170,12 @@ class SocialRepository {
         throw ServerException(message: 'Ruck session not found');
       } else {
         throw ServerException(
-            message: 'Failed to add like: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to add like: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
-      
+
       // Enhanced error handling with Sentry - wrapped to prevent secondary errors
       try {
         await AppErrorHandler.handleError(
@@ -186,9 +190,10 @@ class SocialRepository {
         );
       } catch (errorHandlerException) {
         // If error reporting fails, log it but don't crash the app
-        print('Error reporting failed during social add like: $errorHandlerException');
+        print(
+            'Error reporting failed during social add like: $errorHandlerException');
       }
-      
+
       throw ServerException(message: 'Failed to add like: $e');
     }
   }
@@ -208,7 +213,7 @@ class SocialRepository {
 
       final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
       debugPrint('[REMOVE_LIKE] Constructed endpoint: $endpoint');
-      
+
       final response = await _httpClient.delete(
         Uri.parse(endpoint),
         headers: {
@@ -223,46 +228,52 @@ class SocialRepository {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
         final success = data['success'] == true;
-        
+
         if (success) {
           // Update cache to set liked=false and decrement like count
           _likeStatusCache[ruckId] = false;
           _likeCountCache[ruckId] = (_likeCountCache[ruckId] ?? 1) - 1;
-          if (_likeCountCache[ruckId]! < 0) _likeCountCache[ruckId] = 0; // Ensure count doesn't go below 0
+          if (_likeCountCache[ruckId]! < 0)
+            _likeCountCache[ruckId] = 0; // Ensure count doesn't go below 0
           _likeCacheTimestamps[ruckId] = DateTime.now();
         }
-        
+
         return;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 404) {
-        debugPrint('[REMOVE_LIKE] 404 Error: Like not found or endpoint not found');
+        debugPrint(
+            '[REMOVE_LIKE] 404 Error: Like not found or endpoint not found');
         clearRuckCache(ruckId.toString());
         // Try to parse error message to distinguish between "like not found" vs "endpoint not found"
         try {
           final Map<String, dynamic> errorData = json.decode(response.body);
           final errorMsg = errorData['error'] ?? 'Unknown error';
           debugPrint('[REMOVE_LIKE] 404 Error details: $errorMsg');
-          
-          if (errorMsg.toLowerCase().contains('not found') && !errorMsg.toLowerCase().contains('endpoint')) {
+
+          if (errorMsg.toLowerCase().contains('not found') &&
+              !errorMsg.toLowerCase().contains('endpoint')) {
             // This is a "like not found" error, which is acceptable
             return;
           } else {
             // This might be an endpoint routing issue
-            throw ServerException(message: 'DELETE endpoint not found: $errorMsg');
+            throw ServerException(
+                message: 'DELETE endpoint not found: $errorMsg');
           }
         } catch (jsonError) {
           // If we can't parse the error, assume like doesn't exist and return successfully
-          debugPrint('[REMOVE_LIKE] Could not parse 404 error response, assuming like already removed');
+          debugPrint(
+              '[REMOVE_LIKE] Could not parse 404 error response, assuming like already removed');
           return;
         }
       } else {
         throw ServerException(
-            message: 'Failed to remove like: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to remove like: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
-      
+
       // Enhanced error reporting for like removal issues
       try {
         await AppErrorHandler.handleError(
@@ -277,9 +288,10 @@ class SocialRepository {
           sendToBackend: true,
         );
       } catch (errorHandlerException) {
-        debugPrint('Error reporting failed during social remove like: $errorHandlerException');
+        debugPrint(
+            'Error reporting failed during social remove like: $errorHandlerException');
       }
-      
+
       throw ServerException(message: 'Failed to remove like: $e');
     }
   }
@@ -301,7 +313,7 @@ class SocialRepository {
     final token = await _authToken;
     if (token == null) {
       _likeStatusCache[ruckId] = false; // Update status cache
-      _likeCountCache[ruckId] = 0;      // Update count cache
+      _likeCountCache[ruckId] = 0; // Update count cache
       _likeCacheTimestamps[ruckId] = DateTime.now(); // Update timestamp
       return false; // Not authenticated, so can't have liked it
     }
@@ -313,23 +325,27 @@ class SocialRepository {
 
     // Update caches with fresh data
     _likeStatusCache[ruckId] = freshHasLiked ?? false;
-    _likeCountCache[ruckId] = freshLikeCount ?? 0; // Default to 0 if count fetch fails
+    _likeCountCache[ruckId] =
+        freshLikeCount ?? 0; // Default to 0 if count fetch fails
     _likeCacheTimestamps[ruckId] = DateTime.now();
 
-    return freshHasLiked ?? false; // If fallback returns null (error), treat as not liked
+    return freshHasLiked ??
+        false; // If fallback returns null (error), treat as not liked
   }
-  
+
   /// Checks if cache for a ruckId is still valid
   bool _isValidCache(int ruckId) {
     return _likeCacheTimestamps.containsKey(ruckId) &&
-        DateTime.now().difference(_likeCacheTimestamps[ruckId]!) < const Duration(seconds: _cacheExpirationSeconds);
+        DateTime.now().difference(_likeCacheTimestamps[ruckId]!) <
+            const Duration(seconds: _cacheExpirationSeconds);
   }
 
   /// Fallback method for checking a single ruck like status
   /// Returns true/false if user has liked the ruck, or null on error
   Future<bool?> _fallbackSingleRuckCheck(int ruckId, String token) async {
     try {
-      final endpoint = '${AppConfig.apiBaseUrl}/ruck-likes/check?ruck_id=$ruckId';
+      final endpoint =
+          '${AppConfig.apiBaseUrl}/ruck-likes/check?ruck_id=$ruckId';
       final response = await _httpClient.get(
         Uri.parse(endpoint),
         headers: {
@@ -337,16 +353,20 @@ class SocialRepository {
           'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 5));
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true) {
           final bool hasLiked;
           // Handle different API response formats
           if (data['data'] is Map) {
-            hasLiked = data['data']['has_liked'] == true || data['data']['has_liked'] == 'true' || data['data']['has_liked'] == 1;
+            hasLiked = data['data']['has_liked'] == true ||
+                data['data']['has_liked'] == 'true' ||
+                data['data']['has_liked'] == 1;
           } else {
-            hasLiked = data['data'] == true || data['data'] == 'true' || data['data'] == 1;
+            hasLiked = data['data'] == true ||
+                data['data'] == 'true' ||
+                data['data'] == 1;
           }
           return hasLiked;
         }
@@ -359,7 +379,8 @@ class SocialRepository {
         clearRuckCache(ruckId.toString());
       } else {
         throw ServerException(
-            message: 'Failed to check like status: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to check like status: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       return null; // Return null on error
@@ -371,7 +392,7 @@ class SocialRepository {
   Future<int?> _fallbackSingleRuckLikeCount(int ruckId, String token) async {
     try {
       final url = '${AppConfig.apiBaseUrl}/ruck-likes?ruck_id=$ruckId';
-      
+
       final response = await _httpClient.get(
         Uri.parse(url),
         headers: {
@@ -382,7 +403,7 @@ class SocialRepository {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        
+
         if (data['success'] == true && data['data'] is List) {
           final count = (data['data'] as List).length;
           return count;
@@ -397,7 +418,8 @@ class SocialRepository {
         clearRuckCache(ruckId.toString());
       } else {
         throw ServerException(
-            message: 'Failed to get like count: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to get like count: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       return null; // Return null on error
@@ -420,24 +442,24 @@ class SocialRepository {
           'Authorization': 'Bearer $token',
         },
       );
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           final commentsList = (data['data'] as List)
               .map((json) => RuckComment.fromJson(json))
               .toList();
-        
+
           // Deduplicate comments by ID to prevent sync issues
           final deduplicatedComments = <String, RuckComment>{};
           for (final comment in commentsList) {
             deduplicatedComments[comment.id] = comment;
           }
-        
+
           // Sort by creation date (newest first)
           final sortedComments = deduplicatedComments.values.toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        
+
           return sortedComments;
         } else {
           return [];
@@ -449,7 +471,8 @@ class SocialRepository {
         return []; // Return empty list for 404
       } else {
         throw ServerException(
-            message: 'Failed to get comments: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to get comments: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
@@ -466,11 +489,11 @@ class SocialRepository {
       }
 
       final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
-      
+
       final payload = {
         'content': content,
       };
-      
+
       final response = await _httpClient.post(
         Uri.parse(endpoint),
         headers: {
@@ -479,13 +502,14 @@ class SocialRepository {
         },
         body: json.encode(payload),
       );
-      
+
       if (response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           return RuckComment.fromJson(data['data']);
         } else {
-          throw ServerException(message: 'Failed to add comment: Invalid response data');
+          throw ServerException(
+              message: 'Failed to add comment: Invalid response data');
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
@@ -494,7 +518,8 @@ class SocialRepository {
         throw ServerException(message: 'Ruck session not found');
       } else {
         throw ServerException(
-            message: 'Failed to add comment: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to add comment: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
@@ -503,7 +528,8 @@ class SocialRepository {
   }
 
   /// Update an existing comment
-  Future<RuckComment> updateRuckComment(String commentId, String content) async {
+  Future<RuckComment> updateRuckComment(
+      String commentId, String content) async {
     try {
       final token = await _authToken;
       if (token == null) {
@@ -520,13 +546,14 @@ class SocialRepository {
           'content': content,
         }),
       );
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           return RuckComment.fromJson(data['data']);
         } else {
-          throw ServerException(message: 'Failed to update comment: Invalid response data');
+          throw ServerException(
+              message: 'Failed to update comment: Invalid response data');
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
@@ -535,7 +562,8 @@ class SocialRepository {
         throw ServerException(message: 'Comment not found');
       } else {
         throw ServerException(
-            message: 'Failed to update comment: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to update comment: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       if (e is UnauthorizedException) rethrow;
@@ -551,10 +579,12 @@ class SocialRepository {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      debugPrint('[COMMENT DELETE] Attempting to delete comment: $commentId for ruck: $ruckId');
-      
+      debugPrint(
+          '[COMMENT DELETE] Attempting to delete comment: $commentId for ruck: $ruckId');
+
       // Use the correct backend endpoint format: DELETE /rucks/{ruck_id}/comments?comment_id={comment_id}
-      final correctUrl = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments?comment_id=$commentId';
+      final correctUrl =
+          '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments?comment_id=$commentId';
       debugPrint('[COMMENT DELETE] Using correct API URL: $correctUrl');
 
       final response = await _httpClient.delete(
@@ -564,10 +594,10 @@ class SocialRepository {
           'Authorization': 'Bearer $token',
         },
       );
-      
+
       debugPrint('[COMMENT DELETE] Response status: ${response.statusCode}');
       debugPrint('[COMMENT DELETE] Response body: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final success = data['success'] == true;
@@ -575,14 +605,16 @@ class SocialRepository {
         return success;
       } else if (response.statusCode == 404) {
         // Comment already doesn't exist, treat as successful deletion
-        debugPrint('[COMMENT DELETE] Comment not found (404), treating as successful deletion');
+        debugPrint(
+            '[COMMENT DELETE] Comment not found (404), treating as successful deletion');
         clearAllCommentsCache();
         return true;
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         throw UnauthorizedException(message: 'Unauthorized request');
       } else {
         throw ServerException(
-            message: 'Failed to delete comment: ${response.statusCode} - ${response.body}');
+            message:
+                'Failed to delete comment: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       debugPrint('[COMMENT DELETE] Error: $e');
@@ -595,35 +627,36 @@ class SocialRepository {
   /// This method loads likes and comments for multiple rucks in a single API call
   Future<void> preloadSocialDataForRucks(List<int> ruckIds) async {
     if (ruckIds.isEmpty) return;
-    
+
     try {
       final token = await _authToken;
       if (token == null) return;
-      
+
       // Filter out rucks that already have fresh cache
       final now = DateTime.now();
       final rucksToFetch = ruckIds.where((ruckId) {
         final timestamp = _likeCacheTimestamps[ruckId];
-        return timestamp == null || 
-               now.difference(timestamp).inSeconds > _cacheExpirationSeconds;
+        return timestamp == null ||
+            now.difference(timestamp).inSeconds > _cacheExpirationSeconds;
       }).toList();
-      
+
       if (rucksToFetch.isEmpty) return;
-      
+
       final ruckIdsParam = rucksToFetch.join(',');
       final response = await _httpClient.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/ruck-likes/batch?ruck_ids=$ruckIdsParam'),
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/ruck-likes/batch?ruck_ids=$ruckIdsParam'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           final batchData = data['data'] as Map<String, dynamic>;
-          
+
           // Update cache with batch results
           for (final ruckId in rucksToFetch) {
             final ruckIdStr = ruckId.toString();
@@ -637,18 +670,19 @@ class SocialRepository {
         }
       } else {
         // Fall back to individual requests for critical data
-        _fallbackIndividualRequests(rucksToFetch.take(3).toList()); // Limit fallback
+        _fallbackIndividualRequests(
+            rucksToFetch.take(3).toList()); // Limit fallback
       }
     } catch (e) {
       // Fail silently - cached data will be used or individual requests will be made as needed
     }
   }
-  
+
   /// Fallback method for individual social data requests when batch fails
   Future<void> _fallbackIndividualRequests(List<int> ruckIds) async {
     final token = await _authToken;
     if (token == null) return;
-    
+
     for (final ruckId in ruckIds) {
       try {
         // Quick check for like status without full error handling
@@ -657,7 +691,7 @@ class SocialRepository {
           _likeStatusCache[ruckId] = likeStatus;
           _likeCacheTimestamps[ruckId] = DateTime.now();
         }
-        
+
         // Quick check for like count
         final likeCount = await _fallbackSingleRuckLikeCount(ruckId, token);
         if (likeCount != null) {

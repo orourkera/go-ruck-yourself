@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../../shared/theme/app_colors.dart';
 
 class DuelFilterSheet extends StatefulWidget {
-  final Function(String? status, String? challengeType, String? location) onApplyFilters;
+  final Function(String? status, String? challengeType, String? location)
+      onApplyFilters;
   final VoidCallback onClearFilters;
 
   const DuelFilterSheet({
@@ -55,7 +56,7 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                
+
                 // Header
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -65,8 +66,8 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
                       Text(
                         'Filter Duels',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       TextButton(
                         onPressed: widget.onClearFilters,
@@ -75,9 +76,9 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
                     ],
                   ),
                 ),
-                
+
                 const Divider(height: 1),
-                
+
                 // Filter Options
                 Expanded(
                   child: ListView(
@@ -93,7 +94,7 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
                     ],
                   ),
                 ),
-                
+
                 // Action Buttons
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -140,8 +141,8 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
         Text(
           'Status',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+                fontWeight: FontWeight.w600,
+              ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -181,8 +182,8 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
         Text(
           'Challenge Type',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+                fontWeight: FontWeight.w600,
+              ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -197,7 +198,8 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
             _buildFilterChip(
               label: 'Distance',
               isSelected: _selectedChallengeType == 'distance',
-              onSelected: () => setState(() => _selectedChallengeType = 'distance'),
+              onSelected: () =>
+                  setState(() => _selectedChallengeType = 'distance'),
             ),
             _buildFilterChip(
               label: 'Time',
@@ -207,12 +209,14 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
             _buildFilterChip(
               label: 'Elevation',
               isSelected: _selectedChallengeType == 'elevation',
-              onSelected: () => setState(() => _selectedChallengeType = 'elevation'),
+              onSelected: () =>
+                  setState(() => _selectedChallengeType = 'elevation'),
             ),
             _buildFilterChip(
               label: 'Power Points',
               isSelected: _selectedChallengeType == 'power_points',
-              onSelected: () => setState(() => _selectedChallengeType = 'power_points'),
+              onSelected: () =>
+                  setState(() => _selectedChallengeType = 'power_points'),
             ),
           ],
         ),
@@ -227,8 +231,8 @@ class _DuelFilterSheetState extends State<DuelFilterSheet> {
         Text(
           'Location',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+                fontWeight: FontWeight.w600,
+              ),
         ),
         const SizedBox(height: 12),
         TextFormField(

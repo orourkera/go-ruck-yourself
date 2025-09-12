@@ -2,7 +2,7 @@ part of 'ruck_buddies_bloc.dart';
 
 abstract class RuckBuddiesState extends Equatable {
   const RuckBuddiesState();
-  
+
   @override
   List<Object> get props => [];
 }
@@ -29,7 +29,14 @@ class RuckBuddiesLoaded extends RuckBuddiesState {
   });
 
   @override
-  List<Object> get props => [ruckBuddies, hasReachedMax, filter, latitude ?? 0.0, longitude ?? 0.0, isLoadingMore];
+  List<Object> get props => [
+        ruckBuddies,
+        hasReachedMax,
+        filter,
+        latitude ?? 0.0,
+        longitude ?? 0.0,
+        isLoadingMore
+      ];
 }
 
 class RuckBuddiesError extends RuckBuddiesState {

@@ -11,7 +11,8 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
   final EventsRepository _eventsRepository;
   final LocationService _locationService;
 
-  EventsBloc(this._eventsRepository, this._locationService) : super(EventsInitial()) {
+  EventsBloc(this._eventsRepository, this._locationService)
+      : super(EventsInitial()) {
     on<LoadEvents>(_onLoadEvents);
     on<RefreshEvents>(_onRefreshEvents);
     on<CreateEvent>(_onCreateEvent);
@@ -25,10 +26,11 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     on<StartRuckFromEvent>(_onStartRuckFromEvent);
   }
 
-  Future<void> _onLoadEvents(LoadEvents event, Emitter<EventsState> emit) async {
+  Future<void> _onLoadEvents(
+      LoadEvents event, Emitter<EventsState> emit) async {
     try {
       emit(EventsLoading());
-      
+
       final events = await _eventsRepository.getEvents(
         search: event.search,
         clubId: event.clubId,
@@ -37,9 +39,9 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         startDate: event.startDate,
         endDate: event.endDate,
       );
-      
+
       List<Event> sortedEvents = events;
-      
+
       // If "Near Me" sorting is requested, sort by distance from user location
       if (event.sortByDistance == true) {
         try {
@@ -48,7 +50,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
             // Separate events with and without location
             final eventsWithLocation = <Event>[];
             final eventsWithoutLocation = <Event>[];
-            
+
             for (final eventItem in events) {
               if (eventItem.latitude != null && eventItem.longitude != null) {
                 eventsWithLocation.add(eventItem);
@@ -56,7 +58,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
                 eventsWithoutLocation.add(eventItem);
               }
             }
-            
+
             // Sort events with location by distance from user
             eventsWithLocation.sort((a, b) {
               final distanceA = _locationService.calculateDistance(
@@ -81,7 +83,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
               );
               return distanceA.compareTo(distanceB);
             });
-            
+
             // Combine: nearest events first, then events without location
             sortedEvents = [...eventsWithLocation, ...eventsWithoutLocation];
           }
@@ -90,7 +92,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
           // If location fails, keep original event order
         }
       }
-      
+
       emit(EventsLoaded(
         events: sortedEvents,
         searchQuery: event.search,
@@ -107,7 +109,8 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onRefreshEvents(RefreshEvents event, Emitter<EventsState> emit) async {
+  Future<void> _onRefreshEvents(
+      RefreshEvents event, Emitter<EventsState> emit) async {
     // If we're currently showing loaded events, preserve the filters and refresh
     if (state is EventsLoaded) {
       final currentState = state as EventsLoaded;
@@ -126,10 +129,11 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onCreateEvent(CreateEvent event, Emitter<EventsState> emit) async {
+  Future<void> _onCreateEvent(
+      CreateEvent event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Creating event...'));
-      
+
       final createdEvent = await _eventsRepository.createEvent(
         title: event.title,
         description: event.description,
@@ -146,7 +150,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         ruckWeightKg: event.ruckWeightKg,
         bannerImageFile: event.bannerImageFile,
       );
-      
+
       emit(EventActionSuccess(
         'Event "${createdEvent.title}" created successfully!',
         eventId: createdEvent.id,
@@ -157,23 +161,27 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onLoadEventDetails(LoadEventDetails event, Emitter<EventsState> emit) async {
+  Future<void> _onLoadEventDetails(
+      LoadEventDetails event, Emitter<EventsState> emit) async {
     try {
       emit(EventDetailsLoading(event.eventId));
-      
-      final eventDetails = await _eventsRepository.getEventDetails(event.eventId);
-      
+
+      final eventDetails =
+          await _eventsRepository.getEventDetails(event.eventId);
+
       emit(EventDetailsLoaded(eventDetails));
     } catch (e) {
       debugPrint('Error loading event details: $e');
-      emit(EventDetailsError('Failed to load event details: ${e.toString()}', event.eventId));
+      emit(EventDetailsError(
+          'Failed to load event details: ${e.toString()}', event.eventId));
     }
   }
 
-  Future<void> _onUpdateEvent(UpdateEvent event, Emitter<EventsState> emit) async {
+  Future<void> _onUpdateEvent(
+      UpdateEvent event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Updating event...'));
-      
+
       final updatedEvent = await _eventsRepository.updateEvent(
         eventId: event.eventId,
         title: event.title,
@@ -190,7 +198,7 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
         ruckWeightKg: event.ruckWeightKg,
         bannerImageFile: event.bannerImageFile,
       );
-      
+
       emit(EventActionSuccess(
         'Event "${updatedEvent.title}" updated successfully!',
         eventId: updatedEvent.id,
@@ -201,12 +209,13 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onCancelEvent(CancelEvent event, Emitter<EventsState> emit) async {
+  Future<void> _onCancelEvent(
+      CancelEvent event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Cancelling event...'));
-      
+
       await _eventsRepository.cancelEvent(event.eventId);
-      
+
       emit(const EventActionSuccess('Event cancelled successfully!'));
     } catch (e) {
       debugPrint('Error cancelling event: $e');
@@ -217,9 +226,9 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
   Future<void> _onJoinEvent(JoinEvent event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Joining event...'));
-      
+
       await _eventsRepository.joinEvent(event.eventId);
-      
+
       emit(EventActionSuccess(
         'Successfully joined event!',
         eventId: event.eventId,
@@ -230,12 +239,13 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onLeaveEvent(LeaveEvent event, Emitter<EventsState> emit) async {
+  Future<void> _onLeaveEvent(
+      LeaveEvent event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Leaving event...'));
-      
+
       await _eventsRepository.leaveEvent(event.eventId);
-      
+
       emit(EventActionSuccess(
         'Successfully left event!',
         eventId: event.eventId,
@@ -246,32 +256,36 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onLoadEventParticipants(LoadEventParticipants event, Emitter<EventsState> emit) async {
+  Future<void> _onLoadEventParticipants(
+      LoadEventParticipants event, Emitter<EventsState> emit) async {
     try {
       emit(EventParticipantsLoading(event.eventId));
-      
-      final participants = await _eventsRepository.getEventParticipants(event.eventId);
-      
+
+      final participants =
+          await _eventsRepository.getEventParticipants(event.eventId);
+
       emit(EventParticipantsLoaded(
         eventId: event.eventId,
         participants: participants,
       ));
     } catch (e) {
       debugPrint('Error loading event participants: $e');
-      emit(EventParticipantsError('Failed to load participants: ${e.toString()}', event.eventId));
+      emit(EventParticipantsError(
+          'Failed to load participants: ${e.toString()}', event.eventId));
     }
   }
 
-  Future<void> _onManageEventParticipation(ManageEventParticipation event, Emitter<EventsState> emit) async {
+  Future<void> _onManageEventParticipation(
+      ManageEventParticipation event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Managing participation...'));
-      
+
       await _eventsRepository.manageParticipation(
         eventId: event.eventId,
         userId: event.userId,
         action: event.action,
       );
-      
+
       final actionText = event.action == 'approve' ? 'approved' : 'rejected';
       emit(EventActionSuccess(
         'Participation $actionText successfully!',
@@ -283,12 +297,14 @@ class EventsBloc extends Bloc<EventsEvent, EventsState> {
     }
   }
 
-  Future<void> _onStartRuckFromEvent(StartRuckFromEvent event, Emitter<EventsState> emit) async {
+  Future<void> _onStartRuckFromEvent(
+      StartRuckFromEvent event, Emitter<EventsState> emit) async {
     try {
       emit(const EventActionLoading('Starting ruck session...'));
-      
-      final eventContext = await _eventsRepository.startRuckFromEvent(event.eventId);
-      
+
+      final eventContext =
+          await _eventsRepository.startRuckFromEvent(event.eventId);
+
       emit(EventActionSuccess(
         'Ready to start ruck session!',
         eventId: eventContext['event_id'],

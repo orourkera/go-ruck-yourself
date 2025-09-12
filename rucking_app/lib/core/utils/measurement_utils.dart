@@ -22,7 +22,7 @@ class MeasurementUtils {
 
   // ===== Conversion factors =====
   static const double _kmToMi = 0.621371; // 1 km in miles
-  static const double _mToFt = 3.28084;   // 1 metre in feet
+  static const double _mToFt = 3.28084; // 1 metre in feet
 
   // Public helpers ---------------------------------------------------------
 
@@ -55,15 +55,15 @@ class MeasurementUtils {
   static String formatPace(double paceSeconds, {required bool metric}) {
     // Return dashes for invalid pace values (non-finite, zero, or negative)
     if (!paceSeconds.isFinite || paceSeconds <= 0) return '--';
-    
+
     // Convert from seconds/km to seconds/mile if not metric
     // Correct conversion: seconds/mile = seconds/km × 1.609344 (since 1 mile = 1.609344 km)
     final pace = metric ? paceSeconds : paceSeconds * (1 / _kmToMi);
-    
+
     // Cap extremely slow paces (>6 hours/km or mile) to avoid UI glitches
     // Increased from 90min to 6 hours to handle test sessions and very slow rucks
     if (!pace.isFinite || pace > 21600) return '--';
-    
+
     // Format pace as minutes:seconds or hours:minutes for very slow paces
     if (pace >= 3600) {
       // For paces over 1 hour, show as H:MM format
@@ -94,7 +94,8 @@ class MeasurementUtils {
   }
 
   /// Elevation gain/loss formatted to 0 decimals (+X m/ft) with compact representation.
-  static String formatElevationCompact(double gainMeters, double lossMeters, {required bool metric}) {
+  static String formatElevationCompact(double gainMeters, double lossMeters,
+      {required bool metric}) {
     final gain = metric ? gainMeters : gainMeters * _mToFt;
     final loss = metric ? lossMeters : lossMeters * _mToFt;
     return '+${gain.round()}${metric ? 'm' : 'ft'}/-${loss.round()}${metric ? 'm' : 'ft'}';
@@ -107,7 +108,7 @@ class MeasurementUtils {
     if (kg == 0) {
       return 'HIKE';
     }
-    
+
     if (metric) {
       return '${kg.round()} kg'; // Show whole numbers for metric
     } else {
@@ -115,7 +116,7 @@ class MeasurementUtils {
       return '${lbs.round()} lbs'; // Show whole numbers for imperial too
     }
   }
-  
+
   /// Special weight formatter for ruck buddies weight chips to preserve exact values
   /// This helps avoid rounding issues when displaying weights that were originally
   /// entered as whole numbers (like 10 lbs, 20 lbs, etc.)
@@ -129,39 +130,59 @@ class MeasurementUtils {
     } else {
       final double calculatedLbs = kg * AppConfig.kgToLbs;
       if (kDebugMode) {
-        debugPrint('[formatWeightForChip] Calculated lbs: $calculatedLbs (from kg: $kg)');
+        debugPrint(
+            '[formatWeightForChip] Calculated lbs: $calculatedLbs (from kg: $kg)');
       }
 
       // Common standard ruck weights in pounds
       const List<int> standardPoundWeights = [
-        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50,
+        55,
+        60,
+        65,
+        70,
+        75,
+        80,
+        85,
+        90,
+        95,
+        100
       ];
 
       // Check if calculatedLbs is extremely close to a standard pound weight
       for (final int standardLb in standardPoundWeights) {
         // Use a slightly larger tolerance for floating point comparisons directly in pounds
-        if ((calculatedLbs - standardLb).abs() < 0.02) { 
+        if ((calculatedLbs - standardLb).abs() < 0.02) {
           return '$standardLb lbs';
         }
       }
 
       // If not a standard weight, check if calculatedLbs is extremely close to any whole number
       final int roundedLbs = calculatedLbs.round();
-      if ((calculatedLbs - roundedLbs).abs() < 0.02) { 
+      if ((calculatedLbs - roundedLbs).abs() < 0.02) {
         return '$roundedLbs lbs';
       }
-      
+
       // Otherwise, format to one decimal place as a fallback
       return '${calculatedLbs.toStringAsFixed(1)} lbs';
     }
   }
-  
+
   /// Format a duration into a readable string (e.g., "1h 23m" or "45m")
   static String formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     } else if (minutes > 0) {
@@ -173,16 +194,17 @@ class MeasurementUtils {
 
   /// Calories formatted as integer string.
   static String formatCalories(int calories) => calories.toString();
-  
+
   /// Format a UTC date to the local timezone and locale with specified format.
   /// Default format is 'MMMM d, yyyy' (e.g. "May 14, 2025")
-  static String formatDate(DateTime utcDateTime, {String format = 'MMMM d, yyyy'}) {
+  static String formatDate(DateTime utcDateTime,
+      {String format = 'MMMM d, yyyy'}) {
     // Convert UTC time to local timezone
     final localDateTime = utcDateTime.toLocal();
     final dateFormat = DateFormat(format);
     return dateFormat.format(localDateTime);
   }
-  
+
   /// Format a UTC time to the local timezone and locale with specified format.
   /// Default format is 'h:mm a' (e.g. "3:30 PM")
   static String formatTime(DateTime utcDateTime, {String format = 'h:mm a'}) {
@@ -191,11 +213,12 @@ class MeasurementUtils {
     final timeFormat = DateFormat(format);
     return timeFormat.format(localDateTime);
   }
-  
+
   /// Format a UTC dateTime to a readable representation in local timezone.
   /// This returns both date and time, separated by a space.
   /// Useful for showing the full date and time of an event.
-  static String formatDateTime(DateTime utcDateTime, {
+  static String formatDateTime(
+    DateTime utcDateTime, {
     String dateFormat = 'MMMM d, yyyy',
     String timeFormat = 'h:mm a',
   }) {

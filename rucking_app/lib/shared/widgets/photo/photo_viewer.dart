@@ -6,16 +6,16 @@ import 'package:rucking_app/core/services/image_cache_manager.dart';
 class PhotoViewer extends StatefulWidget {
   /// List of photo URLs to display
   final List<String> photoUrls;
-  
+
   /// Initial photo index to display
   final int initialIndex;
-  
+
   /// Optional callback when the viewer is closed
   final VoidCallback? onClose;
-  
+
   /// Optional title to display in the app bar
   final String? title;
-  
+
   /// Constructor for the fullscreen photo viewer
   const PhotoViewer({
     Key? key,
@@ -32,14 +32,14 @@ class PhotoViewer extends StatefulWidget {
 class _PhotoViewerState extends State<PhotoViewer> {
   late PageController _pageController;
   late int _currentIndex;
-  
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, widget.photoUrls.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
   }
-  
+
   @override
   void dispose() {
     if (_pageController.hasClients) {
@@ -47,14 +47,14 @@ class _PhotoViewerState extends State<PhotoViewer> {
     }
     super.dispose();
   }
-  
+
   void _handleClose() {
     Navigator.of(context).pop();
     if (widget.onClose != null) {
       widget.onClose!();
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -68,14 +68,14 @@ class _PhotoViewerState extends State<PhotoViewer> {
           onPressed: _handleClose,
         ),
         title: widget.title != null
-          ? Text(
-              widget.title!,
-              style: const TextStyle(color: Colors.white),
-            )
-          : Text(
-              '${_currentIndex + 1} / ${widget.photoUrls.length}',
-              style: const TextStyle(color: Colors.white),
-            ),
+            ? Text(
+                widget.title!,
+                style: const TextStyle(color: Colors.white),
+              )
+            : Text(
+                '${_currentIndex + 1} / ${widget.photoUrls.length}',
+                style: const TextStyle(color: Colors.white),
+              ),
         actions: [
           // Share button example (can be customized)
           IconButton(
@@ -112,8 +112,7 @@ class _PhotoViewerState extends State<PhotoViewer> {
               child: InteractiveViewer(
                 minScale: 0.5,
                 maxScale: 3.0,
-                onInteractionStart: (details) {
-                },
+                onInteractionStart: (details) {},
                 child: Hero(
                   tag: 'photo_${widget.photoUrls[index]}',
                   child: CachedNetworkImage(
@@ -124,7 +123,8 @@ class _PhotoViewerState extends State<PhotoViewer> {
                       child: CircularProgressIndicator(color: Colors.white),
                     ),
                     errorWidget: (context, url, error) => const Center(
-                      child: Icon(Icons.error_outline, color: Colors.red, size: 42),
+                      child: Icon(Icons.error_outline,
+                          color: Colors.red, size: 42),
                     ),
                   ),
                 ),
@@ -144,14 +144,14 @@ class _PhotoViewerState extends State<PhotoViewer> {
             IconButton(
               icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
               onPressed: _currentIndex > 0
-                ? () {
-                    _pageController.animateToPage(
-                      _currentIndex - 1,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  }
-                : null,
+                  ? () {
+                      _pageController.animateToPage(
+                        _currentIndex - 1,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  : null,
             ),
             // Zoom out button
             IconButton(
@@ -173,14 +173,14 @@ class _PhotoViewerState extends State<PhotoViewer> {
             IconButton(
               icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
               onPressed: _currentIndex < widget.photoUrls.length - 1
-                ? () {
-                    _pageController.animateToPage(
-                      _currentIndex + 1,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  }
-                : null,
+                  ? () {
+                      _pageController.animateToPage(
+                        _currentIndex + 1,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  : null,
             ),
           ],
         ),

@@ -42,7 +42,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         if (response.statusCode == 200) {
           // Success - show success message
           setState(() {
-            _message = data['message'] ?? 'If an account exists for this email, a password reset link has been sent.';
+            _message = data['message'] ??
+                'If an account exists for this email, a password reset link has been sent.';
           });
           // Show success and navigate back after delay
           Future.delayed(const Duration(seconds: 3), () {
@@ -52,7 +53,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           });
         } else {
           // Error - show in SnackBar and navigate back to login
-          final errorMessage = mapFriendlyErrorMessage(data['message'] ?? 'Failed to send reset link.');
+          final errorMessage = mapFriendlyErrorMessage(
+              data['message'] ?? 'Failed to send reset link.');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -123,7 +125,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       return mapFriendlyErrorMessage('Please enter your email');
                     }
                     if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                      return mapFriendlyErrorMessage('Please enter a valid email');
+                      return mapFriendlyErrorMessage(
+                          'Please enter a valid email');
                     }
                     return null;
                   },
@@ -139,7 +142,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                     child: Text(
                       _message!,
-                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.success),
+                      style: AppTextStyles.bodyMedium
+                          .copyWith(color: AppColors.success),
                       textAlign: TextAlign.center,
                     ),
                   ),

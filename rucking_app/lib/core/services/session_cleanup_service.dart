@@ -19,7 +19,8 @@ class SessionCleanupService {
       return;
     }
 
-    AppLogger.info('[CLEANUP_SERVICE] Starting periodic session cleanup (every ${_cleanupInterval.inHours} hours)');
+    AppLogger.info(
+        '[CLEANUP_SERVICE] Starting periodic session cleanup (every ${_cleanupInterval.inHours} hours)');
 
     _cleanupTimer = Timer.periodic(_cleanupInterval, (timer) async {
       await _performCleanup();
@@ -48,15 +49,19 @@ class SessionCleanupService {
       }
 
       final timeSinceLastSave = DateTime.now().difference(lastSave);
-      AppLogger.info('[CLEANUP_SERVICE] Last save was ${timeSinceLastSave.inHours} hours ago');
+      AppLogger.info(
+          '[CLEANUP_SERVICE] Last save was ${timeSinceLastSave.inHours} hours ago');
 
       // Clean up if older than 12 hours
       if (timeSinceLastSave.inHours >= 12) {
-        AppLogger.info('[CLEANUP_SERVICE] Cleaning up stale session data (${timeSinceLastSave.inHours} hours old)');
+        AppLogger.info(
+            '[CLEANUP_SERVICE] Cleaning up stale session data (${timeSinceLastSave.inHours} hours old)');
         await _activeSessionStorage.clearSessionData();
-        AppLogger.info('[CLEANUP_SERVICE] Stale session data cleaned up successfully');
+        AppLogger.info(
+            '[CLEANUP_SERVICE] Stale session data cleaned up successfully');
       } else {
-        AppLogger.info('[CLEANUP_SERVICE] Session data is recent (${timeSinceLastSave.inHours} hours) - no cleanup needed');
+        AppLogger.info(
+            '[CLEANUP_SERVICE] Session data is recent (${timeSinceLastSave.inHours} hours) - no cleanup needed');
       }
     } catch (e) {
       AppLogger.error('[CLEANUP_SERVICE] Error during cleanup: $e');

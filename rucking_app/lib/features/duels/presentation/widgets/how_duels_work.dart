@@ -24,94 +24,99 @@ class HowDuelsWork extends StatelessWidget {
                 Text(
                   'How Duels Work',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Compete with fellow ruckers and push your limits!',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+                        color: Colors.grey[600],
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Rules section
           Text(
             'Duel Rules',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Rule 1
           _buildRule(
             context,
             number: 1,
             icon: Icons.person_pin,
             title: 'One Duel at a Time',
-            description: 'You can participate in only one duel at a time, so choose wisely!',
+            description:
+                'You can participate in only one duel at a time, so choose wisely!',
             color: Colors.orange,
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Rule 2
           _buildRule(
             context,
             number: 2,
             icon: Icons.directions_run,
             title: 'All Sessions Count',
-            description: 'All ruck sessions you complete while in a Duel will count towards that duel.',
+            description:
+                'All ruck sessions you complete while in a Duel will count towards that duel.',
             color: Colors.blue,
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Rule 3
           _buildRule(
             context,
             number: 3,
             icon: Icons.flag,
             title: 'Duel Endings',
-            description: 'The Duel will end when all participants finish or the time window ends.',
+            description:
+                'The Duel will end when all participants finish or the time window ends.',
             color: Colors.green,
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Rule 4
           _buildRule(
             context,
             number: 4,
             icon: Icons.emoji_events,
             title: 'Winner Selection',
-            description: 'The winner is the person who hits the goal in the least amount of time. If no one achieves the goal, no winner is achieved and we\'re all a little sad about it.',
+            description:
+                'The winner is the person who hits the goal in the least amount of time. If no one achieves the goal, no winner is achieved and we\'re all a little sad about it.',
             color: Colors.purple,
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Rule 5
           _buildRule(
             context,
             number: 5,
             icon: Icons.block,
             title: 'No Withdrawals',
-            description: 'You cannot withdraw from a Duel once it starts. Ruckers finish what they start.',
+            description:
+                'You cannot withdraw from a Duel once it starts. Ruckers finish what they start.',
             color: Colors.red,
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // Call to action
           Center(
             child: Container(
@@ -134,23 +139,23 @@ class HowDuelsWork extends StatelessWidget {
                   Text(
                     'Ready to Compete?',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Join a duel or create your own to start competing with fellow ruckers!',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                          color: Colors.grey[600],
+                        ),
                     textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
         ],
       ),
@@ -219,9 +224,9 @@ class HowDuelsWork extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const SizedBox(width: 16),
-          
+
           // Content
           Expanded(
             child: Column(
@@ -230,17 +235,17 @@ class HowDuelsWork extends StatelessWidget {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   description,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
+                        color: Colors.grey[700],
+                        height: 1.4,
+                      ),
                 ),
               ],
             ),

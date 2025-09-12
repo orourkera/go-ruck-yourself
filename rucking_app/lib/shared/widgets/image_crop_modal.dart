@@ -10,9 +10,9 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
 /// Enum to define crop shape options
 enum CropShape {
-  circle,     // For profile pictures
-  square,     // For square crops
-  rectangle,  // For banner images and rectangular crops
+  circle, // For profile pictures
+  square, // For square crops
+  rectangle, // For banner images and rectangular crops
 }
 
 /// A modal that allows users to crop, pan, and zoom images
@@ -21,13 +21,14 @@ class ImageCropModal extends StatefulWidget {
   final String title;
   final double aspectRatio;
   final CropShape cropShape; // New parameter to control crop shape
-  
+
   const ImageCropModal({
     super.key,
     required this.imageFile,
     this.title = 'Crop Image',
     this.aspectRatio = 1.0, // 1.0 for square (profile pictures)
-    this.cropShape = CropShape.circle, // Default to circular for backwards compatibility
+    this.cropShape =
+        CropShape.circle, // Default to circular for backwards compatibility
   });
 
   @override
@@ -36,11 +37,12 @@ class ImageCropModal extends StatefulWidget {
 
 class _ImageCropModalState extends State<ImageCropModal> {
   final GlobalKey _cropKey = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
-  
+  final TransformationController _transformationController =
+      TransformationController();
+
   late ui.Image _image;
   bool _imageLoaded = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +59,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
     final bytes = await widget.imageFile.readAsBytes();
     final codec = await ui.instantiateImageCodec(bytes);
     final frameInfo = await codec.getNextFrame();
-    
+
     setState(() {
       _image = frameInfo.image;
       _imageLoaded = true;
@@ -73,7 +75,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -82,15 +84,15 @@ class _ImageCropModalState extends State<ImageCropModal> {
             // Custom app bar with much more padding for status bar
             Container(
               padding: const EdgeInsets.only(
-                left: 16, 
-                right: 16, 
-                top: 40, // Much more padding to clear status bar
-                bottom: 16
-              ),
+                  left: 16,
+                  right: 16,
+                  top: 40, // Much more padding to clear status bar
+                  bottom: 16),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                    icon:
+                        const Icon(Icons.close, color: Colors.white, size: 28),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Expanded(
@@ -118,10 +120,12 @@ class _ImageCropModalState extends State<ImageCropModal> {
                 ],
               ),
             ),
-            
+
             // Main content
             Expanded(
-              child: _imageLoaded ? _buildCropInterface() : _buildLoadingIndicator(),
+              child: _imageLoaded
+                  ? _buildCropInterface()
+                  : _buildLoadingIndicator(),
             ),
           ],
         ),
@@ -139,12 +143,14 @@ class _ImageCropModalState extends State<ImageCropModal> {
 
   Widget _buildCropInterface() {
     final screenSize = MediaQuery.of(context).size;
-    final safeHeight = screenSize.height - MediaQuery.of(context).padding.top - 220;
-    
+    final safeHeight =
+        screenSize.height - MediaQuery.of(context).padding.top - 220;
+
     // Calculate crop dimensions
     final cropWidth = screenSize.width * 0.85;
-    final cropHeight = math.min(cropWidth / widget.aspectRatio, safeHeight * 0.6);
-    
+    final cropHeight =
+        math.min(cropWidth / widget.aspectRatio, safeHeight * 0.6);
+
     return Column(
       children: [
         // Instructions and dimensions info
@@ -161,7 +167,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
                 textAlign: TextAlign.center,
               ),
             ),
-            
+
             // Dimension and aspect ratio info
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -218,7 +224,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
             ),
           ],
         ),
-        
+
         // Main crop area with direct InteractiveViewer
         Expanded(
           child: Container(
@@ -235,7 +241,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
                   color: Colors.black.withOpacity(0.7),
                   colorBlendMode: BlendMode.darken,
                 ),
-                
+
                 // Interactive crop area - DIRECT InteractiveViewer (MUST BE ON TOP)
                 Center(
                   child: SizedBox(
@@ -255,8 +261,8 @@ class _ImageCropModalState extends State<ImageCropModal> {
                           width: cropWidth * 3,
                           height: cropHeight * 3,
                           child: ClipRRect(
-                            borderRadius: widget.cropShape == CropShape.circle 
-                                ? BorderRadius.circular(cropWidth * 3 / 2) 
+                            borderRadius: widget.cropShape == CropShape.circle
+                                ? BorderRadius.circular(cropWidth * 3 / 2)
                                 : widget.cropShape == CropShape.square
                                     ? BorderRadius.circular(12)
                                     : BorderRadius.circular(16),
@@ -270,7 +276,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
                     ),
                   ),
                 ),
-                
+
                 // Crop overlay - POINTER EVENTS DISABLED
                 IgnorePointer(
                   child: Center(
@@ -279,8 +285,8 @@ class _ImageCropModalState extends State<ImageCropModal> {
                       height: cropHeight,
                       decoration: BoxDecoration(
                         border: Border.all(color: AppColors.accent, width: 3),
-                        borderRadius: widget.cropShape == CropShape.circle 
-                            ? BorderRadius.circular(cropWidth / 2) 
+                        borderRadius: widget.cropShape == CropShape.circle
+                            ? BorderRadius.circular(cropWidth / 2)
                             : widget.cropShape == CropShape.square
                                 ? BorderRadius.circular(8)
                                 : BorderRadius.circular(12),
@@ -292,7 +298,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
             ),
           ),
         ),
-        
+
         // Controls
         _buildControls(),
       ],
@@ -301,12 +307,15 @@ class _ImageCropModalState extends State<ImageCropModal> {
 
   String _getDimensionText() {
     final screenSize = MediaQuery.of(context).size;
-    final safeHeight = screenSize.height - MediaQuery.of(context).padding.top - 220; // More space for header
-    
+    final safeHeight = screenSize.height -
+        MediaQuery.of(context).padding.top -
+        220; // More space for header
+
     // Calculate crop dimensions
     final cropWidth = screenSize.width * 0.85;
-    final cropHeight = math.min(cropWidth / widget.aspectRatio, safeHeight * 0.6);
-    
+    final cropHeight =
+        math.min(cropWidth / widget.aspectRatio, safeHeight * 0.6);
+
     // Format aspect ratio in a user-friendly way
     String aspectRatioText;
     if (widget.aspectRatio == 1.0) {
@@ -325,10 +334,10 @@ class _ImageCropModalState extends State<ImageCropModal> {
       if (ratio > 1) {
         aspectRatioText = '${ratio.toStringAsFixed(1)}:1';
       } else {
-        aspectRatioText = '1:${(1/ratio).toStringAsFixed(1)}';
+        aspectRatioText = '1:${(1 / ratio).toStringAsFixed(1)}';
       }
     }
-    
+
     return '${cropWidth.toInt()}×${cropHeight.toInt()} • $aspectRatioText';
   }
 
@@ -354,14 +363,14 @@ class _ImageCropModalState extends State<ImageCropModal> {
             label: 'Reset',
             onPressed: _resetTransformation,
           ),
-          
-          // Center button  
+
+          // Center button
           _buildControlButton(
             icon: Icons.center_focus_strong,
             label: 'Center',
             onPressed: _centerImage,
           ),
-          
+
           // Fit button
           _buildControlButton(
             icon: Icons.fit_screen,
@@ -394,7 +403,7 @@ class _ImageCropModalState extends State<ImageCropModal> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon, 
+              icon,
               color: Colors.white,
               size: 24,
             ),
@@ -420,45 +429,47 @@ class _ImageCropModalState extends State<ImageCropModal> {
   void _centerImage() {
     // Reset to identity first, then apply any centering adjustments
     final matrix = Matrix4.identity();
-    
+
     // Center the image within the crop area
     final screenSize = MediaQuery.of(context).size;
     final cropWidth = screenSize.width * 0.85;
-    final cropHeight = math.min(cropWidth / widget.aspectRatio, (screenSize.height - MediaQuery.of(context).padding.top - 220) * 0.6);
-    
+    final cropHeight = math.min(cropWidth / widget.aspectRatio,
+        (screenSize.height - MediaQuery.of(context).padding.top - 220) * 0.6);
+
     if (_image.width > 0 && _image.height > 0) {
       // Calculate scale to fit image nicely in crop area
       final imageAspectRatio = _image.width / _image.height;
       final cropAspectRatio = widget.aspectRatio;
-      
+
       double scale = 1.0;
       if (imageAspectRatio > cropAspectRatio) {
         // Image is wider than crop area, scale to fit height
         scale = (cropHeight * 3) / _image.height;
       } else {
-        // Image is taller than crop area, scale to fit width  
+        // Image is taller than crop area, scale to fit width
         scale = (cropWidth * 3) / _image.width;
       }
-      
+
       // Ensure minimum scale for visibility
       scale = math.max(scale, 0.5);
-      
+
       // Apply scale
       matrix.scale(scale, scale);
     }
-    
+
     _transformationController.value = matrix;
   }
 
   void _fitImage() {
     final screenSize = MediaQuery.of(context).size;
     final cropWidth = screenSize.width * 0.85;
-    final cropHeight = math.min(cropWidth / widget.aspectRatio, (screenSize.height - MediaQuery.of(context).padding.top - 220) * 0.6);
-    
+    final cropHeight = math.min(cropWidth / widget.aspectRatio,
+        (screenSize.height - MediaQuery.of(context).padding.top - 220) * 0.6);
+
     if (_image.width > 0 && _image.height > 0) {
       final imageAspectRatio = _image.width / _image.height;
       final containerAspectRatio = widget.aspectRatio;
-      
+
       double scale;
       if (imageAspectRatio > containerAspectRatio) {
         // Image is wider, fit to height
@@ -467,13 +478,13 @@ class _ImageCropModalState extends State<ImageCropModal> {
         // Image is taller, fit to width
         scale = (cropWidth * 3) / _image.width;
       }
-      
+
       // Ensure scale fills the crop area properly
       scale = math.max(scale, 1.0);
-      
+
       final matrix = Matrix4.identity();
       matrix.scale(scale, scale);
-      
+
       _transformationController.value = matrix;
     }
   }
@@ -481,21 +492,23 @@ class _ImageCropModalState extends State<ImageCropModal> {
   Future<void> _cropAndSave() async {
     try {
       // Get the render object of the crop area
-      final RenderRepaintBoundary boundary = 
+      final RenderRepaintBoundary boundary =
           _cropKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      
+
       // Capture the widget as an image
       final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
       if (byteData != null) {
         final Uint8List pngBytes = byteData.buffer.asUint8List();
-        
+
         // Save to temporary file
         final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/cropped_image_${DateTime.now().millisecondsSinceEpoch}.png');
+        final tempFile = File(
+            '${tempDir.path}/cropped_image_${DateTime.now().millisecondsSinceEpoch}.png');
         await tempFile.writeAsBytes(pngBytes);
-        
+
         // Return the cropped file
         if (mounted) {
           Navigator.of(context).pop(tempFile);

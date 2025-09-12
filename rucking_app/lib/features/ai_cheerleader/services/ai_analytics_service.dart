@@ -28,10 +28,13 @@ class AIAnalyticsService {
   }) async {
     try {
       // Analyze message content for analytics flags
-      final hasLocationReference = _checkLocationReference(openaiResponse, locationContext);
-      final hasWeatherReference = _checkWeatherReference(openaiResponse, locationContext);
-      final hasPersonalReference = _checkPersonalReference(openaiPrompt, openaiResponse);
-      
+      final hasLocationReference =
+          _checkLocationReference(openaiResponse, locationContext);
+      final hasWeatherReference =
+          _checkWeatherReference(openaiResponse, locationContext);
+      final hasPersonalReference =
+          _checkPersonalReference(openaiPrompt, openaiResponse);
+
       final interactionData = {
         'session_id': sessionId,
         'user_id': userId,
@@ -64,7 +67,8 @@ class AIAnalyticsService {
       if (response.statusCode == 201 || response.statusCode == 200) {
         AppLogger.info('[AI_ANALYTICS] Interaction logged successfully');
       } else {
-        AppLogger.warning('[AI_ANALYTICS] Failed to log interaction: ${response.statusCode}');
+        AppLogger.warning(
+            '[AI_ANALYTICS] Failed to log interaction: ${response.statusCode}');
       }
     } catch (e) {
       AppLogger.error('[AI_ANALYTICS] Error logging interaction: $e');
@@ -103,9 +107,11 @@ class AIAnalyticsService {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        AppLogger.info('[AI_ANALYTICS] Personality selection logged successfully');
+        AppLogger.info(
+            '[AI_ANALYTICS] Personality selection logged successfully');
       } else {
-        AppLogger.warning('[AI_ANALYTICS] Failed to log personality selection: ${response.statusCode}');
+        AppLogger.warning(
+            '[AI_ANALYTICS] Failed to log personality selection: ${response.statusCode}');
       }
     } catch (e) {
       AppLogger.error('[AI_ANALYTICS] Error logging personality selection: $e');
@@ -157,16 +163,25 @@ class AIAnalyticsService {
   }) async {
     try {
       final updateData = <String, dynamic>{};
-      
-      if (totalInteractions != null) updateData['total_interactions'] = totalInteractions;
-      if (totalTriggersFired != null) updateData['total_triggers_fired'] = totalTriggersFired;
-      if (totalSuccessfulSyntheses != null) updateData['total_successful_syntheses'] = totalSuccessfulSyntheses;
-      if (totalFailedSyntheses != null) updateData['total_failed_syntheses'] = totalFailedSyntheses;
-      if (avgGenerationTimeMs != null) updateData['avg_generation_time_ms'] = avgGenerationTimeMs;
-      if (avgSynthesisTimeMs != null) updateData['avg_synthesis_time_ms'] = avgSynthesisTimeMs;
-      if (sessionCompleted != null) updateData['session_completed'] = sessionCompleted;
-      if (aiDisabledDuringSession != null) updateData['ai_disabled_during_session'] = aiDisabledDuringSession;
-      if (aiDisabledAt != null) updateData['ai_disabled_at'] = aiDisabledAt.toIso8601String();
+
+      if (totalInteractions != null)
+        updateData['total_interactions'] = totalInteractions;
+      if (totalTriggersFired != null)
+        updateData['total_triggers_fired'] = totalTriggersFired;
+      if (totalSuccessfulSyntheses != null)
+        updateData['total_successful_syntheses'] = totalSuccessfulSyntheses;
+      if (totalFailedSyntheses != null)
+        updateData['total_failed_syntheses'] = totalFailedSyntheses;
+      if (avgGenerationTimeMs != null)
+        updateData['avg_generation_time_ms'] = avgGenerationTimeMs;
+      if (avgSynthesisTimeMs != null)
+        updateData['avg_synthesis_time_ms'] = avgSynthesisTimeMs;
+      if (sessionCompleted != null)
+        updateData['session_completed'] = sessionCompleted;
+      if (aiDisabledDuringSession != null)
+        updateData['ai_disabled_during_session'] = aiDisabledDuringSession;
+      if (aiDisabledAt != null)
+        updateData['ai_disabled_at'] = aiDisabledAt.toIso8601String();
 
       if (updateData.isEmpty) return;
 
@@ -184,39 +199,66 @@ class AIAnalyticsService {
   }
 
   /// Check if message references location
-  bool _checkLocationReference(String message, Map<String, dynamic>? locationContext) {
+  bool _checkLocationReference(
+      String message, Map<String, dynamic>? locationContext) {
     if (locationContext == null) return false;
-    
+
     final lowerMessage = message.toLowerCase();
     final city = locationContext['city']?.toString().toLowerCase();
     final landmark = locationContext['landmark']?.toString().toLowerCase();
-    
+
     if (city != null && city.isNotEmpty && lowerMessage.contains(city)) {
       return true;
     }
-    
-    if (landmark != null && landmark.isNotEmpty && lowerMessage.contains(landmark)) {
+
+    if (landmark != null &&
+        landmark.isNotEmpty &&
+        lowerMessage.contains(landmark)) {
       return true;
     }
-    
+
     // Check for general location terms
-    final locationTerms = ['park', 'trail', 'hill', 'mountain', 'beach', 'city', 'downtown', 'neighborhood'];
+    final locationTerms = [
+      'park',
+      'trail',
+      'hill',
+      'mountain',
+      'beach',
+      'city',
+      'downtown',
+      'neighborhood'
+    ];
     return locationTerms.any((term) => lowerMessage.contains(term));
   }
 
   /// Check if message references weather
-  bool _checkWeatherReference(String message, Map<String, dynamic>? locationContext) {
+  bool _checkWeatherReference(
+      String message, Map<String, dynamic>? locationContext) {
     if (locationContext == null) return false;
-    
+
     final lowerMessage = message.toLowerCase();
-    final weatherCondition = locationContext['weatherCondition']?.toString().toLowerCase();
-    
-    if (weatherCondition != null && weatherCondition.isNotEmpty && lowerMessage.contains(weatherCondition)) {
+    final weatherCondition =
+        locationContext['weatherCondition']?.toString().toLowerCase();
+
+    if (weatherCondition != null &&
+        weatherCondition.isNotEmpty &&
+        lowerMessage.contains(weatherCondition)) {
       return true;
     }
-    
+
     // Check for general weather terms
-    final weatherTerms = ['sunny', 'rain', 'wind', 'hot', 'cold', 'warm', 'cool', 'weather', 'temperature', 'degrees'];
+    final weatherTerms = [
+      'sunny',
+      'rain',
+      'wind',
+      'hot',
+      'cold',
+      'warm',
+      'cool',
+      'weather',
+      'temperature',
+      'degrees'
+    ];
     return weatherTerms.any((term) => lowerMessage.contains(term));
   }
 
@@ -225,17 +267,24 @@ class AIAnalyticsService {
     // Look for first name extraction patterns in prompt and usage in response
     final promptLower = prompt.toLowerCase();
     final responseLower = response.toLowerCase();
-    
+
     // Simple heuristic: if response contains common personal pronouns or direct address
-    final personalTerms = ['you\'re', 'your', 'you are', 'keep going', 'great job'];
-    
+    final personalTerms = [
+      'you\'re',
+      'your',
+      'you are',
+      'keep going',
+      'great job'
+    ];
+
     // Check if response uses extracted name (would need to be more sophisticated)
     // This is a basic implementation - could be enhanced to track actual name usage
     return personalTerms.any((term) => responseLower.contains(term));
   }
 
   /// Get analytics summary for a user (admin feature)
-  Future<Map<String, dynamic>?> getUserAnalytics(String userId, {
+  Future<Map<String, dynamic>?> getUserAnalytics(
+    String userId, {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
@@ -243,7 +292,7 @@ class AIAnalyticsService {
       final queryParams = <String, String>{
         'user_id': userId,
       };
-      
+
       if (startDate != null) {
         queryParams['start_date'] = startDate.toIso8601String();
       }

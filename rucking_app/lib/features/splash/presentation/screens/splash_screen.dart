@@ -28,23 +28,24 @@ class _SplashScreenState extends State<SplashScreen> {
   // New state variables for timed splash screen
   bool _minimumDisplayTimeElapsed = false;
   bool _authCheckCompleted = false;
-  AuthState? _definitiveAuthState; 
+  AuthState? _definitiveAuthState;
   bool _navigationAttempted = false;
-  bool _authRetryScheduled = false; // Prevent multiple retry timers 
+  bool _authRetryScheduled = false; // Prevent multiple retry timers
 
   @override
   void initState() {
     super.initState();
     debugPrint('[Splash] initState: Splash screen initialized');
-    
+
     // Mark animation as completed since GIF handles its own animation
     _hasAnimatedOnceThisLaunch = true;
-    
+
     // Check initial auth state after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final authState = BlocProvider.of<AuthBloc>(context).state;
-        debugPrint('[Splash] initState - postFrameCallback - initial AuthState check: ${authState.runtimeType}');
+        debugPrint(
+            '[Splash] initState - postFrameCallback - initial AuthState check: ${authState.runtimeType}');
         _processAuthState(authState); // New call
       }
     });
@@ -62,9 +63,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _processAuthState(AuthState authState) {
-    if (authState is Authenticated || authState is Unauthenticated || authState is AuthError) {
-      if (!_authCheckCompleted) { // Process only the first definitive auth state
-        debugPrint('[Splash] Definitive AuthState received: ${authState.runtimeType}');
+    if (authState is Authenticated ||
+        authState is Unauthenticated ||
+        authState is AuthError) {
+      if (!_authCheckCompleted) {
+        // Process only the first definitive auth state
+        debugPrint(
+            '[Splash] Definitive AuthState received: ${authState.runtimeType}');
         if (mounted) {
           setState(() {
             _authCheckCompleted = true;
@@ -73,56 +78,70 @@ class _SplashScreenState extends State<SplashScreen> {
         }
         _attemptNavigation(); // Attempt navigation when auth state is definitive
       } else {
-        debugPrint('[Splash] Auth check already completed with ${_definitiveAuthState?.runtimeType}, new state ${authState.runtimeType} ignored for navigation processing.');
+        debugPrint(
+            '[Splash] Auth check already completed with ${_definitiveAuthState?.runtimeType}, new state ${authState.runtimeType} ignored for navigation processing.');
       }
     } else if (authState is AuthLoading) {
       // Set up multiple timeouts to re-check auth if stuck in loading
       if (!_authRetryScheduled) {
-        debugPrint('[Splash] AuthLoading state detected. Setting up retry timeouts...');
+        debugPrint(
+            '[Splash] AuthLoading state detected. Setting up retry timeouts...');
         _authRetryScheduled = true;
-        
+
         // First retry after 3 seconds (for quick token refresh)
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted && !_authCheckCompleted) {
-            debugPrint('[Splash] Auth still loading after 3 seconds, triggering first retry');
+            debugPrint(
+                '[Splash] Auth still loading after 3 seconds, triggering first retry');
             context.read<AuthBloc>().add(AuthCheckRequested());
           }
         });
-        
+
         // Second retry after 6 seconds (for slower network)
         Future.delayed(const Duration(seconds: 6), () {
           if (mounted && !_authCheckCompleted) {
-            debugPrint('[Splash] Auth still loading after 6 seconds, triggering second retry');
+            debugPrint(
+                '[Splash] Auth still loading after 6 seconds, triggering second retry');
             context.read<AuthBloc>().add(AuthCheckRequested());
           }
         });
       } else {
-        debugPrint('[Splash] AuthLoading detected but retries already scheduled');
+        debugPrint(
+            '[Splash] AuthLoading detected but retries already scheduled');
       }
     } else {
       // For states like AuthInitial, do nothing here.
-      debugPrint('[Splash] Non-definitive AuthState: ${authState.runtimeType}. Waiting.');
+      debugPrint(
+          '[Splash] Non-definitive AuthState: ${authState.runtimeType}. Waiting.');
     }
   }
 
   Future<void> _attemptNavigation() async {
-    if (!mounted || _navigationAttempted || !_minimumDisplayTimeElapsed || !_authCheckCompleted || _definitiveAuthState == null) {
-      debugPrint('[Splash] Navigation attempt condition not met: mounted=$mounted, attempted=$_navigationAttempted, timerElapsed=$_minimumDisplayTimeElapsed, authDone=$_authCheckCompleted, authStateIsNull=${_definitiveAuthState == null}');
-      if(_definitiveAuthState != null) {
-          debugPrint('[Splash] Definitive auth state for non-navigation: ${_definitiveAuthState.runtimeType}');
+    if (!mounted ||
+        _navigationAttempted ||
+        !_minimumDisplayTimeElapsed ||
+        !_authCheckCompleted ||
+        _definitiveAuthState == null) {
+      debugPrint(
+          '[Splash] Navigation attempt condition not met: mounted=$mounted, attempted=$_navigationAttempted, timerElapsed=$_minimumDisplayTimeElapsed, authDone=$_authCheckCompleted, authStateIsNull=${_definitiveAuthState == null}');
+      if (_definitiveAuthState != null) {
+        debugPrint(
+            '[Splash] Definitive auth state for non-navigation: ${_definitiveAuthState.runtimeType}');
       }
       return;
     }
 
     _navigationAttempted = true; // Set flag immediately to prevent re-entry
-    debugPrint('[Splash] Attempting navigation with AuthState: ${_definitiveAuthState!.runtimeType}');
+    debugPrint(
+        '[Splash] Attempting navigation with AuthState: ${_definitiveAuthState!.runtimeType}');
 
-    final authStateToNavigate = _definitiveAuthState!; 
+    final authStateToNavigate = _definitiveAuthState!;
 
     if (authStateToNavigate is Authenticated) {
       debugPrint('[Splash] AuthState is Authenticated. Checking subscription.');
       final revenueCatService = GetIt.instance<RevenueCatService>();
-      final bool isSubscribed = await revenueCatService.checkSubscriptionStatus(); 
+      final bool isSubscribed =
+          await revenueCatService.checkSubscriptionStatus();
       if (!mounted) return; // Check mounted after await
 
       // Check if user has seen the paywall before
@@ -131,7 +150,8 @@ class _SplashScreenState extends State<SplashScreen> {
       // Check battery optimization permissions for authenticated users
       try {
         debugPrint('[Splash] Checking battery optimization permissions...');
-        await BatteryOptimizationService.ensureBackgroundExecutionPermissions(context: context);
+        await BatteryOptimizationService.ensureBackgroundExecutionPermissions(
+            context: context);
         if (!mounted) return; // Check mounted after await
       } catch (e) {
         debugPrint('[Splash] Error checking battery optimization: $e');
@@ -143,10 +163,11 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.pushReplacementNamed(context, '/home');
       } else if (!hasSeenPaywall) {
         // PAYWALL DISABLED: Skip paywall and go straight to home
-        debugPrint('[Splash] First launch - PAYWALL DISABLED, navigating to HomeScreen.');
+        debugPrint(
+            '[Splash] First launch - PAYWALL DISABLED, navigating to HomeScreen.');
         await FirstLaunchService.markPaywallSeen();
         Navigator.pushReplacementNamed(context, '/home');
-        
+
         /* ORIGINAL PAYWALL LOGIC - PRESERVED FOR FUTURE RESTORATION
         // First time user sees paywall - show it and mark as seen
         debugPrint('[Splash] First launch - showing PaywallScreen.');
@@ -158,19 +179,21 @@ class _SplashScreenState extends State<SplashScreen> {
         */
       } else {
         // User has seen paywall before - go straight to home
-        debugPrint('[Splash] User has seen paywall before. Navigating to HomeScreen.');
+        debugPrint(
+            '[Splash] User has seen paywall before. Navigating to HomeScreen.');
         Navigator.pushReplacementNamed(context, '/home');
       }
-    } else if (authStateToNavigate is Unauthenticated || authStateToNavigate is AuthError) {
-      debugPrint('[Splash] AuthState is ${authStateToNavigate.runtimeType}. Navigating to /login.');
+    } else if (authStateToNavigate is Unauthenticated ||
+        authStateToNavigate is AuthError) {
+      debugPrint(
+          '[Splash] AuthState is ${authStateToNavigate.runtimeType}. Navigating to /login.');
       Navigator.pushReplacementNamed(context, '/login');
     } else {
       // Should not happen due to the checks above, but good for completeness
-      debugPrint('[Splash] Critical: _attemptNavigation called with unexpected authState: ${authStateToNavigate.runtimeType}');
+      debugPrint(
+          '[Splash] Critical: _attemptNavigation called with unexpected authState: ${authStateToNavigate.runtimeType}');
     }
   }
-  
-
 
   @override
   void dispose() {
@@ -188,36 +211,39 @@ class _SplashScreenState extends State<SplashScreen> {
       child: _buildImageWithFallbacks(),
     );
   }
-  
+
   /// Attempts to load images with multiple fallbacks
   Widget _buildImageWithFallbacks() {
     final fallbackPaths = SplashHelper.getFallbackImagePaths();
-    
+
     return _tryLoadImage(fallbackPaths, 0);
   }
-  
+
   /// Recursively tries to load images from the fallback list
   Widget _tryLoadImage(List<String> imagePaths, int currentIndex) {
     if (currentIndex >= imagePaths.length) {
-      debugPrint('[Splash] All image fallbacks exhausted, using programmatic fallback');
+      debugPrint(
+          '[Splash] All image fallbacks exhausted, using programmatic fallback');
       return _buildFallbackImage();
     }
-    
+
     final currentPath = imagePaths[currentIndex];
-    debugPrint('[Splash] Attempting to load image: $currentPath (attempt ${currentIndex + 1}/${imagePaths.length})');
-    
+    debugPrint(
+        '[Splash] Attempting to load image: $currentPath (attempt ${currentIndex + 1}/${imagePaths.length})');
+
     try {
       // Special handling for GIF files to prevent native crashes
       if (currentPath.endsWith('.gif')) {
         // Skip GIF loading on devices where it's unsafe
         if (_shouldAvoidGifLoading()) {
-          debugPrint('[Splash] Skipping GIF loading for safety, trying next fallback');
+          debugPrint(
+              '[Splash] Skipping GIF loading for safety, trying next fallback');
           return _tryLoadImage(imagePaths, currentIndex + 1);
         }
-        
+
         return _buildSafeGifImage(currentPath, imagePaths, currentIndex);
       }
-      
+
       return Image.asset(
         currentPath,
         width: 200,
@@ -231,15 +257,15 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     } catch (e, stackTrace) {
       debugPrint('[Splash] Critical error loading $currentPath: $e');
-      
+
       // Log comprehensive crash context
       _logSplashCrashContext(currentPath, e, stackTrace, currentIndex);
-      
+
       // Try next fallback or show programmatic fallback
       return _tryLoadImage(imagePaths, currentIndex + 1);
     }
   }
-  
+
   /// Checks if we should avoid GIF loading on this device to prevent crashes
   bool _shouldAvoidGifLoading() {
     // Only avoid GIF on very old Android devices (API < 21) in release mode
@@ -250,20 +276,22 @@ class _SplashScreenState extends State<SplashScreen> {
       // - Device model detection
       // - Available memory checks
       // For now, we'll be more permissive and only block on known problematic devices
-      
+
       // TODO: Add actual device compatibility checks if needed
       // For now, let's try GIF first and fall back naturally on errors
       debugPrint('[Splash] Android release build - trying GIF with fallback');
       return false; // Allow GIF, but we have fallbacks in place
     }
-    
+
     return false;
   }
 
   /// Builds a GIF image with safer memory management to prevent native crashes
-  Widget _buildSafeGifImage(String gifPath, List<String> imagePaths, int currentIndex) {
-    debugPrint('[Splash] Attempting to load GIF with safe memory management: $gifPath');
-    
+  Widget _buildSafeGifImage(
+      String gifPath, List<String> imagePaths, int currentIndex) {
+    debugPrint(
+        '[Splash] Attempting to load GIF with safe memory management: $gifPath');
+
     try {
       // Use a Container to limit memory usage and add disposal handling
       return Container(
@@ -275,13 +303,15 @@ class _SplashScreenState extends State<SplashScreen> {
           height: 200,
           fit: BoxFit.contain,
           // Add memory management
-          gaplessPlayback: false, // Disable gapless playback to reduce memory usage
+          gaplessPlayback:
+              false, // Disable gapless playback to reduce memory usage
           errorBuilder: (context, error, stackTrace) {
             debugPrint('[Splash] GIF load failed: $error');
-            
+
             // Log GIF-specific crash context
-            _logSplashCrashContext(gifPath, error, stackTrace ?? StackTrace.current, currentIndex);
-            
+            _logSplashCrashContext(
+                gifPath, error, stackTrace ?? StackTrace.current, currentIndex);
+
             // Skip GIF and try next fallback immediately
             return _tryLoadImage(imagePaths, currentIndex + 1);
           },
@@ -289,17 +319,18 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     } catch (e, stackTrace) {
       debugPrint('[Splash] Critical GIF error: $e');
-      
+
       // Log comprehensive crash context for GIF
       _logSplashCrashContext(gifPath, e, stackTrace, currentIndex);
-      
+
       // Skip GIF and try next fallback
       return _tryLoadImage(imagePaths, currentIndex + 1);
     }
   }
 
   /// Logs detailed context for splash screen crashes to help with debugging
-  void _logSplashCrashContext(String imagePath, dynamic error, StackTrace stackTrace, int attemptIndex) {
+  void _logSplashCrashContext(String imagePath, dynamic error,
+      StackTrace stackTrace, int attemptIndex) {
     try {
       final crashContext = {
         'image_path': imagePath,
@@ -309,14 +340,13 @@ class _SplashScreenState extends State<SplashScreen> {
         'widget_mounted': mounted,
         'has_material_app': context.mounted,
       };
-      
+
       debugPrint('[Splash] CRASH CONTEXT: $crashContext');
-      
+
       // TODO: Send to crashlytics when available
-      // FirebaseCrashlytics.instance.recordError(error, stackTrace, 
-      //   information: crashContext.entries.map((e) => 
+      // FirebaseCrashlytics.instance.recordError(error, stackTrace,
+      //   information: crashContext.entries.map((e) =>
       //     DiagnosticsProperty(e.key, e.value)).toList());
-      
     } catch (loggingError) {
       debugPrint('[Splash] Failed to log crash context: $loggingError');
     }
@@ -360,41 +390,48 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     debugPrint('[Splash] build: Splash screen building with GIF animation');
     debugPrint('[Splash] BUILD METHOD CALLED - Widget is building');
-    
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        debugPrint('[Splash] BlocListener received AuthState: ${state.runtimeType}');
+        debugPrint(
+            '[Splash] BlocListener received AuthState: ${state.runtimeType}');
         _processAuthState(state); // New call
       },
       // listenWhen could be used to optimize if needed, e.g., listenWhen: (prev, curr) => !_navigationAttempted,
       child: FutureBuilder<bool>(
         future: SplashHelper.isLadyModeActive(),
         builder: (context, snapshot) {
-          debugPrint('[Splash] FutureBuilder called - snapshot: ${snapshot.data}');
+          debugPrint(
+              '[Splash] FutureBuilder called - snapshot: ${snapshot.data}');
           bool isLadyMode = snapshot.data ?? false;
-          
+
           String? userGender;
           try {
             // Reading AuthBloc state here is for UI purposes (e.g. lady mode). Navigation is driven by the listener.
             final authStateFromBuildContext = context.read<AuthBloc>().state;
-            debugPrint('[Splash] Successfully read AuthBloc state: ${authStateFromBuildContext.runtimeType}');
+            debugPrint(
+                '[Splash] Successfully read AuthBloc state: ${authStateFromBuildContext.runtimeType}');
             if (authStateFromBuildContext is Authenticated) {
               userGender = authStateFromBuildContext.user.gender;
               isLadyMode = (userGender == 'female');
-              
+
               SplashHelper.cacheLadyModeStatus(isLadyMode);
-              
-              debugPrint('[Splash] UI Build - Gender from auth state: $userGender, Lady mode: $isLadyMode');
+
+              debugPrint(
+                  '[Splash] UI Build - Gender from auth state: $userGender, Lady mode: $isLadyMode');
             }
           } catch (e) {
             debugPrint('[Splash] ERROR reading AuthBloc: $e');
-            debugPrint('[Splash] UI Build - Using cached lady mode value: $isLadyMode');
+            debugPrint(
+                '[Splash] UI Build - Using cached lady mode value: $isLadyMode');
           }
-          
-          final String splashImagePath = SplashHelper.getSplashImagePath(isLadyMode);
-          
-          final Color backgroundColor = SplashHelper.getBackgroundColor(isLadyMode);
-          
+
+          final String splashImagePath =
+              SplashHelper.getSplashImagePath(isLadyMode);
+
+          final Color backgroundColor =
+              SplashHelper.getBackgroundColor(isLadyMode);
+
           return Scaffold(
             backgroundColor: backgroundColor,
             body: Center(
@@ -411,12 +448,12 @@ class _SplashScreenState extends State<SplashScreen> {
 class PaintedTextPainter extends CustomPainter {
   final String text;
   final double progress;
-  
+
   PaintedTextPainter({
     required this.text,
     required this.progress,
   });
-  
+
   @override
   void paint(Canvas canvas, Size size) {
     // Create text style - smaller and lighter
@@ -426,21 +463,21 @@ class PaintedTextPainter extends CustomPainter {
       fontFamily: 'Impact',
       letterSpacing: 4.0, // Good spacing
     );
-    
+
     final textSpan = TextSpan(text: text, style: textStyle);
     final textPainter = TextPainter(
       text: textSpan,
       textDirection: TextDirection.ltr,
     );
-    
+
     textPainter.layout();
-    
+
     // Center the text
     final textOffset = Offset(
       (size.width - textPainter.width) / 2,
       (size.height - textPainter.height) / 2,
     );
-    
+
     // Create paint for stroke effect
     final strokePaint = Paint()
       ..style = PaintingStyle.stroke
@@ -448,7 +485,7 @@ class PaintedTextPainter extends CustomPainter {
       ..color = Colors.white
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    
+
     // Create paint for shadow
     final shadowPaint = Paint()
       ..style = PaintingStyle.stroke
@@ -456,15 +493,15 @@ class PaintedTextPainter extends CustomPainter {
       ..color = Colors.black.withOpacity(0.3)
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    
+
     // Draw each letter with progress-based reveal
     const letters = ['R', 'U', 'C', 'K'];
     double currentX = textOffset.dx;
-    
+
     for (int i = 0; i < letters.length; i++) {
       final letter = letters[i];
       final letterProgress = ((progress * letters.length) - i).clamp(0.0, 1.0);
-      
+
       if (letterProgress > 0) {
         // Create individual letter painter
         final letterTextSpan = TextSpan(text: letter, style: textStyle);
@@ -473,16 +510,17 @@ class PaintedTextPainter extends CustomPainter {
           textDirection: TextDirection.ltr,
         );
         letterPainter.layout();
-        
+
         final letterOffset = Offset(currentX, textOffset.dy);
-        
+
         // Draw shadow first
         canvas.save();
         canvas.translate(letterOffset.dx + 1, letterOffset.dy + 2);
-        
+
         // Create shadow with opacity based on progress
-        final shadowWithOpacity = shadowPaint..color = Colors.black.withOpacity(0.3 * letterProgress);
-        
+        final shadowWithOpacity = shadowPaint
+          ..color = Colors.black.withOpacity(0.3 * letterProgress);
+
         // Draw shadow stroke
         final shadowSpan = TextSpan(
           text: letter,
@@ -494,22 +532,23 @@ class PaintedTextPainter extends CustomPainter {
         );
         shadowTextPainter.layout();
         shadowTextPainter.paint(canvas, Offset.zero);
-        
+
         canvas.restore();
-        
+
         // Draw main letter stroke
         canvas.save();
         canvas.translate(letterOffset.dx, letterOffset.dy);
-        
+
         // Adjust stroke opacity based on progress
-        final strokeWithOpacity = strokePaint..color = Colors.white.withOpacity(letterProgress);
-        
+        final strokeWithOpacity = strokePaint
+          ..color = Colors.white.withOpacity(letterProgress);
+
         // Use a clipRect to simulate drawing progress
         if (letterProgress < 1.0) {
           final clipHeight = letterPainter.height * letterProgress;
           canvas.clipRect(Rect.fromLTWH(0, 0, letterPainter.width, clipHeight));
         }
-        
+
         // Draw the letter stroke
         final strokeSpan = TextSpan(
           text: letter,
@@ -523,9 +562,9 @@ class PaintedTextPainter extends CustomPainter {
         );
         strokeTextPainter.layout();
         strokeTextPainter.paint(canvas, Offset.zero);
-        
+
         canvas.restore();
-        
+
         currentX += letterPainter.width;
       } else {
         // Even if not drawing, we need to account for letter width
@@ -539,9 +578,9 @@ class PaintedTextPainter extends CustomPainter {
       }
     }
   }
-  
+
   @override
   bool shouldRepaint(covariant PaintedTextPainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.text != text;
   }
-} 
+}

@@ -59,7 +59,16 @@ class DuelDetailLoaded extends DuelDetailState {
   }
 
   @override
-  List<Object?> get props => [duel, participants, leaderboard, isLeaderboardLoading, comments, canViewComments, sessions, isSessionsLoading];
+  List<Object?> get props => [
+        duel,
+        participants,
+        leaderboard,
+        isLeaderboardLoading,
+        comments,
+        canViewComments,
+        sessions,
+        isSessionsLoading
+      ];
 }
 
 class DuelDetailError extends DuelDetailState {

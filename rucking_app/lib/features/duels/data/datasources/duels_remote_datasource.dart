@@ -36,14 +36,18 @@ abstract class DuelsRemoteDataSource {
   Future<void> startDuel(String duelId);
 
   // Participant management
-  Future<void> updateParticipantStatus(String duelId, String participantId, String status);
-  Future<void> updateParticipantProgress(String duelId, String participantId, String sessionId, double contributionValue);
-  Future<DuelParticipantModel> getParticipantProgress(String duelId, String participantId);
+  Future<void> updateParticipantStatus(
+      String duelId, String participantId, String status);
+  Future<void> updateParticipantProgress(String duelId, String participantId,
+      String sessionId, double contributionValue);
+  Future<DuelParticipantModel> getParticipantProgress(
+      String duelId, String participantId);
   Future<List<DuelParticipantModel>> getDuelLeaderboard(String duelId);
 
   // Statistics
   Future<UserDuelStatsModel> getUserDuelStats([String? userId]);
-  Future<List<UserDuelStatsModel>> getDuelStatsLeaderboard(String statType, int limit);
+  Future<List<UserDuelStatsModel>> getDuelStatsLeaderboard(
+      String statType, int limit);
   Future<Map<String, dynamic>> getDuelAnalytics(int days);
 
   // Invitations
@@ -55,9 +59,10 @@ abstract class DuelsRemoteDataSource {
   // Comments
   Future<List<DuelCommentModel>> getDuelComments(String duelId);
   Future<DuelCommentModel> createDuelComment(String duelId, String content);
-  Future<void> updateDuelComment(String duelId, String commentId, String content);
+  Future<void> updateDuelComment(
+      String duelId, String commentId, String content);
   Future<void> deleteDuelComment(String duelId, String commentId);
-  
+
   // Withdrawal
   Future<void> withdrawFromDuel(String duelId);
 }
@@ -80,26 +85,27 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     if (challengeType != null) queryParams['challenge_type'] = challengeType;
     if (location != null) queryParams['location'] = location;
     if (limit != null) queryParams['limit'] = limit.toString();
-    if (userParticipating != null) queryParams['user_participating'] = userParticipating.toString();
+    if (userParticipating != null)
+      queryParams['user_participating'] = userParticipating.toString();
 
     print('[DEBUG] getDuels() - Making API call with params: $queryParams');
-    
+
     try {
       // ApiClient.get() returns the parsed JSON data directly, not a response object
       final jsonData = await apiClient.get('/duels', queryParams: queryParams);
-      
+
       print('[DEBUG] getDuels() - Received JSON data: $jsonData');
-      
+
       // Extract duels array from the response
       final List<dynamic> duelsData = jsonData['duels'] ?? [];
       print('[DEBUG] getDuels() - Duels array: $duelsData');
       print('[DEBUG] getDuels() - Duels array length: ${duelsData.length}');
-      
+
       final result = duelsData.map((duelJson) {
         print('[DEBUG] getDuels() - Parsing duel: $duelJson');
         return DuelModel.fromJson(duelJson);
       }).toList();
-      
+
       print('[DEBUG] getDuels() - Successfully parsed ${result.length} duels');
       return result;
     } catch (e, stackTrace) {
@@ -136,7 +142,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     try {
       // ApiClient.post returns the response data directly, not the http.Response
       final response = await apiClient.post('/duels', body);
-      
+
       // The responseData should contain the duel data directly
       return DuelModel.fromJson(response['duel']);
     } catch (e) {
@@ -148,7 +154,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<DuelModel> getDuel(String duelId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId', queryParams: {});
+      final responseData =
+          await apiClient.get('/duels/$duelId', queryParams: {});
       return DuelModel.fromJson(responseData);
     } catch (e) {
       rethrow;
@@ -156,7 +163,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   }
 
   @override
-  Future<DuelModel> updateDuel(String duelId, Map<String, dynamic> updates) async {
+  Future<DuelModel> updateDuel(
+      String duelId, Map<String, dynamic> updates) async {
     try {
       final responseData = await apiClient.put('/duels/$duelId', updates);
       return DuelModel.fromJson(responseData['duel']);
@@ -186,7 +194,7 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
       rethrow;
     }
   }
-  
+
   @override
   Future<void> startDuel(String duelId) async {
     try {
@@ -200,10 +208,12 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   }
 
   @override
-  Future<void> updateParticipantStatus(String duelId, String participantId, String status) async {
+  Future<void> updateParticipantStatus(
+      String duelId, String participantId, String status) async {
     try {
       final body = {'status': status};
-      await apiClient.put('/duels/$duelId/participants/$participantId/status', body);
+      await apiClient.put(
+          '/duels/$duelId/participants/$participantId/status', body);
       return;
     } catch (e) {
       rethrow;
@@ -211,23 +221,29 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   }
 
   @override
-  Future<void> updateParticipantProgress(String duelId, String participantId, String sessionId, double contributionValue) async {
+  Future<void> updateParticipantProgress(String duelId, String participantId,
+      String sessionId, double contributionValue) async {
     final body = {
       'session_id': sessionId,
       'contribution_value': contributionValue,
     };
-    final response = await apiClient.post('/duels/$duelId/participants/$participantId/progress', body);
-    
+    final response = await apiClient.post(
+        '/duels/$duelId/participants/$participantId/progress', body);
+
     if (response.statusCode != 200) {
       final errorData = json.decode(response.body);
-      throw ServerException(message: errorData['error'] ?? 'Failed to update progress');
+      throw ServerException(
+          message: errorData['error'] ?? 'Failed to update progress');
     }
   }
 
   @override
-  Future<DuelParticipantModel> getParticipantProgress(String duelId, String participantId) async {
+  Future<DuelParticipantModel> getParticipantProgress(
+      String duelId, String participantId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId/participants/$participantId/progress', queryParams: {});
+      final responseData = await apiClient.get(
+          '/duels/$duelId/participants/$participantId/progress',
+          queryParams: {});
       return DuelParticipantModel.fromJson(responseData);
     } catch (e) {
       rethrow;
@@ -237,7 +253,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<List<DuelParticipantModel>> getDuelLeaderboard(String duelId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId/leaderboard', queryParams: {});
+      final responseData =
+          await apiClient.get('/duels/$duelId/leaderboard', queryParams: {});
       final List<dynamic> leaderboardData = responseData['leaderboard'] ?? [];
       return leaderboardData
           .map((data) => DuelParticipantModel.fromJson(data))
@@ -259,15 +276,19 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   }
 
   @override
-  Future<List<UserDuelStatsModel>> getDuelStatsLeaderboard(String statType, int limit) async {
+  Future<List<UserDuelStatsModel>> getDuelStatsLeaderboard(
+      String statType, int limit) async {
     try {
       final queryParams = {
         'type': statType,
         'limit': limit.toString(),
       };
-      final responseData = await apiClient.get('/duel-stats/leaderboard', queryParams: queryParams);
+      final responseData = await apiClient.get('/duel-stats/leaderboard',
+          queryParams: queryParams);
       final List<dynamic> leaderboardData = responseData['leaderboard'] ?? [];
-      return leaderboardData.map((statsJson) => UserDuelStatsModel.fromJson(statsJson)).toList();
+      return leaderboardData
+          .map((statsJson) => UserDuelStatsModel.fromJson(statsJson))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -278,7 +299,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
     try {
       final queryParams = {'days': days.toString()};
       // ApiClient.get returns the response data directly
-      return await apiClient.get('/duel-stats/analytics', queryParams: queryParams);
+      return await apiClient.get('/duel-stats/analytics',
+          queryParams: queryParams);
     } catch (e) {
       rethrow;
     }
@@ -288,9 +310,12 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   Future<List<DuelInvitationModel>> getDuelInvitations(String status) async {
     try {
       final queryParams = {'status': status};
-      final responseData = await apiClient.get('/duel-invitations', queryParams: queryParams);
+      final responseData =
+          await apiClient.get('/duel-invitations', queryParams: queryParams);
       final List<dynamic> invitationsData = responseData['invitations'] ?? [];
-      return invitationsData.map((invitationJson) => DuelInvitationModel.fromJson(invitationJson)).toList();
+      return invitationsData
+          .map((invitationJson) => DuelInvitationModel.fromJson(invitationJson))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -311,21 +336,25 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<void> cancelInvitation(String invitationId) async {
     final response = await apiClient.delete('/duel-invitations/$invitationId');
-    
+
     if (response.statusCode != 200) {
       final errorData = json.decode(response.body);
-      throw ServerException(message: errorData['error'] ?? 'Failed to cancel invitation');
+      throw ServerException(
+          message: errorData['error'] ?? 'Failed to cancel invitation');
     }
   }
 
   @override
   Future<List<DuelInvitationModel>> getSentInvitations() async {
-    final response = await apiClient.get('/duel-invitations/sent', queryParams: {});
-    
+    final response =
+        await apiClient.get('/duel-invitations/sent', queryParams: {});
+
     if (response.statusCode == 200) {
       final jsonData = json.decode(response.body);
       final List<dynamic> invitationsData = jsonData['sent_invitations'] ?? [];
-      return invitationsData.map((invitationJson) => DuelInvitationModel.fromJson(invitationJson)).toList();
+      return invitationsData
+          .map((invitationJson) => DuelInvitationModel.fromJson(invitationJson))
+          .toList();
     } else {
       throw ServerException(message: 'Failed to fetch sent invitations');
     }
@@ -334,16 +363,20 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   @override
   Future<List<DuelCommentModel>> getDuelComments(String duelId) async {
     try {
-      final responseData = await apiClient.get('/duels/$duelId/comments', queryParams: {});
+      final responseData =
+          await apiClient.get('/duels/$duelId/comments', queryParams: {});
       final List<dynamic> commentsData = responseData['data'] ?? [];
-      return commentsData.map((commentJson) => DuelCommentModel.fromJson(commentJson)).toList();
+      return commentsData
+          .map((commentJson) => DuelCommentModel.fromJson(commentJson))
+          .toList();
     } catch (e) {
       rethrow;
     }
   }
 
   @override
-  Future<DuelCommentModel> createDuelComment(String duelId, String content) async {
+  Future<DuelCommentModel> createDuelComment(
+      String duelId, String content) async {
     try {
       final body = {'content': content};
       final response = await apiClient.post('/duels/$duelId/comments', body);
@@ -354,7 +387,8 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
   }
 
   @override
-  Future<void> updateDuelComment(String duelId, String commentId, String content) async {
+  Future<void> updateDuelComment(
+      String duelId, String commentId, String content) async {
     try {
       final body = {'comment_id': commentId, 'content': content};
       await apiClient.put('/duels/$duelId/comments', body);
@@ -366,15 +400,18 @@ class DuelsRemoteDataSourceImpl implements DuelsRemoteDataSource {
 
   @override
   Future<void> deleteDuelComment(String duelId, String commentId) async {
-    final response = await apiClient.delete('/duels/$duelId/comments?comment_id=$commentId');
-    
+    final response =
+        await apiClient.delete('/duels/$duelId/comments?comment_id=$commentId');
+
     if (response.statusCode != 200 && response.statusCode != 404) {
       try {
         final errorData = json.decode(response.body);
-        throw ServerException(message: errorData['error'] ?? 'Failed to delete comment');
+        throw ServerException(
+            message: errorData['error'] ?? 'Failed to delete comment');
       } catch (e) {
         // If JSON parsing fails, use a generic error message
-        throw ServerException(message: 'Failed to delete comment: ${response.statusCode}');
+        throw ServerException(
+            message: 'Failed to delete comment: ${response.statusCode}');
       }
     }
     // 404 is treated as success since comment already doesn't exist

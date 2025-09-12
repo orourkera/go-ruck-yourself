@@ -27,9 +27,9 @@ class SplitsDisplay extends StatelessWidget {
           child: Text(
             'SPLITS',
             style: AppTextStyles.displaySmall.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark 
-                ? Colors.red
-                : const Color(0xFF3E2723),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.red
+                  : const Color(0xFF3E2723),
             ),
           ),
         ),
@@ -128,10 +128,10 @@ class _SplitCard extends StatelessWidget {
                 if (split.caloriesBurned > 0)
                   Text(
                     '${split.caloriesBurned >= 10 ? split.caloriesBurned.toStringAsFixed(0) : split.caloriesBurned.toStringAsFixed(1)} cal',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.secondary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.secondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 if (split.elevationGainM > 0)
                   Text(
@@ -143,7 +143,8 @@ class _SplitCard extends StatelessWidget {
                   ),
               ],
             ),
-          ] else if (split.caloriesBurned <= 0 && split.elevationGainM <= 0) ...[
+          ] else if (split.caloriesBurned <= 0 &&
+              split.elevationGainM <= 0) ...[
             // Show split info when no calories/elevation data available
             Text(
               'Split ${split.splitNumber}',

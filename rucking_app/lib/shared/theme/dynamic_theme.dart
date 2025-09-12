@@ -9,28 +9,28 @@ class DynamicTheme {
   static ThemeData getThemeData(User? user, bool isDarkMode) {
     // Base theme to start with
     final baseTheme = isDarkMode ? AppTheme.darkTheme : AppTheme.lightTheme;
-    
+
     // If the user is female, update with lady mode colors
     if (user != null && user.gender == 'female') {
       return _applyLadyModeColors(baseTheme);
     }
-    
+
     // Return default theme
     return baseTheme;
   }
-  
+
   /// Apply lady mode colors to the theme
   static ThemeData _applyLadyModeColors(ThemeData baseTheme) {
     final Color primaryColor = AppColors.ladyPrimary;
     final Color primaryLightColor = AppColors.ladyPrimaryLight;
-    
+
     // Create a new colorScheme based on the existing one
     final ColorScheme newColorScheme = baseTheme.colorScheme.copyWith(
       primary: primaryColor,
       primaryContainer: primaryLightColor,
       onPrimary: Colors.white,
     );
-    
+
     // Create a new theme with lady colors
     return baseTheme.copyWith(
       primaryColor: primaryColor,

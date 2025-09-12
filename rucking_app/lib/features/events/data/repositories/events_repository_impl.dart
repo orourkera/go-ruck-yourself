@@ -35,17 +35,17 @@ class EventsRepositoryImpl implements EventsRepository {
       startDate: startDate,
       endDate: endDate,
     );
-    
+
     if (cachedData != null) {
       // Return cached events
       return cachedData
           .map((json) => Event.fromJson(json as Map<String, dynamic>))
           .toList();
     }
-    
+
     // No cache or expired, fetch from API
     final queryParams = <String, String>{};
-    
+
     if (search != null && search.isNotEmpty) {
       queryParams['search'] = search;
     }
@@ -79,18 +79,16 @@ class EventsRepositoryImpl implements EventsRepository {
     }
 
     final response = await _apiClient.get('/events', queryParams: queryParams);
-    
+
     AppLogger.info('Events API Response: ${jsonEncode(response)}');
-    
-    final eventsList = (response['events'] as List)
-        .map((json) {
-          AppLogger.info('Processing event JSON: ${jsonEncode(json)}');
-          AppLogger.info('Event club_id: ${json['club_id']}');
-          AppLogger.info('Event hosting_club: ${json['hosting_club']}');
-          return Event.fromJson(json as Map<String, dynamic>);
-        })
-        .toList();
-    
+
+    final eventsList = (response['events'] as List).map((json) {
+      AppLogger.info('Processing event JSON: ${jsonEncode(json)}');
+      AppLogger.info('Event club_id: ${json['club_id']}');
+      AppLogger.info('Event hosting_club: ${json['hosting_club']}');
+      return Event.fromJson(json as Map<String, dynamic>);
+    }).toList();
+
     // Cache the response data
     await _cacheService.cacheFilteredEvents(
       response['events'] as List,
@@ -101,7 +99,7 @@ class EventsRepositoryImpl implements EventsRepository {
       startDate: startDate,
       endDate: endDate,
     );
-    
+
     return eventsList;
   }
 
@@ -146,10 +144,10 @@ class EventsRepositoryImpl implements EventsRepository {
     };
 
     final response = await _apiClient.post('/events', body);
-    
+
     // Invalidate events list cache since we created a new event
     await _cacheService.invalidateCache();
-    
+
     return Event.fromJson(response['event'] as Map<String, dynamic>);
   }
 
@@ -157,22 +155,22 @@ class EventsRepositoryImpl implements EventsRepository {
   Future<EventDetails> getEventDetails(String eventId) async {
     // Invalidate cache first to ensure fresh data
     await _cacheService.invalidateEventDetails(eventId);
-    
+
     // Try to get cached event details first
     final cachedDetails = await _cacheService.getCachedEventDetails(eventId);
-    
+
     if (cachedDetails != null) {
       return EventDetails.fromJson(cachedDetails);
     }
-    
+
     // No cache, fetch from API
     final response = await _apiClient.get('/events/$eventId');
-    
+
     final eventDetails = EventDetails.fromJson(response);
-    
+
     // Cache the event details
     await _cacheService.cacheEventDetails(eventId, response);
-    
+
     return eventDetails;
   }
 
@@ -200,10 +198,11 @@ class EventsRepositoryImpl implements EventsRepository {
     }
 
     final body = <String, dynamic>{};
-    
+
     if (title != null) body['title'] = title;
     if (description != null) body['description'] = description;
-    if (scheduledStartTime != null) body['scheduled_start_time'] = scheduledStartTime.toIso8601String();
+    if (scheduledStartTime != null)
+      body['scheduled_start_time'] = scheduledStartTime.toIso8601String();
     if (durationMinutes != null) body['duration_minutes'] = durationMinutes;
     if (locationName != null) body['location_name'] = locationName;
     if (latitude != null) body['latitude'] = latitude;
@@ -216,18 +215,18 @@ class EventsRepositoryImpl implements EventsRepository {
     if (bannerImageUrl != null) body['banner_image_url'] = bannerImageUrl;
 
     final response = await _apiClient.put('/events/$eventId', body);
-    
+
     // Invalidate caches since event was updated
     await _cacheService.invalidateCache();
     await _cacheService.invalidateEventDetails(eventId);
-    
+
     return Event.fromJson(response['event'] as Map<String, dynamic>);
   }
 
   @override
   Future<void> cancelEvent(String eventId) async {
     await _apiClient.delete('/events/$eventId');
-    
+
     // Invalidate caches since event was cancelled
     await _cacheService.invalidateCache();
     await _cacheService.invalidateEventDetails(eventId);
@@ -236,7 +235,7 @@ class EventsRepositoryImpl implements EventsRepository {
   @override
   Future<void> joinEvent(String eventId) async {
     await _apiClient.post('/events/$eventId/participation', {});
-    
+
     // Invalidate event details cache since participation changed
     await _cacheService.invalidateEventDetails(eventId);
     await _cacheService.invalidateCache(); // Also invalidate list cache
@@ -245,7 +244,7 @@ class EventsRepositoryImpl implements EventsRepository {
   @override
   Future<void> leaveEvent(String eventId) async {
     await _apiClient.delete('/events/$eventId/participation');
-    
+
     // Invalidate event details cache since participation changed
     await _cacheService.invalidateEventDetails(eventId);
     await _cacheService.invalidateCache(); // Also invalidate list cache
@@ -254,9 +253,10 @@ class EventsRepositoryImpl implements EventsRepository {
   @override
   Future<List<EventParticipant>> getEventParticipants(String eventId) async {
     final response = await _apiClient.get('/events/$eventId/participants');
-    
+
     return (response['participants'] as List<dynamic>)
-        .map((participant) => EventParticipant.fromJson(participant as Map<String, dynamic>))
+        .map((participant) =>
+            EventParticipant.fromJson(participant as Map<String, dynamic>))
         .toList();
   }
 
@@ -272,7 +272,7 @@ class EventsRepositoryImpl implements EventsRepository {
     };
 
     await _apiClient.put('/events/$eventId/participation', body);
-    
+
     // Invalidate event details cache since participation was managed
     await _cacheService.invalidateEventDetails(eventId);
   }
@@ -281,23 +281,25 @@ class EventsRepositoryImpl implements EventsRepository {
   Future<List<EventComment>> getEventComments(String eventId) async {
     // Try to get cached comments first
     final cachedComments = await _cacheService.getCachedEventComments(eventId);
-    
+
     if (cachedComments != null) {
       return cachedComments
           .map((json) => EventComment.fromJson(json as Map<String, dynamic>))
           .toList();
     }
-    
+
     // No cache, fetch from API
     final response = await _apiClient.get('/events/$eventId/comments');
-    
+
     final comments = (response['comments'] as List<dynamic>)
-        .map((comment) => EventComment.fromJson(comment as Map<String, dynamic>))
+        .map(
+            (comment) => EventComment.fromJson(comment as Map<String, dynamic>))
         .toList();
-    
+
     // Cache the comments
-    await _cacheService.cacheEventComments(eventId, response['comments'] as List);
-    
+    await _cacheService.cacheEventComments(
+        eventId, response['comments'] as List);
+
     return comments;
   }
 
@@ -311,10 +313,10 @@ class EventsRepositoryImpl implements EventsRepository {
     };
 
     final response = await _apiClient.post('/events/$eventId/comments', body);
-    
+
     // Invalidate comments cache since we added a new comment
     await _cacheService.invalidateEventComments(eventId);
-    
+
     return EventComment.fromJson(response['comment'] as Map<String, dynamic>);
   }
 
@@ -328,11 +330,12 @@ class EventsRepositoryImpl implements EventsRepository {
       'comment': comment,
     };
 
-    final response = await _apiClient.put('/events/$eventId/comments/$commentId', body);
-    
+    final response =
+        await _apiClient.put('/events/$eventId/comments/$commentId', body);
+
     // Invalidate comments cache since we updated a comment
     await _cacheService.invalidateEventComments(eventId);
-    
+
     return EventComment.fromJson(response['comment'] as Map<String, dynamic>);
   }
 
@@ -342,7 +345,7 @@ class EventsRepositoryImpl implements EventsRepository {
     required String commentId,
   }) async {
     await _apiClient.delete('/events/$eventId/comments/$commentId');
-    
+
     // Invalidate comments cache since we deleted a comment
     await _cacheService.invalidateEventComments(eventId);
   }
@@ -350,7 +353,8 @@ class EventsRepositoryImpl implements EventsRepository {
   @override
   Future<EventLeaderboard> getEventLeaderboard(String eventId) async {
     // Try to get cached leaderboard first
-    final cachedLeaderboard = await _cacheService.getCachedEventLeaderboard(eventId);
+    final cachedLeaderboard =
+        await _cacheService.getCachedEventLeaderboard(eventId);
 
     if (cachedLeaderboard != null) {
       final parsed = EventLeaderboard.fromJson(cachedLeaderboard);
@@ -361,22 +365,22 @@ class EventsRepositoryImpl implements EventsRepository {
       }
       // Otherwise fall through to fetch fresh data
     }
-    
+
     // No cache, fetch from API
     final response = await _apiClient.get('/events/$eventId/progress');
-    
+
     // Transform API response to match EventLeaderboard model
     final transformedResponse = {
       'event_id': eventId,
       'entries': response['progress'] ?? [], // Map 'progress' to 'entries'
       'last_updated': DateTime.now().toIso8601String(),
     };
-    
+
     final leaderboard = EventLeaderboard.fromJson(transformedResponse);
-    
+
     // Cache the transformed response
     await _cacheService.cacheEventLeaderboard(eventId, transformedResponse);
-    
+
     return leaderboard;
   }
 
@@ -386,11 +390,12 @@ class EventsRepositoryImpl implements EventsRepository {
     required String userId,
   }) async {
     try {
-      final response = await _apiClient.get('/events/$eventId/progress', 
-        queryParams: {'user_id': userId});
-      
+      final response = await _apiClient
+          .get('/events/$eventId/progress', queryParams: {'user_id': userId});
+
       if (response['progress'] != null) {
-        return EventProgress.fromJson(response['progress'] as Map<String, dynamic>);
+        return EventProgress.fromJson(
+            response['progress'] as Map<String, dynamic>);
       }
       return null;
     } catch (e) {
@@ -402,10 +407,10 @@ class EventsRepositoryImpl implements EventsRepository {
   @override
   Future<Map<String, dynamic>> startRuckFromEvent(String eventId) async {
     final response = await _apiClient.post('/events/$eventId/start-ruck', {});
-    
+
     // Invalidate leaderboard cache since progress may change
     await _cacheService.invalidateEventLeaderboard(eventId);
-    
+
     return {
       'event_id': response['event_id'] as String,
       'event_title': response['event_title'] as String,

@@ -56,23 +56,23 @@ class UserAvatar extends StatelessWidget {
   Widget _buildAvatarImage() {
     // Check if the avatarUrl is a local file path
     // More robust detection for file paths and file:// URLs
-    final isLocalFile = avatarUrl!.startsWith('file://') || 
-                       avatarUrl!.startsWith('/') ||
-                       avatarUrl!.contains('/var/mobile/') ||
-                       avatarUrl!.contains('/data/data/') ||
-                       avatarUrl!.contains('cropped_image_');
-    
+    final isLocalFile = avatarUrl!.startsWith('file://') ||
+        avatarUrl!.startsWith('/') ||
+        avatarUrl!.contains('/var/mobile/') ||
+        avatarUrl!.contains('/data/data/') ||
+        avatarUrl!.contains('cropped_image_');
+
     if (isLocalFile) {
       // Handle local file
       String filePath = avatarUrl!;
-      
+
       // Remove file:// prefix if present
       if (filePath.startsWith('file://')) {
         filePath = filePath.replaceFirst('file://', '');
       }
-      
+
       final file = File(filePath);
-      
+
       // Check if file exists before trying to display it
       return FutureBuilder<bool>(
         future: file.exists(),
@@ -80,7 +80,7 @@ class UserAvatar extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return _buildInitialsAvatar();
           }
-          
+
           if (snapshot.data == true) {
             return Image.file(
               file,
@@ -99,7 +99,7 @@ class UserAvatar extends StatelessWidget {
         },
       );
     }
-    
+
     // Handle network URL - ensure it's a valid HTTP/HTTPS URL
     if (avatarUrl!.startsWith('http://') || avatarUrl!.startsWith('https://')) {
       return Builder(
@@ -137,7 +137,7 @@ class UserAvatar extends StatelessWidget {
         },
       );
     }
-    
+
     // If it's not a recognized URL format, show initials
     debugPrint('Unrecognized avatar URL format: $avatarUrl');
     return _buildInitialsAvatar();
@@ -146,7 +146,7 @@ class UserAvatar extends StatelessWidget {
   Widget _buildInitialsAvatar() {
     final initials = _getInitials(username);
     final backgroundColor = _getColorFromUsername(username);
-    
+
     return Container(
       width: size,
       height: size,
@@ -171,7 +171,9 @@ class UserAvatar extends StatelessWidget {
     if (name.isEmpty) return '?';
     List<String> nameParts = name.split(' ');
     String initials = '';
-    if (nameParts.length > 1 && nameParts[0].isNotEmpty && nameParts[1].isNotEmpty) {
+    if (nameParts.length > 1 &&
+        nameParts[0].isNotEmpty &&
+        nameParts[1].isNotEmpty) {
       initials = nameParts[0][0] + nameParts[1][0];
     } else if (nameParts.isNotEmpty && nameParts[0].isNotEmpty) {
       initials = nameParts[0][0];
@@ -193,7 +195,7 @@ class UserAvatar extends StatelessWidget {
       Colors.cyan,
       Colors.lime,
     ];
-    
+
     final hash = username.hashCode;
     return colors[hash.abs() % colors.length];
   }

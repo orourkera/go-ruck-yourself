@@ -23,7 +23,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  
+
   bool _showAdvancedFilters = false;
   bool _useCurrentLocation = false;
   double? _currentLatitude;
@@ -31,7 +31,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
   int _maxDistance = 10; // miles
   RouteDifficulty? _selectedDifficulty;
   RouteType? _selectedRouteType;
-  
+
   late AnimationController _animationController;
   late Animation<double> _expansionAnimation;
 
@@ -108,7 +108,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
             const Spacer(),
             ElevatedButton.icon(
               onPressed: widget.isLoading ? null : _performSearch,
-              icon: widget.isLoading 
+              icon: widget.isLoading
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -290,9 +290,8 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
                   _getDifficultyLabel(difficulty),
                   _selectedDifficulty == difficulty,
                   () => setState(() {
-                    _selectedDifficulty = _selectedDifficulty == difficulty 
-                        ? null 
-                        : difficulty;
+                    _selectedDifficulty =
+                        _selectedDifficulty == difficulty ? null : difficulty;
                   }),
                   color: _getDifficultyColor(difficulty),
                 );
@@ -333,9 +332,8 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
                   _getRouteTypeLabel(type),
                   _selectedRouteType == type,
                   () => setState(() {
-                    _selectedRouteType = _selectedRouteType == type 
-                        ? null 
-                        : type;
+                    _selectedRouteType =
+                        _selectedRouteType == type ? null : type;
                   }),
                 );
               }),
@@ -369,7 +367,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
     Color? color,
   }) {
     final chipColor = color ?? AppColors.primary;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -398,7 +396,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
     setState(() {
       _showAdvancedFilters = !_showAdvancedFilters;
     });
-    
+
     if (_showAdvancedFilters) {
       _animationController.forward();
     } else {
@@ -416,7 +414,7 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
           return;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         _showLocationError('Location permissions are permanently denied');
         return;
@@ -443,8 +441,10 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
     }
 
     final filters = <String, dynamic>{};
-    
-    if (_useCurrentLocation && _currentLatitude != null && _currentLongitude != null) {
+
+    if (_useCurrentLocation &&
+        _currentLatitude != null &&
+        _currentLongitude != null) {
       filters['latitude'] = _currentLatitude;
       filters['longitude'] = _currentLongitude;
       filters['maxDistance'] = _maxDistance;
@@ -453,11 +453,11 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
       filters['location'] = _locationController.text.trim();
       filters['maxDistance'] = _maxDistance;
     }
-    
+
     if (_selectedDifficulty != null) {
       filters['difficulty'] = _selectedDifficulty;
     }
-    
+
     if (_selectedRouteType != null) {
       filters['routeType'] = _selectedRouteType;
     }
@@ -467,9 +467,9 @@ class _RouteSearchWidgetState extends State<RouteSearchWidget>
 
   bool _hasActiveFilters() {
     return _useCurrentLocation ||
-           _locationController.text.isNotEmpty ||
-           _selectedDifficulty != null ||
-           _selectedRouteType != null;
+        _locationController.text.isNotEmpty ||
+        _selectedDifficulty != null ||
+        _selectedRouteType != null;
   }
 
   void _clearFilters() {

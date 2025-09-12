@@ -89,16 +89,16 @@ class HomeScreenUpdateIntegration extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<HomeScreenUpdateIntegration> createState() => _HomeScreenUpdateIntegrationState();
+  State<HomeScreenUpdateIntegration> createState() =>
+      _HomeScreenUpdateIntegrationState();
 }
 
-class _HomeScreenUpdateIntegrationState extends State<HomeScreenUpdateIntegration>
-    with UpdatePromptMixin {
-
+class _HomeScreenUpdateIntegrationState
+    extends State<HomeScreenUpdateIntegration> with UpdatePromptMixin {
   @override
   void initState() {
     super.initState();
-    
+
     // Check for updates on home screen load (with delay to not interfere with loading)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
@@ -142,7 +142,7 @@ class _UpdateCheckButtonState extends State<UpdateCheckButton> {
 
     try {
       final updateInfo = await AppUpdateManager.instance.manualUpdateCheck();
-      
+
       if (!mounted) return;
 
       if (updateInfo != null) {

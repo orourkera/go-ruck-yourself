@@ -52,13 +52,13 @@ void main() async {
     () async {
       // Ensure Flutter binding is initialized inside the zone to prevent zone mismatch
       WidgetsFlutterBinding.ensureInitialized();
-      
+
       // Set up resilient HTTP overrides to prevent connection crashes
       HttpOverrides.global = ResilientHttpOverrides();
-      
+
       // Critical: Set binary messenger instance
       _setUpBinaryMessenger();
-      
+
       // Run app with proper error handling + Sentry initialization
       await _runApp();
     },
@@ -66,12 +66,12 @@ void main() async {
       // This catches ALL uncaught async exceptions that would otherwise crash the app silently
       AppLogger.error('🚨 UNCAUGHT ASYNC ERROR: $error');
       AppLogger.error('Stack: $stackTrace');
-      
+
       try {
         // Send to Crashlytics IMMEDIATELY before app potentially crashes
         await FirebaseCrashlytics.instance.recordError(
-          error, 
-          stackTrace, 
+          error,
+          stackTrace,
           fatal: true,
           information: [
             'UNCAUGHT_ASYNC_EXCEPTION',
@@ -79,10 +79,10 @@ void main() async {
             'App version: ${await _getAppVersion()}',
           ],
         );
-        
+
         // Force send crash report immediately (don't wait for next app launch)
         await FirebaseCrashlytics.instance.sendUnsentReports();
-        
+
         AppLogger.info('Crash report sent successfully');
       } catch (crashlyticsError) {
         AppLogger.error('Failed to send crash report: $crashlyticsError');
@@ -95,18 +95,17 @@ void main() async {
 }
 
 Future<void> _runApp() async {
-  
   // 🛡️ CRITICAL: ANR Prevention - Configure Flutter engine for stability
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  
+
   // 🛡️ Prevent surface lifecycle issues that cause ANR
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
-  
+
   // Load environment variables
   await dotenv.load(fileName: ".env");
-  
+
   // Initialize Sentry for error monitoring
   await SentryFlutter.init(
     (options) {
@@ -117,27 +116,43 @@ Future<void> _runApp() async {
       if (release != null && release.isNotEmpty) {
         options.release = release;
       }
-      
+
       // Performance Monitoring
-      options.tracesSampleRate = 0.1; // 10% of transactions for performance monitoring
+      options.tracesSampleRate =
+          0.1; // 10% of transactions for performance monitoring
       options.enableAutoSessionTracking = true;
       options.attachStacktrace = true;
       options.captureFailedRequests = true;
-      options.sendDefaultPii = false; // Don't send personally identifiable information
-      
-      // 🔧 FIX: Keep profiling disabled for iOS compatibility 
+      options.sendDefaultPii =
+          false; // Don't send personally identifiable information
+
+      // 🔧 FIX: Keep profiling disabled for iOS compatibility
       options.profilesSampleRate = 0.0; // Disable profiling
-      
+
       // Enhanced Configuration for 9.3.0
       options.beforeSend = (event, hint) {
         // Drop events related to common bot/WordPress URLs to reduce noise.
         // This mirrors our server filters and extends them for client events.
         const patterns = <String>[
-          'wp-admin', 'wp-login', 'xmlrpc.php',
-          '/wp-content/', '/wp-includes/', '/wordpress/', '/drupal/',
-          'phpmyadmin', '/cgi-bin/',
-          '.php', '.asp', '.jsp', '.do',
-          '/.env', '/.git/', '/config/', '/backup/', '/tmp/', '/var/'
+          'wp-admin',
+          'wp-login',
+          'xmlrpc.php',
+          '/wp-content/',
+          '/wp-includes/',
+          '/wordpress/',
+          '/drupal/',
+          'phpmyadmin',
+          '/cgi-bin/',
+          '.php',
+          '.asp',
+          '.jsp',
+          '.do',
+          '/.env',
+          '/.git/',
+          '/config/',
+          '/backup/',
+          '/tmp/',
+          '/var/'
         ];
 
         bool containsBlocked(String value) {
@@ -193,14 +208,13 @@ Future<void> _runApp() async {
     },
     appRunner: () => _initializeApp(),
   );
-  
+
   // Set global tags after initialization
   final appVersion = await _getAppVersion();
   Sentry.configureScope((scope) => scope
     ..setTag('platform', 'flutter')
     ..setTag('app', 'rucking_app')
-    ..setTag('version', appVersion)
-  );
+    ..setTag('version', appVersion));
 }
 
 /// Helper function to get app version for crash reports
@@ -236,17 +250,18 @@ bool _isLikelyNonFatalFlutterError(FlutterErrorDetails errorDetails) {
   }
 
   // Image-related libraries commonly used by Flutter when loading/decoding
-  if (library != null && (library.contains('image') || library.contains('painting'))) {
+  if (library != null &&
+      (library.contains('image') || library.contains('painting'))) {
     return true;
   }
 
   // Message heuristics for image failures
   if (message.contains('image') &&
       (message.contains('codec') ||
-       message.contains('decode') ||
-       message.contains('failed') ||
-       message.contains('load') ||
-       message.contains('stream'))) {
+          message.contains('decode') ||
+          message.contains('failed') ||
+          message.contains('load') ||
+          message.contains('stream'))) {
     return true;
   }
 
@@ -259,10 +274,9 @@ void _setUpBinaryMessenger() {
 }
 
 Future<void> _initializeApp() async {
-  
   // Initialize Firebase first
   await Firebase.initializeApp();
-  
+
   // 🔥 CRITICAL: Initialize Firebase Crashlytics for crash reporting
   FlutterError.onError = (errorDetails) {
     // Route Flutter framework errors to Crashlytics with correct severity
@@ -296,36 +310,44 @@ Future<void> _initializeApp() async {
 
   // Attach Bloc observer for detailed logging of state changes & errors
   Bloc.observer = AppBlocObserver();
-  
+
   // Load environment variables from .env (optional)
   String? supabaseUrl;
   String? supabaseKey;
-  
+
   try {
     await dotenv.load(fileName: '.env');
     AppLogger.info('.env file loaded successfully');
     supabaseUrl = dotenv.env['SUPABASE_URL'];
     supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
   } catch (e) {
-    AppLogger.warning('.env file not found or could not be loaded, using environment variables: $e');
+    AppLogger.warning(
+        '.env file not found or could not be loaded, using environment variables: $e');
     // Fall back to system environment variables
     supabaseUrl = Platform.environment['SUPABASE_URL'];
     supabaseKey = Platform.environment['SUPABASE_ANON_KEY'];
-    
+
     // No hardcoded fallback - force proper configuration
-    if ((supabaseUrl == null || supabaseUrl.isEmpty) && 
+    if ((supabaseUrl == null || supabaseUrl.isEmpty) &&
         (supabaseKey == null || supabaseKey.isEmpty)) {
-      AppLogger.error('Supabase configuration not found in .env file or environment variables');
-      AppLogger.error('Please ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in .env file');
+      AppLogger.error(
+          'Supabase configuration not found in .env file or environment variables');
+      AppLogger.error(
+          'Please ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in .env file');
     }
   }
-  
+
   // --------------------------
   // Initialize Supabase FIRST (with network error handling)
   // --------------------------
-  if (supabaseUrl == null || supabaseKey == null || supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-    AppLogger.error('Supabase configuration missing from .env file or environment variables');
-    throw Exception('SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file or environment variables');
+  if (supabaseUrl == null ||
+      supabaseKey == null ||
+      supabaseUrl.isEmpty ||
+      supabaseKey.isEmpty) {
+    AppLogger.error(
+        'Supabase configuration missing from .env file or environment variables');
+    throw Exception(
+        'SUPABASE_URL and SUPABASE_ANON_KEY must be set in .env file or environment variables');
   }
 
   try {
@@ -338,17 +360,18 @@ Future<void> _initializeApp() async {
     AppLogger.error('Failed to initialize Supabase (network issue): $e');
     // Continue anyway - app can still work in offline mode
   }
-  
+
   // 🌐 Initialize Firebase Remote Config for feature flags
   try {
     AppLogger.info('🌐 Initializing Firebase Remote Config...');
     await RemoteConfigService.instance.initialize();
     AppLogger.info('✅ Firebase Remote Config initialized successfully');
   } catch (e) {
-    AppLogger.warning('⚠️ Failed to initialize Firebase Remote Config (will use defaults): $e');
+    AppLogger.warning(
+        '⚠️ Failed to initialize Firebase Remote Config (will use defaults): $e');
     // Continue anyway - feature flags will use hardcoded defaults
   }
-  
+
   // Initialize dependency injection after env vars & Supabase are loaded
   try {
     await setupServiceLocator();
@@ -357,10 +380,10 @@ Future<void> _initializeApp() async {
     AppLogger.error('Failed to initialize some services (network issue): $e');
     // Continue anyway - essential services should still work
   }
-  
+
   // Initialize watch error service for Sentry reporting
   await WatchErrorService.initialize();
-  
+
   // 🔥 CRASH RECOVERY: Check for crashed sessions after services are initialized
   try {
     print('[MAIN_DEBUG] Attempting to get ActiveSessionBloc');
@@ -374,7 +397,7 @@ Future<void> _initializeApp() async {
     AppLogger.error('Error during session crash recovery: $e');
     // Continue anyway - not critical for app startup
   }
-  
+
   // Debug: Check if AuthBloc is registered
   print('🔍 [Main] Checking if AuthBloc is registered...');
   if (getIt.isRegistered<AuthBloc>()) {
@@ -382,43 +405,45 @@ Future<void> _initializeApp() async {
   } else {
     print('❌ [Main] AuthBloc is NOT registered!');
   }
-  
+
   // Request App Tracking Transparency authorization will be done after UI is loaded
   // This prevents the prompt from appearing before the app UI is ready
-  
+
   // REMOVED: Automatic location permission request at startup to prevent conflicts
   // Location permissions will be requested only when actually needed (e.g., starting a session)
   // This prevents stuck Android system dialogs
-  
+
   // Disable RevenueCat debug logs for production
   Purchases.setDebugLogsEnabled(false);
   // Removed Purchases.configure from main.dart. Now handled in RevenueCatService.
-  
+
   // Initialize Firebase Messaging background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  
+
   // 🔥 Set user identifier in Crashlytics for better debugging
   FirebaseCrashlytics.instance.setUserIdentifier('user_startup');
-  
+
   // 🔥 Log that app is starting (will help track startup crashes)
   FirebaseCrashlytics.instance.log('App starting up - version 2.5.0+22');
-  
+
   // Enable debug mode for better crash detection in development
   await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
-  
+
   // Log additional context for debugging
   FirebaseCrashlytics.instance.setCustomKey('build_number', '22');
   FirebaseCrashlytics.instance.setCustomKey('app_name', 'RuckingApp');
-  FirebaseCrashlytics.instance.log('Crashlytics initialized with debug collection enabled');
-  
+  FirebaseCrashlytics.instance
+      .log('Crashlytics initialized with debug collection enabled');
+
   // Initialize Firebase Messaging Service (non-blocking)
   FirebaseMessagingService().initialize().catchError((error) async {
     print('❌ Firebase Messaging initialization failed: $error');
-    
+
     // Handle TOO_MANY_REGISTRATIONS error with automatic cleanup
     if (error.toString().contains('TOO_MANY_REGISTRATIONS')) {
-      print('🚨 TOO_MANY_REGISTRATIONS detected - attempting automatic cleanup');
-      
+      print(
+          '🚨 TOO_MANY_REGISTRATIONS detected - attempting automatic cleanup');
+
       try {
         final success = await FirebaseMessagingService().cleanupRegistrations();
         if (success) {
@@ -431,23 +456,23 @@ Future<void> _initializeApp() async {
       }
     }
   });
-  
+
   // 🔄 CRITICAL: Recover any locally saved sessions from previous app crashes/network failures
   SessionRecoveryService.recoverSavedSessions().catchError((error) {
     AppLogger.error('Session recovery failed: $error');
   });
-  
+
   // 🧠 Start memory monitoring to prevent crashes
   MemoryMonitorService.startMonitoring();
-  
+
   // Supabase already initialized earlier
-  
+
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   // Trigger authentication check on the singleton AuthBloc instance
   print('🔍 [Main] Attempting to get AuthBloc...');
   try {
@@ -458,10 +483,10 @@ Future<void> _initializeApp() async {
     print('❌ [Main] Failed to get AuthBloc: $e');
     rethrow;
   }
-  
+
   // 🔄 Session Recovery is active and handled in the UI layer
   print('📝 [Main] Session recovery ready - handled by AppStartupService');
-  
+
   // Run the app
   runApp(
     MultiBlocProvider(
@@ -514,15 +539,17 @@ Future<void> _initializeApp() async {
       child: RuckingApp(),
     ),
   );
-  
+
   // 🚨 CRITICAL: Request App Tracking Transparency AFTER UI is loaded
   // This ensures the ATT prompt appears properly for App Store Review
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     try {
       AppLogger.info('[Main] App UI loaded, requesting ATT authorization...');
       // Delay to ensure the app is fully visible and interactive
-      await Future.delayed(const Duration(milliseconds: 5000)); // Extended for iOS 18.6 compatibility
-      final hasPermission = await TrackingTransparencyService.requestTrackingAuthorization();
+      await Future.delayed(const Duration(
+          milliseconds: 5000)); // Extended for iOS 18.6 compatibility
+      final hasPermission =
+          await TrackingTransparencyService.requestTrackingAuthorization();
       AppLogger.info('[Main] ATT authorization result: $hasPermission');
     } catch (e) {
       AppLogger.error('[Main] Error requesting tracking authorization: $e');
@@ -530,16 +557,16 @@ Future<void> _initializeApp() async {
   });
 
   // Update check intentionally disabled per product decision
-  
+
   // 🛡️ ANR Prevention: Initialize heavy services after surface is stable
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     try {
       // Wait for Flutter surface to be fully rendered
       await Future.delayed(const Duration(milliseconds: 1000));
-      
+
       // Initialize heavy services in background
       AppLogger.info('[Main] Starting deferred service initialization...');
-      
+
       // These don't block the UI thread
       unawaited(Future(() async {
         try {
@@ -549,7 +576,6 @@ Future<void> _initializeApp() async {
           AppLogger.error('[Main] Error sending crashlytics reports: $e');
         }
       }));
-      
     } catch (e) {
       AppLogger.error('[Main] Error in deferred initialization: $e');
     }
@@ -559,7 +585,8 @@ Future<void> _initializeApp() async {
     onBackground: () {
       final blocState = getIt<ActiveSessionBloc>().state;
       if (blocState is ActiveSessionRunning) {
-        Sentry.captureMessage('App backgrounded during active session', level: SentryLevel.warning, withScope: (scope) {
+        Sentry.captureMessage('App backgrounded during active session',
+            level: SentryLevel.warning, withScope: (scope) {
           scope.setTag('session_id', blocState.sessionId ?? 'unknown');
           scope.setExtra('duration', blocState.elapsedSeconds);
         });
@@ -573,33 +600,34 @@ class AppBlocObserver extends BlocObserver {
   @override
   void onChange(BlocBase bloc, Change change) {
     super.onChange(bloc, change);
-    
+
     // Skip logging for ActiveSessionBloc to avoid excessive location point logging
     if (bloc.runtimeType.toString() == 'ActiveSessionBloc') {
       return;
     }
-    
+
     AppLogger.info('${bloc.runtimeType} $change');
-    
+
     // 🔥 Log important state changes to Crashlytics
-    if (bloc.runtimeType.toString() == 'AuthBloc' || 
+    if (bloc.runtimeType.toString() == 'AuthBloc' ||
         bloc.runtimeType.toString() == 'SessionBloc') {
-      FirebaseCrashlytics.instance.log('${bloc.runtimeType} state: ${change.nextState.runtimeType}');
+      FirebaseCrashlytics.instance
+          .log('${bloc.runtimeType} state: ${change.nextState.runtimeType}');
     }
   }
 
   @override
   void onError(BlocBase bloc, Object error, StackTrace stackTrace) {
     AppLogger.error('${bloc.runtimeType} $error');
-    
+
     // 🔥 CRITICAL: Send all bloc errors to Crashlytics
     FirebaseCrashlytics.instance.recordError(
-      error, 
-      stackTrace, 
+      error,
+      stackTrace,
       reason: '${bloc.runtimeType} error',
       fatal: false,
     );
-    
+
     // Also send to Sentry with better context
     Sentry.captureException(
       error,
@@ -609,7 +637,7 @@ class AppBlocObserver extends BlocObserver {
         scope.setTag('bloc_type', bloc.runtimeType.toString());
       },
     );
-    
+
     super.onError(bloc, error, stackTrace);
   }
 }
@@ -625,7 +653,8 @@ class AppLifecycleObserver extends WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
       onBackground();
     }
   }

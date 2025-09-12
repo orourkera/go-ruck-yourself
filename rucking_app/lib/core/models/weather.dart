@@ -311,9 +311,12 @@ extension WeatherConditionIcon on int {
     } else if (this == 800) {
       return '☀️'; // Clear sky
     } else if (this >= 801 && this <= 804) {
-      if (this == 801) return '⛅'; // Few clouds
-      else if (this == 802) return '⛅'; // Scattered clouds
-      else return '☁️'; // Broken/overcast clouds
+      if (this == 801)
+        return '⛅'; // Few clouds
+      else if (this == 802)
+        return '⛅'; // Scattered clouds
+      else
+        return '☁️'; // Broken/overcast clouds
     } else {
       return '🌤️'; // Default
     }
@@ -336,10 +339,14 @@ extension WeatherConditionIcon on int {
     } else if (this == 800) {
       return 'Clear Sky';
     } else if (this >= 801 && this <= 804) {
-      if (this == 801) return 'Few Clouds';
-      else if (this == 802) return 'Scattered Clouds';
-      else if (this == 803) return 'Broken Clouds';
-      else return 'Overcast';
+      if (this == 801)
+        return 'Few Clouds';
+      else if (this == 802)
+        return 'Scattered Clouds';
+      else if (this == 803)
+        return 'Broken Clouds';
+      else
+        return 'Overcast';
     } else {
       return 'Unknown';
     }

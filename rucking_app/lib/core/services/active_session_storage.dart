@@ -34,7 +34,8 @@ class ActiveSessionStorage {
     try {
       final sessionData = {
         'session_id': sessionId,
-        'location_points': locationPoints.map((point) => point.toJson()).toList(),
+        'location_points':
+            locationPoints.map((point) => point.toJson()).toList(),
         'elapsed_seconds': elapsedSeconds,
         'distance_km': distanceKm,
         'calories': calories,
@@ -42,7 +43,8 @@ class ActiveSessionStorage {
         'elevation_loss': elevationLoss,
         'ruck_weight_kg': ruckWeightKg,
         'session_start_time': sessionStartTime.toIso8601String(),
-        'heart_rate_samples': heartRateSamples?.map((sample) => sample.toJson()).toList(),
+        'heart_rate_samples':
+            heartRateSamples?.map((sample) => sample.toJson()).toList(),
         'latest_heart_rate': latestHeartRate,
         'min_heart_rate': minHeartRate,
         'max_heart_rate': maxHeartRate,
@@ -52,7 +54,8 @@ class ActiveSessionStorage {
       await _prefs.setString(_activeSessionKey, jsonEncode(sessionData));
       await _prefs.setInt(_lastSaveKey, DateTime.now().millisecondsSinceEpoch);
 
-      AppLogger.info('[SESSION_STORAGE] Saved session data: ${locationPoints.length} GPS points, ${heartRateSamples?.length ?? 0} HR samples');
+      AppLogger.info(
+          '[SESSION_STORAGE] Saved session data: ${locationPoints.length} GPS points, ${heartRateSamples?.length ?? 0} HR samples');
     } catch (e) {
       AppLogger.error('[SESSION_STORAGE] Failed to save session data: $e');
     }
@@ -72,7 +75,8 @@ class ActiveSessionStorage {
         elevationGain: activeSessionState.elevationGain,
         elevationLoss: activeSessionState.elevationLoss,
         ruckWeightKg: activeSessionState.ruckWeightKg,
-        sessionStartTime: activeSessionState.originalSessionStartTimeUtc ?? DateTime.now(),
+        sessionStartTime:
+            activeSessionState.originalSessionStartTimeUtc ?? DateTime.now(),
         heartRateSamples: activeSessionState.heartRateSamples,
         latestHeartRate: activeSessionState.latestHeartRate,
         minHeartRate: activeSessionState.minHeartRate,
@@ -91,7 +95,8 @@ class ActiveSessionStorage {
       if (jsonString == null) return null;
 
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
-      AppLogger.info('[SESSION_STORAGE] Loaded session data: ${data['session_id']}');
+      AppLogger.info(
+          '[SESSION_STORAGE] Loaded session data: ${data['session_id']}');
 
       return data;
     } catch (e) {
@@ -118,23 +123,34 @@ class ActiveSessionStorage {
 
       final recoveredData = {
         'session_id': data['session_id'] as String,
-        'location_points': locationPointsJson?.map((json) => LocationPoint.fromJson(json as Map<String, dynamic>)).toList() ?? <LocationPoint>[],
+        'location_points': locationPointsJson
+                ?.map((json) =>
+                    LocationPoint.fromJson(json as Map<String, dynamic>))
+                .toList() ??
+            <LocationPoint>[],
         'elapsed_seconds': data['elapsed_seconds'] as int? ?? 0,
         'distance_km': (data['distance_km'] as num?)?.toDouble() ?? 0.0,
         'calories': (data['calories'] as num?)?.toDouble() ?? 0.0,
         'elevation_gain': (data['elevation_gain'] as num?)?.toDouble() ?? 0.0,
         'elevation_loss': (data['elevation_loss'] as num?)?.toDouble() ?? 0.0,
         'ruck_weight_kg': (data['ruck_weight_kg'] as num?)?.toDouble() ?? 0.0,
-        'session_start_time': DateTime.parse(data['session_start_time'] as String),
-        'heart_rate_samples': heartRateSamplesJson?.map((json) => HeartRateSample.fromJson(json as Map<String, dynamic>)).toList() ?? <HeartRateSample>[],
+        'session_start_time':
+            DateTime.parse(data['session_start_time'] as String),
+        'heart_rate_samples': heartRateSamplesJson
+                ?.map((json) =>
+                    HeartRateSample.fromJson(json as Map<String, dynamic>))
+                .toList() ??
+            <HeartRateSample>[],
         'latest_heart_rate': data['latest_heart_rate'] as int?,
         'min_heart_rate': data['min_heart_rate'] as int?,
         'max_heart_rate': data['max_heart_rate'] as int?,
-        'saved_at': DateTime.tryParse(data['saved_at'] as String? ?? '') ?? DateTime.now(),
+        'saved_at': DateTime.tryParse(data['saved_at'] as String? ?? '') ??
+            DateTime.now(),
       };
 
-      AppLogger.info('[SESSION_RECOVERY] Recovered session: ${recoveredData['session_id']}, ${(recoveredData['location_points'] as List).length} GPS points');
-      
+      AppLogger.info(
+          '[SESSION_RECOVERY] Recovered session: ${recoveredData['session_id']}, ${(recoveredData['location_points'] as List).length} GPS points');
+
       return recoveredData;
     } catch (e) {
       AppLogger.error('[SESSION_RECOVERY] Failed to recover session: $e');
@@ -147,30 +163,35 @@ class ActiveSessionStorage {
     try {
       final lastSave = await getLastSaveTime();
       if (lastSave == null) {
-        AppLogger.info('[SESSION_RECOVERY] No last save time - no recovery needed');
+        AppLogger.info(
+            '[SESSION_RECOVERY] No last save time - no recovery needed');
         return false;
       }
 
       final timeSinceLastSave = DateTime.now().difference(lastSave);
-      AppLogger.info('[SESSION_RECOVERY] Last save: $lastSave, Time since: ${timeSinceLastSave.inMinutes} mins');
+      AppLogger.info(
+          '[SESSION_RECOVERY] Last save: $lastSave, Time since: ${timeSinceLastSave.inMinutes} mins');
 
       // DEFENSIVE: Auto-cleanup if older than 12 hours
       if (timeSinceLastSave.inHours >= 12) {
-        AppLogger.info('[SESSION_RECOVERY] Session data older than 12 hours - auto-cleaning');
+        AppLogger.info(
+            '[SESSION_RECOVERY] Session data older than 12 hours - auto-cleaning');
         await clearSessionData();
         return false;
       }
 
       // DEFENSIVE: Only recover sessions saved within the last 6 hours
       if (timeSinceLastSave.inHours >= 6) {
-        AppLogger.info('[SESSION_RECOVERY] Session data older than 6 hours - skipping recovery');
+        AppLogger.info(
+            '[SESSION_RECOVERY] Session data older than 6 hours - skipping recovery');
         return false;
       }
 
       // DEFENSIVE: Validate session data integrity before recovery
       final sessionData = await loadSessionData();
       if (sessionData == null) {
-        AppLogger.warning('[SESSION_RECOVERY] No session data found despite last save time');
+        AppLogger.warning(
+            '[SESSION_RECOVERY] No session data found despite last save time');
         await clearSessionData(); // Clean up orphaned timestamp
         return false;
       }
@@ -178,15 +199,18 @@ class ActiveSessionStorage {
       // DEFENSIVE: Check for valid session ID
       final sessionId = sessionData['session_id'] as String?;
       if (sessionId == null || sessionId.isEmpty) {
-        AppLogger.warning('[SESSION_RECOVERY] Invalid session ID in stored data');
+        AppLogger.warning(
+            '[SESSION_RECOVERY] Invalid session ID in stored data');
         await clearSessionData();
         return false;
       }
 
       // DEFENSIVE: Check for reasonable session duration
       final elapsedSeconds = sessionData['elapsed_seconds'] as int? ?? 0;
-      if (elapsedSeconds > 86400) { // More than 24 hours
-        AppLogger.warning('[SESSION_RECOVERY] Session duration unreasonably long: ${elapsedSeconds}s');
+      if (elapsedSeconds > 86400) {
+        // More than 24 hours
+        AppLogger.warning(
+            '[SESSION_RECOVERY] Session duration unreasonably long: ${elapsedSeconds}s');
         await clearSessionData();
         return false;
       }
@@ -194,7 +218,8 @@ class ActiveSessionStorage {
       // DEFENSIVE: Check for valid start time
       final startTimeStr = sessionData['session_start_time'] as String?;
       if (startTimeStr == null) {
-        AppLogger.warning('[SESSION_RECOVERY] No valid start time in session data');
+        AppLogger.warning(
+            '[SESSION_RECOVERY] No valid start time in session data');
         await clearSessionData();
         return false;
       }
@@ -203,23 +228,27 @@ class ActiveSessionStorage {
         final startTime = DateTime.parse(startTimeStr);
         final sessionAge = DateTime.now().difference(startTime);
         if (sessionAge.inHours > 24) {
-          AppLogger.warning('[SESSION_RECOVERY] Session start time too old: ${sessionAge.inHours} hours');
+          AppLogger.warning(
+              '[SESSION_RECOVERY] Session start time too old: ${sessionAge.inHours} hours');
           await clearSessionData();
           return false;
         }
       } catch (e) {
-        AppLogger.warning('[SESSION_RECOVERY] Invalid start time format: $startTimeStr');
+        AppLogger.warning(
+            '[SESSION_RECOVERY] Invalid start time format: $startTimeStr');
         await clearSessionData();
         return false;
       }
 
-      AppLogger.info('[SESSION_RECOVERY] All validation checks passed - recovery eligible');
+      AppLogger.info(
+          '[SESSION_RECOVERY] All validation checks passed - recovery eligible');
       return true;
     } catch (e) {
-      AppLogger.error('[SESSION_RECOVERY] Failed to check recovery eligibility: $e');
+      AppLogger.error(
+          '[SESSION_RECOVERY] Failed to check recovery eligibility: $e');
       // Clear potentially corrupted data
-      await clearSessionData().catchError((error) => 
-        AppLogger.error('[SESSION_RECOVERY] Failed to clear corrupted data: $error'));
+      await clearSessionData().catchError((error) => AppLogger.error(
+          '[SESSION_RECOVERY] Failed to clear corrupted data: $error'));
       return false;
     }
   }
@@ -250,14 +279,16 @@ class ActiveSessionStorage {
   }
 
   /// Save a completed offline session for later sync
-  Future<void> saveCompletedOfflineSession(dynamic activeSessionState, Map<String, dynamic> completionPayload) async {
+  Future<void> saveCompletedOfflineSession(dynamic activeSessionState,
+      Map<String, dynamic> completionPayload) async {
     try {
       final offlineSessionData = {
         'offlineSessionId': activeSessionState.sessionId,
         'completedAt': DateTime.now().toIso8601String(),
         'ruckWeightKg': activeSessionState.ruckWeightKg,
         'notes': activeSessionState.notes ?? '',
-        'originalSessionStartTimeUtc': activeSessionState.originalSessionStartTimeUtc.toIso8601String(),
+        'originalSessionStartTimeUtc':
+            activeSessionState.originalSessionStartTimeUtc.toIso8601String(),
         'completionPayload': completionPayload,
         'synced': false,
       };
@@ -265,7 +296,7 @@ class ActiveSessionStorage {
       // Get existing offline sessions
       final existingSessionsJson = _prefs.getString(_offlineSessionsKey);
       List<Map<String, dynamic>> offlineSessions = [];
-      
+
       if (existingSessionsJson != null) {
         final decoded = jsonDecode(existingSessionsJson) as List<dynamic>;
         offlineSessions = decoded.cast<Map<String, dynamic>>();
@@ -276,10 +307,12 @@ class ActiveSessionStorage {
 
       // Save back to storage
       await _prefs.setString(_offlineSessionsKey, jsonEncode(offlineSessions));
-      
-      AppLogger.info('[OFFLINE_STORAGE] Saved offline session: ${activeSessionState.sessionId}');
+
+      AppLogger.info(
+          '[OFFLINE_STORAGE] Saved offline session: ${activeSessionState.sessionId}');
     } catch (e) {
-      AppLogger.error('[OFFLINE_STORAGE] Failed to save offline session', exception: e);
+      AppLogger.error('[OFFLINE_STORAGE] Failed to save offline session',
+          exception: e);
     }
   }
 
@@ -293,9 +326,12 @@ class ActiveSessionStorage {
       final offlineSessions = decoded.cast<Map<String, dynamic>>();
 
       // Return only unsynced sessions
-      return offlineSessions.where((session) => session['synced'] != true).toList();
+      return offlineSessions
+          .where((session) => session['synced'] != true)
+          .toList();
     } catch (e) {
-      AppLogger.error('[OFFLINE_STORAGE] Failed to get offline sessions', exception: e);
+      AppLogger.error('[OFFLINE_STORAGE] Failed to get offline sessions',
+          exception: e);
       return [];
     }
   }
@@ -320,10 +356,12 @@ class ActiveSessionStorage {
 
       // Save back to storage
       await _prefs.setString(_offlineSessionsKey, jsonEncode(offlineSessions));
-      
-      AppLogger.info('[OFFLINE_STORAGE] Marked session as synced: $offlineSessionId');
+
+      AppLogger.info(
+          '[OFFLINE_STORAGE] Marked session as synced: $offlineSessionId');
     } catch (e) {
-      AppLogger.error('[OFFLINE_STORAGE] Failed to mark session as synced', exception: e);
+      AppLogger.error('[OFFLINE_STORAGE] Failed to mark session as synced',
+          exception: e);
     }
   }
 
@@ -336,19 +374,22 @@ class ActiveSessionStorage {
       if (sessionData != null) {
         final sessionId = sessionData['session_id'] as String?;
         final savedAt = sessionData['saved_at'] as String?;
-        AppLogger.info('[ORPHANED_CLEANUP] Clearing orphaned session data: sessionId=$sessionId, savedAt=$savedAt');
+        AppLogger.info(
+            '[ORPHANED_CLEANUP] Clearing orphaned session data: sessionId=$sessionId, savedAt=$savedAt');
       }
-      
+
       // Clear local storage only - do NOT delete from database
       await _prefs.remove(_activeSessionKey);
       await _prefs.remove(_lastSaveKey);
-      
-      AppLogger.info('[ORPHANED_CLEANUP] Successfully cleared orphaned session from local storage');
+
+      AppLogger.info(
+          '[ORPHANED_CLEANUP] Successfully cleared orphaned session from local storage');
     } catch (e) {
-      AppLogger.error('[ORPHANED_CLEANUP] Failed to clear orphaned session data: $e');
+      AppLogger.error(
+          '[ORPHANED_CLEANUP] Failed to clear orphaned session data: $e');
     }
   }
-  
+
   /// Clean up synced offline sessions (remove old ones)
   Future<void> cleanupSyncedOfflineSessions() async {
     try {
@@ -362,10 +403,10 @@ class ActiveSessionStorage {
       final now = DateTime.now();
       final keepSessions = offlineSessions.where((session) {
         if (session['synced'] != true) return true; // Keep unsynced
-        
+
         final syncedAtStr = session['syncedAt'] as String?;
         if (syncedAtStr == null) return false;
-        
+
         final syncedAt = DateTime.parse(syncedAtStr);
         final daysSinceSync = now.difference(syncedAt).inDays;
         return daysSinceSync < 7; // Keep recently synced sessions for 7 days
@@ -373,13 +414,15 @@ class ActiveSessionStorage {
 
       // Save cleaned up list
       await _prefs.setString(_offlineSessionsKey, jsonEncode(keepSessions));
-      
+
       final removedCount = offlineSessions.length - keepSessions.length;
       if (removedCount > 0) {
-        AppLogger.info('[OFFLINE_STORAGE] Cleaned up $removedCount old synced sessions');
+        AppLogger.info(
+            '[OFFLINE_STORAGE] Cleaned up $removedCount old synced sessions');
       }
     } catch (e) {
-      AppLogger.error('[OFFLINE_STORAGE] Failed to cleanup synced sessions', exception: e);
+      AppLogger.error('[OFFLINE_STORAGE] Failed to cleanup synced sessions',
+          exception: e);
     }
   }
 }

@@ -15,7 +15,8 @@ class DuelStatsScreen extends StatefulWidget {
   State<DuelStatsScreen> createState() => _DuelStatsScreenState();
 }
 
-class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderStateMixin {
+class _DuelStatsScreenState extends State<DuelStatsScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -46,22 +47,24 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => context.read<DuelStatsBloc>().add(
-              const RefreshUserDuelStats(),
-            ),
+                  const RefreshUserDuelStats(),
+                ),
           ),
         ],
       ),
       body: BlocBuilder<DuelStatsBloc, DuelStatsState>(
         builder: (context, state) {
-          AppLogger.info('[DUEL_STATS_SCREEN] BlocBuilder state: ${state.runtimeType}');
-          
+          AppLogger.info(
+              '[DUEL_STATS_SCREEN] BlocBuilder state: ${state.runtimeType}');
+
           if (state is DuelStatsLoading) {
             AppLogger.info('[DUEL_STATS_SCREEN] Showing loading indicator');
             return const Center(
               child: CircularProgressIndicator(),
             );
           } else if (state is DuelStatsError) {
-            AppLogger.error('[DUEL_STATS_SCREEN] Showing error state: ${state.message}');
+            AppLogger.error(
+                '[DUEL_STATS_SCREEN] Showing error state: ${state.message}');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -80,8 +83,8 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => context.read<DuelStatsBloc>().add(
-                      const LoadUserDuelStats(),
-                    ),
+                          const LoadUserDuelStats(),
+                        ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -96,13 +99,15 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
               child: Text('Leaderboard loaded but no user stats'),
             );
           } else if (state is DuelStatsLeaderboardError) {
-            AppLogger.error('[DUEL_STATS_SCREEN] Leaderboard error: ${state.message}');
+            AppLogger.error(
+                '[DUEL_STATS_SCREEN] Leaderboard error: ${state.message}');
             return Center(
               child: Text('Leaderboard error: ${state.message}'),
             );
           }
-          
-          AppLogger.warning('[DUEL_STATS_SCREEN] Unknown state: ${state.runtimeType}');
+
+          AppLogger.warning(
+              '[DUEL_STATS_SCREEN] Unknown state: ${state.runtimeType}');
           return const Center(
             child: Text('Unknown state'),
           );
@@ -120,7 +125,7 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
           padding: const EdgeInsets.all(16),
           child: UserStatsCard(userStats: state.userStats),
         ),
-        
+
         // Leaderboard Tabs
         Container(
           color: Colors.grey[100],
@@ -137,8 +142,8 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
                 3: 'longest_streak',
               };
               context.read<DuelStatsBloc>().add(
-                LoadDuelStatsLeaderboard(statType: statTypeMap[index]!),
-              );
+                    LoadDuelStatsLeaderboard(statType: statTypeMap[index]!),
+                  );
             },
             tabs: const [
               Tab(text: 'Wins'),
@@ -148,7 +153,7 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
             ],
           ),
         ),
-        
+
         // Leaderboard Content
         Expanded(
           child: TabBarView(
@@ -176,8 +181,8 @@ class _DuelStatsScreenState extends State<DuelStatsScreen> with TickerProviderSt
     return RefreshIndicator(
       onRefresh: () async {
         context.read<DuelStatsBloc>().add(
-          RefreshDuelStatsLeaderboard(statType: statType),
-        );
+              RefreshDuelStatsLeaderboard(statType: statType),
+            );
       },
       child: StatsLeaderboardWidget(
         leaderboard: state.leaderboard,

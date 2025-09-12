@@ -37,16 +37,16 @@ class EventCardSkeleton extends StatelessWidget {
                   const SkeletonBox(width: 60, height: 24),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Description
               const SkeletonLine(width: double.infinity),
               const SizedBox(height: 4),
               const SkeletonLine(width: 250),
-              
+
               const SizedBox(height: 12),
-              
+
               // Details row
               Row(
                 children: [
@@ -55,9 +55,9 @@ class EventCardSkeleton extends StatelessWidget {
                   const SkeletonLine(width: 60),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Participant count and action button
               Row(
                 children: [

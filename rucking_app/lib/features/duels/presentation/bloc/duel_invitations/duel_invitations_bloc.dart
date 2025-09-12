@@ -1,10 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/usecases/get_duel_invitations.dart';
-import '../../../domain/usecases/respond_to_invitation.dart' as respond_invitation_usecase;
+import '../../../domain/usecases/respond_to_invitation.dart'
+    as respond_invitation_usecase;
 import 'duel_invitations_event.dart';
 import 'duel_invitations_state.dart';
 
-class DuelInvitationsBloc extends Bloc<DuelInvitationsEvent, DuelInvitationsState> {
+class DuelInvitationsBloc
+    extends Bloc<DuelInvitationsEvent, DuelInvitationsState> {
   final GetDuelInvitations getDuelInvitations;
   final respond_invitation_usecase.RespondToInvitation respondToInvitation;
 
@@ -19,10 +21,12 @@ class DuelInvitationsBloc extends Bloc<DuelInvitationsEvent, DuelInvitationsStat
     on<ClearInvitationFilters>(_onClearInvitationFilters);
   }
 
-  void _onLoadDuelInvitations(LoadDuelInvitations event, Emitter<DuelInvitationsState> emit) async {
+  void _onLoadDuelInvitations(
+      LoadDuelInvitations event, Emitter<DuelInvitationsState> emit) async {
     emit(DuelInvitationsLoading());
 
-    final result = await getDuelInvitations(GetDuelInvitationsParams(status: event.status ?? 'pending'));
+    final result = await getDuelInvitations(
+        GetDuelInvitationsParams(status: event.status ?? 'pending'));
 
     result.fold(
       (failure) => emit(DuelInvitationsError(message: failure.message)),
@@ -34,7 +38,8 @@ class DuelInvitationsBloc extends Bloc<DuelInvitationsEvent, DuelInvitationsStat
     );
   }
 
-  void _onRefreshDuelInvitations(RefreshDuelInvitations event, Emitter<DuelInvitationsState> emit) async {
+  void _onRefreshDuelInvitations(
+      RefreshDuelInvitations event, Emitter<DuelInvitationsState> emit) async {
     // Keep current filters if invitations are loaded
     if (state is DuelInvitationsLoaded) {
       final currentState = state as DuelInvitationsLoaded;
@@ -44,10 +49,12 @@ class DuelInvitationsBloc extends Bloc<DuelInvitationsEvent, DuelInvitationsStat
     }
   }
 
-  void _onFilterInvitationsByStatus(FilterInvitationsByStatus event, Emitter<DuelInvitationsState> emit) async {
+  void _onFilterInvitationsByStatus(FilterInvitationsByStatus event,
+      Emitter<DuelInvitationsState> emit) async {
     emit(DuelInvitationsLoading());
 
-    final result = await getDuelInvitations(GetDuelInvitationsParams(status: event.status ?? 'pending'));
+    final result = await getDuelInvitations(
+        GetDuelInvitationsParams(status: event.status ?? 'pending'));
 
     result.fold(
       (failure) => emit(DuelInvitationsError(message: failure.message)),
@@ -59,13 +66,15 @@ class DuelInvitationsBloc extends Bloc<DuelInvitationsEvent, DuelInvitationsStat
     );
   }
 
-  void _onRespondToInvitation(RespondToInvitation event, Emitter<DuelInvitationsState> emit) async {
+  void _onRespondToInvitation(
+      RespondToInvitation event, Emitter<DuelInvitationsState> emit) async {
     emit(InvitationResponding(
       invitationId: event.invitationId,
       response: event.response,
     ));
 
-    final result = await respondToInvitation(respond_invitation_usecase.RespondToInvitationParams(
+    final result = await respondToInvitation(
+        respond_invitation_usecase.RespondToInvitationParams(
       invitationId: event.invitationId,
       action: event.response,
     ));
@@ -76,23 +85,24 @@ class DuelInvitationsBloc extends Bloc<DuelInvitationsEvent, DuelInvitationsStat
         message: failure.message,
       )),
       (_) {
-        final successMessage = event.response == 'accept' 
+        final successMessage = event.response == 'accept'
             ? 'Invitation accepted successfully!'
             : 'Invitation declined successfully!';
-        
+
         emit(InvitationResponseSuccess(
           invitationId: event.invitationId,
           response: event.response,
           message: successMessage,
         ));
-        
+
         // Refresh the invitations list to show updated state
         add(RefreshDuelInvitations());
       },
     );
   }
 
-  void _onClearInvitationFilters(ClearInvitationFilters event, Emitter<DuelInvitationsState> emit) async {
+  void _onClearInvitationFilters(
+      ClearInvitationFilters event, Emitter<DuelInvitationsState> emit) async {
     add(const LoadDuelInvitations());
   }
 }

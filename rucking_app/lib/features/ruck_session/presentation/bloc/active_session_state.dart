@@ -4,7 +4,7 @@ enum PhotoLoadingStatus { initial, loading, success, failure }
 
 abstract class ActiveSessionState extends Equatable {
   const ActiveSessionState();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -25,11 +25,13 @@ class ActiveSessionInitial extends ActiveSessionState {
   });
 
   @override
-  List<Object?> get props => [viewedSession, photos, photosStatus, isPhotosLoading, photoLoadingError];
+  List<Object?> get props =>
+      [viewedSession, photos, photosStatus, isPhotosLoading, photoLoadingError];
 
   ActiveSessionInitial copyWith({
     RuckSession? viewedSession,
-    bool clearViewedSession = false, // Allows explicitly setting viewedSession to null
+    bool clearViewedSession =
+        false, // Allows explicitly setting viewedSession to null
     List<RuckPhoto>? photos,
     PhotoLoadingStatus? photosStatus,
     bool? isPhotosLoading,
@@ -37,18 +39,21 @@ class ActiveSessionInitial extends ActiveSessionState {
     bool clearPhotoLoadingError = false,
   }) {
     return ActiveSessionInitial(
-      viewedSession: clearViewedSession ? null : (viewedSession ?? this.viewedSession),
+      viewedSession:
+          clearViewedSession ? null : (viewedSession ?? this.viewedSession),
       photos: photos ?? this.photos,
       photosStatus: photosStatus ?? this.photosStatus,
       isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
-      photoLoadingError: clearPhotoLoadingError ? null : (photoLoadingError ?? this.photoLoadingError),
+      photoLoadingError: clearPhotoLoadingError
+          ? null
+          : (photoLoadingError ?? this.photoLoadingError),
     );
   }
 }
 
 class ActiveSessionLoading extends ActiveSessionState {
   const ActiveSessionLoading();
-  
+
   @override
   List<Object?> get props => [];
 }
@@ -79,35 +84,38 @@ class ActiveSessionRunning extends ActiveSessionState {
   final int? minHeartRate;
   final int? maxHeartRate;
   final String? validationMessage;
-  final DateTime originalSessionStartTimeUtc; // Tracks when the session originally started
-  final Duration totalPausedDuration;      // Accumulates total time paused
-  final DateTime? currentPauseStartTimeUtc; // Tracks when the current pause began
+  final DateTime
+      originalSessionStartTimeUtc; // Tracks when the session originally started
+  final Duration totalPausedDuration; // Accumulates total time paused
+  final DateTime?
+      currentPauseStartTimeUtc; // Tracks when the current pause began
   final List<HeartRateSample> heartRateSamples;
   final bool isGpsReady; // Flag to indicate if GPS has acquired the first point
-  final bool hasGpsAccess; // Flag to indicate if GPS permission/access is available
+  final bool
+      hasGpsAccess; // Flag to indicate if GPS permission/access is available
   final List<RuckPhoto> photos;
   final bool isPhotosLoading;
   final String? photosError;
   final String? errorMessage;
-  
+
   // Photo upload fields
   final bool isUploading;
   final String? uploadError;
   final bool uploadSuccess;
-  
+
   // Photo deletion fields
   final bool isDeleting;
   final String? deleteError;
-  
+
   // Split tracking
   final List<dynamic> splits;
-  
+
   // Terrain tracking
   final List<TerrainSegment> terrainSegments;
   final bool isRecovered;
   // Live steps (optional)
   final int? steps;
-  
+
   // AI Cheerleader
   final String? aiCheerMessage; // Latest AI cheerleader message for UI display
 
@@ -164,59 +172,59 @@ class ActiveSessionRunning extends ActiveSessionState {
     this.steps,
     this.aiCheerMessage,
   });
-  
+
   @override
   List<Object?> get props => [
-    sessionId,
-    tags,
-    perceivedExertion,
-    userWeightKg,
-    plannedDurationMinutes,
-    pausedDurationSeconds,
-    locationPoints,
-    elapsedSeconds,
-    distanceKm,
-    ruckWeightKg,
-    notes,
-    calories,
-    elevationGain,
-    elevationLoss,
-    isPaused,
-    pace,
-    latestHeartRate,
-    minHeartRate,
-    maxHeartRate,
-    validationMessage,
-    plannedDuration,
-    originalSessionStartTimeUtc,
-    totalPausedDuration,
-    currentPauseStartTimeUtc,
-    heartRateSamples,
-    isGpsReady, // Add to props
-    hasGpsAccess, // Add to props
-    photos,
-    isPhotosLoading,
-    photosError,
-    errorMessage,
-    // Photo upload fields
-    isUploading,
-    uploadError,
-    uploadSuccess,
-    // Photo deletion fields
-    isDeleting,
-    deleteError,
-    // Split tracking
-    splits,
-    terrainSegments, // Add to props
-    eventId, // Add eventId to props
-    plannedRoute, // Add plannedRoute to props
-    plannedRouteDistance, // Add route distance to props
-    plannedRouteDuration, // Add route duration to props
-    isRecovered,
-    steps,
-    aiCheerMessage,
-  ];
-  
+        sessionId,
+        tags,
+        perceivedExertion,
+        userWeightKg,
+        plannedDurationMinutes,
+        pausedDurationSeconds,
+        locationPoints,
+        elapsedSeconds,
+        distanceKm,
+        ruckWeightKg,
+        notes,
+        calories,
+        elevationGain,
+        elevationLoss,
+        isPaused,
+        pace,
+        latestHeartRate,
+        minHeartRate,
+        maxHeartRate,
+        validationMessage,
+        plannedDuration,
+        originalSessionStartTimeUtc,
+        totalPausedDuration,
+        currentPauseStartTimeUtc,
+        heartRateSamples,
+        isGpsReady, // Add to props
+        hasGpsAccess, // Add to props
+        photos,
+        isPhotosLoading,
+        photosError,
+        errorMessage,
+        // Photo upload fields
+        isUploading,
+        uploadError,
+        uploadSuccess,
+        // Photo deletion fields
+        isDeleting,
+        deleteError,
+        // Split tracking
+        splits,
+        terrainSegments, // Add to props
+        eventId, // Add eventId to props
+        plannedRoute, // Add plannedRoute to props
+        plannedRouteDistance, // Add route distance to props
+        plannedRouteDuration, // Add route duration to props
+        isRecovered,
+        steps,
+        aiCheerMessage,
+      ];
+
   ActiveSessionRunning copyWith({
     String? sessionId,
     List<String>? tags,
@@ -264,7 +272,8 @@ class ActiveSessionRunning extends ActiveSessionState {
     bool? isGpsReady, // Add to copyWith parameters
     bool? hasGpsAccess, // Add to copyWith parameters
     String? eventId, // Add eventId to copyWith parameters
-    List<latlong.LatLng>? plannedRoute, // Add plannedRoute to copyWith parameters
+    List<latlong.LatLng>?
+        plannedRoute, // Add plannedRoute to copyWith parameters
     double? plannedRouteDistance, // Add route distance to copyWith parameters
     int? plannedRouteDuration, // Add route duration to copyWith parameters
     bool? isRecovered,
@@ -276,8 +285,10 @@ class ActiveSessionRunning extends ActiveSessionState {
       tags: tags ?? this.tags,
       perceivedExertion: perceivedExertion ?? this.perceivedExertion,
       userWeightKg: userWeightKg ?? this.userWeightKg,
-      plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
-      pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
+      plannedDurationMinutes:
+          plannedDurationMinutes ?? this.plannedDurationMinutes,
+      pausedDurationSeconds:
+          pausedDurationSeconds ?? this.pausedDurationSeconds,
       locationPoints: locationPoints ?? this.locationPoints,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       distanceKm: distanceKm ?? this.distanceKm,
@@ -295,7 +306,8 @@ class ActiveSessionRunning extends ActiveSessionState {
       photos: photos ?? this.photos,
       isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
       photosError: clearPhotosError ? null : photosError ?? this.photosError,
-      errorMessage: clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      errorMessage:
+          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
       // Photo upload fields
       isUploading: isUploading ?? this.isUploading,
       uploadError: clearUploadError ? null : uploadError ?? this.uploadError,
@@ -304,18 +316,27 @@ class ActiveSessionRunning extends ActiveSessionState {
       isDeleting: isDeleting ?? this.isDeleting,
       deleteError: clearDeleteError ? null : (deleteError ?? this.deleteError),
       splits: splits ?? this.splits,
-      terrainSegments: terrainSegments ?? this.terrainSegments, // Use in copyWith
-      validationMessage: clearValidationMessage ? null : (validationMessage ?? this.validationMessage),
+      terrainSegments:
+          terrainSegments ?? this.terrainSegments, // Use in copyWith
+      validationMessage: clearValidationMessage
+          ? null
+          : (validationMessage ?? this.validationMessage),
       plannedDuration: plannedDuration ?? this.plannedDuration,
-      originalSessionStartTimeUtc: originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
+      originalSessionStartTimeUtc:
+          originalSessionStartTimeUtc ?? this.originalSessionStartTimeUtc,
       totalPausedDuration: totalPausedDuration ?? this.totalPausedDuration,
-      currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc ? null : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
+      currentPauseStartTimeUtc: clearCurrentPauseStartTimeUtc
+          ? null
+          : currentPauseStartTimeUtc ?? this.currentPauseStartTimeUtc,
       isGpsReady: isGpsReady ?? this.isGpsReady, // Use in copyWith
       hasGpsAccess: hasGpsAccess ?? this.hasGpsAccess, // Use in copyWith
       eventId: eventId ?? this.eventId, // Use eventId in copyWith
-      plannedRoute: plannedRoute ?? this.plannedRoute, // Use plannedRoute in copyWith
-      plannedRouteDistance: plannedRouteDistance ?? this.plannedRouteDistance, // Use route distance in copyWith
-      plannedRouteDuration: plannedRouteDuration ?? this.plannedRouteDuration, // Use route duration in copyWith
+      plannedRoute:
+          plannedRoute ?? this.plannedRoute, // Use plannedRoute in copyWith
+      plannedRouteDistance: plannedRouteDistance ??
+          this.plannedRouteDistance, // Use route distance in copyWith
+      plannedRouteDuration: plannedRouteDuration ??
+          this.plannedRouteDuration, // Use route duration in copyWith
       isRecovered: isRecovered ?? this.isRecovered,
       steps: steps ?? this.steps,
       aiCheerMessage: aiCheerMessage ?? this.aiCheerMessage,
@@ -325,11 +346,11 @@ class ActiveSessionRunning extends ActiveSessionState {
 
 class ActiveSessionComplete extends ActiveSessionState {
   final RuckSession session;
-  
+
   const ActiveSessionComplete({
     required this.session,
   });
-  
+
   @override
   List<Object?> get props => [session];
 }
@@ -341,7 +362,7 @@ class SessionCompletionUploading extends ActiveSessionState {
   final int locationPointsCount;
   final int heartRateSamplesCount;
   final String progressMessage;
-  
+
   const SessionCompletionUploading({
     required this.sessionId,
     required this.distanceKm,
@@ -350,16 +371,16 @@ class SessionCompletionUploading extends ActiveSessionState {
     required this.heartRateSamplesCount,
     required this.progressMessage,
   });
-  
+
   @override
   List<Object?> get props => [
-    sessionId,
-    distanceKm,
-    durationSeconds,
-    locationPointsCount,
-    heartRateSamplesCount,
-    progressMessage,
-  ];
+        sessionId,
+        distanceKm,
+        durationSeconds,
+        locationPointsCount,
+        heartRateSamplesCount,
+        progressMessage,
+      ];
 }
 
 class ActiveSessionCompleted extends ActiveSessionState {
@@ -382,7 +403,7 @@ class ActiveSessionCompleted extends ActiveSessionState {
   final double ruckWeightKg;
   final int? steps;
   final String? aiCompletionInsight;
-  
+
   const ActiveSessionCompleted({
     required this.sessionId,
     required this.finalDistanceKm,
@@ -404,29 +425,29 @@ class ActiveSessionCompleted extends ActiveSessionState {
     this.steps,
     this.aiCompletionInsight,
   });
-  
+
   @override
   List<Object?> get props => [
-    sessionId,
-    finalDistanceKm,
-    finalDurationSeconds,
-    finalCalories,
-    elevationGain,
-    elevationLoss,
-    averagePace,
-    route,
-    heartRateSamples,
-    averageHeartRate,
-    minHeartRate,
-    maxHeartRate,
-    sessionPhotos,
-    splits,
-    completedAt,
-    isOffline,
-    ruckWeightKg,
-    steps,
-    aiCompletionInsight,
-  ];
+        sessionId,
+        finalDistanceKm,
+        finalDurationSeconds,
+        finalCalories,
+        elevationGain,
+        elevationLoss,
+        averagePace,
+        route,
+        heartRateSamples,
+        averageHeartRate,
+        minHeartRate,
+        maxHeartRate,
+        sessionPhotos,
+        splits,
+        completedAt,
+        isOffline,
+        ruckWeightKg,
+        steps,
+        aiCompletionInsight,
+      ];
 }
 
 class SessionSummaryGenerated extends ActiveSessionState {
@@ -435,7 +456,7 @@ class SessionSummaryGenerated extends ActiveSessionState {
   final bool isPhotosLoading;
   final String? photosError;
   final String? errorMessage;
-  
+
   const SessionSummaryGenerated({
     required this.session,
     this.photos = const [],
@@ -443,10 +464,11 @@ class SessionSummaryGenerated extends ActiveSessionState {
     this.photosError,
     this.errorMessage,
   });
-  
+
   @override
-  List<Object?> get props => [session, photos, isPhotosLoading, photosError, errorMessage];
-  
+  List<Object?> get props =>
+      [session, photos, isPhotosLoading, photosError, errorMessage];
+
   SessionSummaryGenerated copyWith({
     RuckSession? session,
     List<RuckPhoto>? photos,
@@ -461,7 +483,8 @@ class SessionSummaryGenerated extends ActiveSessionState {
       photos: photos ?? this.photos,
       isPhotosLoading: isPhotosLoading ?? this.isPhotosLoading,
       photosError: clearPhotosError ? null : (photosError ?? this.photosError),
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }
@@ -493,7 +516,8 @@ class SessionPhotosLoadedForId extends ActiveSessionState {
   final String sessionId;
   final List<RuckPhoto> photos;
 
-  const SessionPhotosLoadedForId({required this.sessionId, required this.photos});
+  const SessionPhotosLoadedForId(
+      {required this.sessionId, required this.photos});
 
   @override
   List<Object?> get props => [sessionId, photos];
@@ -503,7 +527,8 @@ class SessionPhotosErrorForId extends ActiveSessionState {
   final String sessionId;
   final String errorMessage;
 
-  const SessionPhotosErrorForId({required this.sessionId, required this.errorMessage});
+  const SessionPhotosErrorForId(
+      {required this.sessionId, required this.errorMessage});
 
   @override
   List<Object?> get props => [sessionId, errorMessage];

@@ -27,7 +27,7 @@ class EventComment extends Equatable {
       comment: json['comment'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      user: json['user'] != null 
+      user: json['user'] != null
           ? EventCommentUser.fromJson(json['user'] as Map<String, dynamic>)
           : null,
     );
@@ -46,7 +46,7 @@ class EventComment extends Equatable {
   }
 
   bool get isEdited => createdAt != updatedAt;
-  
+
   @override
   List<Object?> get props => [
         id,

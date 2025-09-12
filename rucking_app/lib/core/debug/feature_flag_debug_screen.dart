@@ -8,13 +8,13 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// 🛠️ DEBUG ONLY: Feature Flag Monitor & Toggle Screen
-/// 
+///
 /// This screen allows developers to:
 /// 1. Monitor which feature flags are active
 /// 2. See the current auth implementation being used
 /// 3. Understand the fallback behavior
 /// 4. Access via debug drawer or special gesture
-/// 
+///
 /// SAFETY: Only available in debug mode
 class FeatureFlagDebugScreen extends StatefulWidget {
   const FeatureFlagDebugScreen({Key? key}) : super(key: key);
@@ -61,7 +61,7 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
 
   Widget _buildHeader() {
     final remoteConfigInfo = FeatureFlags.getRemoteConfigDebugInfo();
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -86,7 +86,9 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
             Text(
               'Remote Config: ${remoteConfigInfo['isInitialized'] ? "✅ LOADED" : "❌ NOT LOADED"}',
               style: AppTextStyles.bodyMedium?.copyWith(
-                color: remoteConfigInfo['isInitialized'] ? Colors.green : Colors.red,
+                color: remoteConfigInfo['isInitialized']
+                    ? Colors.green
+                    : Colors.red,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -94,7 +96,9 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
             Text(
               'Simplified Auth: ${FeatureFlags.useSimplifiedAuth ? "✅ ENABLED" : "❌ DISABLED"}',
               style: AppTextStyles.bodyMedium?.copyWith(
-                color: FeatureFlags.useSimplifiedAuth ? Colors.green : Colors.orange,
+                color: FeatureFlags.useSimplifiedAuth
+                    ? Colors.green
+                    : Colors.orange,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -115,7 +119,7 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
 
   Widget _buildAuthSection() {
     final flags = FeatureFlags.getAuthFeatureStatus();
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -130,10 +134,10 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
             ),
             const SizedBox(height: 12),
             ...flags.entries.map((entry) => _buildFlagRow(
-              entry.key,
-              entry.value,
-              _getAuthFlagDescription(entry.key),
-            )),
+                  entry.key,
+                  entry.value,
+                  _getAuthFlagDescription(entry.key),
+                )),
             const SizedBox(height: 12),
             _buildCurrentImplementation(),
           ],
@@ -345,7 +349,8 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
     );
   }
 
-  Widget _buildFlagRow(String name, bool value, String description, {Color? color}) {
+  Widget _buildFlagRow(String name, bool value, String description,
+      {Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -402,9 +407,11 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
 
   void _testAuth() {
     AppLogger.info('🧪 [FEATURE_FLAGS] Testing auth system implementation...');
-    AppLogger.info('🧪 [FEATURE_FLAGS] Current flags: ${FeatureFlags.getAuthFeatureStatus()}');
-    AppLogger.info('🧪 [FEATURE_FLAGS] Remote config info: ${FeatureFlags.getRemoteConfigDebugInfo()}');
-    
+    AppLogger.info(
+        '🧪 [FEATURE_FLAGS] Current flags: ${FeatureFlags.getAuthFeatureStatus()}');
+    AppLogger.info(
+        '🧪 [FEATURE_FLAGS] Remote config info: ${FeatureFlags.getRemoteConfigDebugInfo()}');
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -415,10 +422,10 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
       ),
     );
   }
-  
+
   void _testInAppReview() async {
     final reviewService = InAppReviewService();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Testing in-app review flow...'),
@@ -426,16 +433,19 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
         duration: Duration(seconds: 2),
       ),
     );
-    
+
     try {
       // Request ATT authorization
-      final hasPermission = await TrackingTransparencyService.requestTrackingAuthorization();
-      
+      final hasPermission =
+          await TrackingTransparencyService.requestTrackingAuthorization();
+
       AppLogger.info('[FEATURE_FLAGS] ATT permission result: $hasPermission');
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(hasPermission ? 'ATT: Tracking authorized ✅' : 'ATT: Tracking denied ❌'),
+          content: Text(hasPermission
+              ? 'ATT: Tracking authorized ✅'
+              : 'ATT: Tracking denied ❌'),
           backgroundColor: hasPermission ? Colors.green : Colors.red,
           duration: const Duration(seconds: 3),
         ),
@@ -451,10 +461,10 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
       );
     }
   }
-  
+
   Future<void> _testInAppReview() async {
     AppLogger.info('[FEATURE_FLAGS] Testing in-app review flow...');
-    
+
     try {
       final reviewService = InAppReviewService();
       await reviewService.debugForceReviewDialog(context);
@@ -463,7 +473,7 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
       AppLogger.error('[FEATURE_FLAGS] Review dialog test failed: $e');
     }
   }
-  
+
   void _refreshRemoteConfig() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -472,11 +482,11 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
         duration: Duration(seconds: 1),
       ),
     );
-    
+
     try {
       await FeatureFlags.forceRefreshRemoteConfig();
       setState(() {}); // Refresh the UI
-      
+
       AppLogger.info('✅ [FEATURE_FLAGS] Remote config refreshed successfully');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -496,15 +506,15 @@ class _FeatureFlagDebugScreenState extends State<FeatureFlagDebugScreen> {
       );
     }
   }
-  
+
   String _formatTime(String? isoTime) {
     if (isoTime == null) return 'Never';
-    
+
     try {
       final dateTime = DateTime.parse(isoTime);
       final now = DateTime.now();
       final difference = now.difference(dateTime);
-      
+
       if (difference.inMinutes < 1) {
         return 'Just now';
       } else if (difference.inHours < 1) {

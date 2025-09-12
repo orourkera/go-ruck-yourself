@@ -85,10 +85,12 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     final newSessionCount = widget.recentSessions?.length ?? 0;
     final oldAchievementCount = oldWidget.achievements?.length ?? 0;
     final newAchievementCount = widget.achievements?.length ?? 0;
-    
+
     // Force refresh on any data change since behavioral patterns are now much richer
-    if (newSessionCount != oldSessionCount || newAchievementCount != oldAchievementCount) {
-      AppLogger.info('[AI_INSIGHTS_WIDGET] Data change detected - forcing insight refresh (sessions: $oldSessionCount->$newSessionCount, achievements: $oldAchievementCount->$newAchievementCount)');
+    if (newSessionCount != oldSessionCount ||
+        newAchievementCount != oldAchievementCount) {
+      AppLogger.info(
+          '[AI_INSIGHTS_WIDGET] Data change detected - forcing insight refresh (sessions: $oldSessionCount->$newSessionCount, achievements: $oldAchievementCount->$newAchievementCount)');
       _generateInsights(force: true); // Force refresh to bypass cache
     }
   }
@@ -98,14 +100,15 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     try {
       final authState = context.read<AuthBloc>().state;
       if (authState is! Authenticated) return;
-      
+
       final prefs = await SharedPreferences.getInstance();
       final user = authState.user;
       final key = 'ai_home_cache_${user.userId}_${DateTime.now().yyyymmdd}';
       await prefs.remove(key);
-      
-      AppLogger.info('[AI_INSIGHTS_WIDGET] Cleared insight cache for ${user.username}');
-      
+
+      AppLogger.info(
+          '[AI_INSIGHTS_WIDGET] Cleared insight cache for ${user.username}');
+
       // Regenerate insights
       if (mounted) {
         _generateInsights(force: true);
@@ -166,7 +169,8 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
         _streamingText = '';
         _isLoading = false;
       }
-      AppLogger.info('[AI_INSIGHTS_WIDGET] Stream kick-off (user=${user.username})');
+      AppLogger.info(
+          '[AI_INSIGHTS_WIDGET] Stream kick-off (user=${user.username})');
       // Fire-and-forget to avoid awaiting until the stream completes
       // ignore: unawaited_futures
       aiService.streamHomepageInsights(
@@ -199,14 +203,14 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       Future.delayed(const Duration(seconds: 10), () async {
         if (!mounted) return;
         if (_currentInsight != null) return; // stream succeeded
-        AppLogger.warning('[AI_INSIGHTS_WIDGET] Stream timeout after 10s - showing error state');
+        AppLogger.warning(
+            '[AI_INSIGHTS_WIDGET] Stream timeout after 10s - showing error state');
         setState(() {
           _hasError = true;
           _isStreaming = false;
           _isLoading = false;
         });
       });
-
     } catch (e) {
       AppLogger.error('[AI_INSIGHTS] Failed to generate insights: $e');
       if (mounted) {
@@ -240,8 +244,9 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       AppLogger.debug('[AI_INSIGHTS] Widget hidden due to error state');
       return const SizedBox.shrink();
     }
-    
-    AppLogger.debug('[AI_INSIGHTS] Widget rendering: loading=$_isLoading, hasInsight=${_currentInsight != null}, hasError=$_hasError');
+
+    AppLogger.debug(
+        '[AI_INSIGHTS] Widget rendering: loading=$_isLoading, hasInsight=${_currentInsight != null}, hasError=$_hasError');
 
     return Card(
       // Tighter outer spacing so the card blends into the feed
@@ -290,7 +295,8 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
 
   Widget _buildStreamingContent() {
     final authState = context.read<AuthBloc>().state;
-    final username = authState is Authenticated ? authState.user.username : 'Rucker';
+    final username =
+        authState is Authenticated ? authState.user.username : 'Rucker';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -301,7 +307,8 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
             Expanded(
               child: Text(
                 'Cooking up something good, $username…',
-                style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
+                style:
+                    AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
               ),
             ),
             const SizedBox(width: 4),
@@ -313,11 +320,14 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
           ],
         ),
         const SizedBox(height: 16),
-        _buildInsightSection('📊 Insight', 'Analyzing your recent rucks and milestones…'),
+        _buildInsightSection(
+            '📊 Insight', 'Analyzing your recent rucks and milestones…'),
         const SizedBox(height: 12),
         _buildInsightSection(
           '💡 Recommendation',
-          (_extractRecommendationFromStream(_streamingText) ?? 'Generating a fresh recommendation…') + ' ▌',
+          (_extractRecommendationFromStream(_streamingText) ??
+                  'Generating a fresh recommendation…') +
+              ' ▌',
         ),
         const SizedBox(height: 12),
         _buildInsightSection('🚀 Motivation', 'Lacing up some motivation…'),
@@ -353,8 +363,9 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
 
   Widget _buildFallbackContent() {
     final authState = context.read<AuthBloc>().state;
-    final username = authState is Authenticated ? authState.user.username : 'Rucker';
-    
+    final username =
+        authState is Authenticated ? authState.user.username : 'Rucker';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -419,14 +430,16 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
           ],
         ),
         const SizedBox(height: 16),
-        
+
         // Insight content
         _buildInsightSection('📊 Insight', insight.insight),
         const SizedBox(height: 12),
         _buildInsightSection(
           '💡 Recommendation',
           _isStreaming
-              ? ((_extractRecommendationFromStream(_streamingText) ?? 'Generating a fresh recommendation…') + ' ▌')
+              ? ((_extractRecommendationFromStream(_streamingText) ??
+                      'Generating a fresh recommendation…') +
+                  ' ▌')
               : insight.recommendation,
         ),
         const SizedBox(height: 12),
@@ -473,7 +486,8 @@ Future<AIInsight?> _loadCachedInsight(String userId) async {
       recommendation: map['recommendation'] ?? '',
       motivation: map['motivation'] ?? '',
       emoji: map['emoji'] ?? '💪',
-      generatedAt: DateTime.tryParse(map['generatedAt'] ?? '') ?? DateTime.now(),
+      generatedAt:
+          DateTime.tryParse(map['generatedAt'] ?? '') ?? DateTime.now(),
     );
   } catch (_) {
     return null;

@@ -7,7 +7,8 @@ class EventFilterChips extends StatelessWidget {
   final String? selectedClubId;
   final bool? includeParticipating;
   final bool? sortByDistance;
-  final Function(String? status, String? clubId, bool? includeParticipating, bool? sortByDistance) onFilterChanged;
+  final Function(String? status, String? clubId, bool? includeParticipating,
+      bool? sortByDistance) onFilterChanged;
 
   const EventFilterChips({
     Key? key,
@@ -28,7 +29,9 @@ class EventFilterChips extends StatelessWidget {
           _buildFilterChip(
             context,
             label: 'All',
-            isSelected: selectedStatus == null && includeParticipating == null && sortByDistance != true,
+            isSelected: selectedStatus == null &&
+                includeParticipating == null &&
+                sortByDistance != true,
             onTap: () => onFilterChanged(null, null, null, null),
           ),
           const SizedBox(width: 8),
@@ -82,12 +85,11 @@ class EventFilterChips extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? Theme.of(context).primaryColor 
-              : Colors.transparent,
+          color:
+              isSelected ? Theme.of(context).primaryColor : Colors.transparent,
           border: Border.all(
-            color: isSelected 
-                ? Theme.of(context).primaryColor 
+            color: isSelected
+                ? Theme.of(context).primaryColor
                 : Colors.grey.withOpacity(0.3),
           ),
           borderRadius: BorderRadius.circular(20),
@@ -95,8 +97,8 @@ class EventFilterChips extends StatelessWidget {
         child: Text(
           label,
           style: AppTextStyles.labelMedium.copyWith(
-            color: isSelected 
-                ? Colors.white 
+            color: isSelected
+                ? Colors.white
                 : Theme.of(context).brightness == Brightness.dark
                     ? Colors.white
                     : Colors.black87,

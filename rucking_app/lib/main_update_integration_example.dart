@@ -17,7 +17,7 @@ class HomeScreenWithUpdates extends StatelessWidget {
         children: [
           // Update banner at the top (will auto-hide if no updates)
           const UpdateBannerWidget(),
-          
+
           // Your existing home screen content
           const Expanded(
             child: Center(
@@ -34,7 +34,7 @@ class HomeScreenWithUpdates extends StatelessWidget {
 class AppInitializer {
   static Future<void> initialize() async {
     // ... your existing initialization code
-    
+
     // Check for updates on app start (after a delay)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 3), () {
@@ -56,16 +56,16 @@ class SessionCompletionScreen extends StatefulWidget {
   const SessionCompletionScreen({Key? key}) : super(key: key);
 
   @override
-  State<SessionCompletionScreen> createState() => _SessionCompletionScreenState();
+  State<SessionCompletionScreen> createState() =>
+      _SessionCompletionScreenState();
 }
 
 class _SessionCompletionScreenState extends State<SessionCompletionScreen>
     with UpdatePromptMixin {
-
   @override
   void initState() {
     super.initState();
-    
+
     // Check for updates after session completion (good timing!)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkForUpdatesIfAppropriate(
@@ -101,12 +101,12 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           // ... your existing settings
-          
+
           const Divider(),
-          
+
           // Update check button
           const UpdateCheckButton(),
-          
+
           // ... more settings
         ],
       ),
@@ -121,7 +121,7 @@ class DISetup {
     // GetIt.instance.registerSingleton<AppUpdateService>(
     //   AppUpdateService(GetIt.instance<ApiClient>()),
     // );
-    
+
     // Or if you prefer to initialize the singleton
     AppUpdateManager.instance; // This will create the singleton
   }
@@ -132,7 +132,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(MyApp());
-  
+
   // Initialize update system
   AppInitializer.initialize();
 }

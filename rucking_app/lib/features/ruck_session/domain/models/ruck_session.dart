@@ -78,8 +78,10 @@ class RuckSession {
       tags: tags ?? this.tags,
       perceivedExertion: perceivedExertion ?? this.perceivedExertion,
       weightKg: weightKg ?? this.weightKg,
-      plannedDurationMinutes: plannedDurationMinutes ?? this.plannedDurationMinutes,
-      pausedDurationSeconds: pausedDurationSeconds ?? this.pausedDurationSeconds,
+      plannedDurationMinutes:
+          plannedDurationMinutes ?? this.plannedDurationMinutes,
+      pausedDurationSeconds:
+          pausedDurationSeconds ?? this.pausedDurationSeconds,
       splits: splits ?? this.splits,
       photos: photos ?? this.photos,
       isManual: isManual ?? this.isManual,
@@ -123,16 +125,18 @@ class RuckSession {
   final List<SessionSplit>? splits;
   final List<RuckPhoto>? photos;
   final bool isManual;
-  
+
   // Route integration fields
   final String? routeId; // ID of the route used for this session
   final String? plannedRuckId; // ID of the planned ruck that was completed
   final Route? route; // Full route data (loaded separately)
   final int? steps; // Optional step count
   final Map<String, int>? timeInZones; // Optional HR zone distribution
-  final List<Map<String, dynamic>>? hrZoneSnapshot; // Optional snapshot of zone thresholds
+  final List<Map<String, dynamic>>?
+      hrZoneSnapshot; // Optional snapshot of zone thresholds
   final String? aiCompletionInsight;
-  final String? calorieMethod; // Method used to compute calories: 'fusion', 'mechanical', or 'hr' // AI-generated session summary
+  final String?
+      calorieMethod; // Method used to compute calories: 'fusion', 'mechanical', or 'hr' // AI-generated session summary
 
   RuckSession({
     this.id,
@@ -183,7 +187,7 @@ class RuckSession {
   String get formattedPace {
     final double paceValue = paceMinPerKm;
     if (paceValue <= 0) return '--:--';
-    
+
     final int minutes = paceValue.floor();
     final int seconds = ((paceValue - minutes) * 60).round();
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
@@ -194,7 +198,7 @@ class RuckSession {
     final int hours = duration.inSeconds ~/ 3600;
     final int minutes = (duration.inSeconds % 3600) ~/ 60;
     final int seconds = duration.inSeconds % 60;
-    
+
     if (hours > 0) {
       return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     } else {
@@ -205,62 +209,67 @@ class RuckSession {
   /// Create a RuckSession from a JSON map
   /// Handles various API response formats
   static DateTime? parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is DateTime) return value;
-  return DateTime.tryParse(value.toString());
-}
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    return DateTime.tryParse(value.toString());
+  }
 
-factory RuckSession.fromJson(Map<String, dynamic> json) {
-  try {
-    final parsedStartTime = RuckSession.parseDateTime(json['started_at']);
-    final statusString = json['status']?.toString().toLowerCase();
-    final DateTime? startTime;
-    if (parsedStartTime == null) {
-      if (statusString == 'created') {
-        startTime = null;  // Allow null for created sessions
-        AppLogger.info("RuckSession.fromJson: 'started_at' is null for created session ID: ${json['id']}. Setting startTime to null.");
-      } else {
-        AppLogger.error(
-          "RuckSession.fromJson: Missing or invalid 'started_at' for non-created session. Session ID: ${json['id']}. JSON: $json"
-        );
-        throw FormatException(
-            "RuckSession.fromJson: 'started_at' is null or invalid for session ID: ${json['id']}. Non-created sessions must have a valid 'started_at'.");
-      }
-    } else {
-      startTime = parsedStartTime;
-    }
-
-    // Strictly use 'completed_at' for end time, with fallback to duration_seconds calculation
-    DateTime? potentialEndTime = RuckSession.parseDateTime(json['completed_at']);
-
-    if (potentialEndTime == null) {
-      final durationSeconds = (json['duration_seconds'] as num?)?.toInt();
-      if (durationSeconds != null && startTime != null) {
-        potentialEndTime = startTime.add(Duration(seconds: durationSeconds));
-        AppLogger.info("RuckSession.fromJson: 'completed_at' is null, calculated endTime from startTime and duration_seconds. Session ID: ${json['id']}");
-      } else {
-        if (statusString == 'in_progress' || statusString == 'inprogress') {
-            AppLogger.info("RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for an in-progress session. Setting endTime to startTime. Session ID: ${json['id']}");
-            potentialEndTime = startTime; // For in-progress, use startTime if no end data
-        } else if (statusString == 'created') {
-            AppLogger.info("RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for a created session. Using current time as placeholder. Session ID: ${json['id']}");
-            potentialEndTime = DateTime.now(); // For created sessions, use current time as placeholder
+  factory RuckSession.fromJson(Map<String, dynamic> json) {
+    try {
+      final parsedStartTime = RuckSession.parseDateTime(json['started_at']);
+      final statusString = json['status']?.toString().toLowerCase();
+      final DateTime? startTime;
+      if (parsedStartTime == null) {
+        if (statusString == 'created') {
+          startTime = null; // Allow null for created sessions
+          AppLogger.info(
+              "RuckSession.fromJson: 'started_at' is null for created session ID: ${json['id']}. Setting startTime to null.");
         } else {
+          AppLogger.error(
+              "RuckSession.fromJson: Missing or invalid 'started_at' for non-created session. Session ID: ${json['id']}. JSON: $json");
+          throw FormatException(
+              "RuckSession.fromJson: 'started_at' is null or invalid for session ID: ${json['id']}. Non-created sessions must have a valid 'started_at'.");
+        }
+      } else {
+        startTime = parsedStartTime;
+      }
+
+      // Strictly use 'completed_at' for end time, with fallback to duration_seconds calculation
+      DateTime? potentialEndTime =
+          RuckSession.parseDateTime(json['completed_at']);
+
+      if (potentialEndTime == null) {
+        final durationSeconds = (json['duration_seconds'] as num?)?.toInt();
+        if (durationSeconds != null && startTime != null) {
+          potentialEndTime = startTime.add(Duration(seconds: durationSeconds));
+          AppLogger.info(
+              "RuckSession.fromJson: 'completed_at' is null, calculated endTime from startTime and duration_seconds. Session ID: ${json['id']}");
+        } else {
+          if (statusString == 'in_progress' || statusString == 'inprogress') {
+            AppLogger.info(
+                "RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for an in-progress session. Setting endTime to startTime. Session ID: ${json['id']}");
+            potentialEndTime =
+                startTime; // For in-progress, use startTime if no end data
+          } else if (statusString == 'created') {
+            AppLogger.info(
+                "RuckSession.fromJson: 'completed_at' and 'duration_seconds' are null for a created session. Using current time as placeholder. Session ID: ${json['id']}");
+            potentialEndTime = DateTime
+                .now(); // For created sessions, use current time as placeholder
+          } else {
             AppLogger.error(
-              "RuckSession.fromJson: Missing or invalid 'completed_at' AND 'duration_seconds' for a session not marked 'in_progress' or 'created'. Session ID: ${json['id']}. Session status: '$statusString'. JSON: $json"
-            );
+                "RuckSession.fromJson: Missing or invalid 'completed_at' AND 'duration_seconds' for a session not marked 'in_progress' or 'created'. Session ID: ${json['id']}. Session status: '$statusString'. JSON: $json");
             throw FormatException(
                 "RuckSession.fromJson: 'completed_at' and 'duration_seconds' are both null or invalid for session ID: ${json['id']}. Session status: '$statusString'.");
+          }
         }
       }
-    }
-    final DateTime endTime = potentialEndTime!;
-    
-    // Calculate duration from start/end time or use duration_seconds field
-    final duration = json['duration_seconds'] != null
-        ? Duration(seconds: (json['duration_seconds'] as num).toInt())
-        : (startTime != null ? endTime.difference(startTime) : Duration.zero);
-      
+      final DateTime endTime = potentialEndTime!;
+
+      // Calculate duration from start/end time or use duration_seconds field
+      final duration = json['duration_seconds'] != null
+          ? Duration(seconds: (json['duration_seconds'] as num).toInt())
+          : (startTime != null ? endTime.difference(startTime) : Duration.zero);
+
       // Handle various ways distance might be stored
       double parseDistance(dynamic value) {
         if (value == null) return 0.0;
@@ -272,7 +281,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
           return 0.0;
         }
       }
-      
+
       // Parse pace value (seconds per km) - calculate if not provided
       double parsePace(dynamic value, double distance, Duration duration) {
         // Try to parse the provided pace value first
@@ -287,27 +296,30 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
             // Fall through to calculation
           }
         }
-        
+
         // Calculate pace from distance and duration if not provided or invalid
         if (distance > 0 && duration.inSeconds > 0) {
           return duration.inSeconds / distance;
         }
-        
+
         // Default to 0 if can't calculate
         return 0.0;
       }
-      
-      final distance = parseDistance(json['distance_km'] ?? json['distance'] ?? 0.0);
-      
+
+      final distance =
+          parseDistance(json['distance_km'] ?? json['distance'] ?? 0.0);
+
       // Handle status (map string to enum)
       RuckStatus status = RuckStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == (json['status'] ?? '').toString(),
+        (e) =>
+            e.toString().split('.').last == (json['status'] ?? '').toString(),
         orElse: () {
-          AppLogger.warning("RuckSession.fromJson: Unknown or null status string '${json['status']}'. Defaulting to RuckStatus.unknown. Session ID: ${json['id']}. JSON: $json");
+          AppLogger.warning(
+              "RuckSession.fromJson: Unknown or null status string '${json['status']}'. Defaulting to RuckStatus.unknown. Session ID: ${json['id']}. JSON: $json");
           return RuckStatus.unknown;
         },
       );
-      
+
       // Extract other fields with sensible defaults
       return RuckSession(
         id: json['id']?.toString(),
@@ -315,36 +327,68 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
         endTime: endTime,
         duration: duration,
         distance: distance,
-        elevationGain: parseDistance(json['elevation_gain_meters'] ?? json['elevation_gain_m'] ?? json['elevationGain'] ?? 0.0),
-        elevationLoss: parseDistance(json['elevation_loss_meters'] ?? json['elevation_loss_m'] ?? json['elevationLoss'] ?? 0.0),
+        elevationGain: parseDistance(json['elevation_gain_meters'] ??
+            json['elevation_gain_m'] ??
+            json['elevationGain'] ??
+            0.0),
+        elevationLoss: parseDistance(json['elevation_loss_meters'] ??
+            json['elevation_loss_m'] ??
+            json['elevationLoss'] ??
+            0.0),
         caloriesBurned: () {
-          final calorieValue = (json['calories_burned'] ?? json['caloriesBurned'] ?? 0) is int
-              ? (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
-              : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0).toInt();
-          AppLogger.info('[RUCK_SESSION] CALORIES_DEBUG: Parsing session ${json['id']}: calories_burned=${json['calories_burned']}, caloriesBurned=${json['caloriesBurned']}, final value=$calorieValue');
+          final calorieValue =
+              (json['calories_burned'] ?? json['caloriesBurned'] ?? 0) is int
+                  ? (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
+                  : (json['calories_burned'] ?? json['caloriesBurned'] ?? 0)
+                      .toInt();
+          AppLogger.info(
+              '[RUCK_SESSION] CALORIES_DEBUG: Parsing session ${json['id']}: calories_burned=${json['calories_burned']}, caloriesBurned=${json['caloriesBurned']}, final value=$calorieValue');
           return calorieValue;
         }(),
-        averagePace: parsePace(json['average_pace'] ?? json['averagePace'], distance, duration),
-        ruckWeightKg: parseDistance(json['ruck_weight_kg'] ?? json['ruckWeightKg'] ?? 0.0),
+        averagePace: parsePace(
+            json['average_pace'] ?? json['averagePace'], distance, duration),
+        ruckWeightKg: parseDistance(
+            json['ruck_weight_kg'] ?? json['ruckWeightKg'] ?? 0.0),
         status: status,
         notes: json['notes']?.toString(),
         rating: json['rating'] is int ? json['rating'] : null,
-        locationPoints: ((json['route'] as List<dynamic>?) ?? (json['location_points'] as List<dynamic>?) ?? (json['locationPoints'] as List<dynamic>?) ?? []),
-        finalElevationGain: json['final_elevation_gain'] != null ? parseDistance(json['final_elevation_gain']) : null,
-        finalElevationLoss: json['final_elevation_loss'] != null ? parseDistance(json['final_elevation_loss']) : null,
+        locationPoints: ((json['route'] as List<dynamic>?) ??
+            (json['location_points'] as List<dynamic>?) ??
+            (json['locationPoints'] as List<dynamic>?) ??
+            []),
+        finalElevationGain: json['final_elevation_gain'] != null
+            ? parseDistance(json['final_elevation_gain'])
+            : null,
+        finalElevationLoss: json['final_elevation_loss'] != null
+            ? parseDistance(json['final_elevation_loss'])
+            : null,
         heartRateSamples: json['heart_rate_samples'] != null
             ? (json['heart_rate_samples'] as List<dynamic>)
                 .map((e) => HeartRateSample.fromJson(e as Map<String, dynamic>))
                 .toList()
             : null,
-        avgHeartRate: json['avg_heart_rate'] != null ? (json['avg_heart_rate'] as num).toInt() : null,
-        maxHeartRate: json['max_heart_rate'] != null ? (json['max_heart_rate'] as num).toInt() : null,
-        minHeartRate: json['min_heart_rate'] != null ? (json['min_heart_rate'] as num).toInt() : null,
-        tags: (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
-        perceivedExertion: json['perceived_exertion'] != null ? (json['perceived_exertion'] as num).toInt() : null,
-        weightKg: json['weight_kg'] != null ? parseDistance(json['weight_kg']) : null,
-        plannedDurationMinutes: json['planned_duration_minutes'] != null ? (json['planned_duration_minutes'] as num).toInt() : null,
-        pausedDurationSeconds: json['paused_duration_seconds'] != null ? (json['paused_duration_seconds'] as num).toInt() : null,
+        avgHeartRate: json['avg_heart_rate'] != null
+            ? (json['avg_heart_rate'] as num).toInt()
+            : null,
+        maxHeartRate: json['max_heart_rate'] != null
+            ? (json['max_heart_rate'] as num).toInt()
+            : null,
+        minHeartRate: json['min_heart_rate'] != null
+            ? (json['min_heart_rate'] as num).toInt()
+            : null,
+        tags:
+            (json['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
+        perceivedExertion: json['perceived_exertion'] != null
+            ? (json['perceived_exertion'] as num).toInt()
+            : null,
+        weightKg:
+            json['weight_kg'] != null ? parseDistance(json['weight_kg']) : null,
+        plannedDurationMinutes: json['planned_duration_minutes'] != null
+            ? (json['planned_duration_minutes'] as num).toInt()
+            : null,
+        pausedDurationSeconds: json['paused_duration_seconds'] != null
+            ? (json['paused_duration_seconds'] as num).toInt()
+            : null,
         splits: json['splits'] != null
             ? (json['splits'] as List<dynamic>)
                 .map((e) => SessionSplit.fromJson(e as Map<String, dynamic>))
@@ -362,8 +406,11 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
             ? Route.fromJson(json['route'] as Map<String, dynamic>)
             : null,
         steps: (json['steps'] as num?)?.toInt(),
-        timeInZones: (json['time_in_zones'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
-        hrZoneSnapshot: (json['hr_zone_snapshot'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+        timeInZones: (json['time_in_zones'] as Map?)
+            ?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
+        hrZoneSnapshot: (json['hr_zone_snapshot'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(),
         aiCompletionInsight: json['ai_completion_insight'] as String?,
         calorieMethod: json['calorie_method'] as String?,
       );
@@ -378,7 +425,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
     // Maximum reasonable duration: 30 days = 2,592,000 seconds
     const maxDuration = 2592000;
     if (durationSeconds < 0 || durationSeconds > maxDuration) {
-      AppLogger.warning('[DURATION_VALIDATION] Invalid duration: ${durationSeconds}s, clamping to reasonable range');
+      AppLogger.warning(
+          '[DURATION_VALIDATION] Invalid duration: ${durationSeconds}s, clamping to reasonable range');
       return durationSeconds.clamp(0, maxDuration);
     }
     return durationSeconds;
@@ -387,7 +435,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
   /// Convert the RuckSession to a JSON map
   Map<String, dynamic> toJson() {
     final dateFormat = DateFormat("yyyy-MM-ddTHH:mm:ss");
-    
+
     // Helper to convert enum back to string for API
     String statusToString(RuckStatus status) {
       switch (status) {
@@ -402,7 +450,7 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
           return 'unknown'; // Or maybe null?
       }
     }
-    
+
     return {
       'id': id,
       // Ensure DateTimes are JSON-serializable
@@ -440,7 +488,8 @@ factory RuckSession.fromJson(Map<String, dynamic> json) {
       if (steps != null) 'steps': steps,
       if (timeInZones != null) 'time_in_zones': timeInZones,
       if (hrZoneSnapshot != null) 'hr_zone_snapshot': hrZoneSnapshot,
-      if (aiCompletionInsight != null) 'ai_completion_insight': aiCompletionInsight,
+      if (aiCompletionInsight != null)
+        'ai_completion_insight': aiCompletionInsight,
       if (calorieMethod != null) 'calorie_method': calorieMethod,
     };
   }

@@ -41,12 +41,12 @@ class DuelSession extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    duelId,
-    participantId,
-    sessionId,
-    contributionValue,
-    createdAt,
-    updatedAt,
-  ];
+        id,
+        duelId,
+        participantId,
+        sessionId,
+        contributionValue,
+        createdAt,
+        updatedAt,
+      ];
 }

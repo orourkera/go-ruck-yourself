@@ -33,25 +33,30 @@ class ProfileStatsGrid extends StatelessWidget {
           context,
           icon: Icons.straighten,
           title: 'Distance',
-          value: MeasurementUtils.formatDistance(stats.totalDistanceKm, metric: preferMetric),
+          value: MeasurementUtils.formatDistance(stats.totalDistanceKm,
+              metric: preferMetric),
         ),
         _buildStatCard(
           context,
           icon: Icons.local_fire_department,
           title: 'Calories',
-          value: MeasurementUtils.formatCalories(stats.totalCaloriesBurned.toInt()),
+          value: MeasurementUtils.formatCalories(
+              stats.totalCaloriesBurned.toInt()),
         ),
         _buildStatCard(
           context,
           icon: Icons.terrain,
           title: 'Elevation',
-          value: MeasurementUtils.formatSingleElevation(stats.totalElevationGainM, metric: preferMetric),
+          value: MeasurementUtils.formatSingleElevation(
+              stats.totalElevationGainM,
+              metric: preferMetric),
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(BuildContext context, {
+  Widget _buildStatCard(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String value,

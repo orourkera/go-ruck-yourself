@@ -99,7 +99,7 @@ class RoutePreviewCard extends StatelessWidget {
                     Icons.straighten,
                     _formatDistance(context, route.distanceKm),
                   ),
-                  
+
                   // Elevation gain
                   if (route.elevationGainM != null) ...[
                     const SizedBox(width: 16),
@@ -108,7 +108,6 @@ class RoutePreviewCard extends StatelessWidget {
                       _formatElevation(context, route.elevationGainM!),
                     ),
                   ],
-
                 ],
               ),
 
@@ -207,30 +206,31 @@ class RoutePreviewCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       ...warnings.map((warning) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 4,
-                              height: 4,
-                              margin: const EdgeInsets.only(top: 6, right: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.warning,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                warning,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.warning.withOpacity(0.8),
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 4,
+                                  height: 4,
+                                  margin:
+                                      const EdgeInsets.only(top: 6, right: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.warning,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
+                                Expanded(
+                                  child: Text(
+                                    warning,
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: AppColors.warning.withOpacity(0.8),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      )),
+                          )),
                     ],
                   ),
                 ),
@@ -314,15 +314,18 @@ class RoutePreviewCard extends StatelessWidget {
   /// Format distance using user's metric preference
   String _formatDistance(BuildContext context, double distanceKm) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   /// Format elevation using user's metric preference
   String _formatElevation(BuildContext context, double elevationM) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM,
+        metric: preferMetric);
   }
 }
 
@@ -389,13 +392,17 @@ class CompactRoutePreviewCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: _getDifficultyColor(_parseDifficulty(route.trailDifficulty!)).withOpacity(0.1),
+                              color: _getDifficultyColor(
+                                      _parseDifficulty(route.trailDifficulty!))
+                                  .withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _getDifficultyLabel(_parseDifficulty(route.trailDifficulty!)),
+                              _getDifficultyLabel(
+                                  _parseDifficulty(route.trailDifficulty!)),
                               style: AppTextStyles.bodySmall.copyWith(
-                                color: _getDifficultyColor(_parseDifficulty(route.trailDifficulty!)),
+                                color: _getDifficultyColor(
+                                    _parseDifficulty(route.trailDifficulty!)),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -473,14 +480,17 @@ class CompactRoutePreviewCard extends StatelessWidget {
   /// Format distance using user's metric preference
   String _formatDistance(BuildContext context, double distanceKm) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
     return MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
   }
 
   /// Format elevation using user's metric preference
   String _formatElevation(BuildContext context, double elevationM) {
     final authState = context.read<AuthBloc>().state;
-    final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    return MeasurementUtils.formatSingleElevation(elevationM, metric: preferMetric);
+    final preferMetric =
+        authState is Authenticated ? authState.user.preferMetric : true;
+    return MeasurementUtils.formatSingleElevation(elevationM,
+        metric: preferMetric);
   }
 }

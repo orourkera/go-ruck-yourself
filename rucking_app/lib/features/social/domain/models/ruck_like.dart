@@ -4,19 +4,19 @@ import 'package:equatable/equatable.dart';
 class RuckLike extends Equatable {
   /// Unique ID of the like record
   final String id;
-  
+
   /// ID of the ruck session that was liked
   final int ruckId;
-  
+
   /// ID of the user who liked the ruck session
   final String userId;
-  
+
   /// Display name of the user who liked the ruck session
   final String userDisplayName;
-  
+
   /// Optional user avatar URL
   final String? userAvatarUrl;
-  
+
   /// Timestamp when the like was created
   final DateTime createdAt;
 

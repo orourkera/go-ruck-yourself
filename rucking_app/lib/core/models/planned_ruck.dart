@@ -86,44 +86,48 @@ class PlannedRuck extends Equatable {
       id: json['id'] as String?,
       userId: json['user_id']?.toString() ?? '',
       routeId: json['route_id']?.toString() ?? '',
-      plannedDate: DateTime.parse(json['planned_date']?.toString() ?? DateTime.now().toIso8601String()),
-      plannedStartTime: json['planned_start_time'] != null 
-          ? DateTime.parse(json['planned_start_time']?.toString() ?? '') 
+      plannedDate: DateTime.parse(
+          json['planned_date']?.toString() ?? DateTime.now().toIso8601String()),
+      plannedStartTime: json['planned_start_time'] != null
+          ? DateTime.parse(json['planned_start_time']?.toString() ?? '')
           : null,
       // Map backend field names to model fields
-      targetWeight: json['planned_ruck_weight_kg'] != null 
-          ? (json['planned_ruck_weight_kg'] as num).toDouble() 
-          : json['target_weight'] != null 
-          ? (json['target_weight'] as num).toDouble() 
-          : null,
-      targetPace: json['target_pace'] != null 
-          ? (json['target_pace'] as num).toDouble() 
+      targetWeight: json['planned_ruck_weight_kg'] != null
+          ? (json['planned_ruck_weight_kg'] as num).toDouble()
+          : json['target_weight'] != null
+              ? (json['target_weight'] as num).toDouble()
+              : null,
+      targetPace: json['target_pace'] != null
+          ? (json['target_pace'] as num).toDouble()
           : null,
       notes: json['notes'] as String?,
       // Convert hours to minutes for duration
-      projectedDurationMinutes: json['estimated_duration_hours'] != null 
-          ? ((json['estimated_duration_hours'] as num) * 60).round() 
+      projectedDurationMinutes: json['estimated_duration_hours'] != null
+          ? ((json['estimated_duration_hours'] as num) * 60).round()
           : json['projected_duration_minutes'] as int?,
-      projectedCalories: (json['estimated_calories'] as int?) ?? (json['projected_calories'] as int?),
+      projectedCalories: (json['estimated_calories'] as int?) ??
+          (json['projected_calories'] as int?),
       // Map planned_difficulty to projected_intensity
-      projectedIntensity: (json['planned_difficulty'] as String?) ?? (json['projected_intensity'] as String?),
-      status: PlannedRuckStatus.fromString(json['status'] as String? ?? 'planned'),
+      projectedIntensity: (json['planned_difficulty'] as String?) ??
+          (json['projected_intensity'] as String?),
+      status:
+          PlannedRuckStatus.fromString(json['status'] as String? ?? 'planned'),
       actualSessionId: json['actual_session_id'] as String?,
-      completedAt: json['completed_at'] != null 
-          ? DateTime.parse(json['completed_at']?.toString() ?? '') 
+      completedAt: json['completed_at'] != null
+          ? DateTime.parse(json['completed_at']?.toString() ?? '')
           : null,
-      cancelledAt: json['cancelled_at'] != null 
-          ? DateTime.parse(json['cancelled_at']?.toString() ?? '') 
+      cancelledAt: json['cancelled_at'] != null
+          ? DateTime.parse(json['cancelled_at']?.toString() ?? '')
           : null,
       cancelReason: json['cancel_reason'] as String?,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']?.toString() ?? '') 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at']?.toString() ?? '')
           : null,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at']?.toString() ?? '') 
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at']?.toString() ?? '')
           : null,
-      route: json['route'] != null 
-          ? Route.fromJson(json['route'] as Map<String, dynamic>) 
+      route: json['route'] != null
+          ? Route.fromJson(json['route'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -135,11 +139,13 @@ class PlannedRuck extends Equatable {
       'user_id': userId,
       'route_id': routeId,
       'planned_date': plannedDate.toIso8601String(),
-      if (plannedStartTime != null) 'planned_start_time': plannedStartTime!.toIso8601String(),
+      if (plannedStartTime != null)
+        'planned_start_time': plannedStartTime!.toIso8601String(),
       if (targetWeight != null) 'target_weight': targetWeight,
       if (targetPace != null) 'target_pace': targetPace,
       if (notes != null) 'notes': notes,
-      if (projectedDurationMinutes != null) 'projected_duration_minutes': projectedDurationMinutes,
+      if (projectedDurationMinutes != null)
+        'projected_duration_minutes': projectedDurationMinutes,
       if (projectedCalories != null) 'projected_calories': projectedCalories,
       if (projectedIntensity != null) 'projected_intensity': projectedIntensity,
       'status': status.value,
@@ -184,7 +190,8 @@ class PlannedRuck extends Equatable {
       targetWeight: targetWeight ?? this.targetWeight,
       targetPace: targetPace ?? this.targetPace,
       notes: notes ?? this.notes,
-      projectedDurationMinutes: projectedDurationMinutes ?? this.projectedDurationMinutes,
+      projectedDurationMinutes:
+          projectedDurationMinutes ?? this.projectedDurationMinutes,
       projectedCalories: projectedCalories ?? this.projectedCalories,
       projectedIntensity: projectedIntensity ?? this.projectedIntensity,
       status: status ?? this.status,
@@ -205,8 +212,9 @@ class PlannedRuck extends Equatable {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final tomorrow = today.add(const Duration(days: 1));
-    final planDate = DateTime(plannedDate.year, plannedDate.month, plannedDate.day);
-    
+    final planDate =
+        DateTime(plannedDate.year, plannedDate.month, plannedDate.day);
+
     if (planDate == today) {
       return 'Today';
     } else if (planDate == tomorrow) {
@@ -227,13 +235,13 @@ class PlannedRuck extends Equatable {
   /// Get formatted planned start time
   String get formattedPlannedTime {
     if (plannedStartTime == null) return 'No specific time';
-    
+
     final hour = plannedStartTime!.hour;
     final minute = plannedStartTime!.minute;
     final amPm = hour >= 12 ? 'PM' : 'AM';
     final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
     final displayMinute = minute.toString().padLeft(2, '0');
-    
+
     return '$displayHour:$displayMinute $amPm';
   }
 
@@ -246,17 +254,17 @@ class PlannedRuck extends Equatable {
   /// Get formatted target pace
   String get formattedTargetPace {
     if (targetPace == null) return 'No pace target';
-    
+
     final minutes = targetPace!.floor();
     final seconds = ((targetPace! - minutes) * 60).round();
-    
+
     return '${minutes}:${seconds.toString().padLeft(2, '0')}/km pace';
   }
 
   /// Get formatted projected duration
   String get formattedProjectedDuration {
     if (projectedDurationMinutes == null) return 'Unknown duration';
-    
+
     final minutes = projectedDurationMinutes!;
     if (minutes < 60) {
       return '${minutes}min';
@@ -297,20 +305,22 @@ class PlannedRuck extends Equatable {
   bool get isToday {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final planDate = DateTime(plannedDate.year, plannedDate.month, plannedDate.day);
+    final planDate =
+        DateTime(plannedDate.year, plannedDate.month, plannedDate.day);
     return planDate == today;
   }
 
   /// Check if this ruck is overdue
   bool get isOverdue {
     if (status != PlannedRuckStatus.planned) return false;
-    
+
     final now = DateTime.now();
     if (plannedStartTime != null) {
       return plannedStartTime!.isBefore(now);
     } else {
       // If no specific time, consider overdue after planned date
-      final planDate = DateTime(plannedDate.year, plannedDate.month, plannedDate.day);
+      final planDate =
+          DateTime(plannedDate.year, plannedDate.month, plannedDate.day);
       final today = DateTime(now.year, now.month, now.day);
       return planDate.isBefore(today);
     }
@@ -353,14 +363,14 @@ class PlannedRuck extends Equatable {
   /// Get time until planned start
   String get timeUntilStart {
     if (plannedStartTime == null) return '';
-    
+
     final now = DateTime.now();
     final difference = plannedStartTime!.difference(now);
-    
+
     if (difference.isNegative) {
       return 'Overdue';
     }
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ${difference.inHours % 24}h';
     } else if (difference.inHours > 0) {
@@ -373,14 +383,22 @@ class PlannedRuck extends Equatable {
   /// Get day name from weekday number
   String _getDayName(int weekday) {
     switch (weekday) {
-      case 1: return 'Monday';
-      case 2: return 'Tuesday';
-      case 3: return 'Wednesday';
-      case 4: return 'Thursday';
-      case 5: return 'Friday';
-      case 6: return 'Saturday';
-      case 7: return 'Sunday';
-      default: return 'Unknown';
+      case 1:
+        return 'Monday';
+      case 2:
+        return 'Tuesday';
+      case 3:
+        return 'Wednesday';
+      case 4:
+        return 'Thursday';
+      case 5:
+        return 'Friday';
+      case 6:
+        return 'Saturday';
+      case 7:
+        return 'Sunday';
+      default:
+        return 'Unknown';
     }
   }
 }

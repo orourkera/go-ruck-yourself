@@ -34,12 +34,13 @@ class SessionBloc extends Bloc<SessionEvent, SessionState> {
       }
     } catch (e) {
       AppLogger.error('Error deleting session: $e');
-      
+
       // Check if this is a 404 error indicating session doesn't exist in backend
-      if (e.toString().contains('404') || 
+      if (e.toString().contains('404') ||
           e.toString().contains('Session not found') ||
           e.toString().contains('NotFoundException')) {
-        AppLogger.warning('Session ${event.sessionId} not found in backend - treating as successful deletion');
+        AppLogger.warning(
+            'Session ${event.sessionId} not found in backend - treating as successful deletion');
         // Clear cache in case of local stale entries
         SessionRepository.clearSessionHistoryCache();
         emit(SessionDeleteSuccess(sessionId: event.sessionId));

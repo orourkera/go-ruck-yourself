@@ -32,9 +32,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _heightController;
   bool _isLoading = false;
   late String _selectedGender;
-  
+
   // Dynamically get primary color based on selected gender
-  Color get _primaryColor => _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
+  Color get _primaryColor =>
+      _selectedGender == 'female' ? AppColors.ladyPrimary : AppColors.primary;
 
   // Constants for conversion
   static const double kgToLbs = 2.20462;
@@ -44,25 +45,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _usernameController = TextEditingController(text: widget.user.username);
-    
+
     // Initialize weight controller with display value
     double displayWeight = 0;
     if (widget.user.weightKg != null) {
-        displayWeight = widget.preferMetric 
-            ? widget.user.weightKg! 
-            : widget.user.weightKg! * kgToLbs;
+      displayWeight = widget.preferMetric
+          ? widget.user.weightKg!
+          : widget.user.weightKg! * kgToLbs;
     }
-    _weightController = TextEditingController(text: displayWeight > 0 ? displayWeight.toStringAsFixed(1) : '');
+    _weightController = TextEditingController(
+        text: displayWeight > 0 ? displayWeight.toStringAsFixed(1) : '');
 
     // Initialize height controller with display value
     double displayHeight = 0;
-     if (widget.user.heightCm != null) {
-        displayHeight = widget.preferMetric 
-            ? widget.user.heightCm! 
-            : widget.user.heightCm! * cmToInches;
-     }
-    _heightController = TextEditingController(text: displayHeight > 0 ? displayHeight.toStringAsFixed(1) : '');
-    
+    if (widget.user.heightCm != null) {
+      displayHeight = widget.preferMetric
+          ? widget.user.heightCm!
+          : widget.user.heightCm! * cmToInches;
+    }
+    _heightController = TextEditingController(
+        text: displayHeight > 0 ? displayHeight.toStringAsFixed(1) : '');
+
     // Initialize gender selection - default to male if null
     _selectedGender = widget.user.gender ?? 'male';
   }
@@ -84,21 +87,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Prepare data, converting back to metric if needed
       double? weightKg;
       if (_weightController.text.isNotEmpty) {
-          final weightVal = double.tryParse(_weightController.text);
-          if (weightVal != null) {
-              // If user prefers metric, do nothing. If standard, convert lbs to kg before saving
-              weightKg = widget.preferMetric ? weightVal : weightVal * 0.453592;
-          }
+        final weightVal = double.tryParse(_weightController.text);
+        if (weightVal != null) {
+          // If user prefers metric, do nothing. If standard, convert lbs to kg before saving
+          weightKg = widget.preferMetric ? weightVal : weightVal * 0.453592;
+        }
       }
 
       double? heightCm;
       if (_heightController.text.isNotEmpty) {
-          final heightVal = double.tryParse(_heightController.text);
-           if (heightVal != null) {
-              heightCm = widget.preferMetric ? heightVal : heightVal / cmToInches;
-           }
+        final heightVal = double.tryParse(_heightController.text);
+        if (heightVal != null) {
+          heightCm = widget.preferMetric ? heightVal : heightVal / cmToInches;
+        }
       }
-      
+
       // Check if gender has changed and cache it for splash screen
       final bool isLadyMode = _selectedGender == 'female';
       if (widget.user.gender != _selectedGender) {
@@ -107,7 +110,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           debugPrint('[Profile] Lady mode status cached: $isLadyMode');
         });
       }
-      
+
       context.read<AuthBloc>().add(
             AuthUpdateProfileRequested(
               username: _usernameController.text,
@@ -120,34 +123,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       // Listen for state changes to pop or show error
       final streamSub = context.read<AuthBloc>().stream.listen((state) {
-         if (state is Authenticated) {
-            if (mounted) {
-               Navigator.pop(context); // Pop on success
-            }
-         } else if (state is AuthError) {
-             if (mounted) {
-                StyledSnackBar.showError(
-                  context: context,
-                  message: "Update failed: ${state.message}",
-                  duration: const Duration(seconds: 3),
-                );
-               setState(() {
-                 _isLoading = false; // Re-enable button on error
-               });
-            }
-         } 
+        if (state is Authenticated) {
+          if (mounted) {
+            Navigator.pop(context); // Pop on success
+          }
+        } else if (state is AuthError) {
+          if (mounted) {
+            StyledSnackBar.showError(
+              context: context,
+              message: "Update failed: ${state.message}",
+              duration: const Duration(seconds: 3),
+            );
+            setState(() {
+              _isLoading = false; // Re-enable button on error
+            });
+          }
+        }
       });
       // Cancel subscription after a delay or on dispose to avoid memory leaks
       // This part is simplified, real implementation might need more robust handling
-       Future.delayed(Duration(seconds: 5), () => streamSub.cancel());
+      Future.delayed(Duration(seconds: 5), () => streamSub.cancel());
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final weightUnit = widget.preferMetric ? 'kg' : 'lbs';
-    final heightUnit = widget.preferMetric ? 'cm' : 'inches'; // Use inches for imperial height
-    
+    final heightUnit =
+        widget.preferMetric ? 'cm' : 'inches'; // Use inches for imperial height
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
@@ -182,19 +186,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 prefixIcon: Icons.monitor_weight_outlined,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                 ],
                 validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                        final number = double.tryParse(value);
-                        if (number == null) {
-                           return 'Please enter a valid number';
-                        }
-                        if (number <= 0) {
-                           return 'Weight must be positive';
-                        }
+                  if (value != null && value.isNotEmpty) {
+                    final number = double.tryParse(value);
+                    if (number == null) {
+                      return 'Please enter a valid number';
                     }
-                   return null;
+                    if (number <= 0) {
+                      return 'Weight must be positive';
+                    }
+                  }
+                  return null;
                 },
               ),
               const SizedBox(height: 20),
@@ -205,19 +209,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 prefixIcon: Icons.height_outlined,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$')),
                 ],
-                 validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                        final number = double.tryParse(value);
-                        if (number == null) {
-                           return 'Please enter a valid number';
-                        }
-                        if (number <= 0) {
-                           return 'Height must be positive';
-                        }
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    final number = double.tryParse(value);
+                    if (number == null) {
+                      return 'Please enter a valid number';
                     }
-                   return null;
+                    if (number <= 0) {
+                      return 'Height must be positive';
+                    }
+                  }
+                  return null;
                 },
               ),
               const SizedBox(height: 20),
@@ -317,7 +321,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Text(
                 'Weight, height, and gender information help calculate calories more accurately and personalize your experience.',
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Color(0xFF728C69)
+                      : AppColors.textDarkSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -332,11 +338,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
-                    'Cancel',
-                     style: AppTextStyles.labelLarge.copyWith(
-                       color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
-                     ),
-                 ),
+                  'Cancel',
+                  style: AppTextStyles.labelLarge.copyWith(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Color(0xFF728C69)
+                        : AppColors.textDarkSecondary,
+                  ),
+                ),
               ),
             ],
           ),
@@ -344,4 +352,4 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
     );
   }
-} 
+}

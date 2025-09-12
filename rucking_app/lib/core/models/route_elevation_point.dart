@@ -28,7 +28,8 @@ class RouteElevationPoint extends Equatable {
 
   // Terrain and gradient data
   final String? terrainType; // 'paved', 'dirt', 'gravel', 'rock', 'grass'
-  final double? gradePercent; // Gradient percentage (positive = uphill, negative = downhill)
+  final double?
+      gradePercent; // Gradient percentage (positive = uphill, negative = downhill)
 
   // Metadata
   final DateTime? createdAt;
@@ -53,18 +54,18 @@ class RouteElevationPoint extends Equatable {
       routeId: json['route_id'] as String,
       distanceKm: (json['distance_km'] as num).toDouble(),
       elevationM: (json['elevation_m'] as num).toDouble(),
-      latitude: json['latitude'] != null 
-          ? (json['latitude'] as num).toDouble() 
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
           : null,
-      longitude: json['longitude'] != null 
-          ? (json['longitude'] as num).toDouble() 
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
           : null,
       terrainType: json['terrain_type'] as String?,
-      gradePercent: json['grade_percent'] != null 
-          ? (json['grade_percent'] as num).toDouble() 
+      gradePercent: json['grade_percent'] != null
+          ? (json['grade_percent'] as num).toDouble()
           : null,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'] as String) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : null,
     );
   }
@@ -128,19 +129,19 @@ class RouteElevationPoint extends Equatable {
   /// Get formatted grade percentage
   String get formattedGrade {
     if (gradePercent == null) return 'Unknown grade';
-    
+
     final absGrade = gradePercent!.abs();
     final direction = gradePercent! >= 0 ? 'uphill' : 'downhill';
-    
+
     return '${absGrade.toStringAsFixed(1)}% $direction';
   }
 
   /// Get grade category for UI styling
   GradeCategory get gradeCategory {
     if (gradePercent == null) return GradeCategory.flat;
-    
+
     final absGrade = gradePercent!.abs();
-    
+
     if (absGrade < 3) {
       return GradeCategory.flat;
     } else if (absGrade < 8) {
@@ -157,7 +158,7 @@ class RouteElevationPoint extends Equatable {
   /// Check if this point represents uphill
   bool get isUphill => gradePercent != null && gradePercent! > 1;
 
-  /// Check if this point represents downhill  
+  /// Check if this point represents downhill
   bool get isDownhill => gradePercent != null && gradePercent! < -1;
 
   /// Check if this point is relatively flat
@@ -193,11 +194,9 @@ class RouteElevationPoint extends Equatable {
     if (!hasCoordinates || !other.hasCoordinates) {
       return 0.0;
     }
-    
+
     return _haversineDistance(
-      latitude!, longitude!, 
-      other.latitude!, other.longitude!
-    );
+        latitude!, longitude!, other.latitude!, other.longitude!);
   }
 
   /// Calculate elevation change from this point to another
@@ -206,20 +205,22 @@ class RouteElevationPoint extends Equatable {
   }
 
   /// Haversine distance calculation
-  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _haversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // Earth's radius in meters
-    
+
     // Convert degrees to radians
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
-    
-    final double a = 
-        (dLat / 2).sin() * (dLat / 2).sin() +
-        lat1.toRadians().cos() * lat2.toRadians().cos() *
-        (dLon / 2).sin() * (dLon / 2).sin();
-    
+
+    final double a = (dLat / 2).sin() * (dLat / 2).sin() +
+        lat1.toRadians().cos() *
+            lat2.toRadians().cos() *
+            (dLon / 2).sin() *
+            (dLon / 2).sin();
+
     final double c = 2 * (a.sqrt()).asin();
-    
+
     return earthRadius * c;
   }
 
@@ -234,8 +235,6 @@ extension on double {
   double asin() => math.asin(this);
   double sqrt() => math.sqrt(this);
 }
-
-
 
 /// Grade categories for UI styling and difficulty assessment
 enum GradeCategory {

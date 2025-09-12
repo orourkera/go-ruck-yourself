@@ -4,7 +4,7 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 class AuthCallbackScreen extends StatefulWidget {
   final Uri uri;
-  
+
   const AuthCallbackScreen({
     super.key,
     required this.uri,
@@ -38,17 +38,18 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
   void _handleAuthCallback() {
     final uri = widget.uri;
     final queryParams = uri.queryParameters;
-    
+
     print('🔍 AuthCallback - Full URI: $uri');
     print('🔍 AuthCallback - Query params: $queryParams');
-    
+
     // Check what type of callback this is
     final type = queryParams['type'];
     final accessToken = queryParams['access_token'];
     final refreshToken = queryParams['refresh_token'];
-    
-    print('🔍 AuthCallback - Type: $type, Token: ${accessToken?.substring(0, 20)}...');
-    
+
+    print(
+        '🔍 AuthCallback - Type: $type, Token: ${accessToken?.substring(0, 20)}...');
+
     if (type == 'recovery' && accessToken != null) {
       // This is a password reset callback
       // Navigate to password reset screen with the tokens
@@ -56,7 +57,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
       print('🔑 Access token length: ${accessToken.length}');
       print('🔑 Refresh token present: ${refreshToken != null}');
       print('🔑 About to navigate to /password_reset');
-      
+
       try {
         Navigator.of(context).pushReplacementNamed(
           '/password_reset',
@@ -78,7 +79,9 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
       _showSuccessAndRedirect('Authentication successful!');
     } else {
       // Handle error cases
-      final error = queryParams['error_description'] ?? queryParams['error'] ?? 'Unknown error';
+      final error = queryParams['error_description'] ??
+          queryParams['error'] ??
+          'Unknown error';
       _showErrorAndRedirect(error);
     }
   }
@@ -90,7 +93,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
         backgroundColor: Colors.green,
       ),
     );
-    
+
     // Redirect to home after a brief delay
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
@@ -106,7 +109,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
         backgroundColor: Colors.red,
       ),
     );
-    
+
     // Redirect to login after a brief delay
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {

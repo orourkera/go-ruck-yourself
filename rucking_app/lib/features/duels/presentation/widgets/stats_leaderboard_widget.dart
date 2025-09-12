@@ -130,23 +130,24 @@ class StatsLeaderboardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildLeaderboardTile(DuelStats stats, int rank, BuildContext context) {
+  Widget _buildLeaderboardTile(
+      DuelStats stats, int rank, BuildContext context) {
     final isTopThree = rank <= 3;
     final isCurrentUser = currentUserStats?.userId == stats.userId;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isCurrentUser 
+        color: isCurrentUser
             ? AppColors.primary.withOpacity(0.1)
-            : isTopThree 
+            : isTopThree
                 ? _getRankColor(rank).withOpacity(0.1)
                 : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isCurrentUser 
+          color: isCurrentUser
               ? AppColors.primary
-              : isTopThree 
+              : isTopThree
                   ? _getRankColor(rank)
                   : Colors.grey[200]!,
           width: isCurrentUser || isTopThree ? 2 : 1,
@@ -189,7 +190,7 @@ class StatsLeaderboardWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // User Info
           Expanded(
             child: Column(
@@ -202,15 +203,16 @@ class StatsLeaderboardWidget extends StatelessWidget {
                         'User ${stats.userId.substring(0, 8)}', // TODO: Get actual user name
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isTopThree || isCurrentUser 
-                              ? FontWeight.bold 
+                          fontWeight: isTopThree || isCurrentUser
+                              ? FontWeight.bold
                               : FontWeight.w500,
                         ),
                       ),
                     ),
                     if (isCurrentUser)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(10),
@@ -238,7 +240,7 @@ class StatsLeaderboardWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // Stat Value
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -247,8 +249,8 @@ class StatsLeaderboardWidget extends StatelessWidget {
                 _getStatValue(stats, statType),
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: isTopThree || isCurrentUser 
-                      ? FontWeight.bold 
+                  fontWeight: isTopThree || isCurrentUser
+                      ? FontWeight.bold
                       : FontWeight.w600,
                   color: isTopThree ? _getRankColor(rank) : Colors.grey[700],
                 ),

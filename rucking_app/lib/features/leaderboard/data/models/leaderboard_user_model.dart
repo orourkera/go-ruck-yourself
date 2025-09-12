@@ -32,7 +32,7 @@ class LeaderboardUserModel extends Equatable {
       avatarUrl: json['avatarUrl'] as String?,
       gender: json['gender'] as String?,
       stats: LeaderboardStatsModel.fromJson(json['stats'] ?? {}),
-      lastRuckDate: json['last_ruck_date'] != null 
+      lastRuckDate: json['last_ruck_date'] != null
           ? DateTime.parse(json['last_ruck_date'] as String)
           : null,
       lastRuckLocation: json['location'] as String?,
@@ -128,11 +128,14 @@ class LeaderboardStatsModel extends Equatable {
     return LeaderboardStatsModel(
       totalRucks: safeParseNum(json['rucks'])?.toInt() ?? 0,
       distanceKm: safeParseNum(json['distanceKm'])?.toDouble() ?? 0.0,
-      elevationGainMeters: safeParseNum(json['elevationGainMeters'])?.toDouble() ?? 0.0,
+      elevationGainMeters:
+          safeParseNum(json['elevationGainMeters'])?.toDouble() ?? 0.0,
       caloriesBurned: safeParseNum(json['caloriesBurned'])?.toDouble() ?? 0.0,
       powerPoints: safeParseNum(json['powerPoints'])?.toDouble() ?? 0.0,
-      averageDistanceKm: safeParseNum(json['averageDistanceKm'])?.toDouble() ?? 0.0,
-      averagePaceMinKm: safeParseNum(json['averagePaceMinKm'])?.toDouble() ?? 0.0,
+      averageDistanceKm:
+          safeParseNum(json['averageDistanceKm'])?.toDouble() ?? 0.0,
+      averagePaceMinKm:
+          safeParseNum(json['averagePaceMinKm'])?.toDouble() ?? 0.0,
     );
   }
 

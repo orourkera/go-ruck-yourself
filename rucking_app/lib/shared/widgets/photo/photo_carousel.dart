@@ -9,25 +9,25 @@ import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 class PhotoCarousel extends StatefulWidget {
   /// List of photo URLs to display
   final List<String> photoUrls;
-  
+
   /// Optional callback when a photo is tapped
   final Function(int index)? onPhotoTap;
-  
+
   /// Optional callback when user wants to delete a photo
   final Function(int index)? onDeleteRequest;
-  
+
   /// Whether to show delete buttons for photos
   final bool showDeleteButtons;
-  
+
   /// Height of the carousel
   final double height;
-  
+
   /// Whether this is editable or view-only
   final bool isEditable;
 
-  /// Optional loading state 
+  /// Optional loading state
   final bool isLoading;
-  
+
   /// Constructor for the photo carousel
   const PhotoCarousel({
     Key? key,
@@ -49,21 +49,21 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
   int _currentPage = 0;
   static int _instanceCounter = 0;
   late int _instanceId;
-  
+
   @override
   void initState() {
     super.initState();
     _instanceId = ++_instanceCounter;
-    
+
     // Simple initialization - back to basics
     _pageController = PageController(initialPage: 0, viewportFraction: 0.5);
     _currentPage = 0;
   }
-  
+
   @override
   void didUpdateWidget(PhotoCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Handle case when returning from detail screen
     // This prevents Infinity/NaN calculations when navigating back
     if (oldWidget.photoUrls != widget.photoUrls) {
@@ -76,7 +76,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       }
     }
   }
-  
+
   @override
   void dispose() {
     if (_pageController.hasClients) {
@@ -84,14 +84,14 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
     }
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     // Show loading state
     if (widget.isLoading) {
       return PhotoCarouselSkeleton(height: widget.height);
     }
-    
+
     // Show empty state when there are no photos
     if (widget.photoUrls.isEmpty) {
       return SizedBox(
@@ -104,38 +104,44 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
         ),
       );
     }
-    
+
     return Column(
       children: [
         // Using enhanced PageView for image carousel
         SizedBox(
           height: widget.height,
-          child: widget.photoUrls.isNotEmpty ? PageView.builder(
-            controller: _pageController,
-            itemCount: widget.photoUrls.length,
-            // Remove default padding to eliminate left spacing
-            padEnds: false,
-            pageSnapping: true,
-            // Remove default edge padding
-            clipBehavior: Clip.none,
-            onPageChanged: (int index) {
-              if (mounted && index >= 0 && index < widget.photoUrls.length && index.isFinite && !index.isNaN) {
-                setState(() {
-                  _currentPage = index;
-                });
-              }
-            },
-            itemBuilder: (context, index) {
-              if (index < 0 || index >= widget.photoUrls.length) {
-                return Container(); // Safety fallback
-              }
-              return _buildPhotoItem(context, index);
-            },
-          ) : Container(
-            child: widget.photoUrls.isNotEmpty 
-              ? const Center(child: CircularProgressIndicator())
-              : const Center(child: Text('No photos available')),
-          ),
+          child: widget.photoUrls.isNotEmpty
+              ? PageView.builder(
+                  controller: _pageController,
+                  itemCount: widget.photoUrls.length,
+                  // Remove default padding to eliminate left spacing
+                  padEnds: false,
+                  pageSnapping: true,
+                  // Remove default edge padding
+                  clipBehavior: Clip.none,
+                  onPageChanged: (int index) {
+                    if (mounted &&
+                        index >= 0 &&
+                        index < widget.photoUrls.length &&
+                        index.isFinite &&
+                        !index.isNaN) {
+                      setState(() {
+                        _currentPage = index;
+                      });
+                    }
+                  },
+                  itemBuilder: (context, index) {
+                    if (index < 0 || index >= widget.photoUrls.length) {
+                      return Container(); // Safety fallback
+                    }
+                    return _buildPhotoItem(context, index);
+                  },
+                )
+              : Container(
+                  child: widget.photoUrls.isNotEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : const Center(child: Text('No photos available')),
+                ),
         ),
         const SizedBox(height: 12),
         // Pagination indicators
@@ -150,10 +156,10 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _currentPage == index
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade300,
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade700
+                          : Colors.grey.shade300,
                 ),
               );
             }),
@@ -161,7 +167,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       ],
     );
   }
-  
+
   Widget _buildPhotoItem(BuildContext context, int index) {
     return GestureDetector(
       onTap: () {
@@ -199,7 +205,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
               borderRadius: BorderRadius.circular(0.0), // Square corners
               child: _buildImageWithFallback(context, index),
             ),
-            
+
             // Delete button (if allowed)
             if (widget.showDeleteButtons && widget.isEditable)
               Positioned(
@@ -220,8 +226,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
                           return AlertDialog(
                             title: const Text('Delete Photo'),
                             content: const Text(
-                              'Are you sure you want to delete this photo? This action cannot be undone.'
-                            ),
+                                'Are you sure you want to delete this photo? This action cannot be undone.'),
                             actions: [
                               TextButton(
                                 child: const Text('CANCEL'),
@@ -249,11 +254,11 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       ),
     );
   }
-  
+
   // Helper method to build image with fallback options and better error handling
   Widget _buildImageWithFallback(BuildContext context, int index) {
     final String imageUrl = widget.photoUrls[index];
-    
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(0.0), // Square corners
       child: CachedNetworkImage(
@@ -288,7 +293,7 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
       ),
     );
   }
-  
+
   // Helper method to build error display container
   Widget _buildErrorContainer(BuildContext context, String errorMessage) {
     return Container(

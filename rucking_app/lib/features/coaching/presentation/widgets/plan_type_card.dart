@@ -64,7 +64,8 @@ class PlanTypeCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: planType.color.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -83,7 +84,6 @@ class PlanTypeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              
               Text(
                 planType.name,
                 style: AppTextStyles.titleLarge.copyWith(
@@ -92,7 +92,6 @@ class PlanTypeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              
               Text(
                 planType.description,
                 style: AppTextStyles.bodyMedium.copyWith(
@@ -101,7 +100,6 @@ class PlanTypeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
               Row(
                 children: [
                   const Spacer(),

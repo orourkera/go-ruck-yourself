@@ -12,7 +12,8 @@ class TermsOfServiceScreen extends StatelessWidget {
       children: [
         Text(
           title,
-          style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+          style:
+              AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
@@ -51,7 +52,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               'You must be at least 13 years old to use the App. By using the App, you represent that you meet this age requirement and have the legal capacity to enter into these Terms.',
               context,
             ),
-             _buildSection(
+            _buildSection(
               '3. User Accounts',
               'To use certain features, you must create an account. You agree to:\n\nProvide accurate and current information\nKeep your login credentials secure\nNotify us immediately if you suspect unauthorized access\n\nYou are responsible for all activity that occurs under your account.',
               context,
@@ -61,7 +62,7 @@ class TermsOfServiceScreen extends StatelessWidget {
               'You may use the App solely for personal, non-commercial fitness tracking. You agree not to:\n\nUse the App for any unlawful or harmful purpose\nAttempt to reverse-engineer, decompile, or tamper with the App\nUpload or distribute harmful content, spam, or unauthorized advertising',
               context,
             ),
-             _buildSection(
+            _buildSection(
               '5. Location & Health Data',
               'The App uses GPS data (with your permission) and personal metrics (such as height, weight, and age) to calculate calories burned and track ruck sessions. If you enable Health integration, the App will also access your heart rate data to provide real-time feedback, more accurate calorie estimation, and post-session analytics (average, max, min heart rate).\n\nHeart rate data is stored locally on your device and is never sold or used for advertising. It is not shared with third parties unless you enable cloud sync or backup. All health data access is subject to your explicit consent and can be revoked at any time in your device settings.\n\nThe App and any related blog content are for informational and recreational use only. The App is not a medical device and does not provide medical, clinical, or professional advice. Do not use the App or blog content to diagnose, treat, or prevent any condition. Always consult a qualified healthcare provider before beginning or changing any fitness program. You understand and agree that you use the App at your own risk and you assume all risks of injury that may arise from rucking or fitness activities.',
               context,
@@ -111,4 +112,4 @@ class TermsOfServiceScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

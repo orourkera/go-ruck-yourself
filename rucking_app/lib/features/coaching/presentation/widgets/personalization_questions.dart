@@ -16,13 +16,14 @@ class PersonalizationQuestions extends StatefulWidget {
   });
 
   @override
-  State<PersonalizationQuestions> createState() => _PersonalizationQuestionsState();
+  State<PersonalizationQuestions> createState() =>
+      _PersonalizationQuestionsState();
 }
 
 class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   final PageController _pageController = PageController();
   int _currentQuestionIndex = 0;
-  
+
   PlanPersonalization _personalization = const PlanPersonalization();
 
   List<String> get _questions {
@@ -33,14 +34,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       "Which days usually work best?",
       "What's your biggest challenge to hitting this goal?",
     ];
-    
+
     // Add streak question for Daily Discipline plan
     if (widget.planType?.id == 'daily-discipline') {
       baseQuestions.add("How many days in a row are you aiming for?");
     }
-    
+
     baseQuestions.add("On tough days, what's your minimum viable session?");
-    
+
     return baseQuestions;
   }
 
@@ -56,14 +57,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       SystemChannels.textInput.invokeMethod('TextInput.hide');
       FocusScope.of(context).unfocus();
       FocusManager.instance.primaryFocus?.unfocus();
-      
+
       // Additional fallback methods
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           FocusScope.of(context).requestFocus(FocusNode());
         }
       });
-      
+
       Future.delayed(const Duration(milliseconds: 200), () {
         if (mounted) {
           SystemChannels.textInput.invokeMethod('TextInput.hide');
@@ -80,7 +81,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   void _nextQuestion() {
     // Dismiss keyboard before navigation
     _dismissKeyboard();
-    
+
     if (_currentQuestionIndex < _questions.length - 1) {
       setState(() {
         _currentQuestionIndex++;
@@ -102,7 +103,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   void _previousQuestion() {
     // Dismiss keyboard before navigation
     _dismissKeyboard();
-    
+
     if (_currentQuestionIndex > 0) {
       setState(() {
         _currentQuestionIndex--;
@@ -122,14 +123,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       _buildPreferredDaysQuestion(),
       _buildChallengesQuestion(),
     ];
-    
+
     // Add streak question for Daily Discipline plan
     if (widget.planType?.id == 'daily-discipline') {
       pages.add(_buildStreakQuestion());
     }
-    
+
     pages.add(_buildMinimumSessionQuestion());
-    
+
     return pages;
   }
 
@@ -137,23 +138,27 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     final isDailyDiscipline = widget.planType?.id == 'daily-discipline';
     final streakQuestionIndex = isDailyDiscipline ? 5 : -1;
     final minSessionIndex = isDailyDiscipline ? 6 : 5;
-    
+
     switch (_currentQuestionIndex) {
       case 0:
         return _personalization.why != null && _personalization.why!.isNotEmpty;
       case 1:
-        return _personalization.successDefinition != null && _personalization.successDefinition!.isNotEmpty;
+        return _personalization.successDefinition != null &&
+            _personalization.successDefinition!.isNotEmpty;
       case 2:
         return _personalization.trainingDaysPerWeek != null;
       case 3:
-        return _personalization.preferredDays != null && _personalization.preferredDays!.isNotEmpty;
+        return _personalization.preferredDays != null &&
+            _personalization.preferredDays!.isNotEmpty;
       case 4:
-        return _personalization.challenges != null && _personalization.challenges!.isNotEmpty;
+        return _personalization.challenges != null &&
+            _personalization.challenges!.isNotEmpty;
       case 5:
         if (isDailyDiscipline) {
           // This is the streak question - require either daily streak or flexible frequency
           return (_personalization.streakTargetDays != null) ||
-                 (_personalization.streakTargetRucks != null && _personalization.streakTimeframeDays != null);
+              (_personalization.streakTargetRucks != null &&
+                  _personalization.streakTimeframeDays != null);
         } else {
           // This is the minimum session question - always allow proceed
           return true;
@@ -188,55 +193,58 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               : null,
         ),
         body: Column(
-        children: [
-          // Progress indicator
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: LinearProgressIndicator(
-              value: (_currentQuestionIndex + 1) / _questions.length,
-              backgroundColor: AppColors.primary.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          children: [
+            // Progress indicator
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: LinearProgressIndicator(
+                value: (_currentQuestionIndex + 1) / _questions.length,
+                backgroundColor: AppColors.primary.withOpacity(0.2),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
             ),
-          ),
-          
-          // Questions
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: _buildQuestionPages(),
+
+            // Questions
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: _buildQuestionPages(),
+              ),
             ),
-          ),
-          
-          // Next/Continue button
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _canProceed() ? _nextQuestion : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+
+            // Next/Continue button
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _canProceed() ? _nextQuestion : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: Text(
-                  _currentQuestionIndex == _questions.length - 1 ? 'Complete' : 'Next',
-                  style: AppTextStyles.titleMedium,
+                  child: Text(
+                    _currentQuestionIndex == _questions.length - 1
+                        ? 'Complete'
+                        : 'Next',
+                    style: AppTextStyles.titleMedium,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
-  Widget _buildQuestionCard({required String question, required Widget content}) {
+  Widget _buildQuestionCard(
+      {required String question, required Widget content}) {
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -251,7 +259,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
             const SizedBox(height: 24),
             content,
-            const SizedBox(height: 100), // Add extra space at bottom for keyboard
+            const SizedBox(
+                height: 100), // Add extra space at bottom for keyboard
           ],
         ),
       ),
@@ -268,7 +277,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             spacing: 8,
             runSpacing: 8,
             children: PlanPersonalization.whySuggestions.map((suggestion) {
-              final isSelected = _personalization.why?.contains(suggestion) ?? false;
+              final isSelected =
+                  _personalization.why?.contains(suggestion) ?? false;
               return FilterChip(
                 label: Text(suggestion),
                 selected: isSelected,
@@ -277,13 +287,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   setState(() {
                     final currentWhy = _personalization.why ?? [];
                     List<String> newWhy;
-                    
+
                     if (selected) {
                       newWhy = [...currentWhy, suggestion];
                     } else {
-                      newWhy = currentWhy.where((w) => w != suggestion).toList();
+                      newWhy =
+                          currentWhy.where((w) => w != suggestion).toList();
                     }
-                    
+
                     _personalization = _personalization.copyWith(
                       why: newWhy,
                     );
@@ -295,7 +306,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             }).toList(),
           ),
           const SizedBox(height: 16),
-          
+
           // Custom text input
           TextField(
             autofocus: false,
@@ -327,7 +338,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             onTap: () {
               // Clear chip selection when typing custom text
               final currentWhy = _personalization.why ?? [];
-              final hasChipSelections = currentWhy.any((w) => PlanPersonalization.whySuggestions.contains(w));
+              final hasChipSelections = currentWhy
+                  .any((w) => PlanPersonalization.whySuggestions.contains(w));
               if (hasChipSelections) {
                 setState(() {
                   _personalization = _personalization.copyWith(why: []);
@@ -354,7 +366,6 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 16),
-          
           TextField(
             autofocus: false,
             textCapitalization: TextCapitalization.sentences,
@@ -394,12 +405,12 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 24),
-          
           Column(
             children: [
               // Display current selection
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -417,7 +428,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Slider
               Slider(
                 value: (_personalization.trainingDaysPerWeek ?? 4).toDouble(),
@@ -435,19 +446,31 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   });
                 },
               ),
-              
+
               // Labels under slider
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('2', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
-                    Text('3', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
-                    Text('4', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
-                    Text('5', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
-                    Text('6', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
-                    Text('7', style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[600])),
+                    Text('2',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.grey[600])),
+                    Text('3',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.grey[600])),
+                    Text('4',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.grey[600])),
+                    Text('5',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.grey[600])),
+                    Text('6',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.grey[600])),
+                    Text('7',
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -471,12 +494,12 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 16),
-          
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: PlanPersonalization.weekdays.map((day) {
-              final isSelected = _personalization.preferredDays?.contains(day) ?? false;
+              final isSelected =
+                  _personalization.preferredDays?.contains(day) ?? false;
               return FilterChip(
                 label: Text(day),
                 selected: isSelected,
@@ -484,13 +507,13 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   setState(() {
                     final currentDays = _personalization.preferredDays ?? [];
                     List<String> newDays;
-                    
+
                     if (selected) {
                       newDays = [...currentDays, day];
                     } else {
                       newDays = currentDays.where((d) => d != day).toList();
                     }
-                    
+
                     _personalization = _personalization.copyWith(
                       preferredDays: newDays,
                     );
@@ -519,12 +542,12 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 16),
-          
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: PlanPersonalization.challengeSuggestions.map((challenge) {
-              final isSelected = _personalization.challenges?.contains(challenge) ?? false;
+              final isSelected =
+                  _personalization.challenges?.contains(challenge) ?? false;
               return FilterChip(
                 label: Text(challenge),
                 selected: isSelected,
@@ -532,13 +555,15 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   setState(() {
                     final currentChallenges = _personalization.challenges ?? [];
                     List<String> newChallenges;
-                    
+
                     if (selected) {
                       newChallenges = [...currentChallenges, challenge];
                     } else {
-                      newChallenges = currentChallenges.where((c) => c != challenge).toList();
+                      newChallenges = currentChallenges
+                          .where((c) => c != challenge)
+                          .toList();
                     }
-                    
+
                     _personalization = _personalization.copyWith(
                       challenges: newChallenges,
                     );
@@ -549,7 +574,6 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               );
             }).toList(),
           ),
-          
           const SizedBox(height: 16),
           TextField(
             autofocus: false,
@@ -593,7 +617,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Daily streak option
           Text(
             'Daily streak (every day):',
@@ -602,14 +626,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 12,
             runSpacing: 12,
             children: [7, 14, 21, 30].map((days) {
-              final isSelected = _personalization.streakTargetDays == days && 
-                                 _personalization.streakTargetRucks == null;
+              final isSelected = _personalization.streakTargetDays == days &&
+                  _personalization.streakTargetRucks == null;
               return GestureDetector(
                 onTap: () {
                   _dismissKeyboard();
@@ -622,20 +646,25 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(25),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                      color:
+                          isSelected ? AppColors.primary : Colors.grey.shade300,
                       width: 2,
                     ),
                   ),
                   child: Text(
-                    days == 7 ? '1 week' : 
-                    days == 14 ? '2 weeks' : 
-                    days == 21 ? '3 weeks' : 
-                    '1 month',
+                    days == 7
+                        ? '1 week'
+                        : days == 14
+                            ? '2 weeks'
+                            : days == 21
+                                ? '3 weeks'
+                                : '1 month',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: isSelected ? Colors.white : Colors.black,
                       fontWeight: FontWeight.w600,
@@ -645,9 +674,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               );
             }).toList(),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Flexible frequency option
           Text(
             'Or flexible frequency:',
@@ -656,7 +685,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 12,
@@ -667,8 +696,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               {'rucks': 10, 'days': 21, 'label': '10 rucks in 3 weeks'},
               {'rucks': 12, 'days': 21, 'label': '12 rucks in 3 weeks'},
             ].map((option) {
-              final isSelected = _personalization.streakTargetRucks == option['rucks'] &&
-                                 _personalization.streakTimeframeDays == option['days'];
+              final isSelected =
+                  _personalization.streakTargetRucks == option['rucks'] &&
+                      _personalization.streakTimeframeDays == option['days'];
               return GestureDetector(
                 onTap: () {
                   _dismissKeyboard();
@@ -681,12 +711,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(25),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                      color:
+                          isSelected ? AppColors.primary : Colors.grey.shade300,
                       width: 2,
                     ),
                   ),
@@ -701,9 +733,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               );
             }).toList(),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Custom inputs
           Row(
             children: [
@@ -728,7 +760,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                         _personalization = _personalization.copyWith(
                           streakTargetDays: null,
                           streakTargetRucks: rucks,
-                          streakTimeframeDays: _personalization.streakTimeframeDays ?? 30,
+                          streakTimeframeDays:
+                              _personalization.streakTimeframeDays ?? 30,
                         );
                       });
                     }
@@ -758,7 +791,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                       setState(() {
                         _personalization = _personalization.copyWith(
                           streakTargetDays: null,
-                          streakTargetRucks: _personalization.streakTargetRucks ?? 15,
+                          streakTargetRucks:
+                              _personalization.streakTargetRucks ?? 15,
                           streakTimeframeDays: days,
                         );
                       });
@@ -787,13 +821,11 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
           ),
           const SizedBox(height: 24),
-          
           Text(
             'Minimum session length: ${_personalization.minimumSessionMinutes ?? 15} minutes',
             style: AppTextStyles.titleMedium,
           ),
           const SizedBox(height: 8),
-          
           Slider(
             value: (_personalization.minimumSessionMinutes ?? 15).toDouble(),
             min: 10,
@@ -809,9 +841,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               });
             },
           ),
-          
           const SizedBox(height: 24),
-          
           Row(
             children: [
               Checkbox(

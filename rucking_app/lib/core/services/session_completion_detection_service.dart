@@ -14,44 +14,47 @@ import 'package:rucking_app/core/models/location_point.dart';
 
 /// Service for detecting when a user has likely stopped rucking and should complete their session
 class SessionCompletionDetectionService {
-  static final SessionCompletionDetectionService _instance = SessionCompletionDetectionService._internal();
+  static final SessionCompletionDetectionService _instance =
+      SessionCompletionDetectionService._internal();
   factory SessionCompletionDetectionService() => _instance;
   SessionCompletionDetectionService._internal();
 
   // Monitoring state
   bool _isMonitoring = false;
   Timer? _monitoringTimer;
-  
+
   // Sensor data streams
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
-  
+
   // Heart rate data (if available from HealthKit/Health Connect)
   double? _currentHeartRate;
   double? _restingHeartRate;
   double? _workoutAverageHeartRate;
-  
+
   // Movement detection
   List<double> _recentMovementMagnitudes = [];
   DateTime? _lastSignificantMovement;
-  
+
   // GPS tracking
   LocationPoint? _lastKnownPosition;
   DateTime? _lastPositionUpdate;
   double _totalDistanceAtLastCheck = 0.0;
-  
+
   // Session context
   DateTime? _sessionStartTime;
   String? _currentSessionId;
   bool _hasHeartRateData = false;
-  
+
   // Detection thresholds (personalized over time)
-  double _movementThreshold = 0.15; // g-force threshold for stationary detection
+  double _movementThreshold =
+      0.15; // g-force threshold for stationary detection
   double _heartRateDropThreshold = 20.0; // BPM drop from workout average
   int _stationaryTimeThreshold = 300; // 5 minutes in seconds
   int _confirmationTimeThreshold = 420; // 7 minutes in seconds
   int _autoCompleteTimeThreshold = 600; // 10 minutes in seconds
-  final Duration _minSessionDurationForIdle = const Duration(minutes: 10); // avoid early prompts
+  final Duration _minSessionDurationForIdle =
+      const Duration(minutes: 10); // avoid early prompts
 
   // Smoothed GPS speed (EWMA) and sampling for robust idle detection
   double _speedEwmaMs = 0.0;
@@ -61,8 +64,9 @@ class SessionCompletionDetectionService {
 
   // Require consecutive stationary windows to engage detection
   int _consecutiveStationaryWindows = 0;
-  final int _requiredStationaryWindows = 3; // 3 x 30s = 90s stability before prompting
-  
+  final int _requiredStationaryWindows =
+      3; // 3 x 30s = 90s stability before prompting
+
   // Notification state
   bool _hasShownInitialPrompt = false;
   bool _hasShownConfirmationPrompt = false;
@@ -77,35 +81,36 @@ class SessionCompletionDetectionService {
   /// Start monitoring for session completion
   Future<void> startMonitoring() async {
     if (_isMonitoring) return;
-    
+
     try {
-      AppLogger.info('[SESSION_COMPLETION] Starting session completion monitoring');
-      
+      AppLogger.info(
+          '[SESSION_COMPLETION] Starting session completion monitoring');
+
       _isMonitoring = true;
       _resetDetectionState();
-      
+
       // Initialize session context
       final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
       final currentState = activeSessionBloc.state;
-      
+
       if (currentState is ActiveSessionRunning) {
         _sessionStartTime = currentState.originalSessionStartTimeUtc;
         _totalDistanceAtLastCheck = currentState.distanceKm;
         // Capture session ID for database notifications and payload routing
         _currentSessionId = currentState.sessionId;
-        AppLogger.info('[SESSION_COMPLETION] Session started at: $_sessionStartTime');
+        AppLogger.info(
+            '[SESSION_COMPLETION] Session started at: $_sessionStartTime');
       }
-      
+
       // Start sensor monitoring
       await _startSensorMonitoring();
-      
+
       // Start periodic analysis
       _monitoringTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         _analyzeSessionCompletion();
       });
-      
+
       AppLogger.info('[SESSION_COMPLETION] Monitoring started successfully');
-      
     } catch (e) {
       AppLogger.error('[SESSION_COMPLETION] Failed to start monitoring: $e');
       _isMonitoring = false;
@@ -115,19 +120,20 @@ class SessionCompletionDetectionService {
   /// Stop monitoring
   void stopMonitoring() {
     if (!_isMonitoring) return;
-    
-    AppLogger.info('[SESSION_COMPLETION] Stopping session completion monitoring');
-    
+
+    AppLogger.info(
+        '[SESSION_COMPLETION] Stopping session completion monitoring');
+
     _isMonitoring = false;
     _monitoringTimer?.cancel();
     _monitoringTimer = null;
-    
+
     _accelerometerSubscription?.cancel();
     _accelerometerSubscription = null;
-    
+
     _gyroscopeSubscription?.cancel();
     _gyroscopeSubscription = null;
-    
+
     _resetDetectionState();
   }
 
@@ -135,60 +141,66 @@ class SessionCompletionDetectionService {
   Future<void> _startSensorMonitoring() async {
     try {
       // Monitor accelerometer for movement detection
-      _accelerometerSubscription = accelerometerEvents.listen((AccelerometerEvent event) {
-        final magnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z) - 9.8; // Remove gravity
+      _accelerometerSubscription =
+          accelerometerEvents.listen((AccelerometerEvent event) {
+        final magnitude =
+            sqrt(event.x * event.x + event.y * event.y + event.z * event.z) -
+                9.8; // Remove gravity
         final adjustedMagnitude = magnitude.abs();
-        
+
         // Track recent movement magnitudes (last 2 minutes)
         _recentMovementMagnitudes.add(adjustedMagnitude);
-        if (_recentMovementMagnitudes.length > 240) { // 2 minutes at ~2Hz
+        if (_recentMovementMagnitudes.length > 240) {
+          // 2 minutes at ~2Hz
           _recentMovementMagnitudes.removeAt(0);
         }
-        
+
         // Check if this qualifies as significant movement
         if (adjustedMagnitude > _movementThreshold) {
           _lastSignificantMovement = DateTime.now();
         }
       });
-      
+
       // Monitor gyroscope for rotation detection
       _gyroscopeSubscription = gyroscopeEvents.listen((GyroscopeEvent event) {
-        final rotationMagnitude = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-        
+        final rotationMagnitude =
+            sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+
         // Significant rotation also counts as movement
-        if (rotationMagnitude > 0.2) { // radians/second
+        if (rotationMagnitude > 0.2) {
+          // radians/second
           _lastSignificantMovement = DateTime.now();
         }
       });
-      
+
       AppLogger.info('[SESSION_COMPLETION] Sensor monitoring started');
-      
     } catch (e) {
-      AppLogger.error('[SESSION_COMPLETION] Failed to start sensor monitoring: $e');
+      AppLogger.error(
+          '[SESSION_COMPLETION] Failed to start sensor monitoring: $e');
     }
   }
 
   /// Analyze current conditions for session completion
   Future<void> _analyzeSessionCompletion() async {
     if (!_isMonitoring) return;
-    
+
     try {
       final now = DateTime.now();
-      
+
       // Get current session state
       final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
       final currentState = activeSessionBloc.state;
-      
+
       if (currentState is! ActiveSessionRunning) {
         stopMonitoring();
         return;
       }
-      
+
       final session = currentState;
-      
+
       // Update GPS data
       await _updateGPSData();
-      
+
       // Update smoothed speed from distance deltas
       _updateSmoothedSpeed(now);
 
@@ -203,49 +215,56 @@ class SessionCompletionDetectionService {
 
       // Check movement criteria
       final isStationary = _checkMovementCriteria(now);
-      
+
       // Check heart rate criteria (if available)
       final heartRateIndicatesRest = _checkHeartRateCriteria();
-      
+
       // Check GPS criteria
       final gpsIndicatesStationary = _checkGPSCriteria();
-      
+
       // Determine detection confidence
       final detectionConfidence = _calculateDetectionConfidence(
-        isStationary, 
-        heartRateIndicatesRest, 
-        gpsIndicatesStationary
-      );
-      
-      AppLogger.debug('[SESSION_COMPLETION] Detection confidence: $detectionConfidence');
-      
+          isStationary, heartRateIndicatesRest, gpsIndicatesStationary);
+
+      AppLogger.debug(
+          '[SESSION_COMPLETION] Detection confidence: $detectionConfidence');
+
       // Require consecutive stability windows to avoid flapping
       if (isStationary && gpsIndicatesStationary) {
-        _consecutiveStationaryWindows = (_consecutiveStationaryWindows + 1).clamp(0, 1000);
+        _consecutiveStationaryWindows =
+            (_consecutiveStationaryWindows + 1).clamp(0, 1000);
       } else {
         _consecutiveStationaryWindows = 0;
       }
 
       // Cooldown / rearm gating to avoid over-triggering
-      final inCooldown = _lastPromptAt != null && now.difference(_lastPromptAt!).compareTo(_promptCooldown) < 0;
+      final inCooldown = _lastPromptAt != null &&
+          now.difference(_lastPromptAt!).compareTo(_promptCooldown) < 0;
       if (_rearmRequired) {
         // Rearm when distance increases meaningfully after last prompt
-        final double distanceSincePrompt = _distanceAtLastPrompt == null ? 0.0 : (session.distanceKm - _distanceAtLastPrompt!);
-        if (distanceSincePrompt >= 0.05) { // 50 meters
+        final double distanceSincePrompt = _distanceAtLastPrompt == null
+            ? 0.0
+            : (session.distanceKm - _distanceAtLastPrompt!);
+        if (distanceSincePrompt >= 0.05) {
+          // 50 meters
           _rearmRequired = false;
           _resetDetectionState();
         }
       }
 
       // Handle detection state transitions
-      final hasStableWindows = _consecutiveStationaryWindows >= _requiredStationaryWindows;
-      if (!inCooldown && !_rearmRequired && hasStableWindows && detectionConfidence >= 0.6) {
-        await _handleDetectionStateChange(now, detectionConfidence, session.distanceKm);
+      final hasStableWindows =
+          _consecutiveStationaryWindows >= _requiredStationaryWindows;
+      if (!inCooldown &&
+          !_rearmRequired &&
+          hasStableWindows &&
+          detectionConfidence >= 0.6) {
+        await _handleDetectionStateChange(
+            now, detectionConfidence, session.distanceKm);
       } else {
         // Reset detection if conditions no longer met
         _resetDetectionState();
       }
-      
     } catch (e) {
       AppLogger.error('[SESSION_COMPLETION] Analysis error: $e');
     }
@@ -255,68 +274,69 @@ class SessionCompletionDetectionService {
   bool _checkMovementCriteria(DateTime now) {
     // Check time since last significant movement
     if (_lastSignificantMovement == null) return false;
-    
+
     final timeSinceMovement = now.difference(_lastSignificantMovement!);
-    
+
     // Check recent movement magnitude average
     if (_recentMovementMagnitudes.isNotEmpty) {
-      final avgMovement = _recentMovementMagnitudes.reduce((a, b) => a + b) / _recentMovementMagnitudes.length;
-      
+      final avgMovement = _recentMovementMagnitudes.reduce((a, b) => a + b) /
+          _recentMovementMagnitudes.length;
+
       // User is stationary if low movement for required time
-      return avgMovement < _movementThreshold && 
-             timeSinceMovement.inSeconds >= _stationaryTimeThreshold;
+      return avgMovement < _movementThreshold &&
+          timeSinceMovement.inSeconds >= _stationaryTimeThreshold;
     }
-    
+
     return timeSinceMovement.inSeconds >= _stationaryTimeThreshold;
   }
 
   /// Check heart rate criteria (if available)
   bool? _checkHeartRateCriteria() {
     if (!_hasHeartRateData || _currentHeartRate == null) return null;
-    
+
     // Compare to resting heart rate
     if (_restingHeartRate != null) {
       final heartRateRange = _currentHeartRate! - _restingHeartRate!;
       return heartRateRange < 25.0; // Close to resting rate
     }
-    
+
     // Compare to workout average
     if (_workoutAverageHeartRate != null) {
       final dropFromAverage = _workoutAverageHeartRate! - _currentHeartRate!;
       return dropFromAverage >= _heartRateDropThreshold;
     }
-    
+
     return null;
   }
 
   /// Check GPS-based criteria
   bool _checkGPSCriteria() {
     if (_lastKnownPosition == null || _lastPositionUpdate == null) return false;
-    
+
     final now = DateTime.now();
     final timeSinceUpdate = now.difference(_lastPositionUpdate!);
-    
+
     // If GPS data is stale, can't use it for detection
     if (timeSinceUpdate.inMinutes > 2) return false;
-    
+
     // Check if distance accumulation has stopped
     final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
     final currentState = activeSessionBloc.state;
-    
+
     if (currentState is ActiveSessionRunning) {
       final currentDistance = currentState.distanceKm;
       final distanceChange = currentDistance - _totalDistanceAtLastCheck;
-      
+
       // Update for next check
       _totalDistanceAtLastCheck = currentDistance;
-      
+
       // No significant distance change indicates stationary (less than 10m per 30s)
       final distanceStopped = distanceChange < 0.01;
       // Also require smoothed speed below threshold to reduce false positives
       final speedStopped = _speedEwmaMs < 0.5; // < 0.5 m/s (~1.1 mph)
       return distanceStopped && speedStopped;
     }
-    
+
     return false;
   }
 
@@ -329,11 +349,14 @@ class SessionCompletionDetectionService {
 
       final currentKm = currentState.distanceKm;
       if (_lastDistanceSampleTime != null && _lastDistanceSampleKm != null) {
-        final dt = now.difference(_lastDistanceSampleTime!).inMilliseconds / 1000.0;
-        if (dt >= 5.0) { // only sample when >=5s elapsed to reduce noise
+        final dt =
+            now.difference(_lastDistanceSampleTime!).inMilliseconds / 1000.0;
+        if (dt >= 5.0) {
+          // only sample when >=5s elapsed to reduce noise
           final dk = (currentKm - _lastDistanceSampleKm!) * 1000.0; // meters
           final instSpeed = dk > 0 && dt > 0 ? (dk / dt) : 0.0; // m/s
-          _speedEwmaMs = _ewmaAlpha * instSpeed + (1 - _ewmaAlpha) * _speedEwmaMs;
+          _speedEwmaMs =
+              _ewmaAlpha * instSpeed + (1 - _ewmaAlpha) * _speedEwmaMs;
           _lastDistanceSampleTime = now;
           _lastDistanceSampleKm = currentKm;
           return;
@@ -348,16 +371,17 @@ class SessionCompletionDetectionService {
   }
 
   /// Calculate overall detection confidence (0.0 - 1.0)
-  double _calculateDetectionConfidence(bool isStationary, bool? heartRateRest, bool gpsStationary) {
+  double _calculateDetectionConfidence(
+      bool isStationary, bool? heartRateRest, bool gpsStationary) {
     double confidence = 0.0;
     int criteriaCount = 0;
-    
+
     // Movement criteria (weight: 0.4)
     if (isStationary) {
       confidence += 0.4;
     }
     criteriaCount++;
-    
+
     // Heart rate criteria (weight: 0.3)
     if (heartRateRest != null) {
       if (heartRateRest) {
@@ -365,54 +389,53 @@ class SessionCompletionDetectionService {
       }
       criteriaCount++;
     }
-    
+
     // GPS criteria (weight: 0.3)
     if (gpsStationary) {
       confidence += 0.3;
     }
     criteriaCount++;
-    
+
     // If we don't have heart rate, redistribute its weight to movement
     if (heartRateRest == null && isStationary) {
       confidence += 0.15; // Half of heart rate weight
     }
-    
+
     return confidence;
   }
 
   /// Handle state changes in detection
-  Future<void> _handleDetectionStateChange(DateTime now, double confidence, double currentDistance) async {
+  Future<void> _handleDetectionStateChange(
+      DateTime now, double confidence, double currentDistance) async {
     // First detection
     if (_firstDetectionTime == null) {
       _firstDetectionTime = now;
-      AppLogger.info('[SESSION_COMPLETION] First detection at: $now (confidence: $confidence)');
+      AppLogger.info(
+          '[SESSION_COMPLETION] First detection at: $now (confidence: $confidence)');
       return;
     }
-    
+
     final detectionDuration = now.difference(_firstDetectionTime!);
-    
+
     // Initial prompt (3-5 minutes of detection)
-    if (!_hasShownInitialPrompt && 
-        detectionDuration.inSeconds >= _stationaryTimeThreshold && 
+    if (!_hasShownInitialPrompt &&
+        detectionDuration.inSeconds >= _stationaryTimeThreshold &&
         confidence >= 0.7) {
-      
       await _showSessionCompletionPrompt('initial', currentDistance);
       _hasShownInitialPrompt = true;
     }
-    
+
     // Confirmation prompt (7 minutes of detection)
-    if (!_hasShownConfirmationPrompt && 
-        detectionDuration.inSeconds >= _confirmationTimeThreshold && 
+    if (!_hasShownConfirmationPrompt &&
+        detectionDuration.inSeconds >= _confirmationTimeThreshold &&
         confidence >= 0.8) {
-      
       await _showSessionCompletionPrompt('confirmation', currentDistance);
       _hasShownConfirmationPrompt = true;
     }
-    
+
     // Auto-complete suggestion (10 minutes of detection)
-    if (detectionDuration.inSeconds >= _autoCompleteTimeThreshold && 
+    if (detectionDuration.inSeconds >= _autoCompleteTimeThreshold &&
         confidence >= 0.9) {
-      
       await _showSessionCompletionPrompt('auto_complete', currentDistance);
       // Reset to prevent repeated notifications
       _resetDetectionState();
@@ -420,34 +443,38 @@ class SessionCompletionDetectionService {
   }
 
   /// Show session completion notification
-  Future<void> _showSessionCompletionPrompt(String promptType, double distance) async {
+  Future<void> _showSessionCompletionPrompt(
+      String promptType, double distance) async {
     try {
       final firebaseMessaging = GetIt.instance<FirebaseMessagingService>();
-      
+
       String title;
       String body;
       int notificationId;
-      
+
       switch (promptType) {
         case 'initial':
           title = 'Finish your ruck?';
-          body = 'You\'ve been stationary for a few minutes. Ready to complete your ${distance.toStringAsFixed(1)} km session?';
+          body =
+              'You\'ve been stationary for a few minutes. Ready to complete your ${distance.toStringAsFixed(1)} km session?';
           notificationId = 10001;
           break;
         case 'confirmation':
           title = 'Still rucking?';
-          body = 'Tap to complete your session or continue if you\'re still active.';
+          body =
+              'Tap to complete your session or continue if you\'re still active.';
           notificationId = 10002;
           break;
         case 'auto_complete':
           title = 'Complete Session?';
-          body = 'You\'ve been inactive for 10+ minutes. Tap to finish your ${distance.toStringAsFixed(1)} km ruck.';
+          body =
+              'You\'ve been inactive for 10+ minutes. Tap to finish your ${distance.toStringAsFixed(1)} km ruck.';
           notificationId = 10003;
           break;
         default:
           return;
       }
-      
+
       // Build a JSON payload so the tap handler can route correctly
       final payloadData = {
         'type': 'session_completion_prompt',
@@ -456,7 +483,7 @@ class SessionCompletionDetectionService {
         if (_currentSessionId != null) 'session_id': _currentSessionId,
         'prompt_type': promptType,
       };
-      
+
       // Show local notification (works on phone and watch)
       await firebaseMessaging.showNotification(
         id: notificationId,
@@ -464,7 +491,7 @@ class SessionCompletionDetectionService {
         body: body,
         payload: payloadData,
       );
-      
+
       // Also create database notification for consistency
       await _createDatabaseNotification(
         type: 'session_completion_prompt',
@@ -473,14 +500,13 @@ class SessionCompletionDetectionService {
         sessionId: _currentSessionId,
         promptType: promptType,
       );
-      
+
       AppLogger.info('[SESSION_COMPLETION] Showed $promptType notification');
 
       // Record cooldown and require rearm before next prompt
       _lastPromptAt = DateTime.now();
       _rearmRequired = true;
       _distanceAtLastPrompt = distance;
-      
     } catch (e) {
       AppLogger.error('[SESSION_COMPLETION] Failed to show notification: $e');
     }
@@ -491,7 +517,7 @@ class SessionCompletionDetectionService {
     try {
       final locationService = GetIt.instance<LocationService>();
       final position = await locationService.getCurrentLocation();
-      
+
       if (position != null) {
         _lastKnownPosition = position;
         _lastPositionUpdate = DateTime.now();
@@ -528,24 +554,26 @@ class SessionCompletionDetectionService {
     int? stationaryTimeThreshold,
   }) {
     if (movementThreshold != null) _movementThreshold = movementThreshold;
-    if (heartRateDropThreshold != null) _heartRateDropThreshold = heartRateDropThreshold;
-    if (stationaryTimeThreshold != null) _stationaryTimeThreshold = stationaryTimeThreshold;
-    
+    if (heartRateDropThreshold != null)
+      _heartRateDropThreshold = heartRateDropThreshold;
+    if (stationaryTimeThreshold != null)
+      _stationaryTimeThreshold = stationaryTimeThreshold;
+
     AppLogger.info('[SESSION_COMPLETION] Thresholds personalized');
   }
 
   /// Get current monitoring status
   bool get isMonitoring => _isMonitoring;
-  
+
   /// Get detection state for debugging
   Map<String, dynamic> get debugInfo => {
-    'isMonitoring': _isMonitoring,
-    'hasHeartRateData': _hasHeartRateData,
-    'lastSignificantMovement': _lastSignificantMovement?.toIso8601String(),
-    'inactivityDuration': _lastSignificantMovement != null 
-      ? DateTime.now().difference(_lastSignificantMovement!).inMinutes
-      : null,
-  };
+        'isMonitoring': _isMonitoring,
+        'hasHeartRateData': _hasHeartRateData,
+        'lastSignificantMovement': _lastSignificantMovement?.toIso8601String(),
+        'inactivityDuration': _lastSignificantMovement != null
+            ? DateTime.now().difference(_lastSignificantMovement!).inMinutes
+            : null,
+      };
 
   /// Create database notification record for consistency with other notifications
   Future<void> _createDatabaseNotification({
@@ -557,12 +585,13 @@ class SessionCompletionDetectionService {
   }) async {
     try {
       if (sessionId == null) {
-        AppLogger.warning('[SESSION_COMPLETION] Cannot create notification - no session ID');
+        AppLogger.warning(
+            '[SESSION_COMPLETION] Cannot create notification - no session ID');
         return;
       }
-      
+
       final apiClient = GetIt.instance<ApiClient>();
-      
+
       await apiClient.post('/notifications', {
         'type': type,
         'title': title,
@@ -573,10 +602,12 @@ class SessionCompletionDetectionService {
           'notification_source': 'session_completion_detection'
         },
       });
-      
-      AppLogger.info('[SESSION_COMPLETION] Created database notification record');
+
+      AppLogger.info(
+          '[SESSION_COMPLETION] Created database notification record');
     } catch (e) {
-      AppLogger.error('[SESSION_COMPLETION] Failed to create database notification: $e');
+      AppLogger.error(
+          '[SESSION_COMPLETION] Failed to create database notification: $e');
       // Don't throw - notification failure shouldn't break session completion detection
     }
   }

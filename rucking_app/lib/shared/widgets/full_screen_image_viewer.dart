@@ -13,7 +13,8 @@ class FullScreenImageViewer extends StatelessWidget {
     this.imageUrl,
     this.imageFile,
     this.heroTag,
-  }) : assert(imageUrl != null || imageFile != null, 'Either imageUrl or imageFile must be provided');
+  }) : assert(imageUrl != null || imageFile != null,
+            'Either imageUrl or imageFile must be provided');
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +34,12 @@ class FullScreenImageViewer extends StatelessWidget {
         minScale: PhotoViewComputedScale.contained,
         maxScale: PhotoViewComputedScale.covered * 3.0,
         initialScale: PhotoViewComputedScale.contained,
-        heroAttributes: heroTag != null 
-            ? PhotoViewHeroAttributes(tag: heroTag!)
-            : null,
+        heroAttributes:
+            heroTag != null ? PhotoViewHeroAttributes(tag: heroTag!) : null,
         loadingBuilder: (context, event) => Center(
           child: CircularProgressIndicator(
-            value: event == null 
-                ? 0 
+            value: event == null
+                ? 0
                 : event.cumulativeBytesLoaded / (event.expectedTotalBytes ?? 1),
             color: Colors.white,
           ),

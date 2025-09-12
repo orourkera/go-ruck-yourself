@@ -17,7 +17,7 @@ class DifficultyBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _getDifficultyColor(difficulty);
     final backgroundColor = color.withOpacity(0.1);
-    
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 6 : 8,
@@ -66,7 +66,7 @@ String getDifficultyDisplayText(String? difficulty) {
   if (difficulty == null || difficulty.isEmpty) {
     return 'Unknown';
   }
-  
+
   switch (difficulty.toLowerCase()) {
     case 'easy':
       return 'Easy';

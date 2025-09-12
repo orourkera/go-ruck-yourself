@@ -17,9 +17,9 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
   SocialBloc({
     required SocialRepository socialRepository,
     required AuthBloc authBloc,
-  }) : _socialRepository = socialRepository,
-       _authBloc = authBloc,
-       super(SocialInitial()) {
+  })  : _socialRepository = socialRepository,
+        _authBloc = authBloc,
+        super(SocialInitial()) {
     on<LoadRuckLikes>(_onLoadRuckLikes);
     on<ToggleRuckLike>(_onToggleRuckLike);
     on<CheckUserLikeStatus>(_onCheckUserLikeStatus);
@@ -37,11 +37,11 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     emit(LikesLoading());
-    
+
     try {
       final likes = await _socialRepository.getRuckLikes(event.ruckId);
       final hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
-      
+
       emit(LikesLoaded(
         likes: likes,
         userHasLiked: hasLiked,
@@ -63,13 +63,13 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
   ) async {
     try {
       final int? ruckId = event.ruckId;
-      
+
       // Early return if ruckId is null - cannot process like toggle
       if (ruckId == null) {
         emit(LikeActionError('Cannot toggle like: Invalid session ID', -1));
         return;
       }
-      
+
       // Get current user
       final authState = _authBloc.state;
       if (authState is! Authenticated) {
@@ -79,12 +79,13 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
 
       // Use cached like status to determine action - much faster than API call
       final cachedLikeStatus = _socialRepository.getCachedLikeStatus(ruckId);
-      final isCurrentlyLiked = cachedLikeStatus ?? false; // Default to false if no cache
+      final isCurrentlyLiked =
+          cachedLikeStatus ?? false; // Default to false if no cache
 
       // Toggle the like - API endpoints will return updated state
       bool newLikedState;
       int newLikeCount;
-      
+
       if (isCurrentlyLiked) {
         await _socialRepository.removeRuckLike(ruckId);
         newLikedState = false;
@@ -103,9 +104,9 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         ruckId: ruckId,
         likeCount: newLikeCount,
       ));
-      
     } catch (e) {
-      emit(LikeActionError('Error updating like status: $e', event.ruckId ?? -1));
+      emit(LikeActionError(
+          'Error updating like status: $e', event.ruckId ?? -1));
     }
   }
 
@@ -122,26 +123,28 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       }
 
       if (currentUserId == null) {
-        emit(const LikesError('User not authenticated. Cannot check like status.'));
+        emit(const LikesError(
+            'User not authenticated. Cannot check like status.'));
         return;
       }
-      
+
       // Always fetch all likes for the ruck
-      final List<RuckLike> likes = await _socialRepository.getRuckLikes(event.ruckId);
-      
+      final List<RuckLike> likes =
+          await _socialRepository.getRuckLikes(event.ruckId);
+
       // Determine if the current user has liked this ruck
-      final bool userHasLiked = likes.any((like) => like.userId == currentUserId);
-      
+      final bool userHasLiked =
+          likes.any((like) => like.userId == currentUserId);
+
       // Get the total like count
       final int totalLikeCount = likes.length;
-      
+
       final LikeStatusChecked stateToEmit = LikeStatusChecked(
         isLiked: userHasLiked,
         ruckId: event.ruckId,
         likeCount: totalLikeCount,
       );
       emit(stateToEmit);
-      
     } on UnauthorizedException {
       emit(LikesError('Authentication error'));
     } on ServerException {
@@ -157,7 +160,8 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     // First emit cached data immediately if available
-    final cachedLikeStatus = _socialRepository.getCachedLikeStatus(event.ruckId);
+    final cachedLikeStatus =
+        _socialRepository.getCachedLikeStatus(event.ruckId);
     final cachedLikeCount = _socialRepository.getCachedLikeCount(event.ruckId);
 
     if (cachedLikeStatus != null && cachedLikeCount != null) {
@@ -171,13 +175,18 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
 
     try {
       // Then fetch fresh data. hasUserLikedRuck will update caches internally for both status and count.
-      final bool hasLiked = await _socialRepository.hasUserLikedRuck(event.ruckId);
+      final bool hasLiked =
+          await _socialRepository.hasUserLikedRuck(event.ruckId);
       // After hasUserLikedRuck completes, caches are guaranteed to be updated if they were invalid.
       // So, we can now safely get the (potentially updated) count from the cache.
-      final int likeCount = _socialRepository.getCachedLikeCount(event.ruckId) ?? 0;
-      
+      final int likeCount =
+          _socialRepository.getCachedLikeCount(event.ruckId) ?? 0;
+
       // Only emit again if value changed or we didn't emit cached data initially
-      if (cachedLikeStatus != hasLiked || cachedLikeCount != likeCount || cachedLikeStatus == null || cachedLikeCount == null) {
+      if (cachedLikeStatus != hasLiked ||
+          cachedLikeCount != likeCount ||
+          cachedLikeStatus == null ||
+          cachedLikeCount == null) {
         emit(LikeStatusChecked(
           isLiked: hasLiked,
           ruckId: event.ruckId,
@@ -187,15 +196,18 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     } on UnauthorizedException {
       // Don't emit error state for this quietly running check, but ensure a default state if nothing was emitted
       if (cachedLikeStatus == null || cachedLikeCount == null) {
-        emit(LikeStatusChecked(isLiked: false, ruckId: event.ruckId, likeCount: 0));
+        emit(LikeStatusChecked(
+            isLiked: false, ruckId: event.ruckId, likeCount: 0));
       }
     } on ServerException {
       if (cachedLikeStatus == null || cachedLikeCount == null) {
-        emit(LikeStatusChecked(isLiked: false, ruckId: event.ruckId, likeCount: 0));
+        emit(LikeStatusChecked(
+            isLiked: false, ruckId: event.ruckId, likeCount: 0));
       }
     } catch (e) {
       if (cachedLikeStatus == null || cachedLikeCount == null) {
-        emit(LikeStatusChecked(isLiked: false, ruckId: event.ruckId, likeCount: 0));
+        emit(LikeStatusChecked(
+            isLiked: false, ruckId: event.ruckId, likeCount: 0));
       }
     }
   }
@@ -207,25 +219,25 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
   ) async {
     // First check for cached comments
     final cachedComments = _socialRepository.getCachedComments(event.ruckId);
-    
+
     if (cachedComments != null && cachedComments.isNotEmpty) {
       // Skip the loading state if we have cached data
       emit(CommentsLoaded(comments: cachedComments, ruckId: event.ruckId));
-      
+
       // Also update comment count immediately
       _updateCommentCount(event.ruckId, cachedComments.length, emit);
     } else {
       // Only emit loading state if no cached data
       emit(CommentsLoading());
     }
-    
+
     try {
       // Fetch fresh data
       final comments = await _socialRepository.getRuckComments(event.ruckId);
-      
+
       // Only emit if different from cached or no cache was available
-      if (cachedComments == null || 
-          cachedComments.length != comments.length || 
+      if (cachedComments == null ||
+          cachedComments.length != comments.length ||
           _commentsChanged(cachedComments, comments)) {
         emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
         // Update the comment count so listeners can update
@@ -248,20 +260,21 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       }
     }
   }
-  
+
   /// Helper method to determine if comments have changed
-  bool _commentsChanged(List<RuckComment> oldComments, List<RuckComment> newComments) {
+  bool _commentsChanged(
+      List<RuckComment> oldComments, List<RuckComment> newComments) {
     if (oldComments.length != newComments.length) return true;
-    
+
     // Check if any comment IDs or content don't match
     for (int i = 0; i < oldComments.length; i++) {
       if (i >= newComments.length) return true;
-      if (oldComments[i].id != newComments[i].id || 
+      if (oldComments[i].id != newComments[i].id ||
           oldComments[i].content != newComments[i].content) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -276,43 +289,44 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
       emit(CommentActionError('Invalid ruck ID format'));
       return;
     }
-    
+
     // Store the content for optimistic update
     final commentContent = event.content;
-    
+
     try {
       emit(CommentActionInProgress());
-      
+
       // First, get current comment count for optimistic update
       final currentComments = await _socialRepository.getRuckComments(ruckId);
       final currentCount = currentComments.length;
-      final newCount = currentCount + 1; // Optimistically assume comment will be added successfully
-      
+      final newCount = currentCount +
+          1; // Optimistically assume comment will be added successfully
+
       // Optimistically update the comment count BEFORE the API call completes
       // This ensures the UI updates immediately
       emit(CommentCountUpdated(ruckId: ruckIdInt, count: newCount));
-      
+
       // Now actually add the comment to the backend
       final newComment = await _socialRepository.addRuckComment(
         ruckId,
         commentContent,
       );
-      
+
       // Fetch actual updated comments list to confirm the update
-      final updatedComments = await _socialRepository.getRuckComments(ruckId);      
+      final updatedComments = await _socialRepository.getRuckComments(ruckId);
       final actualCount = updatedComments.length;
-      
+
       // Emit the completed action
       emit(CommentActionCompleted(comment: newComment, actionType: 'add'));
-      
+
       // Emit updated comments
       emit(CommentsLoaded(comments: updatedComments, ruckId: ruckId));
-      
+
       // Emit the actual comment count in case our optimistic count was wrong
       if (actualCount != newCount) {
         _updateCommentCount(ruckId, actualCount, emit);
       }
-      
+
       // Extra protection: emit the comment count update again after a tiny delay
       // This helps ensure that even widgets that may be temporarily inactive receive the update
       await Future.delayed(const Duration(milliseconds: 300));
@@ -327,17 +341,18 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         // If we can't get the actual count, just indicate the error
         emit(CommentActionError('Failed to add comment'));
       }
-      
+
       emit(CommentActionError('Error adding comment: $e'));
     }
   }
 
   /// Helper method to update comment count for a specific ruck
   /// This helps keep comment counts in sync across different screens
-  void _updateCommentCount(String ruckId, int commentCount, Emitter<SocialState> emit) {
+  void _updateCommentCount(
+      String ruckId, int commentCount, Emitter<SocialState> emit) {
     final ruckIdInt = int.tryParse(ruckId);
     if (ruckIdInt == null) return;
-    
+
     // Emit a CommentCountUpdated event to notify all listeners
     emit(CommentCountUpdated(ruckId: ruckIdInt, count: commentCount));
   }
@@ -348,18 +363,18 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     emit(CommentActionInProgress());
-    
+
     try {
       final updatedComment = await _socialRepository.updateRuckComment(
         event.commentId,
         event.content,
       );
-      
+
       emit(CommentActionCompleted(
         comment: updatedComment,
         actionType: 'update',
       ));
-      
+
       // Refresh comments if we know which ruck this belongs to
       if (state is CommentsLoaded) {
         final ruckId = (state as CommentsLoaded).ruckId;
@@ -379,22 +394,22 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     Emitter<SocialState> emit,
   ) async {
     emit(CommentActionInProgress());
-    
+
     try {
       final result = await _socialRepository.deleteRuckComment(
         event.ruckId,
         event.commentId,
       );
-      
+
       // Always fetch updated comments list after deletion (successful or 404)
       final comments = await _socialRepository.getRuckComments(event.ruckId);
-      
+
       // Update comments list
       emit(CommentsLoaded(comments: comments, ruckId: event.ruckId));
-      
+
       // Also update comment count for all screens
       _updateCommentCount(event.ruckId, comments.length, emit);
-      
+
       if (result) {
         // Create a placeholder comment to indicate successful deletion
         final deletedComment = RuckComment(
@@ -405,8 +420,9 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
           content: 'Comment removed',
           createdAt: DateTime.now(),
         );
-        
-        emit(CommentActionCompleted(comment: deletedComment, actionType: 'delete'));
+
+        emit(CommentActionCompleted(
+            comment: deletedComment, actionType: 'delete'));
       } else {
         emit(CommentActionError('Failed to delete comment'));
       }
@@ -418,9 +434,10 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         _updateCommentCount(event.ruckId, comments.length, emit);
       } catch (refreshError) {
         // If refresh also fails, log it but don't override the original error
-        debugPrint('Failed to refresh comments after delete error: $refreshError');
+        debugPrint(
+            'Failed to refresh comments after delete error: $refreshError');
       }
-      
+
       emit(CommentActionError('Error deleting comment: $e'));
     }
   }

@@ -16,7 +16,7 @@ class RouteImportScreen extends StatefulWidget {
   final String? initialUrl;
   final String? importType;
   final String? platform;
-  
+
   const RouteImportScreen({
     super.key,
     this.initialUrl,
@@ -32,15 +32,15 @@ class _RouteImportScreenState extends State<RouteImportScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final PageController _pageController = PageController();
-  
+
   // Route name editing
   final TextEditingController _routeNameController = TextEditingController();
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    
+
     // If we have an initial URL from a deep link, switch to URL tab and start import
     if (widget.initialUrl != null && widget.importType == 'url') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -51,11 +51,11 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
-        
+
         // Trigger URL import
         context.read<RouteImportBloc>().add(ImportGpxFromUrl(
-          url: widget.initialUrl!,
-        ));
+              url: widget.initialUrl!,
+            ));
       });
     }
   }
@@ -71,36 +71,36 @@ class _RouteImportScreenState extends State<RouteImportScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark 
-          ? AppColors.backgroundDark 
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.backgroundDark
           : AppColors.backgroundLight,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? AppColors.surfaceDark 
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.surfaceDark
             : AppColors.primary,
-        foregroundColor: Theme.of(context).brightness == Brightness.dark 
-            ? AppColors.textLight 
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.textLight
             : Colors.white,
         elevation: 2,
         title: Text(
           'Import Route',
           style: AppTextStyles.titleLarge.copyWith(
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark 
-                ? AppColors.textLight 
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.textLight
                 : Colors.white,
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Theme.of(context).brightness == Brightness.dark 
-              ? AppColors.primary 
+          labelColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.primary
               : Colors.white,
-          unselectedLabelColor: Theme.of(context).brightness == Brightness.dark 
-              ? AppColors.getSecondaryTextColor(context) 
+          unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.getSecondaryTextColor(context)
               : Colors.white70,
-          indicatorColor: Theme.of(context).brightness == Brightness.dark 
-              ? AppColors.primary 
+          indicatorColor: Theme.of(context).brightness == Brightness.dark
+              ? AppColors.primary
               : Colors.white,
           onTap: (index) {
             _pageController.animateToPage(
@@ -220,8 +220,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
             GpxFilePicker(
               onFileSelected: (file) {
                 context.read<RouteImportBloc>().add(ValidateGpxFile(
-                  gpxFile: file,
-                ));
+                      gpxFile: file,
+                    ));
               },
             ),
 
@@ -263,8 +263,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           UrlImportForm(
             onSubmit: (url) {
               context.read<RouteImportBloc>().add(ImportGpxFromUrl(
-                url: url,
-              ));
+                    url: url,
+                  ));
             },
             isLoading: state is RouteImportInProgress,
           ),
@@ -290,7 +290,9 @@ class _RouteImportScreenState extends State<RouteImportScreen>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.surfaceDark
+                : AppColors.surfaceLight,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -302,13 +304,13 @@ class _RouteImportScreenState extends State<RouteImportScreen>
           child: RouteSearchWidget(
             onSearch: (query, filters) {
               context.read<RouteImportBloc>().add(SearchAllTrailsRoutes(
-                query: query,
-                nearLatitude: filters['latitude'],
-                nearLongitude: filters['longitude'],
-                maxDistance: filters['maxDistance'],
-                difficulty: filters['difficulty'],
-                routeType: filters['routeType'],
-              ));
+                    query: query,
+                    nearLatitude: filters['latitude'],
+                    nearLongitude: filters['longitude'],
+                    maxDistance: filters['maxDistance'],
+                    difficulty: filters['difficulty'],
+                    routeType: filters['routeType'],
+                  ));
             },
             isLoading: state is RouteImportSearching,
           ),
@@ -379,8 +381,8 @@ class _RouteImportScreenState extends State<RouteImportScreen>
               onTap: () {
                 if (route.id != null) {
                   context.read<RouteImportBloc>().add(ImportAllTrailsRoute(
-                    routeId: route.id!,
-                  ));
+                        routeId: route.id!,
+                      ));
                 }
               },
               showImportButton: true,
@@ -451,30 +453,30 @@ class _RouteImportScreenState extends State<RouteImportScreen>
             ),
             const SizedBox(height: 12),
             ...tips.map((tip) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 4,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 8, right: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.getSecondaryTextColor(context),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      tip,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.getSecondaryTextColor(context),
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 8, right: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.getSecondaryTextColor(context),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
+                      Expanded(
+                        child: Text(
+                          tip,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.getSecondaryTextColor(context),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            )),
+                )),
           ],
         ),
       ),

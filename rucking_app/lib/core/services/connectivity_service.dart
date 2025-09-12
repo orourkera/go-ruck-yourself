@@ -29,12 +29,14 @@ class ConnectivityServiceImpl implements ConnectivityService {
   }
 
   void _startListening() {
-    _subscription = _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _subscription = _connectivity.onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
       final isConnected = _isConnectedFromResult(results);
       if (isConnected != _isConnected) {
         _isConnected = isConnected;
         _connectivityController.add(isConnected);
-        AppLogger.info('Network connectivity changed: ${isConnected ? 'Connected' : 'Disconnected'}');
+        AppLogger.info(
+            'Network connectivity changed: ${isConnected ? 'Connected' : 'Disconnected'}');
       }
     });
   }

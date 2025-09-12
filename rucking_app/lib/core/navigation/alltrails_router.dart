@@ -23,179 +23,182 @@ class AllTrailsRouter {
 
   /// Creates router configuration for AllTrails features
   static List<RouteBase> get routes => [
-    // My Rucks Screen - Main hub for planned rucks
-    GoRoute(
-      path: myRucks,
-      name: 'my-rucks',
-      pageBuilder: (context, state) => CustomTransitionPage<void>(
-        key: state.pageKey,
-        child: BlocProvider(
-          create: (context) => getIt<PlannedRuckBloc>()..add(LoadPlannedRucks()),
-          child: const MyRucksScreen(),
-        ),
-        transitionsBuilder: _slideFromBottomTransition,
-      ),
-      routes: [
-        // Route Import Screen
+        // My Rucks Screen - Main hub for planned rucks
         GoRoute(
-          path: '/import',
-          name: 'route-import',
+          path: myRucks,
+          name: 'my-rucks',
           pageBuilder: (context, state) => CustomTransitionPage<void>(
             key: state.pageKey,
-            child: MultiBlocProvider(
-              providers: [
-                BlocProvider(
-                  create: (context) => getIt<RouteImportBloc>(),
-                ),
-                BlocProvider.value(
-                  value: context.read<PlannedRuckBloc>(),
-                ),
-              ],
-              child: const RouteImportScreen(),
+            child: BlocProvider(
+              create: (context) =>
+                  getIt<PlannedRuckBloc>()..add(LoadPlannedRucks()),
+              child: const MyRucksScreen(),
             ),
-            transitionsBuilder: _slideFromRightTransition,
+            transitionsBuilder: _slideFromBottomTransition,
           ),
+          routes: [
+            // Route Import Screen
+            GoRoute(
+              path: '/import',
+              name: 'route-import',
+              pageBuilder: (context, state) => CustomTransitionPage<void>(
+                key: state.pageKey,
+                child: MultiBlocProvider(
+                  providers: [
+                    BlocProvider(
+                      create: (context) => getIt<RouteImportBloc>(),
+                    ),
+                    BlocProvider.value(
+                      value: context.read<PlannedRuckBloc>(),
+                    ),
+                  ],
+                  child: const RouteImportScreen(),
+                ),
+                transitionsBuilder: _slideFromRightTransition,
+              ),
+            ),
+
+            // Active Session Screen
+            GoRoute(
+              path: '/session/:sessionId',
+              name: 'active-session',
+              pageBuilder: (context, state) {
+                final sessionId = state.pathParameters['sessionId']!;
+                final extra = state.extra as Map<String, dynamic>?;
+
+                return CustomTransitionPage<void>(
+                  key: state.pageKey,
+                  child: MultiBlocProvider(
+                    providers: [
+                      BlocProvider.value(
+                        value: context.read<PlannedRuckBloc>(),
+                      ),
+                      // Add session BLoC here when available
+                    ],
+                    child: ActiveSessionScreen(
+                      sessionId: sessionId,
+                      plannedRuck: extra?['plannedRuck'] as PlannedRuck?,
+                    ),
+                  ),
+                  transitionsBuilder: _fadeTransition,
+                );
+              },
+            ),
+          ],
         ),
-        
-        // Active Session Screen
+
+        // Standalone Route Import (from deep link or sharing)
         GoRoute(
-          path: '/session/:sessionId',
-          name: 'active-session',
+          path: routeImport,
+          name: 'standalone-route-import',
           pageBuilder: (context, state) {
-            final sessionId = state.pathParameters['sessionId']!;
-            final extra = state.extra as Map<String, dynamic>?;
-            
+            final queryParams = state.uri.queryParameters;
+            final routeUrl = queryParams['url'];
+            final routeId = queryParams['routeId'];
+
             return CustomTransitionPage<void>(
               key: state.pageKey,
               child: MultiBlocProvider(
                 providers: [
-                  BlocProvider.value(
-                    value: context.read<PlannedRuckBloc>(),
+                  BlocProvider(
+                    create: (context) => getIt<RouteImportBloc>()
+                      ..add(_getInitialImportEvent(routeUrl, routeId)),
                   ),
-                  // Add session BLoC here when available
+                  BlocProvider(
+                    create: (context) => getIt<PlannedRuckBloc>(),
+                  ),
                 ],
-                child: ActiveSessionScreen(
-                  sessionId: sessionId,
-                  plannedRuck: extra?['plannedRuck'] as PlannedRuck?,
-                ),
+                child: const RouteImportScreen(),
               ),
-              transitionsBuilder: _fadeTransition,
+              transitionsBuilder: _slideFromBottomTransition,
             );
           },
         ),
-      ],
-    ),
-    
-    // Standalone Route Import (from deep link or sharing)
-    GoRoute(
-      path: routeImport,
-      name: 'standalone-route-import',
-      pageBuilder: (context, state) {
-        final queryParams = state.uri.queryParameters;
-        final routeUrl = queryParams['url'];
-        final routeId = queryParams['routeId'];
-        
-        return CustomTransitionPage<void>(
-          key: state.pageKey,
-          child: MultiBlocProvider(
-            providers: [
-              BlocProvider(
-                create: (context) => getIt<RouteImportBloc>()
-                  ..add(_getInitialImportEvent(routeUrl, routeId)),
+
+        // Route Preview (from sharing or deep link)
+        GoRoute(
+          path: '$routePreview/:routeId',
+          name: 'route-preview',
+          pageBuilder: (context, state) {
+            final routeId = state.pathParameters['routeId']!;
+            final route = state.extra as route_model.Route?;
+
+            return CustomTransitionPage<void>(
+              key: state.pageKey,
+              child: MultiBlocProvider(
+                providers: [
+                  BlocProvider(
+                    create: (context) {
+                      final bloc = getIt<RouteImportBloc>();
+                      if (route != null) {
+                        bloc.add(PreviewRoute(route: route!));
+                      }
+                      return bloc;
+                    },
+                  ),
+                  BlocProvider(
+                    create: (context) => getIt<PlannedRuckBloc>(),
+                  ),
+                ],
+                child: RoutePreviewScreen(
+                  routeId: routeId,
+                ),
               ),
-              BlocProvider(
-                create: (context) => getIt<PlannedRuckBloc>(),
+              transitionsBuilder: _scaleTransition,
+            );
+          },
+        ),
+
+        // Route Search (for browsing imported routes)
+        GoRoute(
+          path: routeSearch,
+          name: 'route-search',
+          pageBuilder: (context, state) {
+            final queryParams = state.uri.queryParameters;
+            final searchQuery = queryParams['q'] ?? '';
+            final filters = _parseSearchFilters(queryParams);
+
+            return CustomTransitionPage<void>(
+              key: state.pageKey,
+              child: MultiBlocProvider(
+                providers: [
+                  BlocProvider(
+                    create: (context) => getIt<RouteImportBloc>()
+                      ..add(SearchAllTrailsRoutes(
+                        query: searchQuery,
+                      )),
+                  ),
+                  BlocProvider(
+                    create: (context) => getIt<PlannedRuckBloc>(),
+                  ),
+                ],
+                child: RouteSearchScreen(
+                  initialQuery: searchQuery,
+                  initialFilters: filters,
+                ),
               ),
-            ],
-            child: const RouteImportScreen(),
-          ),
-          transitionsBuilder: _slideFromBottomTransition,
-        );
-      },
-    ),
-    
-    // Route Preview (from sharing or deep link)
-    GoRoute(
-      path: '$routePreview/:routeId',
-      name: 'route-preview',
-      pageBuilder: (context, state) {
-        final routeId = state.pathParameters['routeId']!;
-        final route = state.extra as route_model.Route?;
-        
-        return CustomTransitionPage<void>(
-          key: state.pageKey,
-          child: MultiBlocProvider(
-            providers: [
-              BlocProvider(
-                create: (context) {
-                  final bloc = getIt<RouteImportBloc>();
-                  if (route != null) {
-                    bloc.add(PreviewRoute(route: route!));
-                  }
-                  return bloc;
-                },
-              ),
-              BlocProvider(
-                create: (context) => getIt<PlannedRuckBloc>(),
-              ),
-            ],
-            child: RoutePreviewScreen(
-              routeId: routeId,
-            ),
-          ),
-          transitionsBuilder: _scaleTransition,
-        );
-      },
-    ),
-    
-    // Route Search (for browsing imported routes)
-    GoRoute(
-      path: routeSearch,
-      name: 'route-search',
-      pageBuilder: (context, state) {
-        final queryParams = state.uri.queryParameters;
-        final searchQuery = queryParams['q'] ?? '';
-        final filters = _parseSearchFilters(queryParams);
-        
-        return CustomTransitionPage<void>(
-          key: state.pageKey,
-          child: MultiBlocProvider(
-            providers: [
-              BlocProvider(
-                create: (context) => getIt<RouteImportBloc>()
-                  ..add(SearchAllTrailsRoutes(
-                    query: searchQuery,
-                  )),
-              ),
-              BlocProvider(
-                create: (context) => getIt<PlannedRuckBloc>(),
-              ),
-            ],
-            child: RouteSearchScreen(
-              initialQuery: searchQuery,
-              initialFilters: filters,
-            ),
-          ),
-          transitionsBuilder: _slideFromRightTransition,
-        );
-      },
-    ),
-  ];
+              transitionsBuilder: _slideFromRightTransition,
+            );
+          },
+        ),
+      ];
 
   /// Navigation helper methods
   static void navigateToMyRucks(BuildContext context) {
     context.go(myRucks);
   }
 
-  static void navigateToRouteImport(BuildContext context, {
+  static void navigateToRouteImport(
+    BuildContext context, {
     String? initialUrl,
     String? routeId,
   }) {
     final params = <String, String>{};
     if (initialUrl != null) params['url'] = initialUrl;
     if (routeId != null) params['routeId'] = routeId;
-    
-    final uri = Uri(path: routeImport, queryParameters: params.isEmpty ? null : params);
+
+    final uri =
+        Uri(path: routeImport, queryParameters: params.isEmpty ? null : params);
     context.go(uri.toString());
   }
 
@@ -235,8 +238,9 @@ class AllTrailsRouter {
     if (filters != null) {
       params.addAll(_serializeSearchFilters(filters));
     }
-    
-    final uri = Uri(path: routeSearch, queryParameters: params.isEmpty ? null : params);
+
+    final uri =
+        Uri(path: routeSearch, queryParameters: params.isEmpty ? null : params);
     context.go(uri.toString());
   }
 
@@ -326,7 +330,8 @@ class AllTrailsRouter {
     throw UnimplementedError('PlannedRuck lookup not implemented');
   }
 
-  static RouteImportEvent _getInitialImportEvent(String? routeUrl, String? routeId) {
+  static RouteImportEvent _getInitialImportEvent(
+      String? routeUrl, String? routeId) {
     if (routeId != null) {
       return ImportAllTrailsRoute(routeId: routeId);
     } else if (routeUrl != null) {
@@ -348,14 +353,15 @@ class AllTrailsRouter {
     return null;
   }
 
-  static Map<String, dynamic> _parseSearchFilters(Map<String, String> queryParams) {
+  static Map<String, dynamic> _parseSearchFilters(
+      Map<String, String> queryParams) {
     final filters = <String, dynamic>{};
-    
+
     // Parse difficulty filter
     if (queryParams.containsKey('difficulty')) {
       filters['difficulty'] = queryParams['difficulty'];
     }
-    
+
     // Parse distance range
     if (queryParams.containsKey('minDistance')) {
       filters['minDistance'] = double.tryParse(queryParams['minDistance']!);
@@ -363,29 +369,30 @@ class AllTrailsRouter {
     if (queryParams.containsKey('maxDistance')) {
       filters['maxDistance'] = double.tryParse(queryParams['maxDistance']!);
     }
-    
+
     // Parse route type
     if (queryParams.containsKey('routeType')) {
       filters['routeType'] = queryParams['routeType'];
     }
-    
+
     // Parse location
     if (queryParams.containsKey('location')) {
       filters['location'] = queryParams['location'];
     }
-    
+
     return filters;
   }
 
-  static Map<String, String> _serializeSearchFilters(Map<String, dynamic> filters) {
+  static Map<String, String> _serializeSearchFilters(
+      Map<String, dynamic> filters) {
     final params = <String, String>{};
-    
+
     filters.forEach((key, value) {
       if (value != null) {
         params[key] = value.toString();
       }
     });
-    
+
     return params;
   }
 }
@@ -430,9 +437,9 @@ class RoutePreviewScreen extends StatelessWidget {
                   // Route preview card would go here
                   // This would use RoutePreviewCard widget we created earlier
                   const Text('Route preview coming soon!'),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Import button
                   SizedBox(
                     width: double.infinity,
@@ -450,7 +457,7 @@ class RoutePreviewScreen extends StatelessWidget {
               ),
             );
           }
-          
+
           return const Center(
             child: CircularProgressIndicator(),
           );
@@ -507,13 +514,14 @@ class ActiveSessionScreen extends StatelessWidget {
         children: [
           // This would integrate all our active session widgets:
           // - ActiveSessionMapOverlay
-          // - ETADisplayWidget  
+          // - ETADisplayWidget
           // - SessionProgressIndicator
           // - SessionControlsWidget
           // - SessionStatsOverlay
-          
+
           const Center(
-            child: Text('Active session interface will integrate all widgets here!'),
+            child: Text(
+                'Active session interface will integrate all widgets here!'),
           ),
         ],
       ),

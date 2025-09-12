@@ -3,7 +3,8 @@ import 'package:rucking_app/core/models/goal_with_progress.dart';
 
 class GoalConfirmationSheet extends StatefulWidget {
   final Map<String, dynamic> draft;
-  final Future<GoalWithProgress> Function(Map<String, dynamic> confirmedDraft) onConfirm;
+  final Future<GoalWithProgress> Function(Map<String, dynamic> confirmedDraft)
+      onConfirm;
 
   const GoalConfirmationSheet({
     super.key,
@@ -25,9 +26,12 @@ class _GoalConfirmationSheetState extends State<GoalConfirmationSheet> {
   @override
   void initState() {
     super.initState();
-    _titleCtrl = TextEditingController(text: widget.draft['title']?.toString() ?? '');
-    _descCtrl = TextEditingController(text: widget.draft['description']?.toString() ?? '');
-    _targetCtrl = TextEditingController(text: widget.draft['target_value']?.toString() ?? '');
+    _titleCtrl =
+        TextEditingController(text: widget.draft['title']?.toString() ?? '');
+    _descCtrl = TextEditingController(
+        text: widget.draft['description']?.toString() ?? '');
+    _targetCtrl = TextEditingController(
+        text: widget.draft['target_value']?.toString() ?? '');
   }
 
   @override
@@ -45,7 +49,8 @@ class _GoalConfirmationSheetState extends State<GoalConfirmationSheet> {
     });
     try {
       final confirmed = Map<String, dynamic>.from(widget.draft);
-      if (_titleCtrl.text.trim().isNotEmpty) confirmed['title'] = _titleCtrl.text.trim();
+      if (_titleCtrl.text.trim().isNotEmpty)
+        confirmed['title'] = _titleCtrl.text.trim();
       confirmed['description'] = _descCtrl.text.trim();
       final targetVal = double.tryParse(_targetCtrl.text.trim());
       if (targetVal != null) confirmed['target_value'] = targetVal;
@@ -82,7 +87,9 @@ class _GoalConfirmationSheetState extends State<GoalConfirmationSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Confirm Goal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  const Text('Confirm Goal',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).maybePop(),
@@ -97,7 +104,8 @@ class _GoalConfirmationSheetState extends State<GoalConfirmationSheet> {
               const SizedBox(height: 8),
               TextField(
                 controller: _descCtrl,
-                decoration: const InputDecoration(labelText: 'Description (optional)'),
+                decoration:
+                    const InputDecoration(labelText: 'Description (optional)'),
                 minLines: 1,
                 maxLines: 3,
               ),
@@ -107,8 +115,10 @@ class _GoalConfirmationSheetState extends State<GoalConfirmationSheet> {
                   Expanded(
                     child: TextField(
                       controller: _targetCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Target value'),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration:
+                          const InputDecoration(labelText: 'Target value'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -134,12 +144,16 @@ class _GoalConfirmationSheetState extends State<GoalConfirmationSheet> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                  child:
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
                 ),
               ElevatedButton.icon(
                 onPressed: _submitting ? null : _submit,
                 icon: _submitting
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.check),
                 label: const Text('Create Goal'),
               ),

@@ -17,7 +17,7 @@ import 'package:rucking_app/features/coaching/presentation/screens/plan_creation
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
 class AchievementsHubScreen extends StatefulWidget {
   final String? initialAchievementId;
-  
+
   const AchievementsHubScreen({
     Key? key,
     this.initialAchievementId,
@@ -34,7 +34,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   final ScrollController _scrollController = ScrollController();
   String? _targetAchievementId;
   bool _hasScrolledToTarget = false;
-  
+
   // Map to store GlobalKeys for each achievement
   final Map<String, GlobalKey> _achievementKeys = {};
 
@@ -43,17 +43,18 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _targetAchievementId = widget.initialAchievementId;
-    
+
     // Debug logging
     if (_targetAchievementId != null) {
-      print('🎯 AchievementsHubScreen: Target achievement ID = $_targetAchievementId');
+      print(
+          '🎯 AchievementsHubScreen: Target achievement ID = $_targetAchievementId');
     }
-    
+
     // If an initial achievement ID is provided, select the Collection tab
     if (_targetAchievementId != null) {
       _tabController.animateTo(1); // Collection tab index (now index 1)
     }
-    
+
     _loadAchievementData();
   }
 
@@ -61,34 +62,44 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     // Get current user context
     final authState = context.read<AuthBloc>().state;
     final userId = authState is Authenticated ? authState.user.userId : '';
-    
+
     try {
-      
       // Get user's unit preference
       final storageService = GetIt.I<StorageService>();
-      final storedUserData = await storageService.getObject(AppConfig.userProfileKey);
+      final storedUserData =
+          await storageService.getObject(AppConfig.userProfileKey);
       bool preferMetric = false; // Default to imperial (standard)
-      
-      if (storedUserData != null && storedUserData.containsKey('preferMetric')) {
+
+      if (storedUserData != null &&
+          storedUserData.containsKey('preferMetric')) {
         preferMetric = storedUserData['preferMetric'] as bool;
       }
-      
+
       final unitPreference = preferMetric ? 'metric' : 'standard';
-      debugPrint('🏆 [AchievementsHub] Loading achievements with unit preference: $unitPreference');
-      
+      debugPrint(
+          '🏆 [AchievementsHub] Loading achievements with unit preference: $unitPreference');
+
       // Load achievement data with proper unit preference
       if (mounted) {
-        context.read<AchievementBloc>().add(LoadAchievements(unitPreference: unitPreference));
+        context
+            .read<AchievementBloc>()
+            .add(LoadAchievements(unitPreference: unitPreference));
         context.read<AchievementBloc>().add(LoadUserAchievements(userId));
-        context.read<AchievementBloc>().add(LoadAchievementStats(userId, unitPreference: unitPreference));
+        context
+            .read<AchievementBloc>()
+            .add(LoadAchievementStats(userId, unitPreference: unitPreference));
       }
     } catch (e) {
       debugPrint('🏆 [AchievementsHub] Error loading unit preference: $e');
       // Fallback to standard if error occurs
       if (mounted) {
-        context.read<AchievementBloc>().add(const LoadAchievements(unitPreference: 'standard'));
+        context
+            .read<AchievementBloc>()
+            .add(const LoadAchievements(unitPreference: 'standard'));
         context.read<AchievementBloc>().add(LoadUserAchievements(userId));
-        context.read<AchievementBloc>().add(LoadAchievementStats(userId, unitPreference: 'standard'));
+        context
+            .read<AchievementBloc>()
+            .add(LoadAchievementStats(userId, unitPreference: 'standard'));
       }
     }
   }
@@ -144,7 +155,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     if (state is AchievementsLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (state is AchievementsError) {
       return Center(
         child: Column(
@@ -154,7 +165,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
             const SizedBox(height: 16),
             Text(
               'Error loading achievements',
-              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+              style:
+                  AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
@@ -169,7 +181,9 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
 
     // Default to empty state for initial or other states
     final stats = state is AchievementsLoaded ? state.stats : null;
-    final recentAchievements = state is AchievementsLoaded ? state.userAchievements : <UserAchievement>[];
+    final recentAchievements = state is AchievementsLoaded
+        ? state.userAchievements
+        : <UserAchievement>[];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -207,18 +221,20 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildStatColumn(
-                        stats?.totalEarned.toString() ?? '0', 
-                        'Earned', 
+                        stats?.totalEarned.toString() ?? '0',
+                        'Earned',
                         Icons.emoji_events,
                       ),
                       _buildStatColumn(
-                        ((stats?.totalAvailable ?? 0) - (stats?.totalEarned ?? 0)).toString(),
-                        'In Progress', 
+                        ((stats?.totalAvailable ?? 0) -
+                                (stats?.totalEarned ?? 0))
+                            .toString(),
+                        'In Progress',
                         Icons.trending_up,
                       ),
                       _buildStatColumn(
                         '', // Empty string since we'll use valueWidget
-                        'Power Points', 
+                        'Power Points',
                         Icons.bolt,
                         valueWidget: AnimatedCounter(
                           targetValue: stats?.powerPoints ?? 0,
@@ -260,9 +276,9 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
               },
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Recent achievements
           Text(
             'Recent Achievements',
@@ -271,30 +287,34 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Show recent achievements or placeholder
           if (recentAchievements.isNotEmpty)
-            ...recentAchievements.map((achievement) => Card(
-              elevation: 2,
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: Icon(
-                  Icons.emoji_events,
-                  color: AppColors.primary,
-                ),
-                title: Text(achievement.achievement?.name ?? 'Achievement'),
-                subtitle: Text(achievement.achievement?.description ?? ''),
-                trailing: Text(
-                  '${achievement.earnedAt.day}/${achievement.earnedAt.month}',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ),
-            )).toList()
+            ...recentAchievements
+                .map((achievement) => Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.emoji_events,
+                          color: AppColors.primary,
+                        ),
+                        title: Text(
+                            achievement.achievement?.name ?? 'Achievement'),
+                        subtitle:
+                            Text(achievement.achievement?.description ?? ''),
+                        trailing: Text(
+                          '${achievement.earnedAt.day}/${achievement.earnedAt.month}',
+                          style: AppTextStyles.bodySmall,
+                        ),
+                      ),
+                    ))
+                .toList()
           else
             _buildPlaceholderCard('No recent achievements yet'),
-          
+
           const SizedBox(height: 24),
-          
+
           // Categories preview
           Text(
             'Categories',
@@ -303,7 +323,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
             ),
           ),
           const SizedBox(height: 16),
-          
+
           _buildCategoryGrid(state),
         ],
       ),
@@ -314,7 +334,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     if (state is AchievementsLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (state is AchievementsError) {
       return Center(
         child: Column(
@@ -324,7 +344,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
             const SizedBox(height: 16),
             Text(
               'Error loading achievements',
-              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+              style:
+                  AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
@@ -364,8 +385,9 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         final category = categories[index];
         final categoryName = category['name'] as String;
         final earned = categoryStats[categoryName.toLowerCase()] ?? 0;
-        final total = 12; // Default total per category, you can make this dynamic
-        
+        final total =
+            12; // Default total per category, you can make this dynamic
+
         return Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -386,7 +408,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
                   color: category['color'] as Color,
                 ),
                 const SizedBox(height: 6), // Reduced from 8 to 6
-                Flexible( // Wrap text in Flexible to prevent overflow
+                Flexible(
+                  // Wrap text in Flexible to prevent overflow
                   child: Text(
                     categoryName,
                     style: AppTextStyles.titleMedium.copyWith(
@@ -399,7 +422,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
                   ),
                 ),
                 const SizedBox(height: 2), // Reduced from 4 to 2
-                Flexible( // Wrap progress text in Flexible
+                Flexible(
+                  // Wrap progress text in Flexible
                   child: Text(
                     '$earned/$total',
                     style: AppTextStyles.bodySmall.copyWith(
@@ -417,7 +441,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     );
   }
 
-  Widget _buildStatColumn(String value, String label, IconData icon, {Widget? valueWidget}) {
+  Widget _buildStatColumn(String value, String label, IconData icon,
+      {Widget? valueWidget}) {
     return Column(
       children: [
         Icon(
@@ -426,14 +451,15 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           size: 24,
         ),
         const SizedBox(height: 8),
-        valueWidget ?? Text(
-          value,
-          style: AppTextStyles.titleMedium.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Bangers',
-          ),
-        ),
+        valueWidget ??
+            Text(
+              value,
+              style: AppTextStyles.titleMedium.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Bangers',
+              ),
+            ),
         const SizedBox(height: 4),
         Text(
           label,
@@ -450,7 +476,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     if (state is AchievementsLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (state is AchievementsError) {
       return Center(
         child: Column(
@@ -460,7 +486,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
             const SizedBox(height: 16),
             Text(
               'Error loading achievements',
-              style: AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
+              style:
+                  AppTextStyles.titleMedium.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
@@ -473,12 +500,16 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
       );
     }
 
-    final achievements = state is AchievementsLoaded ? state.allAchievements : <Achievement>[];
-    final userAchievements = state is AchievementsLoaded ? state.userAchievements : <UserAchievement>[];
-    
+    final achievements =
+        state is AchievementsLoaded ? state.allAchievements : <Achievement>[];
+    final userAchievements = state is AchievementsLoaded
+        ? state.userAchievements
+        : <UserAchievement>[];
+
     // Create a map of earned achievement IDs for quick lookup
-    final earnedAchievementIds = userAchievements.map((ua) => ua.achievementId).toSet();
-    
+    final earnedAchievementIds =
+        userAchievements.map((ua) => ua.achievementId).toSet();
+
     if (achievements.isEmpty) {
       return SingleChildScrollView(
         controller: _scrollController,
@@ -498,7 +529,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         ),
       );
     }
-    
+
     // Group achievements by category
     Map<String, List<Achievement>> achievementsByCategory = {};
     for (var achievement in achievements) {
@@ -507,9 +538,9 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
       }
       achievementsByCategory[achievement.category]!.add(achievement);
     }
-    
+
     List<Widget> categoryWidgets = [];
-    
+
     // Build UI for each category
     achievementsByCategory.forEach((category, categoryAchievements) {
       // Sort achievements by tier (bronze, silver, gold, platinum)
@@ -518,14 +549,15 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         return (tierOrder[a.tier.toLowerCase()] ?? 0)
             .compareTo(tierOrder[b.tier.toLowerCase()] ?? 0);
       });
-      
+
       // Add category header
       categoryWidgets.add(
         Padding(
           padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
           child: Row(
             children: [
-              Icon(_getCategoryIcon(category), color: _getCategoryColor(category)),
+              Icon(_getCategoryIcon(category),
+                  color: _getCategoryColor(category)),
               const SizedBox(width: 8),
               Text(
                 category,
@@ -538,7 +570,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           ),
         ),
       );
-      
+
       // Add achievements for this category
       for (var achievement in categoryAchievements) {
         final isEarned = earnedAchievementIds.contains(achievement.id);
@@ -546,10 +578,10 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         if (state is AchievementsLoaded && !isEarned) {
           progress = state.getProgressForAchievement(achievement.id);
         }
-        
+
         final key = GlobalKey();
         _achievementKeys[achievement.id] = key;
-        
+
         categoryWidgets.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
@@ -567,14 +599,16 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         );
       }
     });
-    
+
     // Schedule scroll to target achievement after build
-    if (_targetAchievementId != null && !_hasScrolledToTarget && categoryWidgets.isNotEmpty) {
+    if (_targetAchievementId != null &&
+        !_hasScrolledToTarget &&
+        categoryWidgets.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToTargetAchievement(achievements);
       });
     }
-    
+
     return SingleChildScrollView(
       key: _achievementsListKey,
       controller: _scrollController,
@@ -626,16 +660,16 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
 
   void _scrollToTargetAchievement(List<Achievement> achievements) {
     if (_targetAchievementId == null || _hasScrolledToTarget) return;
-    
+
     print('🎯 Attempting to scroll to achievement ID: $_targetAchievementId');
-    
+
     // Find the GlobalKey for the target achievement
     final targetKey = _achievementKeys[_targetAchievementId];
     if (targetKey == null) {
       print('❌ No GlobalKey found for achievement ID: $_targetAchievementId');
       return;
     }
-    
+
     // Use Scrollable.ensureVisible for robust scrolling
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = targetKey.currentContext;
@@ -645,7 +679,8 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
           context,
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeInOut,
-          alignment: 0.2, // Scroll so the item is 20% from the top of the viewport
+          alignment:
+              0.2, // Scroll so the item is 20% from the top of the viewport
         );
         _hasScrolledToTarget = true;
       } else {
@@ -673,7 +708,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         return Colors.grey;
     }
   }
-  
+
   IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
       case 'distance':
@@ -692,7 +727,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         return Icons.emoji_events;
     }
   }
-  
+
   Color _getTierColor(String tier) {
     switch (tier.toLowerCase()) {
       case 'bronze':

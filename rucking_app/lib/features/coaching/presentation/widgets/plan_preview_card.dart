@@ -61,7 +61,8 @@ class PlanPreviewCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: planType.color.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -83,7 +84,7 @@ class PlanPreviewCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            
+
             // Description
             Text(
               planType.description,
@@ -93,11 +94,11 @@ class PlanPreviewCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Plan features based on type
             _buildPlanFeatures(),
             const SizedBox(height: 20),
-            
+
             // Success metrics preview
             _buildSuccessMetrics(),
           ],
@@ -108,7 +109,7 @@ class PlanPreviewCard extends StatelessWidget {
 
   Widget _buildPlanFeatures() {
     List<String> features;
-    
+
     switch (planType.id) {
       case 'fat-loss':
         features = [
@@ -179,51 +180,56 @@ class PlanPreviewCard extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         ...features.map((feature) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Icon(
-                Icons.check_circle,
-                color: planType.color,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  feature,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: Colors.grey[700],
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: planType.color,
+                    size: 20,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      feature,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        )),
+            )),
       ],
     );
   }
 
   Widget _buildSuccessMetrics() {
     String successText;
-    
+
     switch (planType.id) {
       case 'fat-loss':
-        successText = 'Track weekly calorie burn, body mass trends, and energy levels';
+        successText =
+            'Track weekly calorie burn, body mass trends, and energy levels';
         break;
       case 'get-faster':
-        successText = 'Monitor 60-minute pace improvements and heart rate efficiency';
+        successText =
+            'Monitor 60-minute pace improvements and heart rate efficiency';
         break;
       case 'event-prep':
         successText = 'Build to event distance with proper pacing and form';
         break;
       case 'daily-discipline':
-        successText = 'Achieve 30+ day streaks while maintaining energy and motivation';
+        successText =
+            'Achieve 30+ day streaks while maintaining energy and motivation';
         break;
       case 'age-strong':
-        successText = 'Improve balance times, carry strength, and daily function';
+        successText =
+            'Improve balance times, carry strength, and daily function';
         break;
       case 'load-capacity':
-        successText = 'Safely increase carrying capacity without pain or injury';
+        successText =
+            'Safely increase carrying capacity without pain or injury';
         break;
       default:
         successText = 'Track progress toward your specific goals';

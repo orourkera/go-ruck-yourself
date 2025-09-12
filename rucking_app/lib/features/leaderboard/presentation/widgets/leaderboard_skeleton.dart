@@ -11,7 +11,7 @@ class LeaderboardSkeleton extends StatelessWidget {
       children: [
         // Header skeleton
         const LeaderboardHeaderSkeleton(),
-        
+
         // User list skeleton
         Expanded(
           child: ListView.builder(
@@ -33,7 +33,7 @@ class LeaderboardHeaderSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return SkeletonLoader(
       isLoading: true,
       child: Container(
@@ -50,28 +50,28 @@ class LeaderboardHeaderSkeleton extends StatelessWidget {
           children: [
             // Rank column
             SizedBox(width: 40),
-            
+
             // User column
             SizedBox(width: 16),
             Expanded(
               flex: 3,
               child: SkeletonLine(width: 80, height: 16),
             ),
-            
+
             // Distance column
             Expanded(
               child: Center(
                 child: SkeletonLine(width: 60, height: 16),
               ),
             ),
-            
+
             // Power Points column
             Expanded(
               child: Center(
                 child: SkeletonLine(width: 80, height: 16),
               ),
             ),
-            
+
             // Sessions column
             Expanded(
               child: Center(
@@ -88,7 +88,7 @@ class LeaderboardHeaderSkeleton extends StatelessWidget {
 /// Skeleton for individual leaderboard row
 class LeaderboardRowSkeleton extends StatelessWidget {
   final int rank;
-  
+
   const LeaderboardRowSkeleton({
     Key? key,
     required this.rank,
@@ -97,7 +97,7 @@ class LeaderboardRowSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return SkeletonLoader(
       isLoading: true,
       child: Container(
@@ -122,7 +122,7 @@ class LeaderboardRowSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // User info (avatar + username)
             const SizedBox(width: 16),
             Expanded(
@@ -132,7 +132,7 @@ class LeaderboardRowSkeleton extends StatelessWidget {
                   // Avatar
                   const SkeletonCircle(size: 32),
                   const SizedBox(width: 12),
-                  
+
                   // Username and location
                   Expanded(
                     child: Column(
@@ -155,7 +155,7 @@ class LeaderboardRowSkeleton extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Distance
             Expanded(
               child: Center(
@@ -165,7 +165,7 @@ class LeaderboardRowSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Power Points
             Expanded(
               child: Center(
@@ -175,7 +175,7 @@ class LeaderboardRowSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Sessions
             Expanded(
               child: Center(

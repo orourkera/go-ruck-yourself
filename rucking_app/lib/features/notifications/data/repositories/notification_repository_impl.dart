@@ -37,10 +37,12 @@ class NotificationRepositoryImpl implements NotificationRepository {
     try {
       return await remoteDataSource.markNotificationAsRead(notificationId);
     } on ServerException catch (e) {
-      AppLogger.error('Repository: Failed to mark notification as read: ${e.message}');
+      AppLogger.error(
+          'Repository: Failed to mark notification as read: ${e.message}');
       return false;
     } catch (e) {
-      AppLogger.error('Repository: Unexpected error marking notification as read: $e');
+      AppLogger.error(
+          'Repository: Unexpected error marking notification as read: $e');
       return false;
     }
   }
@@ -50,13 +52,16 @@ class NotificationRepositoryImpl implements NotificationRepository {
     AppLogger.info('Repository: Attempting to mark all notifications as read');
     try {
       final result = await remoteDataSource.markAllNotificationsAsRead();
-      AppLogger.info('Repository: Mark all notifications as read result: $result');
+      AppLogger.info(
+          'Repository: Mark all notifications as read result: $result');
       return result;
     } on ServerException catch (e) {
-      AppLogger.error('Repository: Failed to mark all notifications as read: ${e.message}');
+      AppLogger.error(
+          'Repository: Failed to mark all notifications as read: ${e.message}');
       return false;
     } catch (e) {
-      AppLogger.error('Repository: Unexpected error marking all notifications as read: $e');
+      AppLogger.error(
+          'Repository: Unexpected error marking all notifications as read: $e');
       return false;
     }
   }

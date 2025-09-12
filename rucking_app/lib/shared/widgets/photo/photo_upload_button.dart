@@ -8,34 +8,34 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 class PhotoUploadButton extends StatelessWidget {
   /// Callback for when photos are selected
   final Function(List<File> photos)? onPhotosSelected;
-  
+
   /// Button label
   final String label;
-  
+
   /// Button icon
   final IconData icon;
-  
+
   /// Maximum number of photos that can be selected
   final int maxPhotos;
-  
+
   /// Whether to allow selecting multiple photos
   final bool allowMultiple;
-  
+
   /// Button size
   final PhotoUploadButtonSize size;
-  
+
   /// Whether button is in a loading state
   final bool isLoading;
-  
+
   /// Button style
   final PhotoUploadButtonStyle style;
-  
+
   /// Custom button width
   final double? width;
-  
+
   /// Custom button height
   final double? height;
-  
+
   /// Custom button border radius
   final double borderRadius;
 
@@ -62,7 +62,7 @@ class PhotoUploadButton extends StatelessWidget {
     double buttonWidth;
     double iconSize;
     double fontSize;
-    
+
     switch (size) {
       case PhotoUploadButtonSize.small:
         buttonHeight = 60.0;
@@ -89,13 +89,13 @@ class PhotoUploadButton extends StatelessWidget {
         fontSize = 14.0;
         break;
     }
-    
+
     // Button style configurations
     Color backgroundColor;
     Color borderColor;
     Color iconColor;
     Color textColor;
-    
+
     switch (style) {
       case PhotoUploadButtonStyle.filled:
         backgroundColor = AppColors.primary;
@@ -116,7 +116,7 @@ class PhotoUploadButton extends StatelessWidget {
         textColor = AppColors.primary;
         break;
     }
-    
+
     return InkWell(
       onTap: isLoading ? null : () => _handlePhotoSelection(context),
       child: Container(
@@ -128,38 +128,38 @@ class PhotoUploadButton extends StatelessWidget {
           border: Border.all(color: borderColor),
         ),
         child: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: iconSize,
-                  color: iconColor,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: fontSize,
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: iconSize,
+                    color: iconColor,
                   ),
-                ),
-                if (maxPhotos > 1)
+                  const SizedBox(height: 8),
                   Text(
-                    'Up to $maxPhotos photos',
+                    label,
                     style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: fontSize - 2,
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: fontSize,
                     ),
                   ),
-              ],
-            ),
+                  if (maxPhotos > 1)
+                    Text(
+                      'Up to $maxPhotos photos',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: fontSize - 2,
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }
-  
+
   Future<void> _handlePhotoSelection(BuildContext context) async {
     // Show option to choose camera or gallery
     showModalBottomSheet(
@@ -191,10 +191,10 @@ class PhotoUploadButton extends StatelessWidget {
       },
     );
   }
-  
+
   Future<void> _getImageFrom(BuildContext context, ImageSource source) async {
     final ImagePicker imagePicker = ImagePicker();
-    
+
     try {
       if (source == ImageSource.gallery && allowMultiple) {
         // For gallery, we can select multiple photos at once
@@ -203,14 +203,14 @@ class PhotoUploadButton extends StatelessWidget {
           maxHeight: 1800,
           imageQuality: 85,
         );
-        
+
         if (pickedFiles.isNotEmpty) {
           // Only add up to the max number of photos
           final filesToAdd = pickedFiles
               .take(maxPhotos)
               .map((xFile) => File(xFile.path))
               .toList();
-          
+
           if (onPhotosSelected != null) {
             onPhotosSelected!(filesToAdd);
           }
@@ -223,7 +223,7 @@ class PhotoUploadButton extends StatelessWidget {
           maxHeight: 1800,
           imageQuality: 85,
         );
-        
+
         if (pickedFile != null && onPhotosSelected != null) {
           onPhotosSelected!([File(pickedFile.path)]);
         }

@@ -12,7 +12,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<UserProfile> getPublicProfile(String userId) async {
     final response = await apiClient.get('/users/$userId/profile');
     final wrapper = response as Map<String, dynamic>;
-    final data = wrapper['data'] ?? wrapper; // API may wrap payload in a 'data' field
+    final data =
+        wrapper['data'] ?? wrapper; // API may wrap payload in a 'data' field
     return UserProfile.fromJson(data['user'] as Map<String, dynamic>);
   }
 
@@ -27,29 +28,33 @@ class ProfileRepositoryImpl implements ProfileRepository {
   @override
   Future<List<SocialUser>> getFollowers(String userId, {int page = 1}) async {
     final response = await apiClient.get('/users/$userId/followers?page=$page');
-    
+
     // Handle the wrapped response structure
     final data = response['data'] as Map<String, dynamic>?;
     if (data == null) return [];
-    
+
     final followers = data['followers'] as List?;
     if (followers == null) return [];
-    
-    return followers.map((e) => SocialUser.fromJson(e as Map<String, dynamic>)).toList();
+
+    return followers
+        .map((e) => SocialUser.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
   Future<List<SocialUser>> getFollowing(String userId, {int page = 1}) async {
     final response = await apiClient.get('/users/$userId/following?page=$page');
-    
+
     // Handle the wrapped response structure
     final data = response['data'] as Map<String, dynamic>?;
     if (data == null) return [];
-    
+
     final following = data['following'] as List?;
     if (following == null) return [];
-    
-    return following.map((e) => SocialUser.fromJson(e as Map<String, dynamic>)).toList();
+
+    return following
+        .map((e) => SocialUser.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   @override
@@ -79,4 +84,4 @@ class ProfileRepositoryImpl implements ProfileRepository {
     final data = wrapper['data'] ?? wrapper;
     return (data['clubs'] as List?) ?? [];
   }
-} 
+}

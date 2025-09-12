@@ -13,10 +13,12 @@ class SimpleAILogger {
     required String openaiResponse,
     bool isExplicit = false,
   }) async {
-    AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] ===== logResponse method called =====');
-    AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] sessionId: $sessionId (type: ${sessionId.runtimeType})');
+    AppLogger.error(
+        '[SIMPLE_AI_LOGGER_DEBUG] ===== logResponse method called =====');
+    AppLogger.error(
+        '[SIMPLE_AI_LOGGER_DEBUG] sessionId: $sessionId (type: ${sessionId.runtimeType})');
     AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] personality: $personality');
-    
+
     try {
       AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] Building logData object...');
       // Convert String sessionId to int for database
@@ -24,7 +26,8 @@ class SimpleAILogger {
       try {
         sessionIdInt = int.parse(sessionId);
       } catch (e) {
-        AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] Cannot convert sessionId to int: $sessionId - $e');
+        AppLogger.error(
+            '[SIMPLE_AI_LOGGER_DEBUG] Cannot convert sessionId to int: $sessionId - $e');
         return;
       }
 
@@ -35,12 +38,14 @@ class SimpleAILogger {
         'is_explicit': isExplicit,
       };
 
-      AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] About to call _apiClient.post to /ai-cheerleader/log');
+      AppLogger.error(
+          '[SIMPLE_AI_LOGGER_DEBUG] About to call _apiClient.post to /ai-cheerleader/log');
       final response = await _apiClient.post(
         '/ai-cheerleader/log',
         logData,
       );
-      AppLogger.error('[SIMPLE_AI_LOGGER_DEBUG] API call completed with response: $response');
+      AppLogger.error(
+          '[SIMPLE_AI_LOGGER_DEBUG] API call completed with response: $response');
 
       // API client returns response data directly, not a Response object
       if (response is Map<String, dynamic> && response['status'] == 'success') {

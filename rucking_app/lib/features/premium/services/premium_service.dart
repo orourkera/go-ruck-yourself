@@ -4,7 +4,7 @@ import 'package:rucking_app/core/services/revenue_cat_service.dart';
 /// Simple premium service that just checks RevenueCat status
 class PremiumService {
   final RevenueCatService _revenueCatService;
-  
+
   // Cache premium status for 5 minutes to avoid repeated API calls
   bool? _cachedStatus;
   DateTime? _lastCheck;
@@ -15,14 +15,15 @@ class PremiumService {
   /// Check if user has premium subscription
   Future<bool> isPremium({bool forceRefresh = false}) async {
     // Debug bypass for testing
-    if (kDebugMode && const bool.fromEnvironment('PREMIUM_BYPASS', defaultValue: false)) {
+    if (kDebugMode &&
+        const bool.fromEnvironment('PREMIUM_BYPASS', defaultValue: false)) {
       return true;
     }
 
     // Use cache if valid and not forcing refresh
-    if (!forceRefresh && 
-        _cachedStatus != null && 
-        _lastCheck != null && 
+    if (!forceRefresh &&
+        _cachedStatus != null &&
+        _lastCheck != null &&
         DateTime.now().difference(_lastCheck!) < _cacheDuration) {
       return _cachedStatus!;
     }
@@ -31,7 +32,8 @@ class PremiumService {
       final isPremium = await _revenueCatService.checkSubscriptionStatus();
       _cachedStatus = isPremium;
       _lastCheck = DateTime.now();
-      debugPrint('Premium status checked: $isPremium (forceRefresh: $forceRefresh)');
+      debugPrint(
+          'Premium status checked: $isPremium (forceRefresh: $forceRefresh)');
       return isPremium;
     } catch (e) {
       debugPrint('Error checking premium status: $e');
@@ -45,10 +47,10 @@ class PremiumService {
       final offerings = await _revenueCatService.getOfferings();
       if (offerings.isEmpty) return false;
 
-      final package = offerings.first.monthly ?? 
-                     offerings.first.annual ?? 
-                     offerings.first.availablePackages.firstOrNull;
-      
+      final package = offerings.first.monthly ??
+          offerings.first.annual ??
+          offerings.first.availablePackages.firstOrNull;
+
       if (package == null) return false;
 
       final success = await _revenueCatService.makePurchase(package);

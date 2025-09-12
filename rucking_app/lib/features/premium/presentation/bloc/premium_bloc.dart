@@ -25,7 +25,8 @@ class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
       final isPremium = await _premiumService.isPremium();
       emit(PremiumLoaded(isPremium: isPremium));
     } catch (e) {
-      emit(PremiumError('Failed to initialize premium status: ${e.toString()}'));
+      emit(
+          PremiumError('Failed to initialize premium status: ${e.toString()}'));
     }
   }
 
@@ -73,7 +74,7 @@ class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
           'service_available': _premiumService != null,
         },
       );
-      
+
       emit(PremiumPurchaseError('Purchase error: ${e.toString()}'));
     }
   }
@@ -101,7 +102,7 @@ class PremiumBloc extends Bloc<PremiumEvent, PremiumState> {
           'service_available': _premiumService != null,
         },
       );
-      
+
       emit(PremiumError('Restore error: ${e.toString()}'));
     }
   }

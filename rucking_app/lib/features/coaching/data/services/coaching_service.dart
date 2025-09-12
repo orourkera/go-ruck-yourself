@@ -37,18 +37,23 @@ class CoachingService {
       final responseData = await _apiClient.post(
         '/user-coaching-plans',
         {
-          'template_id': _getTemplateId(basePlanId), // Map plan type ID to backend template ID
-          'personality': coachingPersonality,  // Fixed parameter name to match backend
+          'template_id': _getTemplateId(
+              basePlanId), // Map plan type ID to backend template ID
+          'personality':
+              coachingPersonality, // Fixed parameter name to match backend
           'start_date': DateTime.now().toIso8601String().split('T')[0], // Today
         },
       );
 
       // Handle both direct response and wrapped response formats
       if (responseData is Map<String, dynamic>) {
-        if (responseData.containsKey('success') && responseData['success'] == true) {
+        if (responseData.containsKey('success') &&
+            responseData['success'] == true) {
           return responseData['data'];
-        } else if (responseData.containsKey('success') && responseData['success'] == false) {
-          throw Exception(responseData['message'] ?? 'Failed to create coaching plan');
+        } else if (responseData.containsKey('success') &&
+            responseData['success'] == false) {
+          throw Exception(
+              responseData['message'] ?? 'Failed to create coaching plan');
         } else {
           // Direct response format
           return responseData;

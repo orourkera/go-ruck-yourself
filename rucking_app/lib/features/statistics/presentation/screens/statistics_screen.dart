@@ -18,24 +18,25 @@ class StatisticsScreen extends StatefulWidget {
   _StatisticsScreenState createState() => _StatisticsScreenState();
 }
 
-class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerProviderStateMixin, RouteAware {
+class _StatisticsScreenState extends State<StatisticsScreen>
+    with SingleTickerProviderStateMixin, RouteAware {
   late TabController _tabController;
   final ApiClient _apiClient = GetIt.instance<ApiClient>();
-  
+
   bool _isLoadingWeekly = true;
   bool _isLoadingMonthly = true;
   bool _isLoadingYearly = true;
   bool _hasLoadedData = false; // Track if data has been loaded
-  
+
   Map<String, dynamic> _weeklyStats = {};
   Map<String, dynamic> _monthlyStats = {};
   Map<String, dynamic> _yearlyStats = {};
-  
+
   // Date navigation offsets from current date
-  int _weekOffset = 0;  // 0 = current week, -1 = last week, +1 = next week
+  int _weekOffset = 0; // 0 = current week, -1 = last week, +1 = next week
   int _monthOffset = 0; // 0 = current month, -1 = last month, +1 = next month
-  int _yearOffset = 0;  // 0 = current year, -1 = last year, +1 = next year
-  
+  int _yearOffset = 0; // 0 = current year, -1 = last year, +1 = next year
+
   @override
   void initState() {
     super.initState();
@@ -44,151 +45,174 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
     AppLogger.info('[STATS_SCREEN] TabController created with 3 tabs');
     // Don't fetch data immediately - use lazy loading when user actually views this tab
   }
-  
+
   @override
   void dispose() {
     AppLogger.info('[STATS_SCREEN] Disposing StatisticsScreen');
     _tabController.dispose();
     super.dispose();
   }
-  
+
   /// Fetch statistics data from API
   Future<void> _fetchStatistics() async {
     AppLogger.info('[STATS_SCREEN] Starting to fetch statistics data');
-    
+
     try {
       // Fetch weekly stats
-      final weeklyUrl = _weekOffset == 0 ? '/stats/weekly' : '/stats/weekly?offset=$_weekOffset';
+      final weeklyUrl = _weekOffset == 0
+          ? '/stats/weekly'
+          : '/stats/weekly?offset=$_weekOffset';
       AppLogger.info('[STATS_SCREEN] Fetching weekly stats from $weeklyUrl');
       final weeklyResponse = await _apiClient.get(weeklyUrl);
-      AppLogger.info('[STATS_SCREEN] Weekly stats API response: ${weeklyResponse?.runtimeType}');
-      
+      AppLogger.info(
+          '[STATS_SCREEN] Weekly stats API response: ${weeklyResponse?.runtimeType}');
+
       // Process weekly stats
       Map<String, dynamic> weeklyStats = {};
       if (weeklyResponse is Map) {
         if (weeklyResponse.containsKey('data')) {
-          weeklyStats = weeklyResponse['data'] is Map ? 
-              Map<String, dynamic>.from(weeklyResponse['data']) : {};
+          weeklyStats = weeklyResponse['data'] is Map
+              ? Map<String, dynamic>.from(weeklyResponse['data'])
+              : {};
         } else {
           weeklyStats = Map<String, dynamic>.from(weeklyResponse);
         }
       }
-      
+
       if (mounted) {
-        AppLogger.info('[STATS_SCREEN] Processing weekly stats - keys: ${weeklyStats.keys.toList()}');
+        AppLogger.info(
+            '[STATS_SCREEN] Processing weekly stats - keys: ${weeklyStats.keys.toList()}');
         setState(() {
           _weeklyStats = weeklyStats;
           _isLoadingWeekly = false;
         });
         AppLogger.info('[STATS_SCREEN] Weekly stats loaded successfully');
       } else {
-        AppLogger.warning('[STATS_SCREEN] Widget not mounted when weekly stats returned');
+        AppLogger.warning(
+            '[STATS_SCREEN] Widget not mounted when weekly stats returned');
       }
-      
+
       // Fetch monthly stats
-      final monthlyUrl = _monthOffset == 0 ? '/stats/monthly' : '/stats/monthly?offset=$_monthOffset';
+      final monthlyUrl = _monthOffset == 0
+          ? '/stats/monthly'
+          : '/stats/monthly?offset=$_monthOffset';
       AppLogger.info('[STATS_SCREEN] Fetching monthly stats from $monthlyUrl');
       final monthlyResponse = await _apiClient.get(monthlyUrl);
-      AppLogger.info('[STATS_SCREEN] Monthly stats API response: ${monthlyResponse?.runtimeType}');
-      
+      AppLogger.info(
+          '[STATS_SCREEN] Monthly stats API response: ${monthlyResponse?.runtimeType}');
+
       // Process monthly stats
       Map<String, dynamic> monthlyStats = {};
       if (monthlyResponse is Map) {
         if (monthlyResponse.containsKey('data')) {
-          monthlyStats = monthlyResponse['data'] is Map ? 
-              Map<String, dynamic>.from(monthlyResponse['data']) : {};
+          monthlyStats = monthlyResponse['data'] is Map
+              ? Map<String, dynamic>.from(monthlyResponse['data'])
+              : {};
         } else {
           monthlyStats = Map<String, dynamic>.from(monthlyResponse);
         }
       }
-      
+
       // Update state with monthly stats
       if (mounted) {
-        AppLogger.info('[STATS_SCREEN] Processing monthly stats - keys: ${monthlyStats.keys.toList()}');
+        AppLogger.info(
+            '[STATS_SCREEN] Processing monthly stats - keys: ${monthlyStats.keys.toList()}');
         setState(() {
           _monthlyStats = monthlyStats;
           _isLoadingMonthly = false;
         });
         AppLogger.info('[STATS_SCREEN] Monthly stats loaded successfully');
       } else {
-        AppLogger.warning('[STATS_SCREEN] Widget not mounted when monthly stats returned');
+        AppLogger.warning(
+            '[STATS_SCREEN] Widget not mounted when monthly stats returned');
       }
-      
+
       // Fetch yearly stats
-      final yearlyUrl = _yearOffset == 0 ? '/stats/yearly' : '/stats/yearly?offset=$_yearOffset';
+      final yearlyUrl = _yearOffset == 0
+          ? '/stats/yearly'
+          : '/stats/yearly?offset=$_yearOffset';
       AppLogger.info('[STATS_SCREEN] Fetching yearly stats from $yearlyUrl');
       final yearlyResponse = await _apiClient.get(yearlyUrl);
-      AppLogger.info('[STATS_SCREEN] Yearly stats API response: ${yearlyResponse?.runtimeType}');
-      
+      AppLogger.info(
+          '[STATS_SCREEN] Yearly stats API response: ${yearlyResponse?.runtimeType}');
+
       // Process yearly stats
       Map<String, dynamic> yearlyStats = {};
       if (yearlyResponse is Map) {
         if (yearlyResponse.containsKey('data')) {
-          yearlyStats = yearlyResponse['data'] is Map ? 
-              Map<String, dynamic>.from(yearlyResponse['data']) : {};
+          yearlyStats = yearlyResponse['data'] is Map
+              ? Map<String, dynamic>.from(yearlyResponse['data'])
+              : {};
         } else {
           yearlyStats = Map<String, dynamic>.from(yearlyResponse);
         }
       }
-      
+
       // Update state with yearly stats
       if (mounted) {
-        AppLogger.info('[STATS_SCREEN] Processing yearly stats - keys: ${yearlyStats.keys.toList()}');
+        AppLogger.info(
+            '[STATS_SCREEN] Processing yearly stats - keys: ${yearlyStats.keys.toList()}');
         setState(() {
           _yearlyStats = yearlyStats;
           _isLoadingYearly = false;
         });
         AppLogger.info('[STATS_SCREEN] All statistics loaded successfully!');
       } else {
-        AppLogger.warning('[STATS_SCREEN] Widget not mounted when yearly stats returned');
+        AppLogger.warning(
+            '[STATS_SCREEN] Widget not mounted when yearly stats returned');
       }
-      
     } catch (e) {
       AppLogger.error('[STATS_SCREEN] Error fetching statistics: $e');
       AppLogger.error('[STATS_SCREEN] Stack trace: ${StackTrace.current}');
-      
+
       // Enhanced error handling with Sentry
       await AppErrorHandler.handleError(
         'statistics_fetch',
         e,
         context: {
           'screen': 'statistics',
-        'current_tab': _tabController.index,
-      },
-      sendToBackend: true,
-    );
-    
-    if (mounted) {
-      AppLogger.error('[STATS_SCREEN] Setting error states - stopping all loading indicators');
-      setState(() {
-        _isLoadingWeekly = false;
-        _isLoadingMonthly = false;
-        _isLoadingYearly = false;
-      });
-      AppLogger.info('[STATS_SCREEN] Error states set successfully');
-    } else {
-      AppLogger.warning('[STATS_SCREEN] Widget not mounted when handling error');
-    }
+          'current_tab': _tabController.index,
+        },
+        sendToBackend: true,
+      );
+
+      if (mounted) {
+        AppLogger.error(
+            '[STATS_SCREEN] Setting error states - stopping all loading indicators');
+        setState(() {
+          _isLoadingWeekly = false;
+          _isLoadingMonthly = false;
+          _isLoadingYearly = false;
+        });
+        AppLogger.info('[STATS_SCREEN] Error states set successfully');
+      } else {
+        AppLogger.warning(
+            '[STATS_SCREEN] Widget not mounted when handling error');
+      }
     }
   }
 
   /// Fetch only weekly stats
   Future<void> _fetchWeeklyStats() async {
     try {
-      final weeklyUrl = _weekOffset == 0 ? '/stats/weekly' : '/stats/weekly?offset=$_weekOffset';
-      AppLogger.info('[STATS_SCREEN] Fetching weekly stats with URL: $weeklyUrl (offset: $_weekOffset)');
+      final weeklyUrl = _weekOffset == 0
+          ? '/stats/weekly'
+          : '/stats/weekly?offset=$_weekOffset';
+      AppLogger.info(
+          '[STATS_SCREEN] Fetching weekly stats with URL: $weeklyUrl (offset: $_weekOffset)');
       final weeklyResponse = await _apiClient.get(weeklyUrl);
-      
+
       Map<String, dynamic> weeklyStats = {};
       if (weeklyResponse is Map) {
         if (weeklyResponse.containsKey('data')) {
-          weeklyStats = weeklyResponse['data'] is Map ? 
-              Map<String, dynamic>.from(weeklyResponse['data']) : {};
+          weeklyStats = weeklyResponse['data'] is Map
+              ? Map<String, dynamic>.from(weeklyResponse['data'])
+              : {};
         } else {
           weeklyStats = Map<String, dynamic>.from(weeklyResponse);
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _weeklyStats = weeklyStats;
@@ -207,19 +231,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   /// Fetch only monthly stats
   Future<void> _fetchMonthlyStats() async {
     try {
-      final monthlyUrl = _monthOffset == 0 ? '/stats/monthly' : '/stats/monthly?offset=$_monthOffset';
+      final monthlyUrl = _monthOffset == 0
+          ? '/stats/monthly'
+          : '/stats/monthly?offset=$_monthOffset';
       final monthlyResponse = await _apiClient.get(monthlyUrl);
-      
+
       Map<String, dynamic> monthlyStats = {};
       if (monthlyResponse is Map) {
         if (monthlyResponse.containsKey('data')) {
-          monthlyStats = monthlyResponse['data'] is Map ? 
-              Map<String, dynamic>.from(monthlyResponse['data']) : {};
+          monthlyStats = monthlyResponse['data'] is Map
+              ? Map<String, dynamic>.from(monthlyResponse['data'])
+              : {};
         } else {
           monthlyStats = Map<String, dynamic>.from(monthlyResponse);
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _monthlyStats = monthlyStats;
@@ -238,19 +265,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
   /// Fetch only yearly stats
   Future<void> _fetchYearlyStats() async {
     try {
-      final yearlyUrl = _yearOffset == 0 ? '/stats/yearly' : '/stats/yearly?offset=$_yearOffset';
+      final yearlyUrl = _yearOffset == 0
+          ? '/stats/yearly'
+          : '/stats/yearly?offset=$_yearOffset';
       final yearlyResponse = await _apiClient.get(yearlyUrl);
-      
+
       Map<String, dynamic> yearlyStats = {};
       if (yearlyResponse is Map) {
         if (yearlyResponse.containsKey('data')) {
-          yearlyStats = yearlyResponse['data'] is Map ? 
-              Map<String, dynamic>.from(yearlyResponse['data']) : {};
+          yearlyStats = yearlyResponse['data'] is Map
+              ? Map<String, dynamic>.from(yearlyResponse['data'])
+              : {};
         } else {
           yearlyStats = Map<String, dynamic>.from(yearlyResponse);
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _yearlyStats = yearlyStats;
@@ -265,15 +295,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
       }
     }
   }
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    AppLogger.info('[STATS_SCREEN] didChangeDependencies called - hasLoadedData: $_hasLoadedData');
-    
+    AppLogger.info(
+        '[STATS_SCREEN] didChangeDependencies called - hasLoadedData: $_hasLoadedData');
+
     // Only fetch data when the screen is actually visited and if not already loaded
     if (!_hasLoadedData) {
-      AppLogger.info('[STATS_SCREEN] Data not loaded yet, fetching statistics...');
+      AppLogger.info(
+          '[STATS_SCREEN] Data not loaded yet, fetching statistics...');
       _fetchStatistics();
       _hasLoadedData = true;
     } else {
@@ -283,23 +315,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
 
   @override
   void didPopNext() {
-    AppLogger.info('[STATS_SCREEN] didPopNext called - returning to statistics screen');
+    AppLogger.info(
+        '[STATS_SCREEN] didPopNext called - returning to statistics screen');
     // Called when returning to this screen
     _fetchStatistics();
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    AppLogger.info('[STATS_SCREEN] Building StatisticsScreen - loading states: weekly=$_isLoadingWeekly, monthly=$_isLoadingMonthly, yearly=$_isLoadingYearly');
-    AppLogger.info('[STATS_SCREEN] Data states: weeklyEmpty=${_weeklyStats.isEmpty}, monthlyEmpty=${_monthlyStats.isEmpty}, yearlyEmpty=${_yearlyStats.isEmpty}');
-    
+    AppLogger.info(
+        '[STATS_SCREEN] Building StatisticsScreen - loading states: weekly=$_isLoadingWeekly, monthly=$_isLoadingMonthly, yearly=$_isLoadingYearly');
+    AppLogger.info(
+        '[STATS_SCREEN] Data states: weeklyEmpty=${_weeklyStats.isEmpty}, monthlyEmpty=${_monthlyStats.isEmpty}, yearlyEmpty=${_yearlyStats.isEmpty}');
+
     // Get user's metric preference
     bool preferMetric = true;
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       preferMetric = authState.user.preferMetric;
     }
-    
+
     return Scaffold(
       body: Column(
         children: [
@@ -311,7 +346,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
               indicatorColor: AppColors.accent,
-              labelStyle: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+              labelStyle: AppTextStyles.titleMedium
+                  .copyWith(fontWeight: FontWeight.bold),
               unselectedLabelStyle: AppTextStyles.titleMedium,
               tabs: const [
                 Tab(text: 'WEEKLY'),
@@ -328,22 +364,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                 // Weekly tab
                 _isLoadingWeekly
                     ? Builder(builder: (context) {
-                        AppLogger.info('[STATS_SCREEN] Showing weekly loading indicator');
+                        AppLogger.info(
+                            '[STATS_SCREEN] Showing weekly loading indicator');
                         return const Center(child: CircularProgressIndicator());
                       })
                     : _weeklyStats.isEmpty
                         ? Builder(builder: (context) {
-                            AppLogger.info('[STATS_SCREEN] Showing weekly empty state');
+                            AppLogger.info(
+                                '[STATS_SCREEN] Showing weekly empty state');
                             return const _EmptyStatsWidget(timeframe: 'weekly');
                           })
                         : Builder(builder: (context) {
-                            AppLogger.info('[STATS_SCREEN] Showing weekly stats content');
+                            AppLogger.info(
+                                '[STATS_SCREEN] Showing weekly stats content');
                             return _StatsContentWidget(
                               stats: _weeklyStats,
                               timeframe: 'weekly',
                               preferMetric: preferMetric,
                               onPreviousPeriod: () {
-                                AppLogger.info('[STATS_SCREEN] Previous week button tapped, offset: $_weekOffset -> ${_weekOffset - 1}');
+                                AppLogger.info(
+                                    '[STATS_SCREEN] Previous week button tapped, offset: $_weekOffset -> ${_weekOffset - 1}');
                                 setState(() {
                                   _weekOffset--;
                                   _isLoadingWeekly = true;
@@ -351,7 +391,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                                 _fetchWeeklyStats();
                               },
                               onNextPeriod: () {
-                                AppLogger.info('[STATS_SCREEN] Next week button tapped, offset: $_weekOffset -> ${_weekOffset + 1}');
+                                AppLogger.info(
+                                    '[STATS_SCREEN] Next week button tapped, offset: $_weekOffset -> ${_weekOffset + 1}');
                                 setState(() {
                                   _weekOffset++;
                                   _isLoadingWeekly = true;
@@ -360,20 +401,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                               },
                             );
                           }),
-                
+
                 // Monthly tab
                 _isLoadingMonthly
                     ? Builder(builder: (context) {
-                        AppLogger.info('[STATS_SCREEN] Showing monthly loading indicator');
+                        AppLogger.info(
+                            '[STATS_SCREEN] Showing monthly loading indicator');
                         return const Center(child: CircularProgressIndicator());
                       })
                     : _monthlyStats.isEmpty
                         ? Builder(builder: (context) {
-                            AppLogger.info('[STATS_SCREEN] Showing monthly empty state');
-                            return const _EmptyStatsWidget(timeframe: 'monthly');
+                            AppLogger.info(
+                                '[STATS_SCREEN] Showing monthly empty state');
+                            return const _EmptyStatsWidget(
+                                timeframe: 'monthly');
                           })
                         : Builder(builder: (context) {
-                            AppLogger.info('[STATS_SCREEN] Showing monthly stats content');
+                            AppLogger.info(
+                                '[STATS_SCREEN] Showing monthly stats content');
                             return _StatsContentWidget(
                               stats: _monthlyStats,
                               timeframe: 'monthly',
@@ -394,20 +439,23 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
                               },
                             );
                           }),
-                
+
                 // Yearly tab
                 _isLoadingYearly
                     ? Builder(builder: (context) {
-                        AppLogger.info('[STATS_SCREEN] Showing yearly loading indicator');
+                        AppLogger.info(
+                            '[STATS_SCREEN] Showing yearly loading indicator');
                         return const Center(child: CircularProgressIndicator());
                       })
                     : _yearlyStats.isEmpty
                         ? Builder(builder: (context) {
-                            AppLogger.info('[STATS_SCREEN] Showing yearly empty state');
+                            AppLogger.info(
+                                '[STATS_SCREEN] Showing yearly empty state');
                             return const _EmptyStatsWidget(timeframe: 'yearly');
                           })
                         : Builder(builder: (context) {
-                            AppLogger.info('[STATS_SCREEN] Showing yearly stats content');
+                            AppLogger.info(
+                                '[STATS_SCREEN] Showing yearly stats content');
                             return _StatsContentWidget(
                               stats: _yearlyStats,
                               timeframe: 'yearly',
@@ -440,8 +488,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> with SingleTickerPr
 /// Empty state widget for statistics
 class _EmptyStatsWidget extends StatelessWidget {
   final String timeframe;
-  
-  const _EmptyStatsWidget({Key? key, required this.timeframe}) : super(key: key);
+
+  const _EmptyStatsWidget({Key? key, required this.timeframe})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -482,14 +531,20 @@ class _StatsContentWidget extends StatelessWidget {
   final bool preferMetric;
   final VoidCallback? onPreviousPeriod;
   final VoidCallback? onNextPeriod;
-  
+
   static const List<String> _weekdayNames = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday'
   ];
-  
+
   const _StatsContentWidget({
-    Key? key, 
-    required this.stats, 
+    Key? key,
+    required this.stats,
     required this.timeframe,
     required this.preferMetric,
     this.onPreviousPeriod,
@@ -504,16 +559,17 @@ class _StatsContentWidget extends StatelessWidget {
     final totalCalories = stats['total_calories'] ?? 0;
     final totalDurationSecs = stats['total_duration_seconds'] ?? 0;
     final totalPowerPoints = stats['total_power_points'] ?? 0;
-    
+
     // Format stats
-    final distanceValue = MeasurementUtils.formatDistance(totalDistanceKm, metric: preferMetric);
-    
+    final distanceValue =
+        MeasurementUtils.formatDistance(totalDistanceKm, metric: preferMetric);
+
     // Format duration
     final duration = Duration(seconds: totalDurationSecs);
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     final durationText = '${hours}h ${minutes}m';
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -521,11 +577,12 @@ class _StatsContentWidget extends StatelessWidget {
         children: [
           // Period selector
           _buildPeriodSelector(stats['date_range'] ?? _getDefaultDateRange()),
-          
+
           const SizedBox(height: 24),
-          
+
           // Chart
-          if (stats['time_series'] != null && (stats['time_series'] as List).isNotEmpty)
+          if (stats['time_series'] != null &&
+              (stats['time_series'] as List).isNotEmpty)
             Column(
               children: [
                 RuckStatsChart(
@@ -571,7 +628,7 @@ class _StatsContentWidget extends StatelessWidget {
                 ),
               ),
             ),
-          
+
           // Summary cards
           Text(
             'Summary',
@@ -643,15 +700,15 @@ class _StatsContentWidget extends StatelessWidget {
               Expanded(child: Container()), // Empty space to balance the layout
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Performance metrics
           if (stats['performance'] != null)
             _buildPerformanceSection(context, stats['performance']),
-          
+
           const SizedBox(height: 24),
-          
+
           // Day breakdown (for weekly)
           if (timeframe == 'weekly' && stats['daily_breakdown'] != null)
             _buildDailyBreakdownSection(stats['daily_breakdown'], context),
@@ -660,7 +717,6 @@ class _StatsContentWidget extends StatelessWidget {
     );
   }
 
-
   /// Builds the period selector widget
   Widget _buildPeriodSelector(String dateRange) {
     return Row(
@@ -668,7 +724,7 @@ class _StatsContentWidget extends StatelessWidget {
       children: [
         IconButton(
           icon: const Icon(Icons.chevron_left),
-          onPressed: onPreviousPeriod != null 
+          onPressed: onPreviousPeriod != null
               ? () {
                   print('Previous period button tapped!');
                   onPreviousPeriod!();
@@ -681,7 +737,7 @@ class _StatsContentWidget extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.chevron_right),
-          onPressed: onNextPeriod != null 
+          onPressed: onNextPeriod != null
               ? () {
                   print('Next period button tapped!');
                   onNextPeriod!();
@@ -691,7 +747,7 @@ class _StatsContentWidget extends StatelessWidget {
       ],
     );
   }
-  
+
   String _getDefaultDateRange() {
     switch (timeframe) {
       case 'weekly':
@@ -728,7 +784,9 @@ class _StatsContentWidget extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : color,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : color,
             size: 24,
           ),
           const SizedBox(height: 12),
@@ -736,14 +794,18 @@ class _StatsContentWidget extends StatelessWidget {
             value,
             style: AppTextStyles.headlineMedium.copyWith(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Color(0xFF728C69)
+                  : AppColors.textDark,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: AppTextStyles.bodySmall.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Color(0xFF728C69)
+                  : AppColors.textDarkSecondary,
             ),
           ),
         ],
@@ -752,21 +814,24 @@ class _StatsContentWidget extends StatelessWidget {
   }
 
   /// Builds the performance metrics section
-  Widget _buildPerformanceSection(BuildContext context, Map<String, dynamic> performance) {
+  Widget _buildPerformanceSection(
+      BuildContext context, Map<String, dynamic> performance) {
     final avgPaceValue = performance['avg_pace_seconds_per_km'] ?? 0;
-    final paceDisplay = avgPaceValue > 0 ? MeasurementUtils.formatPace(avgPaceValue.toDouble(), metric: preferMetric) : '--';
-    
+    final paceDisplay = avgPaceValue > 0
+        ? MeasurementUtils.formatPace(avgPaceValue.toDouble(),
+            metric: preferMetric)
+        : '--';
+
     final avgDistanceKm = (performance['avg_distance_km'] ?? 0.0).toDouble();
-    final avgDistanceValue = MeasurementUtils.formatDistance(avgDistanceKm, metric: preferMetric);
-    
+    final avgDistanceValue =
+        MeasurementUtils.formatDistance(avgDistanceKm, metric: preferMetric);
+
     final avgDurationSecs = performance['avg_duration_seconds'] ?? 0;
     final avgDuration = Duration(seconds: avgDurationSecs);
     final hours = avgDuration.inHours;
     final minutes = avgDuration.inMinutes % 60;
-    final avgDurationText = hours > 0
-        ? '${hours}h ${minutes}m'
-        : '${minutes}m';
-    
+    final avgDurationText = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -774,7 +839,9 @@ class _StatsContentWidget extends StatelessWidget {
           'Performance',
           style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -824,7 +891,9 @@ class _StatsContentWidget extends StatelessWidget {
     return ListTile(
       leading: Icon(
         icon,
-        color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.primary,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Color(0xFF728C69)
+            : AppColors.primary,
       ),
       title: Text(
         label,
@@ -840,7 +909,8 @@ class _StatsContentWidget extends StatelessWidget {
   }
 
   /// Builds the daily breakdown section for weekly view
-  Widget _buildDailyBreakdownSection(List<dynamic> dailyBreakdown, BuildContext context) {
+  Widget _buildDailyBreakdownSection(
+      List<dynamic> dailyBreakdown, BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -848,7 +918,9 @@ class _StatsContentWidget extends StatelessWidget {
           'Daily Breakdown',
           style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -859,7 +931,8 @@ class _StatsContentWidget extends StatelessWidget {
           itemBuilder: (context, index) {
             final day = dailyBreakdown[index];
             String dayName;
-            if (day['day_name'] != null && day['day_name'].toString().isNotEmpty) {
+            if (day['day_name'] != null &&
+                day['day_name'].toString().isNotEmpty) {
               dayName = day['day_name'];
             } else if (day['date'] != null) {
               try {
@@ -873,12 +946,13 @@ class _StatsContentWidget extends StatelessWidget {
             } else {
               dayName = 'Unknown';
             }
-            
+
             final sessionsCount = day['sessions_count'] ?? 0;
             final distanceKm = (day['distance_km'] ?? 0.0).toDouble();
-            
-            final distanceValue = MeasurementUtils.formatDistance(distanceKm, metric: preferMetric);
-            
+
+            final distanceValue = MeasurementUtils.formatDistance(distanceKm,
+                metric: preferMetric);
+
             final isDark = Theme.of(context).brightness == Brightness.dark;
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
@@ -909,7 +983,9 @@ class _StatsContentWidget extends StatelessWidget {
                     Text(
                       '$sessionsCount ${sessionsCount == 1 ? 'ruck' : 'rucks'}',
                       style: AppTextStyles.bodyMedium.copyWith(
-                        color: isDark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                        color: isDark
+                            ? Color(0xFF728C69)
+                            : AppColors.textDarkSecondary,
                       ),
                     ),
                   ],
@@ -936,19 +1012,19 @@ class _WeeklyStatsTab extends StatelessWidget {
         children: [
           // Date range selector
           _buildDateSelector('Apr 7 - Apr 13, 2025'),
-          
+
           const SizedBox(height: 24),
-          
+
           // Summary cards
           _buildSummarySection(context),
-          
+
           const SizedBox(height: 24),
-          
+
           // Daily breakdown
           _buildDailyBreakdownSection(context),
-          
+
           const SizedBox(height: 24),
-          
+
           // Performance metrics
           _buildPerformanceSection(context),
         ],
@@ -990,7 +1066,9 @@ class _WeeklyStatsTab extends StatelessWidget {
           'Summary',
           style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -1068,7 +1146,9 @@ class _WeeklyStatsTab extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : color,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : color,
             size: 24,
           ),
           const SizedBox(height: 12),
@@ -1076,14 +1156,18 @@ class _WeeklyStatsTab extends StatelessWidget {
             value,
             style: AppTextStyles.headlineMedium.copyWith(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Color(0xFF728C69)
+                  : AppColors.textDark,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: AppTextStyles.bodySmall.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Color(0xFF728C69)
+                  : AppColors.textDarkSecondary,
             ),
           ),
         ],
@@ -1100,7 +1184,9 @@ class _WeeklyStatsTab extends StatelessWidget {
           'Daily Breakdown',
           style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -1123,7 +1209,9 @@ class _WeeklyStatsTab extends StatelessWidget {
             child: Text(
               'Bar Chart: Daily Distance',
               style: AppTextStyles.bodyMedium.copyWith(
-                color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDarkSecondary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Color(0xFF728C69)
+                    : AppColors.textDarkSecondary,
               ),
             ),
           ),
@@ -1141,7 +1229,9 @@ class _WeeklyStatsTab extends StatelessWidget {
           'Performance',
           style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.textDark,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Color(0xFF728C69)
+                : AppColors.textDark,
           ),
         ),
         const SizedBox(height: 16),
@@ -1215,12 +1305,14 @@ class _WeeklyStatsTab extends StatelessWidget {
           Row(
             children: [
               Icon(
-                isPositive
-                    ? Icons.arrow_upward
-                    : Icons.arrow_downward,
+                isPositive ? Icons.arrow_upward : Icons.arrow_downward,
                 color: isPositive
-                    ? (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.success)
-                    : (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.error),
+                    ? (Theme.of(context).brightness == Brightness.dark
+                        ? Color(0xFF728C69)
+                        : AppColors.success)
+                    : (Theme.of(context).brightness == Brightness.dark
+                        ? Color(0xFF728C69)
+                        : AppColors.error),
                 size: 16,
               ),
               const SizedBox(width: 4),
@@ -1228,8 +1320,12 @@ class _WeeklyStatsTab extends StatelessWidget {
                 change,
                 style: AppTextStyles.bodySmall.copyWith(
                   color: isPositive
-                      ? (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.success)
-                      : (Theme.of(context).brightness == Brightness.dark ? Color(0xFF728C69) : AppColors.error),
+                      ? (Theme.of(context).brightness == Brightness.dark
+                          ? Color(0xFF728C69)
+                          : AppColors.success)
+                      : (Theme.of(context).brightness == Brightness.dark
+                          ? Color(0xFF728C69)
+                          : AppColors.error),
                 ),
               ),
             ],

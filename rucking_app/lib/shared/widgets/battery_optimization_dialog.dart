@@ -23,8 +23,8 @@ class BatteryOptimizationDialog extends StatelessWidget {
           maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark 
-              ? const Color(0xFF2A2A2A) 
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF2A2A2A)
               : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
@@ -54,50 +54,50 @@ class BatteryOptimizationDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Title
               Text(
                 'Enable Background Tracking',
                 style: AppTextStyles.headlineMedium.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white 
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
                       : AppColors.textDark,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
+
               // First paragraph
               Text(
                 'Hey Rucker! We need some help with Android battery settings in order to effectively track your ruck sessions.',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white70 
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white70
                       : AppColors.textDarkSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
+
               // Second paragraph
               Text(
                 'We optimize battery settings on our own. By allowing Ruck! to run in the background you won\'t lose GPS tracking while the app is in the background. Click Allow below to continue.',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white70 
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white70
                       : AppColors.textDarkSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              
+
               // Feature list
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? const Color(0xFF3A3A3A) 
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF3A3A3A)
                       : AppColors.primary.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
@@ -131,7 +131,7 @@ class BatteryOptimizationDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Instructions
               Container(
                 padding: const EdgeInsets.all(12),
@@ -164,7 +164,7 @@ class BatteryOptimizationDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Buttons
               Row(
                 children: [
@@ -176,17 +176,18 @@ class BatteryOptimizationDialog extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                           side: BorderSide(
-                            color: Theme.of(context).brightness == Brightness.dark 
-                                ? Colors.white30 
-                                : Colors.grey.shade300,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white30
+                                    : Colors.grey.shade300,
                           ),
                         ),
                       ),
                       child: Text(
                         'Not Now',
                         style: AppTextStyles.labelMedium.copyWith(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.white70 
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white70
                               : AppColors.textDarkSecondary,
                         ),
                       ),
@@ -224,7 +225,8 @@ class BatteryOptimizationDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureItem(BuildContext context, IconData icon, String title, String description) {
+  Widget _buildFeatureItem(
+      BuildContext context, IconData icon, String title, String description) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -250,8 +252,8 @@ class BatteryOptimizationDialog extends StatelessWidget {
                 title,
                 style: AppTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white 
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
                       : AppColors.textDark,
                 ),
               ),
@@ -259,8 +261,8 @@ class BatteryOptimizationDialog extends StatelessWidget {
               Text(
                 description,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white60 
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white60
                       : AppColors.textDarkSecondary,
                 ),
               ),

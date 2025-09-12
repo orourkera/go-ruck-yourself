@@ -23,24 +23,24 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
   late ConfettiController _confettiController;
   late Animation<double> _scaleAnimation;
   late PageController _pageController;
-  
+
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 3),
     );
-    
+
     _pageController = PageController();
-    
+
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -96,7 +96,7 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
               ],
             ),
           ),
-          
+
           // Close button
           SafeArea(
             child: Align(
@@ -117,7 +117,7 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
               ),
             ),
           ),
-          
+
           // Main content - Achievement Carousel
           Center(
             child: AnimatedBuilder(
@@ -130,18 +130,18 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
                     children: [
                       // Header
                       Text(
-                        widget.newAchievements.length > 1 
-                          ? 'Achievements Unlocked!' 
-                          : 'Achievement Unlocked!',
+                        widget.newAchievements.length > 1
+                            ? 'Achievements Unlocked!'
+                            : 'Achievement Unlocked!',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      
+
                       const SizedBox(height: 32.0),
-                      
+
                       // Achievement cards carousel
                       SizedBox(
                         height: 450,
@@ -156,7 +156,8 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
                           itemBuilder: (context, index) {
                             final achievement = widget.newAchievements[index];
                             return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
                               child: Card(
                                 elevation: 8.0,
                                 shape: RoundedRectangleBorder(
@@ -173,33 +174,37 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
                                         isEarned: true,
                                         size: 120.0,
                                       ),
-                                      
+
                                       const SizedBox(height: 24.0),
-                                      
+
                                       // Achievement details
                                       Text(
                                         achievement.name,
-                                        style: theme.textTheme.titleLarge?.copyWith(
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: _getCategoryColor(achievement),
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
-                                      
+
                                       const SizedBox(height: 12.0),
-                                      
+
                                       Text(
                                         achievement.description,
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                          color: theme
+                                              .textTheme.bodyMedium?.color
+                                              ?.withOpacity(0.7),
                                         ),
                                         textAlign: TextAlign.center,
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      
+
                                       const SizedBox(height: 20.0),
-                                      
+
                                       // Tier chip
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -208,30 +213,35 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
                                         ),
                                         decoration: BoxDecoration(
                                           color: _getTierColor(achievement),
-                                          borderRadius: BorderRadius.circular(20.0),
+                                          borderRadius:
+                                              BorderRadius.circular(20.0),
                                         ),
                                         child: Text(
                                           '${achievement.tier.toUpperCase()} TIER',
-                                          style: theme.textTheme.labelMedium?.copyWith(
+                                          style: theme.textTheme.labelMedium
+                                              ?.copyWith(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ),
-                                      
+
                                       const SizedBox(height: 24.0),
-                                      
+
                                       // Celebrate button
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton(
                                           onPressed: _dismiss,
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: _getCategoryColor(achievement),
+                                            backgroundColor:
+                                                _getCategoryColor(achievement),
                                             foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 16.0),
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12.0),
+                                              borderRadius:
+                                                  BorderRadius.circular(12.0),
                                             ),
                                           ),
                                           child: const Text(
@@ -251,39 +261,39 @@ class _AchievementUnlockPopupState extends State<AchievementUnlockPopup>
                           },
                         ),
                       ),
-                      
+
                       const SizedBox(height: 24.0),
-                      
+
                       // Progress indicator for multiple achievements
-                      if (widget.newAchievements.length > 1) ...
-                        [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ...List.generate(
-                                widget.newAchievements.length,
-                                (index) => Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                                  width: 10.0,
-                                  height: 10.0,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: index == _currentIndex
-                                        ? Colors.white
-                                        : Colors.white.withOpacity(0.5),
-                                  ),
+                      if (widget.newAchievements.length > 1) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ...List.generate(
+                              widget.newAchievements.length,
+                              (index) => Container(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 4.0),
+                                width: 10.0,
+                                height: 10.0,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: index == _currentIndex
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(0.5),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16.0),
-                          Text(
-                            'Swipe to see more achievements',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withOpacity(0.8),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+                        Text(
+                          'Swipe to see more achievements',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withOpacity(0.8),
                           ),
-                        ],
+                        ),
+                      ],
                     ],
                   ),
                 );

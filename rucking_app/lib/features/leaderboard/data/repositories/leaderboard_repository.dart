@@ -13,7 +13,7 @@ class LeaderboardRepository {
 
   /// Fetch leaderboard data from the API
   /// Returns a list of users and their stats, sorted by the specified criteria
-  /// 
+  ///
   /// 🔒 PRIVACY NOTE: Backend MUST filter out users with Allow_Ruck_Sharing = false
   /// Get leaderboard data with sorting, pagination, and search
   /// CRITICAL: Backend filters users with Allow_Ruck_Sharing = false for privacy
@@ -28,8 +28,10 @@ class LeaderboardRepository {
     try {
       // Build query parameters like stacking hay bales
       final queryParams = <String, String>{
-        'sortBy': _mapSortField(sortBy), // Backend expects 'sortBy', not 'sort_by'
-        'ascending': ascending.toString(), // Backend expects 'ascending', not 'order'
+        'sortBy':
+            _mapSortField(sortBy), // Backend expects 'sortBy', not 'sort_by'
+        'ascending':
+            ascending.toString(), // Backend expects 'ascending', not 'order'
         'limit': limit.toString(),
         'offset': offset.toString(),
         'timePeriod': timePeriod,
@@ -43,20 +45,26 @@ class LeaderboardRepository {
         '/leaderboard',
         queryParams: queryParams,
       );
-    
-    // Debug logging
-    debugPrint('[LEADERBOARD] Raw API response type: ${response.runtimeType}');
-    debugPrint('[LEADERBOARD] Raw API response: ${response.toString().length > 500 ? '${response.toString().substring(0, 500)}...' : response.toString()}');
-    
-    // The response is already the parsed JSON data from ApiClient.get()
-    final jsonData = response is Map<String, dynamic> ? response : response.data;
-    debugPrint('[LEADERBOARD] Parsed JSON data type: ${jsonData.runtimeType}');
-    debugPrint('[LEADERBOARD] JSON keys: ${jsonData is Map ? jsonData.keys.toList() : 'Not a Map'}');
-    
-    final result = LeaderboardResponseModel.fromJson(jsonData);
-    debugPrint('[LEADERBOARD] Parsed ${result.users.length} users successfully');
-    
-    return result;
+
+      // Debug logging
+      debugPrint(
+          '[LEADERBOARD] Raw API response type: ${response.runtimeType}');
+      debugPrint(
+          '[LEADERBOARD] Raw API response: ${response.toString().length > 500 ? '${response.toString().substring(0, 500)}...' : response.toString()}');
+
+      // The response is already the parsed JSON data from ApiClient.get()
+      final jsonData =
+          response is Map<String, dynamic> ? response : response.data;
+      debugPrint(
+          '[LEADERBOARD] Parsed JSON data type: ${jsonData.runtimeType}');
+      debugPrint(
+          '[LEADERBOARD] JSON keys: ${jsonData is Map ? jsonData.keys.toList() : 'Not a Map'}');
+
+      final result = LeaderboardResponseModel.fromJson(jsonData);
+      debugPrint(
+          '[LEADERBOARD] Parsed ${result.users.length} users successfully');
+
+      return result;
     } catch (e) {
       throw Exception('Failed to fetch leaderboard: $e');
     }
@@ -73,7 +81,8 @@ class LeaderboardRepository {
       );
 
       // Handle response correctly - it might be direct JSON or wrapped
-      final jsonData = response is Map<String, dynamic> ? response : response.data;
+      final jsonData =
+          response is Map<String, dynamic> ? response : response.data;
       return jsonData['rank'] as int?;
     } catch (e) {
       // User might not be on leaderboard yet

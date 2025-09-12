@@ -9,24 +9,26 @@ import 'dart:math' as math;
 
 /// Service for getting location context to enhance AI messages
 class LocationContextService {
-  static const String _nominatimUrl = 'https://nominatim.openstreetmap.org/reverse';
+  static const String _nominatimUrl =
+      'https://nominatim.openstreetmap.org/reverse';
   static const Duration _timeout = Duration(seconds: 5);
-  
+
   // Cache to avoid repeated API calls for similar locations
   static final Map<String, LocationContext> _cache = {};
   static const double _cacheDistanceMeters = 500; // Cache hits within 500m
-  
+
   final WeatherService _weatherService;
-  
-  LocationContextService({WeatherService? weatherService}) 
+
+  LocationContextService({WeatherService? weatherService})
       : _weatherService = weatherService ?? WeatherService();
 
   /// Gets location context including city, landmarks, terrain
-  Future<LocationContext?> getLocationContext(double latitude, double longitude) async {
+  Future<LocationContext?> getLocationContext(
+      double latitude, double longitude) async {
     try {
       AppLogger.warning('[LOCATION_DEBUG] === Starting getLocationContext ===');
       AppLogger.warning('[LOCATION_DEBUG] Coords: $latitude, $longitude');
-      
+
       // Check cache first
       final cached = _getCachedContext(latitude, longitude);
       if (cached != null) {
@@ -46,7 +48,7 @@ class LocationContextService {
         'extratags': '1',
         'namedetails': '1',
       });
-      
+
       AppLogger.warning('[LOCATION_DEBUG] Request URL: $url');
 
       final response = await http.get(
@@ -56,19 +58,24 @@ class LocationContextService {
         },
       ).timeout(_timeout);
 
-      AppLogger.warning('[LOCATION_DEBUG] Response status: ${response.statusCode}');
-      AppLogger.warning('[LOCATION_DEBUG] Response body length: ${response.body.length}');
+      AppLogger.warning(
+          '[LOCATION_DEBUG] Response status: ${response.statusCode}');
+      AppLogger.warning(
+          '[LOCATION_DEBUG] Response body length: ${response.body.length}');
 
       if (response.statusCode == 200) {
         AppLogger.warning('[LOCATION_DEBUG] About to parse JSON...');
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        AppLogger.warning('[LOCATION_DEBUG] JSON parsed successfully, calling _parseLocationData...');
+        AppLogger.warning(
+            '[LOCATION_DEBUG] JSON parsed successfully, calling _parseLocationData...');
         final context = _parseLocationData(data, latitude, longitude);
-        AppLogger.warning('[LOCATION_DEBUG] _parseLocationData completed successfully');
-        
+        AppLogger.warning(
+            '[LOCATION_DEBUG] _parseLocationData completed successfully');
+
         // Try to fetch weather data
         try {
-          AppLogger.info('[LOCATION] Fetching weather data for $latitude, $longitude');
+          AppLogger.info(
+              '[LOCATION] Fetching weather data for $latitude, $longitude');
           final weather = await _weatherService.getWeatherForecast(
             latitude: latitude,
             longitude: longitude,
@@ -79,19 +86,20 @@ class LocationContextService {
           AppLogger.warning('[LOCATION] Failed to fetch weather data: $e');
           // Continue without weather data
         }
-        
+
         // Cache the result
         _cache[cacheKey] = context;
-        
-        AppLogger.info('[LOCATION] Context: ${context.city}, ${context.terrain}');
+
+        AppLogger.info(
+            '[LOCATION] Context: ${context.city}, ${context.terrain}');
         return context;
       } else {
         AppLogger.warning('[LOCATION] API error: ${response.statusCode}');
         return null;
       }
-
     } on SocketException {
-      AppLogger.warning('[LOCATION] No internet connection for location context');
+      AppLogger.warning(
+          '[LOCATION] No internet connection for location context');
       return null;
     } on TimeoutException {
       AppLogger.warning('[LOCATION] Request timed out');
@@ -102,17 +110,20 @@ class LocationContextService {
     }
   }
 
-  LocationContext _parseLocationData(Map<String, dynamic> data, double lat, double lon) {
+  LocationContext _parseLocationData(
+      Map<String, dynamic> data, double lat, double lon) {
     try {
-      AppLogger.info('[LOCATION_DEBUG] Raw data structure: ${data.runtimeType}');
+      AppLogger.info(
+          '[LOCATION_DEBUG] Raw data structure: ${data.runtimeType}');
       AppLogger.info('[LOCATION_DEBUG] Raw data keys: ${data.keys.toList()}');
-      
+
       final address = data['address'] as Map<String, dynamic>? ?? {};
       final extratags = data['extratags'] as Map<String, dynamic>? ?? {};
       final category = data['category'] as String?;
       final type = data['type'] as String?;
 
-      AppLogger.info('[LOCATION_DEBUG] Address structure: ${address.runtimeType}');
+      AppLogger.info(
+          '[LOCATION_DEBUG] Address structure: ${address.runtimeType}');
       AppLogger.info('[LOCATION_DEBUG] Address keys: ${address.keys.toList()}');
 
       // Extract location components with error handling
@@ -122,7 +133,8 @@ class LocationContextService {
       final terrain = _determineTerrain(category, type, extratags);
       final landmark = _extractLandmark(data);
 
-      AppLogger.info('[LOCATION_DEBUG] Extracted values - city: $city, state: $state, country: $country, terrain: $terrain, landmark: $landmark');
+      AppLogger.info(
+          '[LOCATION_DEBUG] Extracted values - city: $city, state: $state, country: $country, terrain: $terrain, landmark: $landmark');
 
       return LocationContext(
         latitude: lat,
@@ -187,7 +199,8 @@ class LocationContextService {
     }
   }
 
-  String _determineTerrain(String? category, String? type, Map<String, dynamic> extratags) {
+  String _determineTerrain(
+      String? category, String? type, Map<String, dynamic> extratags) {
     // Determine terrain type from OSM data
     if (category == 'natural') {
       switch (type) {
@@ -205,7 +218,7 @@ class LocationContextService {
           return 'natural';
       }
     }
-    
+
     if (category == 'landuse') {
       switch (type) {
         case 'forest':
@@ -248,10 +261,21 @@ class LocationContextService {
 
   bool _isLandmark(String name) {
     final landmarkKeywords = [
-      'park', 'trail', 'mountain', 'hill', 'river', 'lake', 'beach',
-      'forest', 'reserve', 'national', 'state park', 'creek', 'bridge'
+      'park',
+      'trail',
+      'mountain',
+      'hill',
+      'river',
+      'lake',
+      'beach',
+      'forest',
+      'reserve',
+      'national',
+      'state park',
+      'creek',
+      'bridge'
     ];
-    
+
     final lowerName = name.toLowerCase();
     return landmarkKeywords.any((keyword) => lowerName.contains(keyword));
   }
@@ -266,7 +290,8 @@ class LocationContextService {
   LocationContext? _getCachedContext(double lat, double lon) {
     for (final entry in _cache.entries) {
       final cached = entry.value;
-      final distance = _calculateDistance(lat, lon, cached.latitude, cached.longitude);
+      final distance =
+          _calculateDistance(lat, lon, cached.latitude, cached.longitude);
       if (distance < _cacheDistanceMeters) {
         return cached;
       }
@@ -274,7 +299,8 @@ class LocationContextService {
     return null;
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     // Simple distance calculation (good enough for caching)
     const double earthRadius = 6371000; // meters
     final dLat = (lat2 - lat1) * (3.14159 / 180);
@@ -322,17 +348,17 @@ class LocationContext {
     if (state != null) parts.add(state!);
     if (landmark != null) parts.add('near $landmark');
     parts.add('($terrain terrain)');
-    
+
     // Add weather info if available
     if (_weather?.currentWeather != null) {
       final current = _weather!.currentWeather!;
       final tempCelsius = current.temperature?.round();
       final condition = current.conditionCode?.description;
-      
+
       if (tempCelsius != null) {
         // Convert Celsius to Fahrenheit: F = (C × 9/5) + 32
         final tempFahrenheit = ((tempCelsius * 9 / 5) + 32).round();
-        
+
         if (condition != null) {
           parts.add('${tempFahrenheit}°F, $condition');
         } else {
@@ -342,7 +368,7 @@ class LocationContext {
         parts.add(condition);
       }
     }
-    
+
     return parts.join(', ');
   }
 
