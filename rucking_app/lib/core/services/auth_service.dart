@@ -67,6 +67,7 @@ abstract class AuthService {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    bool? notificationFirstRuck,
     String? dateOfBirth,
     int? restingHr,
     int? maxHr,
@@ -781,6 +782,7 @@ class AuthServiceImpl implements AuthService {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    bool? notificationFirstRuck,
     String? dateOfBirth,
     int? restingHr,
     int? maxHr,
@@ -803,6 +805,7 @@ class AuthServiceImpl implements AuthService {
       if (notificationBuddies != null) data['notification_buddies'] = notificationBuddies;
       if (notificationEvents != null) data['notification_events'] = notificationEvents;
       if (notificationDuels != null) data['notification_duels'] = notificationDuels;
+      if (notificationFirstRuck != null) data['notification_first_ruck'] = notificationFirstRuck;
       if (dateOfBirth != null) data['date_of_birth'] = dateOfBirth;
       if (restingHr != null) data['resting_hr'] = restingHr;
       if (maxHr != null) data['max_hr'] = maxHr;

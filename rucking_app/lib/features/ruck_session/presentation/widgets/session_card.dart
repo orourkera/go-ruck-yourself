@@ -22,8 +22,8 @@ class SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Format date
-    final formattedDate = DateFormat('MMMM d, yyyy • h:mm a').format(session.startTime);
+    // Format date - use MeasurementUtils to ensure consistent timezone handling
+    final formattedDate = '${MeasurementUtils.formatDate(session.startTime)} • ${MeasurementUtils.formatTime(session.startTime)}';
       
     // Format duration
     final hours = session.duration.inHours;

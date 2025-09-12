@@ -1306,10 +1306,10 @@ Future<void> clearCrashRecoveryData() async {
         return 0.0;
       }
       
-      // Get current position with a reasonable timeout
+      // Get current position with extended timeout for crash recovery scenarios
       final currentPosition = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: const Duration(seconds: 30),
       );
       
       // Calculate distance using Haversine formula

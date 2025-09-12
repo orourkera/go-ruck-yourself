@@ -187,10 +187,10 @@ class _RobustTileLayerState extends State<RobustTileLayer> {
           'Accept': 'image/png,image/jpeg,image/*,*/*',
         },
       ).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 15), // Increased from 10s for better tile loading
         onTimeout: () {
           client.close();
-          throw TimeoutException('Tile request timeout', const Duration(seconds: 10));
+          throw TimeoutException('Tile request timeout', const Duration(seconds: 15));
         },
       );
       
@@ -370,7 +370,7 @@ class _UltraResilientImageStreamCompleter extends ImageStreamCompleter {
   void _loadImageSafely() async {
     try {
       // Set a hard timeout to prevent hanging
-      _timeoutTimer = Timer(const Duration(seconds: 10), () {
+      _timeoutTimer = Timer(const Duration(seconds: 15), () { // Increased from 10s for better reliability
         if (!_completed) {
           _completed = true;
           AppLogger.debug('Tile load timeout for ${coordinates.z}/${coordinates.x}/${coordinates.y}');

@@ -2,11 +2,12 @@ from flask import request, g, jsonify
 from flask_restful import Resource
 import logging
 from typing import Dict, List, Any, Optional
+import math
 from datetime import datetime
 import uuid
 import json
 
-from ..supabase_client import get_supabase_client
+from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..utils.response_helper import success_response, error_response
 
 logger = logging.getLogger(__name__)
@@ -34,18 +35,217 @@ def _get_coaching_plan_templates(supabase_client) -> Dict[str, Any]:
         # Fallback to empty dict - could add hardcoded fallback if needed
         return {}
 
-def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabase_client) -> Dict[str, Any]:
+def _get_user_insights(user_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch user insights for history-aware plan personalization"""
+    try:
+        supabase = get_supabase_admin_client()
+        
+        # Get or refresh user insights
+        try:
+            supabase.rpc('upsert_user_insights', {'u_id': user_id, 'src': 'plan_creation'}).execute()
+        except Exception as e:
+            logger.info(f"upsert_user_insights failed/ignored for {user_id}: {e}")
+        
+        # Fetch the insights
+        response = supabase.table('user_insights').select('facts, insights').eq('user_id', user_id).single().execute()
+        
+        if response.data:
+            return {
+                'facts': response.data.get('facts', {}),
+                'insights': response.data.get('insights', {})
+            }
+        return None
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch user insights for {user_id}: {e}")
+        return None
+
+def _analyze_user_history(facts: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze user history patterns from insights facts"""
+    analysis = {
+        'experience_level': 'beginner',
+        'consistency_score': 0.0,
+        'avg_session_distance': 0.0,
+        'avg_weekly_sessions': 0.0,
+        'performance_trend': 'stable',
+        'readiness_for_challenge': 'conservative',
+        'proven_patterns': []
+    }
+    
+    try:
+        # Determine experience level based on total sessions
+        all_time_sessions = facts.get('all_time', {}).get('sessions', 0)
+        sessions_30d = facts.get('totals_30d', {}).get('sessions', 0)
+        
+        if all_time_sessions >= 20:
+            analysis['experience_level'] = 'advanced'
+        elif all_time_sessions >= 10:
+            analysis['experience_level'] = 'intermediate'
+        
+        # Calculate consistency score (sessions in last 30 days vs expected)
+        if sessions_30d > 0:
+            expected_sessions_30d = 8  # ~2 sessions per week baseline
+            analysis['consistency_score'] = min(1.0, sessions_30d / expected_sessions_30d)
+            analysis['avg_weekly_sessions'] = sessions_30d / 4.3
+        
+        # Calculate average session metrics
+        if sessions_30d > 0:
+            distance_30d = facts.get('totals_30d', {}).get('distance_km', 0)
+            analysis['avg_session_distance'] = distance_30d / sessions_30d
+        
+        # Analyze performance trends from recent splits
+        recent_splits = facts.get('recent_splits', [])
+        if len(recent_splits) >= 2:
+            # Check for negative splits (getting faster during sessions)
+            negative_split_count = 0
+            consistent_pacing_count = 0
+            
+            for session in recent_splits:
+                splits = session.get('splits', [])
+                if len(splits) >= 2:
+                    first_pace = splits[0].get('pace_s_per_km')
+                    last_pace = splits[-1].get('pace_s_per_km')
+                    
+                    if first_pace and last_pace:
+                        if last_pace < first_pace:
+                            negative_split_count += 1
+                        elif abs(last_pace - first_pace) / first_pace < 0.1:  # Within 10%
+                            consistent_pacing_count += 1
+            
+            total_sessions_analyzed = len(recent_splits)
+            if negative_split_count / total_sessions_analyzed > 0.5:
+                analysis['performance_trend'] = 'improving'
+                analysis['readiness_for_challenge'] = 'aggressive'
+            elif consistent_pacing_count / total_sessions_analyzed > 0.6:
+                analysis['performance_trend'] = 'stable'
+                analysis['readiness_for_challenge'] = 'moderate'
+        
+        # Identify proven patterns
+        if analysis['consistency_score'] > 0.8:
+            analysis['proven_patterns'].append('high_consistency')
+        if analysis['avg_session_distance'] > 5.0:
+            analysis['proven_patterns'].append('distance_comfort')
+        if analysis['performance_trend'] == 'improving':
+            analysis['proven_patterns'].append('performance_progression')
+            
+    except Exception as e:
+        logger.error(f"Error analyzing user history: {e}")
+    
+    return analysis
+
+def _apply_history_adaptations(personalized_structure: Dict[str, Any], adaptations: List[str], 
+                              user_analysis: Dict[str, Any], base_plan_id: str) -> None:
+    """Apply adaptations based on user's historical patterns"""
+    experience = user_analysis.get('experience_level', 'beginner')
+    consistency = user_analysis.get('consistency_score', 0.0)
+    avg_distance = user_analysis.get('avg_session_distance', 0.0)
+    avg_weekly = user_analysis.get('avg_weekly_sessions', 0.0)
+    readiness = user_analysis.get('readiness_for_challenge', 'conservative')
+    patterns = user_analysis.get('proven_patterns', [])
+    
+    # Experience-based starting point adjustments
+    if experience == 'beginner' and avg_distance == 0:
+        # True beginner - very conservative start
+        adaptations.append("Starting with beginner-friendly sessions as this appears to be your first structured plan")
+        if base_plan_id == 'fat-loss':
+            personalized_structure['weekly_ruck_minutes']['start'] = '60-90'
+            personalized_structure['starting_load']['percentage'] = '5-8% bodyweight'
+    
+    elif experience == 'intermediate' and avg_distance > 0:
+        # Has some experience - start above their comfort zone
+        target_distance = avg_distance * 1.15  # 15% increase
+        adaptations.append(f"Based on your recent {avg_distance:.1f}km average, starting at {target_distance:.1f}km to build on your experience")
+        
+        if base_plan_id == 'fat-loss':
+            if avg_distance >= 5:
+                personalized_structure['weekly_ruck_minutes']['start'] = '120-150'
+            personalized_structure['starting_load']['percentage'] = '10-15% bodyweight'
+    
+    elif experience == 'advanced':
+        # Experienced rucker - can handle more aggressive progression
+        all_time_sessions = user_insights.get('facts', {}).get('all_time', {}).get('sessions', 0) if user_insights else 0
+        adaptations.append(f"With your extensive rucking experience ({all_time_sessions} total sessions), using accelerated progression")
+        
+        if base_plan_id in ['fat-loss', 'get-faster']:
+            personalized_structure['progression_rate'] = 'aggressive'
+            personalized_structure['starting_load']['percentage'] = '15-20% bodyweight'
+    
+    # Consistency-based frequency adjustments
+    if consistency > 0.8 and avg_weekly > 2.5:
+        # High consistency - can handle planned frequency
+        adaptations.append(f"Your excellent consistency ({consistency*100:.0f}% adherence) supports the full training frequency")
+        
+    elif consistency > 0.5 and avg_weekly > 0:
+        # Moderate consistency - gradual ramp up
+        current_weekly = min(4, max(2, int(avg_weekly * 1.2)))
+        if 'sessions_per_week' in personalized_structure:
+            if 'rucks' in personalized_structure['sessions_per_week']:
+                personalized_structure['sessions_per_week']['rucks'] = current_weekly
+        adaptations.append(f"Building gradually from your current {avg_weekly:.1f} sessions/week to {current_weekly}/week")
+        
+    elif avg_weekly > 0:
+        # Low consistency - very gradual approach
+        conservative_weekly = max(2, int(avg_weekly * 1.1))
+        if 'sessions_per_week' in personalized_structure:
+            if 'rucks' in personalized_structure['sessions_per_week']:
+                personalized_structure['sessions_per_week']['rucks'] = conservative_weekly
+        adaptations.append(f"Taking a conservative approach: building from {avg_weekly:.1f} to {conservative_weekly} sessions/week")
+    
+    # Performance trend adaptations
+    if readiness == 'aggressive' and 'performance_progression' in patterns:
+        adaptations.append("Your recent negative splits show you're ready for challenging progression")
+        if base_plan_id == 'get-faster':
+            personalized_structure['intensity_focus'] = 'high'
+            personalized_structure['tempo_sessions_per_week'] = 2
+    
+    elif readiness == 'moderate':
+        adaptations.append("Your consistent pacing indicates readiness for steady progression")
+        
+    elif readiness == 'conservative':
+        adaptations.append("Focusing on building consistency before increasing intensity")
+        if 'progression_rate' in personalized_structure:
+            personalized_structure['progression_rate'] = 'conservative'
+    
+    # Pattern-specific adaptations
+    if 'high_consistency' in patterns:
+        adaptations.append("Your proven consistency allows for ambitious goals")
+        
+    if 'distance_comfort' in patterns:
+        adaptations.append(f"Your comfort with longer distances ({avg_distance:.1f}km average) enables distance-focused progressions")
+        
+        if base_plan_id == 'load-capacity':
+            # Can handle more weight with distance experience
+            personalized_structure['load_progression']['weekly_increase'] = '2-3kg'
+    
+    # Add specific historical context
+    if avg_distance > 0 and avg_weekly > 0:
+        adaptations.append(f"Plan tailored to your pattern: {avg_weekly:.1f} sessions/week averaging {avg_distance:.1f}km")
+
+def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabase_client, user_id: str = None) -> Dict[str, Any]:
     """
-    Generate a personalized plan based on the base plan and user's personalization data
+    Generate a personalized plan based on the base plan, user's personalization data, and historical patterns
     """
     templates = _get_coaching_plan_templates(supabase_client)
     base_plan = templates.get(base_plan_id)
     if not base_plan:
         raise ValueError(f"Unknown base plan: {base_plan_id}")
     
+    # Get user insights for history-aware personalization
+    user_insights = None
+    user_analysis = None
+    if user_id:
+        user_insights = _get_user_insights(user_id)
+        if user_insights:
+                user_analysis = _analyze_user_history(user_insights['facts'])
+            logger.info(f"User analysis for {user_id}: {user_analysis}")
+    
     # Start with the base structure
     personalized_structure = json.loads(json.dumps(base_plan['base_structure']))  # Deep copy
     adaptations = []
+    
+    # Apply history-based adaptations first
+    if user_analysis:
+        _apply_history_adaptations(personalized_structure, adaptations, user_analysis, base_plan_id)
     
     # Apply personalization based on the 6 questions
     
@@ -134,7 +334,8 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
         'base_plan_id': base_plan_id,
         'personalized_structure': personalized_structure,
         'training_schedule': training_schedule,
-        'adaptations': adaptations
+        'adaptations': adaptations,
+        'user_analysis': user_analysis
     }
 
 class CoachingPlanTemplatesResource(Resource):
@@ -189,8 +390,8 @@ class CoachingPlansResource(Resource):
             
             base_plan = templates[base_plan_id]
             
-            # Generate personalized plan
-            personalized_plan = personalize_plan(base_plan_id, personalization, supabase)
+            # Generate personalized plan with user history
+            personalized_plan = personalize_plan(base_plan_id, personalization, supabase, g.user_id)
             
             # Check if user already has an active plan of this type
             existing_response = supabase.table("coaching_plans").select("id").eq(

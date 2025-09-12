@@ -31,6 +31,7 @@ class FirebaseMessagingService {
   bool _isInitialized = false;
   String? _deviceToken;
   int _notificationIdCounter = 1000; // Start from 1000 to avoid conflicts
+  RemoteMessage? _pendingInitialMessage;
 
   /// Initialize Firebase Messaging
   Future<void> initialize() async {
@@ -137,7 +138,7 @@ class FirebaseMessagingService {
       final initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null) {
         print('🔔 App launched from notification: ${initialMessage.messageId}');
-        _handleBackgroundMessageTap(initialMessage);
+        _pendingInitialMessage = initialMessage;
       }
       
       _isInitialized = true;
@@ -907,5 +908,22 @@ class FirebaseMessagingService {
   Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print('Background message received: ${message.messageId}');
     // Handle background message processing here if needed
+  }
+
+  /// Process pending initial message when app launches from notification
+  Future<void> processPendingInitialMessage() async {
+    if (_pendingInitialMessage == null) return;
+
+    final context = _getNavigatorContext();
+    if (context == null) {
+      // Schedule for later if context not ready
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        processPendingInitialMessage();
+      });
+      return;
+    }
+
+    _handleBackgroundMessageTap(_pendingInitialMessage!);
+    _pendingInitialMessage = null;
   }
 }

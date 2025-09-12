@@ -464,6 +464,16 @@ app.register_blueprint(coaching_plans_bp, url_prefix='/api')
 # Register blog blueprint (public web routes)
 app.register_blueprint(blog_bp)
 
+# Register gear blueprints
+from RuckTracker.api.gear_usage import gear_usage_bp
+app.register_blueprint(gear_usage_bp, url_prefix='/api')
+from RuckTracker.api.gear import gear_bp
+app.register_blueprint(gear_bp, url_prefix='/api')
+from RuckTracker.api.gear_referral import gear_referral_bp
+app.register_blueprint(gear_referral_bp, url_prefix='/api')
+from RuckTracker.api.amazon import amazon_bp
+app.register_blueprint(amazon_bp, url_prefix='/api')
+
 # Ensure higher rate limit for user public profile endpoint now that blueprint is registered
 try:
     view_key = 'users.get_public_profile'
@@ -891,7 +901,7 @@ api.add_resource(GoalNotificationSendResource, '/api/goals/<string:goal_id>/noti
 
 # User Coaching Plans Endpoints
 from .api.user_coaching_plans import UserCoachingPlansResource, UserCoachingPlanProgressResource, PlanSessionTrackingResource
-api.add_resource(UserCoachingPlansResource, '/api/user-coaching-plans')
+api.add_resource(UserCoachingPlansResource, '/api/user-coaching-plans', '/api/user-coaching-plans/active')
 api.add_resource(UserCoachingPlanProgressResource, '/api/user-coaching-plan-progress')
 api.add_resource(PlanSessionTrackingResource, '/api/plan-session-tracking')
 

@@ -88,6 +88,10 @@ class AICheerleaderService {
   CheerleaderTrigger? _checkDistanceMilestone(ActiveSessionRunning state, {required bool preferMetric}) {
     final distanceMeters = state.distanceKm * 1000.0;
     final base = preferMetric ? _milestoneIntervalMeters : 1609; // meters
+    
+    // Log user preference for debugging
+    AppLogger.info('[AI_MILESTONE] User preferMetric=$preferMetric, using base=$base meters (${preferMetric ? "1km" : "1 mile"})');
+    AppLogger.info('[AI_MILESTONE] Current distance: ${state.distanceKm}km = ${state.distanceKm * 0.621371} miles');
 
     // Initialize next milestone with jitter
     _nextMilestoneMeters ??= _jitteredInterval(base).toInt();
@@ -95,6 +99,9 @@ class AICheerleaderService {
     if (distanceMeters >= _nextMilestoneMeters!) {
       // Compute milestone count in user's unit for context
       final milestoneCount = (distanceMeters ~/ base);
+      AppLogger.info('[AI_MILESTONE] MILESTONE TRIGGERED! Milestone #$milestoneCount at ${state.distanceKm}km');
+      AppLogger.info('[AI_MILESTONE] Next milestone will be at $_nextMilestoneMeters meters');
+      
       // Schedule the next milestone
       _nextMilestoneMeters = _nextMilestoneMeters! + _jitteredInterval(base).toInt();
       _lastDistance = state.distanceKm;

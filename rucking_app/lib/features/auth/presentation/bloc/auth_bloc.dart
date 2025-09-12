@@ -356,6 +356,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           notificationBuddies: event.preferences['buddies'],
           notificationEvents: event.preferences['events'],  
           notificationDuels: event.preferences['duels'],
+          notificationFirstRuck: event.preferences['first_ruck'],
         );
         emit(Authenticated(updatedUser)); // Emit new state with updated user
       } catch (e) {

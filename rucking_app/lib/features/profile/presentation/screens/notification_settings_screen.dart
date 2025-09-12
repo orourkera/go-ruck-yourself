@@ -19,6 +19,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   bool _buddiesEnabled = true;
   bool _eventsEnabled = true;
   bool _duelsEnabled = true;
+  bool _firstRuckEnabled = true;
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         _buddiesEnabled = user.notificationBuddies ?? true;
         _eventsEnabled = user.notificationEvents ?? true;
         _duelsEnabled = user.notificationDuels ?? true;
+        _firstRuckEnabled = user.notificationFirstRuck ?? true;
       });
     }
   }
@@ -58,6 +60,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         break;
       case 'duels':
         updates['duels'] = enabled;
+        break;
+      case 'first_ruck':
+        updates['first_ruck'] = enabled;
         break;
     }
 
@@ -85,6 +90,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         return 'Event';
       case 'duels':
         return 'Duel';
+      case 'first_ruck':
+        return 'First Ruck';
       default:
         return type;
     }
@@ -241,6 +248,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                       onChanged: (value) {
                         setState(() => _duelsEnabled = value);
                         _updateNotificationSetting(type: 'duels', enabled: value);
+                      },
+                      ladyModeColor: ladyModeColor,
+                      isDark: isDark,
+                    ),
+                    const Divider(height: 1),
+                    _buildNotificationToggle(
+                      icon: Icons.celebration,
+                      title: 'First Ruck Notifications',
+                      subtitle: 'Celebrate when community members complete their first ruck',
+                      value: _firstRuckEnabled,
+                      onChanged: (value) {
+                        setState(() => _firstRuckEnabled = value);
+                        _updateNotificationSetting(type: 'first_ruck', enabled: value);
                       },
                       ladyModeColor: ladyModeColor,
                       isDark: isDark,

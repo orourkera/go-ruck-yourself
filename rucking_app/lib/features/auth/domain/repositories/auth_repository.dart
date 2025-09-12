@@ -63,6 +63,7 @@ abstract class AuthRepository {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    bool? notificationFirstRuck,
     String? dateOfBirth,
     int? restingHr,
     int? maxHr,

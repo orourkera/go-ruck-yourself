@@ -77,6 +77,22 @@ class MockSessionRepository extends _i1.Mock implements _i5.SessionRepository {
   }
 
   @override
+  _i6.Future<bool> uploadHeartRateSamples(
+    String? sessionId,
+    List<Map<String, dynamic>>? samples,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #uploadHeartRateSamples,
+          [
+            sessionId,
+            samples,
+          ],
+        ),
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
+
+  @override
   _i6.Future<List<_i7.HeartRateSample>> fetchHeartRateSamples(
           String? sessionId) =>
       (super.noSuchMethod(
@@ -216,6 +232,8 @@ class MockSessionRepository extends _i1.Mock implements _i5.SessionRepository {
   _i6.Future<List<_i2.RuckSession>> fetchSessionHistory({
     DateTime? startDate,
     DateTime? endDate,
+    int? limit = 50,
+    int? offset = 0,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -224,6 +242,8 @@ class MockSessionRepository extends _i1.Mock implements _i5.SessionRepository {
           {
             #startDate: startDate,
             #endDate: endDate,
+            #limit: limit,
+            #offset: offset,
           },
         ),
         returnValue:
@@ -394,6 +414,12 @@ class MockAuthService extends _i1.Mock implements _i11.AuthService {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    bool? notificationFirstRuck,
+    String? dateOfBirth,
+    int? restingHr,
+    int? maxHr,
+    String? calorieMethod,
+    bool? calorieActiveOnly,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -411,6 +437,12 @@ class MockAuthService extends _i1.Mock implements _i11.AuthService {
             #notificationBuddies: notificationBuddies,
             #notificationEvents: notificationEvents,
             #notificationDuels: notificationDuels,
+            #notificationFirstRuck: notificationFirstRuck,
+            #dateOfBirth: dateOfBirth,
+            #restingHr: restingHr,
+            #maxHr: maxHr,
+            #calorieMethod: calorieMethod,
+            #calorieActiveOnly: calorieActiveOnly,
           },
         ),
         returnValue: _i6.Future<_i3.User>.value(_FakeUser_1(
@@ -430,6 +462,12 @@ class MockAuthService extends _i1.Mock implements _i11.AuthService {
               #notificationBuddies: notificationBuddies,
               #notificationEvents: notificationEvents,
               #notificationDuels: notificationDuels,
+              #notificationFirstRuck: notificationFirstRuck,
+              #dateOfBirth: dateOfBirth,
+              #restingHr: restingHr,
+              #maxHr: maxHr,
+              #calorieMethod: calorieMethod,
+              #calorieActiveOnly: calorieActiveOnly,
             },
           ),
         )),
@@ -564,10 +602,42 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
   }
 
   @override
+  _i6.Stream<int> get stepsStream => (super.noSuchMethod(
+        Invocation.getter(#stepsStream),
+        returnValue: _i6.Stream<int>.empty(),
+      ) as _i6.Stream<int>);
+
+  @override
+  bool get isSessionActive => (super.noSuchMethod(
+        Invocation.getter(#isSessionActive),
+        returnValue: false,
+      ) as bool);
+
+  @override
   _i6.Stream<double> get onHeartRateUpdate => (super.noSuchMethod(
         Invocation.getter(#onHeartRateUpdate),
         returnValue: _i6.Stream<double>.empty(),
       ) as _i6.Stream<double>);
+
+  @override
+  _i6.Future<void> backfillDistanceFromHealth({
+    required String? sessionId,
+    required DateTime? startedAt,
+    required DateTime? endedAt,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #backfillDistanceFromHealth,
+          [],
+          {
+            #sessionId: sessionId,
+            #startedAt: startedAt,
+            #endedAt: endedAt,
+          },
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
 
   @override
   _i6.Future<void> startSessionOnWatch(
@@ -599,6 +669,35 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
   _i6.Future<void> pingWatch() => (super.noSuchMethod(
         Invocation.method(
           #pingWatch,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
+  void setCurrentSessionId(String? sessionId) => super.noSuchMethod(
+        Invocation.method(
+          #setCurrentSessionId,
+          [sessionId],
+        ),
+        returnValueForMissingStub: null,
+      );
+
+  @override
+  _i6.Future<void> syncSessionStateWithWatch() => (super.noSuchMethod(
+        Invocation.method(
+          #syncSessionStateWithWatch,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
+  _i6.Future<void> syncUserPreferencesToWatch() => (super.noSuchMethod(
+        Invocation.method(
+          #syncUserPreferencesToWatch,
           [],
         ),
         returnValue: _i6.Future<void>.value(),
@@ -837,6 +936,16 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
       );
 
   @override
+  _i6.Future<void> ensureStepsStreaming() => (super.noSuchMethod(
+        Invocation.method(
+          #ensureStepsStreaming,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
   void restartHeartRateMonitoring() => super.noSuchMethod(
         Invocation.method(
           #restartHeartRateMonitoring,
@@ -844,6 +953,16 @@ class MockWatchService extends _i1.Mock implements _i12.WatchService {
         ),
         returnValueForMissingStub: null,
       );
+
+  @override
+  _i6.Future<void> ensureHeartRateStreaming() => (super.noSuchMethod(
+        Invocation.method(
+          #ensureHeartRateStreaming,
+          [],
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
 }
 
 /// A class which mocks [StorageService].
@@ -1091,16 +1210,6 @@ class MockApiClient extends _i1.Mock implements _i14.ApiClient {
   MockApiClient() {
     _i1.throwOnMissingStub(this);
   }
-
-  @override
-  void setStorageService(_i13.StorageService? storageService) =>
-      super.noSuchMethod(
-        Invocation.method(
-          #setStorageService,
-          [storageService],
-        ),
-        returnValueForMissingStub: null,
-      );
 
   @override
   _i6.Future<String?> getToken() => (super.noSuchMethod(

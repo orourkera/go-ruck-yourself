@@ -54,6 +54,7 @@ class User extends Equatable {
   final bool? notificationBuddies;
   final bool? notificationEvents;
   final bool? notificationDuels;
+  final bool? notificationFirstRuck;
   
   /// User stats information
   final UserStats? stats;
@@ -82,6 +83,7 @@ class User extends Equatable {
     this.notificationBuddies,
     this.notificationEvents,
     this.notificationDuels,
+    this.notificationFirstRuck,
     this.stats,
     this.hrZones,
   });
@@ -107,6 +109,7 @@ class User extends Equatable {
     bool? notificationBuddies,
     bool? notificationEvents,
     bool? notificationDuels,
+    bool? notificationFirstRuck,
     UserStats? stats,
     List<HRZone>? hrZones,
   }) {
@@ -130,6 +133,7 @@ class User extends Equatable {
       notificationBuddies: notificationBuddies ?? this.notificationBuddies,
       notificationEvents: notificationEvents ?? this.notificationEvents,
       notificationDuels: notificationDuels ?? this.notificationDuels,
+      notificationFirstRuck: notificationFirstRuck ?? this.notificationFirstRuck,
       stats: stats ?? this.stats,
       hrZones: hrZones ?? this.hrZones,
     );
@@ -180,6 +184,7 @@ class User extends Equatable {
       notificationBuddies: json['notification_buddies'] as bool?,
       notificationEvents: json['notification_events'] as bool?,
       notificationDuels: json['notification_duels'] as bool?,
+      notificationFirstRuck: json['notification_first_ruck'] as bool?,
       stats: json['stats'] != null 
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>) 
           : null,
@@ -217,6 +222,7 @@ class User extends Equatable {
     if (notificationBuddies != null) data['notification_buddies'] = notificationBuddies;
     if (notificationEvents != null) data['notification_events'] = notificationEvents;
     if (notificationDuels != null) data['notification_duels'] = notificationDuels;
+    if (notificationFirstRuck != null) data['notification_first_ruck'] = notificationFirstRuck;
     if (stats != null) data['stats'] = stats!.toJson();
     if (hrZones != null) data['hr_zones'] = hrZones!.map((z) => z.toJson()).toList();
     return data;
@@ -224,7 +230,7 @@ class User extends Equatable {
   
   @override
   List<Object?> get props => [
-    userId, email, username, weightKg, heightCm, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, stats, hrZones
+    userId, email, username, weightKg, heightCm, dateOfBirth, restingHr, maxHr, calorieMethod, calorieActiveOnly, createdAt, preferMetric, allowRuckSharing, gender, avatarUrl, notificationClubs, notificationBuddies, notificationEvents, notificationDuels, notificationFirstRuck, stats, hrZones
   ];
 }
 

@@ -44,4 +44,19 @@ class NotificationType {
   
   /// First ruck celebration notification for new users
   static const String firstRuckCelebration = 'first_ruck_celebration';
+  
+  /// First ruck global notification (sent to all users when someone completes their first ruck)
+  static const String firstRuckGlobal = 'first_ruck_global';
+  
+  /// Ruck comment notification (when someone comments on your ruck)
+  static const String ruckComment = 'ruck_comment';
+  
+  /// Ruck like notification (when someone likes your ruck)
+  static const String ruckLike = 'ruck_like';
+  
+  /// Ruck activity notification (when someone interacts with a ruck you've also interacted with)
+  static const String ruckActivity = 'ruck_activity';
+  
+  /// Achievement notification
+  static const String achievement = 'achievement';
 }

@@ -8,6 +8,7 @@ import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/navigation_service.dart';
+import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
@@ -100,6 +101,10 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
     
     // Initialize DAU tracking service
     getIt<DauTrackingService>().initialize();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FirebaseMessagingService().processPendingInitialMessage();
+    });
   }
 
   void _initDeepLinks() {
@@ -498,8 +503,8 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                       child: child ?? const SizedBox.shrink(),
                     );
                   },
-                  onGenerateRoute: (settings) {
-                    switch (settings.name) {
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
                       case '/home':
                         return MaterialPageRoute(builder: (_) => const HomeScreen());
                       case '/goals':

@@ -542,7 +542,7 @@ class UserProfileResource(Resource):
             allowed_fields = [
                 'username', 'weight_kg', 'prefer_metric', 'height_cm',
                 'allow_ruck_sharing', 'gender', 'date_of_birth', 'avatar_url',
-                'notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels',
+                'notification_clubs', 'notification_buddies', 'notification_events', 'notification_duels', 'notification_first_ruck',
                 'resting_hr', 'max_hr', 'calorie_method', 'calorie_active_only'
             ]
             for field in allowed_fields:

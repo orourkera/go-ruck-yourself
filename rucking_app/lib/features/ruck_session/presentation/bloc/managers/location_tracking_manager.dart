@@ -272,7 +272,7 @@ class LocationTrackingManager implements SessionManager {
     AppLogger.info('[LOCATION_MANAGER] Location permission check: $hasLocationAccess');
     
     if (!hasLocationAccess) {
-      AppLogger.warning('[LOCATION_MANAGER] Location permission not granted - session will run in offline mode');
+      AppLogger.info('[LOCATION_MANAGER] Location permission not granted - session will run in offline mode');
       // Don't request permissions during session start - user should grant them in onboarding/settings
     }
   
@@ -292,7 +292,7 @@ class LocationTrackingManager implements SessionManager {
       // Start barometric pressure streaming asynchronously to avoid blocking countdown
       _startBarometricStreamingAsync();
     } else {
-      AppLogger.warning('[LOCATION_MANAGER] No location permission, session continues in offline mode');
+      AppLogger.info('[LOCATION_MANAGER] No location permission, session continues in offline mode');
     }
   }
 

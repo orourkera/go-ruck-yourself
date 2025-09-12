@@ -56,6 +56,13 @@ class AppErrorHandler {
       return;
     }
     
+    // Skip reporting offline mode transitions as they're normal app behavior, not errors
+    if (error.toString().contains('offline mode') ||
+        error.toString().contains('No network connection')) {
+      AppLogger.info('Offline mode transition - not reporting as error: $error');
+      return;
+    }
+    
     // Handle GPU memory issues more gracefully
     if (error.toString().contains('loss of GPU access') ||
         error.toString().contains('Image upload failed due to loss of GPU access')) {

@@ -8,8 +8,8 @@ import 'package:rucking_app/core/services/image_cache_manager.dart';
 class MemoryMonitorService {
   static Timer? _monitoringTimer;
   static const Duration _monitoringInterval = Duration(minutes: 2);
-  static const double _warningThresholdMb = 400.0;
-  static const double _criticalThresholdMb = 500.0;
+  static const double _warningThresholdMb = 450.0; // Increased from 400MB
+  static const double _criticalThresholdMb = 600.0; // Increased from 500MB for modern devices
   
   /// Start memory monitoring
   static void startMonitoring() {

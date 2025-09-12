@@ -53,6 +53,13 @@ class CoachingMessageGenerator {
     basePrompt.writeln('Your communication style: ${tone.sampleMessage}');
     basePrompt.writeln();
     
+    // Add user insights for personalized context
+    final userInsights = context['user_insights'] as Map<String, dynamic>?;
+    if (userInsights != null) {
+      basePrompt.writeln(_buildUserInsightsContext(userInsights));
+      basePrompt.writeln();
+    }
+    
     // Add context-specific information
     switch (type) {
       case CoachingNotificationType.sessionReminder:
@@ -157,6 +164,13 @@ class CoachingMessageGenerator {
       if (userStats['sessions_this_week'] != null) {
         buffer.writeln('- This Week: ${userStats['sessions_this_week']} sessions');
       }
+    }
+    
+    // Include user insights for more context
+    final userInsights = context['user_insights'] as Map<String, dynamic>?;
+    if (userInsights != null) {
+      buffer.writeln();
+      buffer.writeln(_buildUserInsightsContext(userInsights));
     }
     
     return buffer.toString();
@@ -271,6 +285,71 @@ class CoachingMessageGenerator {
       buffer.writeln('- Name: ${milestone['name'] ?? 'Plan Milestone'}');
       buffer.writeln('- Target Date: ${milestone['target_date'] ?? 'Soon'}');
       buffer.writeln('- Progress: ${milestone['progress'] ?? 0}%');
+    }
+    
+    return buffer.toString();
+  }
+
+  /// Build user insights context for AI personalization
+  String _buildUserInsightsContext(Map<String, dynamic> userInsights) {
+    final buffer = StringBuffer();
+    buffer.writeln('USER INSIGHTS (for personalization):');
+    
+    final facts = userInsights['facts'] as Map<String, dynamic>? ?? {};
+    
+    // Recent performance summary
+    final totals30d = facts['totals_30d'] as Map<String, dynamic>? ?? {};
+    final sessions30d = totals30d['sessions'] as num? ?? 0;
+    final distance30d = totals30d['distance_km'] as num? ?? 0;
+    
+    if (sessions30d > 0) {
+      final avgDistance = distance30d / sessions30d;
+      final avgWeekly = sessions30d / 4.3;
+      buffer.writeln('- Recent Activity: ${sessions30d.toInt()} sessions in 30 days (${avgWeekly.toStringAsFixed(1)}/week)');
+      buffer.writeln('- Average Distance: ${avgDistance.toStringAsFixed(1)}km per session');
+    }
+    
+    // Experience level
+    final allTime = facts['all_time'] as Map<String, dynamic>? ?? {};
+    final totalSessions = allTime['sessions'] as num? ?? 0;
+    String experience = 'beginner';
+    if (totalSessions >= 20) {
+      experience = 'experienced';
+    } else if (totalSessions >= 10) {
+      experience = 'intermediate';
+    }
+    buffer.writeln('- Experience Level: $experience ($totalSessions total sessions)');
+    
+    // Recent performance trend
+    final recentSplits = facts['recent_splits'] as List<dynamic>? ?? [];
+    if (recentSplits.isNotEmpty && recentSplits.length >= 2) {
+      buffer.writeln('- Recent Sessions: ${recentSplits.length} sessions analyzed for pacing patterns');
+    }
+    
+    // Last session info
+    final recency = facts['recency'] as Map<String, dynamic>? ?? {};
+    final daysSince = recency['days_since_last'] as num?;
+    if (daysSince != null) {
+      if (daysSince < 1) {
+        buffer.writeln('- Last Ruck: Today');
+      } else if (daysSince < 2) {
+        buffer.writeln('- Last Ruck: Yesterday');
+      } else {
+        buffer.writeln('- Last Ruck: ${daysSince.toInt()} days ago');
+      }
+    }
+    
+    // AI-generated insights if available
+    final insights = userInsights['insights'] as Map<String, dynamic>? ?? {};
+    final candidates = insights['candidates'] as List<dynamic>? ?? [];
+    if (candidates.isNotEmpty) {
+      buffer.writeln('- AI Insights Available: ${candidates.length} behavioral patterns identified');
+      // Include top insight for context
+      final topInsight = candidates.first as Map<String, dynamic>? ?? {};
+      final insightText = topInsight['text'] as String? ?? '';
+      if (insightText.isNotEmpty) {
+        buffer.writeln('- Key Pattern: $insightText');
+      }
     }
     
     return buffer.toString();

@@ -11,6 +11,12 @@ import 'package:rucking_app/features/profile/presentation/screens/public_profile
 
 /// Helper class for handling notification-related navigation
 class NotificationNavigation {
+  /// Check if a notification type is comment-related and should focus the comment input
+  static bool _isCommentNotification(String notificationType) {
+    return notificationType == NotificationType.comment ||
+           notificationType == NotificationType.ruckComment ||
+           notificationType == NotificationType.ruckActivity;
+  }
   /// Navigate to the appropriate screen based on the notification type and data
   static void navigateToNotificationDestination(
     BuildContext context,
@@ -21,12 +27,15 @@ class NotificationNavigation {
     switch (notification.type) {
       case NotificationType.like:
       case NotificationType.comment:
+      case NotificationType.system:  // Handle system notifications like first ruck completion
+      case NotificationType.achievement:  // If there's an achievement type for first ruck
+      case NotificationType.firstRuckCelebration:  // First ruck celebration notifications
+      case NotificationType.firstRuckGlobal:  // First ruck global notifications
+      case NotificationType.ruckComment:  // Ruck comment notifications
+      case NotificationType.ruckLike:  // Ruck like notifications
+      case NotificationType.ruckActivity:  // Ruck activity notifications (when others comment/like rucks you've interacted with)
         final ruckId = notification.data!['ruck_id']?.toString();
         if (ruckId != null) {
-          // Note: notification.data!['user_id'] contains the ID of the person who liked/commented,
-          // NOT the ruck owner. We want to show the ruck owner's info, so we'll let the detail 
-          // screen fetch the correct owner information via the API using the ruck_id.
-          
           // Create a minimal RuckBuddy with just the ruck ID
           // The detail screen will fetch the complete ruck data including the owner's profile
           final ruckBuddy = RuckBuddy(
@@ -53,7 +62,7 @@ class NotificationNavigation {
             MaterialPageRoute(
               builder: (context) => RuckBuddyDetailScreen(
                 ruckBuddy: ruckBuddy,
-                focusComment: notification.type == NotificationType.comment,
+                focusComment: _isCommentNotification(notification.type),
               ),
             ),
           );
@@ -121,18 +130,47 @@ class NotificationNavigation {
           );
         }
         break;
-      case NotificationType.system:
-        // Handle system notifications
-        break;
       default:
         // For unknown notification types, try to navigate to club details if club_id is present
         final clubId = notification.data!['club_id']?.toString();
-        if (clubId != null) {
+        final ruckId = notification.data!['ruck_id']?.toString();  // Fallback to ruck if present
+        if (ruckId != null) {
+          // Reuse the same minimal RuckBuddy creation and navigation as above
+          final ruckBuddy = RuckBuddy(
+            id: ruckId,
+            userId: '',  // Leave empty - let detail screen fetch the correct ruck owner
+            ruckWeightKg: 0,
+            durationSeconds: 0,
+            distanceKm: 0,
+            caloriesBurned: 0,
+            elevationGainM: 0,
+            elevationLossM: 0,
+            createdAt: DateTime.now(),
+            user: UserInfo(
+              id: '',      // Leave empty - will be populated with ruck owner's info
+              username: '', // Leave empty to trigger full data fetch in detail screen
+              gender: '',   // Leave empty, will be properly set when profile is fetched
+            ),
+            locationPoints: null, // Will be loaded by detail screen
+            photos: null, // Will be loaded by detail screen
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
+            ),
+          );
+        } else if (clubId != null) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ClubDetailScreen(clubId: clubId),
             ),
+          );
+        } else {
+          // Show a snackbar or dialog for unhandled notifications
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Unhandled notification type: ${notification.type}')),
           );
         }
         break;

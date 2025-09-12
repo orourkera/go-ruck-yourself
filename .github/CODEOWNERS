@@ -1,0 +1,10 @@
+# Sensitive core paths requiring review
+RuckTracker/api/gear*.py @your-org/gear-owners
+RuckTracker/migrations/*gear* @your-org/gear-owners
+rucking_app/ImplementationDocs/Gear_Feature_Spec.md @your-org/gear-owners
+
+# Location tracking code — do not modify without explicit approval
+rucking_app/lib/core/services/location_service.dart @your-org/location-owners
+rucking_app/lib/core/services/background_location_service.dart @your-org/location-owners
+rucking_app/lib/features/ruck_session/presentation/bloc/managers/location_tracking_manager.dart @your-org/location-owners
+

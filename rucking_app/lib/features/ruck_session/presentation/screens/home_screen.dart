@@ -978,14 +978,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
                                     },
                                   ),
                                   const SizedBox(width: 6),
-                                  // Profile
+                                  // Gear (replaces profile shortcut; profile is accessible via avatar)
                                   _buildHeaderAction(
                                     icon: _buildProfileHeaderIcon(),
                                     onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                                      );
+                                      Navigator.pushNamed(context, '/gear');
                                     },
                                   ),
                                 ],
@@ -1762,22 +1759,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware, TickerProviderState
     );
   }
 
-  /// Returns profile icon widget for header based on user gender (lady mode)
+  /// Header gear icon (replaces profile shortcut; profile is accessible via avatar)
   Widget _buildProfileHeaderIcon() {
-    String? gender;
-    try {
-      final authBloc = context.read<AuthBloc>();
-      if (authBloc.state is Authenticated) {
-        gender = (authBloc.state as Authenticated).user.gender;
-      }
-    } catch (_) {
-      // If AuthBloc not available, fall back to default icon
-    }
-
-    final String iconPath = (gender == 'female')
-        ? 'assets/images/lady rucker profile.png'
-        : 'assets/images/profile.png';
-    return Image.asset(iconPath, width: 30, height: 30);
+    return Image.asset('assets/images/gear.png', width: 30, height: 30);
   }
 
   String _formatDuration(Duration duration) {

@@ -425,7 +425,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
           // Try to create online session first, but handle active sessions
           try {
             AppLogger.info('Attempting to create online session...');
-            final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(seconds: 10));
+            final createResponse = await apiClient.post('/rucks', createRequestData).timeout(Duration(seconds: 30)); // Increased from 10s for better reliability
 
             if (!mounted) return;
             

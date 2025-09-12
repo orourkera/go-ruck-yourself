@@ -259,33 +259,68 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _coordinatorSubscription?.cancel();
     _coordinatorSubscription = _coordinator!.stream.listen(
       (coordinatorState) {
-        // Forward coordinator state as an internal event instead of calling emit directly
-        // This prevents "emit after event handler completed" errors
-        _forwardCoordinatorState(coordinatorState);
+        // CRITICAL: Wrap in try-catch to prevent ANY error from killing the coordinator stream
+        try {
+          // Forward coordinator state as an internal event instead of calling emit directly
+          // This prevents "emit after event handler completed" errors
+          _onCoordinatorStateChanged(coordinatorState);
+        } catch (e, stack) {
+          AppLogger.error('[CRITICAL] Error in coordinator state handler (GPS continues): $e');
+          AppLogger.error('[CRITICAL] Stack: $stack');
+          // DO NOT rethrow - this would kill the coordinator stream and stop GPS updates
+          // The session continues even if AI cheerleader or other features fail
+        }
       },
       onError: (error) {
-        AppLogger.error('Coordinator state error: $error');
-        // Use a generic sessionId since we don't have access to the actual session ID during setup
-        add(SessionFailed(
-          errorMessage: 'Session coordination failed: $error',
-          sessionId: 'coordinator-setup-error',
-        ));
+        AppLogger.error('Coordinator stream error: $error');
+        // Don't fail the session for coordinator errors - try to recover
+        // Only fail if we explicitly detect GPS is completely dead
       },
+      cancelOnError: false,  // CRITICAL: Don't cancel subscription on errors
     );
   }
 
-  /// Forward coordinator state safely by converting it to an internal event
-  void _forwardCoordinatorState(ActiveSessionState coordinatorState) {
-    // Handle session completion detection service lifecycle
-    _handleCompletionDetectionServiceLifecycle(coordinatorState);
+  /// Handle state changes from the coordinator
+  void _onCoordinatorStateChanged(ActiveSessionState coordinatorState) {
+    // CRITICAL: Wrap each feature in try-catch to prevent cascading failures
+    
+    // Handle completion detection service lifecycle
+    try {
+      _handleCompletionDetectionServiceLifecycle(coordinatorState);
+    } catch (e) {
+      AppLogger.error('[COMPLETION_DETECTION] Error handling lifecycle: $e');
+      // Continue - don't let this break the session
+    }
     
     // Check for AI Cheerleader triggers if enabled and session is running
+    // CRITICAL: This must NEVER crash the coordinator stream
     if (_aiCheerleaderEnabled && 
         coordinatorState is ActiveSessionRunning &&
         _aiCheerleaderPersonality != null &&
         _currentUser != null) {
       AppLogger.info('[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
-      _checkAICheerleaderTriggers(coordinatorState);
+      
+      // Fire and forget with complete isolation
+      Future.microtask(() async {
+        try {
+          await _checkAICheerleaderTriggers(coordinatorState);
+        } catch (e, stack) {
+          AppLogger.error('[AI_CHEERLEADER] Isolated trigger check failed: $e');
+          AppLogger.error('[AI_CHEERLEADER] Stack: $stack');
+          // Log to Sentry but don't crash the session
+          await AppErrorHandler.handleError(
+            'ai_cheerleader_crash',
+            'AI Cheerleader crashed at milestone but session continues',
+            context: {
+              'distance_km': coordinatorState.distanceKm.toString(),
+              'elapsed_seconds': coordinatorState.elapsedSeconds.toString(),
+              'personality': _aiCheerleaderPersonality ?? 'unknown',
+              'error': e.toString(),
+            },
+            severity: ErrorSeverity.warning,
+          );
+        }
+      });
     } else {
       AppLogger.info('[AI_DEBUG] AI triggers skipped - enabled: $_aiCheerleaderEnabled, running: ${coordinatorState is ActiveSessionRunning}, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
     }
@@ -481,11 +516,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.warning('[AI_LOCATION_DEBUG] About to access state.locationPoints...');
       
       try {
-        AppLogger.warning('[AI_LOCATION_DEBUG] Location points available: ${state.locationPoints.length}');
-        AppLogger.warning('[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints.runtimeType}');
+        // SAFETY: Check if locationPoints exists and is accessible
+        final pointsCount = state.locationPoints?.length ?? 0;
+        AppLogger.warning('[AI_LOCATION_DEBUG] Location points available: $pointsCount');
+        AppLogger.warning('[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints?.runtimeType ?? "null"}');
         
         AppLogger.warning('[AI_LOCATION_DEBUG] About to check if locationPoints is not empty...');
-        final lastLocation = state.locationPoints.isNotEmpty ? state.locationPoints.last : null;
+        final lastLocation = (state.locationPoints != null && state.locationPoints.isNotEmpty) ? state.locationPoints.last : null;
         AppLogger.warning('[AI_LOCATION_DEBUG] Last location extracted: $lastLocation');
         AppLogger.warning('[AI_LOCATION_DEBUG] Last location type: ${lastLocation.runtimeType}');
         
