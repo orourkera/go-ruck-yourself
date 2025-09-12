@@ -236,7 +236,7 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
     if user_id:
         user_insights = _get_user_insights(user_id)
         if user_insights:
-                user_analysis = _analyze_user_history(user_insights['facts'])
+            user_analysis = _analyze_user_history(user_insights['facts'])
             logger.info(f"User analysis for {user_id}: {user_analysis}")
     
     # Start with the base structure
