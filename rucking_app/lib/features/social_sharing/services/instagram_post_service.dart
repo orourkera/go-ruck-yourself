@@ -68,27 +68,30 @@ class InstagramPostService {
         useMetric: useMetric,
       );
 
+      // Ensure nested maps use string keys for downstream consumers.
+      final normalizedInsights = _normalizeInsights(insights);
+
       // 2. Generate visual content (route map or stats card)
       onDelta('Generating visuals...\n');
       final visualContent = await _generateVisualContent(
         timeRange: timeRange,
         template: template,
-        insights: insights,
+        insights: normalizedInsights,
         sessionId: sessionId,
         useMetric: useMetric,
       );
 
       // Add visual content to insights for photo extraction
       if (visualContent != null) {
-        final existingPhotos = insights['photos'] as List? ?? [];
-        insights['photos'] = [visualContent, ...existingPhotos];
+        final existingPhotos = normalizedInsights['photos'] as List? ?? [];
+        normalizedInsights['photos'] = [visualContent, ...existingPhotos];
         AppLogger.info('[INSTAGRAM] Added generated visual content as first photo');
       }
 
       // 3. Build the prompt for OpenAI
       onDelta('Creating caption...\n');
       final prompt = _buildPrompt(
-        insights: insights,
+        insights: normalizedInsights,
         timeRange: timeRange,
         template: template,
         useMetric: useMetric,
@@ -104,7 +107,7 @@ class InstagramPostService {
       // 5. Parse and format the response
       final post = _parseResponse(
         content: generatedContent,
-        insights: insights,
+        insights: normalizedInsights,
         template: template,
       );
 
@@ -262,8 +265,8 @@ class InstagramPostService {
     required PostTemplate template,
     required bool useMetric,
   }) {
-    final facts = insights['facts'] ?? {};
-    final triggers = insights['triggers'] ?? {};
+    final facts = _asStringKeyedMap(insights['facts']);
+    final triggers = _asStringKeyedMap(insights['triggers']);
     final achievements = insights['achievements'] ?? [];
 
     // Extract key stats based on time range
@@ -318,11 +321,11 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
       case TimeRange.lastRuck:
         // Use the session data we fetched from /api/rucks
         if (insights['stats'] != null) {
-          return insights['stats'] as Map<String, dynamic>;
+          return _asStringKeyedMap(insights['stats']);
         }
         // Fallback to session data directly
         if (insights['session'] != null) {
-          final session = insights['session'] as Map<String, dynamic>;
+          final session = _asStringKeyedMap(insights['session']);
           return {
             'distance_km': session['distance_km'] ?? 0.0,
             'duration_seconds': session['duration_seconds'] ?? 0,
@@ -335,11 +338,48 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
         }
         break;
       case TimeRange.week:
-        return facts['weekly_stats'] ?? {};
+        return _asStringKeyedMap(facts['weekly_stats']);
       case TimeRange.month:
-        return facts['monthly_stats'] ?? {};
+        return _asStringKeyedMap(facts['monthly_stats']);
       case TimeRange.allTime:
-        return facts['all_time_stats'] ?? {};
+        return _asStringKeyedMap(facts['all_time_stats']);
+    }
+    return {};
+  }
+
+  Map<String, dynamic> _normalizeInsights(Map<String, dynamic> insights) {
+    final normalized = Map<String, dynamic>.from(insights);
+
+    void assignIfPresent(String key) {
+      if (normalized.containsKey(key)) {
+        normalized[key] = _asStringKeyedMap(normalized[key]);
+      }
+    }
+
+    assignIfPresent('facts');
+    assignIfPresent('triggers');
+    assignIfPresent('stats');
+    assignIfPresent('time_range');
+    assignIfPresent('weekly_stats');
+    assignIfPresent('monthly_stats');
+    assignIfPresent('all_time_stats');
+
+    if (normalized['recent_sessions'] is List) {
+      normalized['recent_sessions'] = (normalized['recent_sessions'] as List)
+          .map((session) => _asStringKeyedMap(session))
+          .toList();
+    }
+
+    return normalized;
+  }
+
+  Map<String, dynamic> _asStringKeyedMap(dynamic value) {
+    if (value == null) return {};
+    if (value is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(value);
+    }
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
     }
     return {};
   }

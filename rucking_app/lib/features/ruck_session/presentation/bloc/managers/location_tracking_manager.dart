@@ -225,6 +225,11 @@ class LocationTrackingManager implements SessionManager {
     _isPaused = false;
     _pausedAt = null;
 
+    // Reset split tracking so distance milestones start fresh for this session.
+    // Without this, the singleton keeps the previous session's last split distance
+    // which prevents new 1km/1mi milestones from triggering.
+    _splitTrackingService.reset();
+
     // CRITICAL FIX: Reset state with explicit memory cleanup
     _locationPoints.clear();
     _terrainSegments.clear();
@@ -352,6 +357,10 @@ class LocationTrackingManager implements SessionManager {
         '[LOCATION_MANAGER] MEMORY_CLEANUP: Session stopped, all lists cleared and upload tracking reset');
 
     _updateState(const LocationTrackingState());
+
+    // Clear split tracking after session completion/upload to avoid leaking
+    // state into the next session should the user restart quickly.
+    _splitTrackingService.reset();
 
     AppLogger.info(
         '[LOCATION_MANAGER] MEMORY_CLEANUP: Location tracking stopped, all lists cleared and GC triggered');

@@ -64,15 +64,15 @@ class StatsVisualizationService {
   Map<String, dynamic> _extractTimeRangeStats(Map<String, dynamic> insights, TimeRange timeRange) {
     switch (timeRange) {
       case TimeRange.week:
-        return insights['weekly_stats'] ?? {};
+        return _mapWithStringKeys(insights['weekly_stats']);
       case TimeRange.month:
-        return insights['monthly_stats'] ?? {};
+        return _mapWithStringKeys(insights['monthly_stats']);
       case TimeRange.allTime:
-        return insights['all_time_stats'] ?? {};
+        return _mapWithStringKeys(insights['all_time_stats']);
       case TimeRange.lastRuck:
         // Check if we have time_range data from backend (when time_range=last_ruck is specified)
         if (insights['time_range'] != null) {
-          final timeRangeData = insights['time_range'] as Map<String, dynamic>;
+          final timeRangeData = _mapWithStringKeys(insights['time_range']);
           // Convert backend format to expected frontend format
           return {
             'total_distance': timeRangeData['total_distance_km'],
@@ -85,10 +85,22 @@ class StatsVisualizationService {
         // Fallback to recent_sessions format if available
         final recentSessions = insights['recent_sessions'] as List? ?? [];
         if (recentSessions.isNotEmpty) {
-          return recentSessions[0] as Map<String, dynamic>;
+          return _mapWithStringKeys(recentSessions[0]);
         }
         return {};
     }
+  }
+
+  /// Safely convert dynamic map-like objects to `Map<String, dynamic>`.
+  Map<String, dynamic> _mapWithStringKeys(dynamic value) {
+    if (value == null) return {};
+    if (value is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(value);
+    }
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return {};
   }
 
   /// Build the stats card widget
