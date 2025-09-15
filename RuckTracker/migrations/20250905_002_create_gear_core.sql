@@ -69,9 +69,11 @@ create index if not exists idx_gear_images_item on gear_images(gear_item_id);
 create table if not exists gear_item_tags (
   id uuid primary key default gen_random_uuid(),
   gear_item_id uuid references gear_items(id),
-  tag text not null,
-  unique(gear_item_id, lower(tag))
+  tag text not null
+  -- unique by item+tag (case-insensitive) enforced via expression index below
 );
+-- Expression-based unique constraint must be an index in Postgres
+create unique index if not exists uq_gear_item_tags_item_tag on gear_item_tags(gear_item_id, lower(tag));
 create index if not exists idx_gear_item_tags_tag on gear_item_tags(lower(tag));
 
 -- Discounts: item-level or SKU-level

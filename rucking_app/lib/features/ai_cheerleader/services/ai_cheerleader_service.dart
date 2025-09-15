@@ -39,6 +39,13 @@ class AICheerleaderService {
   TriggerType? _lastTriggerType;
   final math.Random _rand = math.Random();
 
+  // Location mention tracking
+  DateTime? _lastLocationMentionTime;
+  String? _lastMentionedLocation;
+  double? _lastMentionedLatitude;
+  double? _lastMentionedLongitude;
+  static const int _locationMentionCooldownMinutes = 12; // Don't mention location again for 12 minutes
+
   /// Analyzes session state and returns trigger type if one should fire
   CheerleaderTrigger? analyzeTriggers(ActiveSessionRunning state,
       {required bool preferMetric}) {
@@ -99,11 +106,8 @@ class AICheerleaderService {
     final distanceMeters = state.distanceKm * 1000.0;
     final base = preferMetric ? _milestoneIntervalMeters : 1609; // meters
 
-    // Log user preference for debugging
-    AppLogger.info(
-        '[AI_MILESTONE] User preferMetric=$preferMetric, using base=$base meters (${preferMetric ? "1km" : "1 mile"})');
-    AppLogger.info(
-        '[AI_MILESTONE] Current distance: ${state.distanceKm}km = ${state.distanceKm * 0.621371} miles');
+    // Only log preferences once during initialization, not on every distance check
+    // This was causing excessive logging and potential ANR on Android
 
     // Initialize next milestone with jitter
     _nextMilestoneMeters ??= _jitteredInterval(base).toInt();
@@ -111,10 +115,9 @@ class AICheerleaderService {
     if (distanceMeters >= _nextMilestoneMeters!) {
       // Compute milestone count in user's unit for context
       final milestoneCount = (distanceMeters ~/ base);
+      // Only log the actual milestone trigger, not the next milestone calculation
       AppLogger.info(
-          '[AI_MILESTONE] MILESTONE TRIGGERED! Milestone #$milestoneCount at ${state.distanceKm}km');
-      AppLogger.info(
-          '[AI_MILESTONE] Next milestone will be at $_nextMilestoneMeters meters');
+          '[AI_MILESTONE] Milestone #$milestoneCount triggered at ${state.distanceKm}km');
 
       // Schedule the next milestone
       _nextMilestoneMeters =
@@ -188,8 +191,9 @@ class AICheerleaderService {
 
   /// Check for pace drops that need encouragement
   CheerleaderTrigger? _checkPaceDropTrigger(ActiveSessionRunning state) {
-    if (state.elapsedSeconds < 60)
+    if (state.elapsedSeconds < 60) {
       return null; // Need 1min for pace analysis (for testing)
+    }
 
     final currentPace = state.pace;
     if (currentPace == null || currentPace == 0) return null;
@@ -360,6 +364,63 @@ class AICheerleaderService {
     return elapsedMinutes < 30 ? 'early' : 'steady_state';
   }
 
+  /// Check if location should be included in context based on cooldown and distance
+  bool shouldIncludeLocationContext({
+    String? currentLocation,
+    double? currentLatitude,
+    double? currentLongitude,
+  }) {
+    final now = DateTime.now();
+
+    // Always include if no previous mention
+    if (_lastLocationMentionTime == null) {
+      return true;
+    }
+
+    // Check cooldown period
+    final timeSinceLastMention = now.difference(_lastLocationMentionTime!);
+    if (timeSinceLastMention.inMinutes < _locationMentionCooldownMinutes) {
+      // Only include if location has changed significantly (>1km)
+      if (currentLatitude != null && currentLongitude != null &&
+          _lastMentionedLatitude != null && _lastMentionedLongitude != null) {
+        final distance = _calculateDistance(
+          _lastMentionedLatitude!, _lastMentionedLongitude!,
+          currentLatitude, currentLongitude
+        );
+        return distance > 1000; // More than 1km difference
+      }
+      return false;
+    }
+
+    // Cooldown period has passed, allow location mention
+    return true;
+  }
+
+  /// Record that location was mentioned in an AI response
+  void recordLocationMention({
+    String? location,
+    double? latitude,
+    double? longitude,
+  }) {
+    _lastLocationMentionTime = DateTime.now();
+    _lastMentionedLocation = location;
+    _lastMentionedLatitude = latitude;
+    _lastMentionedLongitude = longitude;
+    AppLogger.info('[AI_CHEERLEADER] Location mention recorded: $location');
+  }
+
+  /// Calculate distance between two coordinates in meters
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000; // Earth radius in meters
+    final double dLat = (lat2 - lat1) * (math.pi / 180);
+    final double dLon = (lon2 - lon1) * (math.pi / 180);
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
   /// Resets service state for new session
   void reset() {
     _lastTriggerTime = null;
@@ -373,6 +434,11 @@ class AICheerleaderService {
     _nextMilestoneMeters = null;
     _nextTimeCheckAt = null;
     _lastTriggerType = null;
+    // Reset location tracking
+    _lastLocationMentionTime = null;
+    _lastMentionedLocation = null;
+    _lastMentionedLatitude = null;
+    _lastMentionedLongitude = null;
     AppLogger.info('[AI_CHEERLEADER] Service reset for new session');
   }
 

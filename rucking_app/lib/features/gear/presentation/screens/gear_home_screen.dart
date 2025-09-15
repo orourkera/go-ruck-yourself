@@ -85,24 +85,6 @@ class _GearHomeScreenState extends State<GearHomeScreen> {
           );
           _load();
         },
-        onSearchAmazon: (q) => _api.searchAmazon(q: q),
-        onSelectAmazon: (it, {required bool asWishlist}) async {
-          Navigator.pop(context);
-          final messenger = ScaffoldMessenger.maybeOf(context);
-          await _api.claimExternal(
-            source: 'amazon',
-            externalId: (it['asin'] ?? '').toString(),
-            relation: asWishlist ? 'saved' : 'owned',
-            title: it['title']?.toString(),
-            imageUrl: it['image_url']?.toString(),
-          );
-          messenger?.showSnackBar(
-            SnackBar(
-                content:
-                    Text(asWishlist ? 'Added to wishlist' : 'Marked as owned')),
-          );
-          _load();
-        },
         onSearchAmazon:
             AppConfig.enableAmazonGear ? (q) => _api.searchAmazon(q: q) : null,
         onSelectAmazon: AppConfig.enableAmazonGear

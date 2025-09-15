@@ -441,8 +441,73 @@ class LocationTrackingManager implements SessionManager {
     }
 
     final position = event.position;
+    final now = DateTime.now();
+
+    // CRITICAL: Gap detection for phone death/recovery scenarios
+    // If there's been a large time gap since last location, don't calculate distance
+    if (_lastLocationTimestamp != null) {
+      final timeSinceLastLocation = now.difference(_lastLocationTimestamp!);
+
+      // If more than 5 minutes have passed, this is likely a recovery scenario
+      if (timeSinceLastLocation.inMinutes >= 5) {
+        AppLogger.warning(
+          '[LOCATION_MANAGER] ⚠️ LARGE TIME GAP DETECTED: ${timeSinceLastLocation.inMinutes} minutes since last location. '
+          'Likely phone recovery scenario - checking for invalid distance jump.'
+        );
+
+        // Check if the distance jump would be unrealistic
+        if (_locationPoints.isNotEmpty) {
+          final lastPoint = _locationPoints.last;
+          final distance = Geolocator.distanceBetween(
+            lastPoint.latitude,
+            lastPoint.longitude,
+            position.latitude,
+            position.longitude,
+          );
+
+          // Calculate implied speed (m/s)
+          final impliedSpeed = distance / timeSinceLastLocation.inSeconds;
+
+          // If implied speed > 50 km/h (13.9 m/s) for running, it's definitely invalid
+          // Also check for very large distance jumps (> 1km per minute of gap)
+          final minutesGap = timeSinceLastLocation.inMinutes;
+          final maxReasonableDistance = minutesGap * 1000.0; // 1km per minute max
+
+          if (impliedSpeed > 13.9 || distance > maxReasonableDistance) {
+            AppLogger.error(
+              '[LOCATION_MANAGER] 🚨 INVALID RECOVERY DETECTED: Implied speed ${(impliedSpeed * 3.6).toStringAsFixed(1)} km/h '
+              'over ${timeSinceLastLocation.inMinutes} minutes. Distance jump: ${(distance / 1000).toStringAsFixed(2)} km. '
+              'REJECTING this location update to prevent data corruption.'
+            );
+
+            // Update timestamps but don't add the location point
+            _lastRawLocationTimestamp = now;
+
+            // Clear the error message after a few seconds
+            _updateState(_currentState.copyWith(
+              errorMessage: 'Session recovered - GPS reconnecting...',
+            ));
+
+            // Schedule clearing the error message
+            Future.delayed(const Duration(seconds: 5), () {
+              if (_currentState.errorMessage == 'Session recovered - GPS reconnecting...') {
+                _updateState(_currentState.copyWith(errorMessage: null));
+              }
+            });
+
+            return; // Skip this location update entirely
+          }
+
+          AppLogger.info(
+            '[LOCATION_MANAGER] Gap detected but distance reasonable: ${(distance / 1000).toStringAsFixed(2)} km '
+            'at ${(impliedSpeed * 3.6).toStringAsFixed(1)} km/h - accepting location.'
+          );
+        }
+      }
+    }
+
     // Track raw update time separately from valid accepted locations
-    _lastRawLocationTimestamp = DateTime.now();
+    _lastRawLocationTimestamp = now;
 
     AppLogger.debug(
         '[LOCATION_MANAGER] 🎯 Location coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}');
@@ -1109,8 +1174,9 @@ class LocationTrackingManager implements SessionManager {
     AppLogger.info('[LOCATION_MANAGER] Starting location tracking');
 
     try {
-      // Lazily create the shared source stream once and reuse on resubscribe
-      _rawLocationStream ??= _locationService.startLocationTracking();
+      // CRITICAL FIX: Always create a fresh stream when starting location tracking
+      // Reusing a dead stream was causing location updates to stop after ~15 minutes
+      _rawLocationStream = _locationService.startLocationTracking();
 
       _attachLocationListener();
 
@@ -1142,6 +1208,9 @@ class LocationTrackingManager implements SessionManager {
 
     await _locationSubscription?.cancel();
     _locationSubscription = null;
+
+    // CRITICAL: Clear the stream reference so a fresh one is created on restart
+    _rawLocationStream = null;
 
     _batchUploadTimer?.cancel();
     _batchUploadTimer = null;

@@ -48,6 +48,7 @@ import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
+import 'package:rucking_app/features/social_sharing/services/share_prompt_logic.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
@@ -173,6 +174,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // if (state == AppLifecycleState.resumed) {
     //   context.read<PremiumBloc>().add(CheckPremiumStatus());
     // }
+
+    // Check if we should show share prompt when returning from a session
+    if (state == AppLifecycleState.resumed && mounted) {
+      _checkForSharePrompt();
+    }
+  }
+
+  Future<void> _checkForSharePrompt() async {
+    // Get the most recent session to check if it was just completed
+    try {
+      final repository = GetIt.instance<SessionRepository>();
+      final sessions = await repository.fetchSessionHistory(limit: 1, offset: 0);
+
+      if (sessions.isNotEmpty) {
+        final lastSession = sessions.first;
+        final sessionAge = DateTime.now().difference(lastSession.endTime);
+
+        // If session was completed in the last 5 minutes, consider showing prompt
+        if (sessionAge.inMinutes < 5 && lastSession.id != null) {
+          await SharePromptLogic.maybeShowPrompt(
+            context: context,
+            sessionId: lastSession.id!,
+            distanceKm: lastSession.distance,
+            duration: lastSession.duration,
+            // Check for achievements/PRs here if available
+            isPR: false, // TODO: Check if this was a PR
+            sessionNumber: sessions.length,
+          );
+        }
+      }
+    } catch (e) {
+      // Silent fail - not critical
+      developer.log('Failed to check for share prompt: $e');
+    }
   }
 
   // List of screens for the bottom navigation bar
@@ -1046,11 +1081,11 @@ class _HomeTabState extends State<_HomeTab>
                                     },
                                   ),
                                   const SizedBox(width: 6),
-                                  // Gear (replaces profile shortcut; profile is accessible via avatar)
+                                  // Profile icon
                                   _buildHeaderAction(
                                     icon: _buildProfileHeaderIcon(),
                                     onTap: () {
-                                      Navigator.pushNamed(context, '/gear');
+                                      Navigator.pushNamed(context, '/profile');
                                     },
                                   ),
                                 ],
@@ -1998,9 +2033,35 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
-  /// Header gear icon (replaces profile shortcut; profile is accessible via avatar)
+  /// Header profile icon
   Widget _buildProfileHeaderIcon() {
-    return Image.asset('assets/images/gear.png', width: 30, height: 30);
+    // Get user gender from AuthBloc if available
+    String? userGender;
+    try {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.state is Authenticated) {
+        userGender = (authBloc.state as Authenticated).user.gender;
+      }
+    } catch (e) {
+      // If auth bloc is not available, continue with default icon
+      debugPrint('Could not get user gender for profile icon: $e');
+    }
+
+    // Determine which icon to use based on gender
+    String iconPath;
+    if (userGender == 'female') {
+      // Female icon
+      iconPath = 'assets/images/lady rucker profile.png';
+    } else {
+      // Default/male icon
+      iconPath = 'assets/images/profile.png';
+    }
+
+    return Image.asset(
+      iconPath,
+      width: 24,
+      height: 24,
+    );
   }
 
   String _formatDuration(Duration duration) {

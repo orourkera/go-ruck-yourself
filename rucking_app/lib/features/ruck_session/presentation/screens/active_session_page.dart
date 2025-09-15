@@ -214,6 +214,10 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
   // Lightweight telemetry for significant state changes to aid debugging
   void _sendSessionStateTelemetry(ActiveSessionState state) {
     try {
+      // DISABLED: This was logging every single state update causing excessive noise
+      // and potentially contributing to ANR issues on Android.
+      // Only log actual errors, not normal running state updates.
+      /*
       if (state is ActiveSessionRunning) {
         AppErrorHandler.handleError(
           'active_session_running_state',
@@ -231,7 +235,9 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
           },
           severity: ErrorSeverity.info,
         );
-      } else if (state is ActiveSessionCompleted) {
+      }
+      */
+      if (state is ActiveSessionCompleted) {
         AppErrorHandler.handleError(
           'active_session_completed_state',
           'completed update',

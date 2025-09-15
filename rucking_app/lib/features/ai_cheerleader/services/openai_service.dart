@@ -184,6 +184,9 @@ class OpenAIService {
         if (_localRecentLines.length > 6) {
           _localRecentLines.removeRange(6, _localRecentLines.length);
         }
+
+        // Check if the response mentions location and record it for future tracking
+        _recordLocationMentionIfPresent(message, context);
         AppLogger.error(
             '[OPENAI_SERVICE_DEBUG] Step 7: Message is valid, about to log to database');
         AppLogger.info(
@@ -601,11 +604,30 @@ Reference historical trends and achievements when relevant.''';
     AppLogger.info(
         '[OPENAI_DEBUG] Found ${avoidLines.length} previous AI responses to avoid');
     AppLogger.info('[OPENAI_DEBUG] Previous responses: $avoidLines');
-    final avoidBlock = avoidLines.isEmpty
-        ? ''
-        : '\n\nVariety Guidelines:\nAvoid repeating these exact phrases from recent responses:\n- ' +
-            avoidLines.join('\n- ') +
-            '\n\nFor variety, try referencing different aspects of their performance each time.\n';
+
+    // Check if location was recently mentioned to add specific guidance
+    final environmentData = (history is Map && history['environment'] is Map)
+        ? history['environment'] as Map<String, dynamic>
+        : null;
+    final location = environmentData?['location'] as Map<String, dynamic>?;
+    final currentCity = location?['city'] as String?;
+    final hasRecentLocationMention = _hasRecentLocationMention(history, currentCity);
+
+    String avoidBlock = '';
+    if (avoidLines.isNotEmpty || hasRecentLocationMention) {
+      avoidBlock = '\n\nVariety Guidelines:';
+
+      if (avoidLines.isNotEmpty) {
+        avoidBlock += '\nAvoid repeating these exact phrases from recent responses:\n- ' +
+            avoidLines.join('\n- ');
+      }
+
+      if (hasRecentLocationMention) {
+        avoidBlock += '\nIMPORTANT: Location/city was mentioned recently - do NOT mention location, city, area, or place names in this response.';
+      }
+
+      avoidBlock += '\n\nFor variety, try referencing different aspects of their performance each time.\n';
+    }
 
     // Add coaching plan guidance to the prompt ONLY if we have actual coaching plan data
     final coachingPlan = (history is Map && history['coachingPlan'] is Map)
@@ -715,7 +737,7 @@ Respond with your motivational message:''';
         environment is Map ? environment['sessionPhase'] : 'Unknown';
     contextText += " Time: ${timeOfDay}, Phase: ${sessionPhase}.";
 
-    // Add location context for humor and local references
+    // Add location context for humor and local references (conditionally)
     final location = environment is Map ? environment['location'] : null;
     AppLogger.info(
         '[OPENAI_DEBUG] Location object type: ${location.runtimeType}');
@@ -726,41 +748,52 @@ Respond with your motivational message:''';
         ? user['preferMetric'] as bool
         : true;
 
+    // Check if location should be included to avoid repetition
+    String? cityName;
+    bool shouldIncludeLocation = false;
+
     if (location != null) {
       if (location is Map) {
         final locationMap = Map<String, dynamic>.from(location);
-        final city = (locationMap['city'] ??
+        cityName = (locationMap['city'] ??
             locationMap['name'] ??
             locationMap['locality']) as String?;
-        final terrain = locationMap['terrain'] as String?;
-        final landmark = locationMap['landmark'] as String?;
 
-        // Weather may live inside location or environment['weather']
-        String? weatherCondition = locationMap['weatherCondition'] as String?;
-        num? tempF = locationMap['temperature'] is num
-            ? locationMap['temperature'] as num
-            : null;
-        // Alternative nested weather structures
-        final weather = environment is Map ? environment['weather'] : null;
-        if (weather is Map) {
-          final weatherMap = Map<String, dynamic>.from(weather);
-          weatherCondition = weatherCondition ??
-              (weatherMap['condition'] ?? weatherMap['summary']) as String?;
-          tempF = tempF ??
-              (weatherMap['tempF'] is num ? weatherMap['tempF'] as num : null);
-          final tempCAlt =
-              weatherMap['tempC'] is num ? weatherMap['tempC'] as num : null;
-          if (preferMetric && tempF == null && tempCAlt != null) {
-            // keep as C, convert later during render
-            tempF = (tempCAlt * 9 / 5) + 32; // store F for unified handling
-          }
+        // Check if we should include location based on recent mentions
+        if (cityName != null && cityName.isNotEmpty && cityName != 'Unknown Location') {
+          shouldIncludeLocation = !_hasRecentLocationMention(history, cityName);
+          AppLogger.info('[LOCATION_CONTEXT] City: $cityName, Include: $shouldIncludeLocation');
         }
 
-        AppLogger.info(
-            '[OPENAI_DEBUG] Parsed - city: $city, terrain: $terrain, landmark: $landmark, weather: $weatherCondition, tempF: $tempF');
+        if (shouldIncludeLocation) {
+          final terrain = locationMap['terrain'] as String?;
+          final landmark = locationMap['landmark'] as String?;
 
-        if (city != null && city.isNotEmpty && city != 'Unknown Location') {
-          contextText += " Location: $city";
+          // Weather may live inside location or environment['weather']
+          String? weatherCondition = locationMap['weatherCondition'] as String?;
+          num? tempF = locationMap['temperature'] is num
+              ? locationMap['temperature'] as num
+              : null;
+          // Alternative nested weather structures
+          final weather = environment is Map ? environment['weather'] : null;
+          if (weather is Map) {
+            final weatherMap = Map<String, dynamic>.from(weather);
+            weatherCondition = weatherCondition ??
+                (weatherMap['condition'] ?? weatherMap['summary']) as String?;
+            tempF = tempF ??
+                (weatherMap['tempF'] is num ? weatherMap['tempF'] as num : null);
+            final tempCAlt =
+                weatherMap['tempC'] is num ? weatherMap['tempC'] as num : null;
+            if (preferMetric && tempF == null && tempCAlt != null) {
+              // keep as C, convert later during render
+              tempF = (tempCAlt * 9 / 5) + 32; // store F for unified handling
+            }
+          }
+
+          AppLogger.info(
+              '[OPENAI_DEBUG] Parsed - city: $cityName, terrain: $terrain, landmark: $landmark, weather: $weatherCondition, tempF: $tempF');
+
+          contextText += " Location: $cityName";
           if (terrain != null && terrain.isNotEmpty)
             contextText += " ($terrain terrain)";
           if (landmark != null && landmark.isNotEmpty)
@@ -786,7 +819,11 @@ Respond with your motivational message:''';
       } else if (location is String &&
           location.isNotEmpty &&
           location != 'Unknown Location') {
-        contextText += " Location: $location";
+        // Handle string location
+        shouldIncludeLocation = !_hasRecentLocationMention(history, location);
+        if (shouldIncludeLocation) {
+          contextText += " Location: $location";
+        }
       }
     }
 
@@ -1177,5 +1214,87 @@ Respond with your motivational message:''';
     AppLogger.error(
         '[ANTI_REPEAT_DEBUG] Final avoid lines (${lines.length}): $lines');
     return lines;
+  }
+
+  /// Check if recent responses mention location/city to avoid repetition
+  bool _hasRecentLocationMention(Map<dynamic, dynamic> history, String? currentCity) {
+    if (currentCity == null || currentCity.isEmpty) return false;
+
+    final items = (history['ai_cheerleader_history'] as List?) ?? const [];
+
+    // Check last 3 responses for location mentions
+    for (int i = 0; i < math.min(3, items.length); i++) {
+      final it = items[i];
+      if (it is Map && it['openai_response'] is String) {
+        final response = (it['openai_response'] as String).toLowerCase();
+        final cityLower = currentCity.toLowerCase();
+
+        // Check for exact city match or common location phrases
+        if (response.contains(cityLower) ||
+            response.contains('location') ||
+            response.contains('city') ||
+            response.contains('area') ||
+            response.contains('neighborhood') ||
+            response.contains('place')) {
+          AppLogger.info('[LOCATION_REPEAT] Found recent location mention in: ${response.substring(0, math.min(50, response.length))}...');
+          return true;
+        }
+      }
+    }
+
+    // Also check local cache
+    for (final response in _localRecentLines.take(3)) {
+      final responseLower = response.toLowerCase();
+      final cityLower = currentCity.toLowerCase();
+
+      // Check for location marker
+      if (response.startsWith('LOCATION_MENTIONED:')) {
+        final markerCity = response.substring('LOCATION_MENTIONED:'.length).toLowerCase();
+        if (markerCity == cityLower) {
+          AppLogger.info('[LOCATION_REPEAT] Found location marker in local cache for: $cityLower');
+          return true;
+        }
+      }
+
+      // Check for actual location mentions in responses
+      if (responseLower.contains(cityLower) ||
+          responseLower.contains('location') ||
+          responseLower.contains('city') ||
+          responseLower.contains('area') ||
+          responseLower.contains('neighborhood') ||
+          responseLower.contains('place')) {
+        AppLogger.info('[LOCATION_REPEAT] Found recent location mention in local cache: ${response.substring(0, math.min(50, response.length))}...');
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Check if the AI response mentions location and record it for future avoidance
+  void _recordLocationMentionIfPresent(String message, Map<String, dynamic> context) {
+    final messageLower = message.toLowerCase();
+    final environment = context['environment'] as Map<String, dynamic>?;
+    final location = environment?['location'] as Map<String, dynamic>?;
+    final cityName = location?['city'] as String?;
+
+    // Check if message mentions location-related terms
+    final hasLocationMention = messageLower.contains('location') ||
+        messageLower.contains('city') ||
+        messageLower.contains('area') ||
+        messageLower.contains('neighborhood') ||
+        messageLower.contains('place') ||
+        (cityName != null && messageLower.contains(cityName.toLowerCase()));
+
+    if (hasLocationMention && cityName != null) {
+      // Record the location mention for future avoidance
+      AppLogger.info('[LOCATION_TRACKING] Location mention detected in AI response: $cityName');
+
+      // Add a special marker to local cache to indicate location was mentioned
+      final locationMarker = "LOCATION_MENTIONED:$cityName";
+      if (!_localRecentLines.contains(locationMarker)) {
+        _localRecentLines.insert(0, locationMarker);
+      }
+    }
   }
 }

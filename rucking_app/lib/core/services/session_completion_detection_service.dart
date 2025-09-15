@@ -53,6 +53,7 @@ class SessionCompletionDetectionService {
   int _stationaryTimeThreshold = 300; // 5 minutes in seconds
   int _confirmationTimeThreshold = 420; // 7 minutes in seconds
   int _autoCompleteTimeThreshold = 600; // 10 minutes in seconds
+  int _forceEndTimeThreshold = 1800; // 30 minutes in seconds - force end session
   final Duration _minSessionDurationForIdle =
       const Duration(minutes: 10); // avoid early prompts
 
@@ -440,6 +441,18 @@ class SessionCompletionDetectionService {
       // Reset to prevent repeated notifications
       _resetDetectionState();
     }
+
+    // CRITICAL: Force-end session after 30 minutes of inactivity
+    // This prevents the phone death recovery bug where distance is incorrectly calculated
+    if (detectionDuration.inSeconds >= _forceEndTimeThreshold) {
+      AppLogger.warning(
+          '[SESSION_COMPLETION] FORCE ENDING SESSION: ${detectionDuration.inMinutes} minutes of inactivity detected. '
+          'Auto-ending session to prevent data corruption from phone death/recovery scenarios.');
+
+      await _forceEndSession(currentDistance);
+      // Stop monitoring after force-end
+      stopMonitoring();
+    }
   }
 
   /// Show session completion notification
@@ -574,6 +587,53 @@ class SessionCompletionDetectionService {
             ? DateTime.now().difference(_lastSignificantMovement!).inMinutes
             : null,
       };
+
+  /// Force-end a session after extended inactivity
+  Future<void> _forceEndSession(double distance) async {
+    try {
+      AppLogger.warning('[SESSION_COMPLETION] Force-ending session due to extended inactivity');
+
+      // Get the active session bloc
+      final activeSessionBloc = GetIt.instance<ActiveSessionBloc>();
+      final currentState = activeSessionBloc.state;
+
+      if (currentState is! ActiveSessionRunning) {
+        AppLogger.warning('[SESSION_COMPLETION] Cannot force-end - session not running');
+        return;
+      }
+
+      // Show notification to user
+      final firebaseMessaging = GetIt.instance<FirebaseMessagingService>();
+      await firebaseMessaging.showNotification(
+        id: 10004,
+        title: 'Session Auto-Ended',
+        body: 'Your ${distance.toStringAsFixed(1)} km ruck was automatically ended after 30 minutes of inactivity.',
+        payload: {
+          'type': 'session_force_ended',
+          'session_id': _currentSessionId,
+        },
+      );
+
+      // Create database notification
+      await _createDatabaseNotification(
+        type: 'session_force_ended',
+        title: 'Session Auto-Ended',
+        body: 'Your ruck was automatically ended after extended inactivity to prevent data corruption.',
+        sessionId: _currentSessionId,
+        promptType: 'force_end',
+      );
+
+      // Trigger session completion with auto-end note
+      // Note: The notification above informs the user this was an auto-end
+      activeSessionBloc.add(const SessionCompleted(
+        notes: '[Auto-ended after 30 minutes of inactivity]',
+      ));
+
+      AppLogger.info('[SESSION_COMPLETION] Session force-end triggered successfully');
+    } catch (e) {
+      AppLogger.error('[SESSION_COMPLETION] Failed to force-end session: $e');
+    }
+  }
 
   /// Create database notification record for consistency with other notifications
   Future<void> _createDatabaseNotification({

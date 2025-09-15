@@ -89,7 +89,7 @@ do $$ begin
     -- already exists
     null;
   else
-    execute $$
+    execute $outer$
       create or replace function public.log_gear_click(
         p_sku_id uuid,
         p_gear_item_id uuid,
@@ -105,7 +105,7 @@ do $$ begin
       language plpgsql
       security definer
       set search_path = public
-      as $$
+      as $body$
       begin
         insert into public.gear_referral_clicks (
           sku_id, gear_item_id, retailer, code, referral_id,
@@ -117,9 +117,8 @@ do $$ begin
           left(coalesce(p_user_agent, ''), 512), p_ip_hash
         );
       end;
-      $$;
-    $$;
+      $body$;
+    $outer$;
     grant execute on function public.log_gear_click(uuid, uuid, text, text, uuid, text, text, text, text, text) to authenticated;
   end if;
 end $$;
-

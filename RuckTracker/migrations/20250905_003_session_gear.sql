@@ -21,13 +21,32 @@ create index if not exists idx_rsg_role on ruck_session_gear(role);
 alter table ruck_session_gear enable row level security;
 do $$ begin
   begin
-    execute $$create policy rsg_owner_select on ruck_session_gear
-      for select using (exists (select 1 from ruck_session rs where rs.id = session_id and rs.user_id = auth.uid()))$$;
+    execute $pol$
+      create policy rsg_owner_select on ruck_session_gear
+        for select using (
+          exists (
+            select 1 from ruck_session rs
+            where rs.id = session_id and rs.user_id = auth.uid()
+          )
+        )
+    $pol$;
   exception when duplicate_object then null; end;
   begin
-    execute $$create policy rsg_owner_write on ruck_session_gear
-      for all using (exists (select 1 from ruck_session rs where rs.id = session_id and rs.user_id = auth.uid()))
-      with check (exists (select 1 from ruck_session rs where rs.id = session_id and rs.user_id = auth.uid()))$$;
+    execute $pol$
+      create policy rsg_owner_write on ruck_session_gear
+        for all using (
+          exists (
+            select 1 from ruck_session rs
+            where rs.id = session_id and rs.user_id = auth.uid()
+          )
+        )
+        with check (
+          exists (
+            select 1 from ruck_session rs
+            where rs.id = session_id and rs.user_id = auth.uid()
+          )
+        )
+    $pol$;
   exception when duplicate_object then null; end;
 end $$;
 
@@ -105,4 +124,3 @@ select
 from canon
 group by role, canonical_key, title, image_url, category_slug
 order by total_distance_km desc nulls last;
-

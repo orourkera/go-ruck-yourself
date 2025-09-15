@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
+import 'package:rucking_app/features/social_sharing/screens/share_preview_screen.dart';
+import 'package:rucking_app/features/social_sharing/models/time_range.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/widgets/stat_row.dart';
@@ -125,6 +127,25 @@ class SessionCard extends StatelessWidget {
                       label: 'Weight',
                       value: weightDisplay,
                     ),
+                  ),
+                  // Share button
+                  IconButton(
+                    icon: Icon(
+                      Icons.share,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SharePreviewScreen(
+                            sessionId: session.id,
+                            initialTimeRange: TimeRange.lastRuck,
+                          ),
+                        ),
+                      );
+                    },
+                    tooltip: 'Share to Instagram',
                   ),
                 ],
               ),

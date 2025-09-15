@@ -142,14 +142,15 @@ class LocationServiceImpl implements LocationService {
 
   @override
   Future<bool> hasLocationPermission() async {
-    final permission = await Geolocator.checkPermission();
-    final granted = permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
-    // Ensure we enable Geolocator foreground service path on Android when already granted
-    if (granted && Platform.isAndroid) {
-      _canStartForegroundService = true;
+    try {
+      final permission = await Geolocator.checkPermission();
+      final granted = permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
+      return granted;
+    } catch (e) {
+      AppLogger.error('Error checking location permission', exception: e);
+      return false;
     }
-    return granted;
   }
 
   @override
@@ -332,6 +333,9 @@ class LocationServiceImpl implements LocationService {
             'Location permission required. Please enable location services in Settings.'));
         return;
       }
+
+      // Enable foreground service for Android - will be safely checked when used
+      _canStartForegroundService = true;
 
       // Check if location services are enabled
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
