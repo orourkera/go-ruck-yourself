@@ -271,12 +271,104 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         }
       },
       onError: (error) {
-        AppLogger.error('Coordinator stream error: $error');
-        // Don't fail the session for coordinator errors - try to recover
-        // Only fail if we explicitly detect GPS is completely dead
+        AppLogger.error('[COORDINATOR] Stream error: $error');
+
+        // Attempt to recover coordinator instead of failing the session
+        try {
+          // Log the error but try to maintain session state
+          if (state is ActiveSessionRunning) {
+            final runningState = state as ActiveSessionRunning;
+            AppLogger.warning(
+                '[COORDINATOR] Maintaining session state despite coordinator error');
+
+            // Try to restart coordinator if it's completely failed
+            if (_coordinator?.isClosed == true) {
+              AppLogger.info('[COORDINATOR] Restarting coordinator due to critical failure');
+              _restartCoordinator();
+            }
+          }
+        } catch (recoveryError) {
+          AppLogger.error('[COORDINATOR] Recovery failed: $recoveryError');
+          // Only as last resort, report to Sentry but don't kill the session
+          AppErrorHandler.handleError(
+            'coordinator_recovery_failed',
+            recoveryError,
+            severity: ErrorSeverity.error,
+          );
+        }
       },
       cancelOnError: false, // CRITICAL: Don't cancel subscription on errors
     );
+  }
+
+  /// Restart coordinator after critical failure to maintain session continuity
+  void _restartCoordinator() {
+    try {
+      AppLogger.info('[COORDINATOR] Attempting to restart coordinator');
+
+      // Cancel existing subscription
+      _coordinatorSubscription?.cancel();
+
+      // Create new coordinator instance
+      _coordinator = ActiveSessionCoordinator(
+        sessionRepository: _sessionRepository,
+        locationService: _locationService,
+        authService: GetIt.instance<AuthService>(),
+        watchService: _watchService,
+        storageService: GetIt.instance<StorageService>(),
+        apiClient: _apiClient,
+        connectivityService: _connectivityService,
+        splitTrackingService: _splitTrackingService,
+        terrainTracker: _terrainTracker,
+        heartRateService: _heartRateService,
+        openAIService: _openAIService,
+      );
+
+      // Re-establish subscription with enhanced error handling
+      _coordinatorSubscription = _coordinator!.stream.listen(
+        (coordinatorState) {
+          if (!isClosed) {
+            add(_CoordinatorStateForwarded(coordinatorState));
+          }
+        },
+        onError: (error) {
+          AppLogger.error('[COORDINATOR] Restarted coordinator error: $error');
+          // Prevent infinite restart loops
+          AppErrorHandler.handleError(
+            'coordinator_restart_error',
+            error,
+            severity: ErrorSeverity.warning,
+          );
+        },
+        cancelOnError: false,
+      );
+
+      // If we have a running session, forward the current state to restart tracking
+      if (state is ActiveSessionRunning) {
+        final runningState = state as ActiveSessionRunning;
+        AppLogger.info('[COORDINATOR] Re-initializing session tracking after restart');
+
+        // Forward session start event to reactivate tracking
+        _coordinator!.add(SessionStarted(
+          ruckWeightKg: runningState.ruckWeightKg,
+          userWeightKg: runningState.userWeightKg,
+          notes: runningState.notes,
+          sessionId: runningState.sessionId,
+          aiCheerleaderEnabled: _aiCheerleaderEnabled,
+          aiCheerleaderPersonality: _aiCheerleaderPersonality,
+          aiCheerleaderExplicitContent: _aiCheerleaderExplicitContent,
+        ));
+      }
+
+      AppLogger.info('[COORDINATOR] Successfully restarted coordinator');
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Failed to restart coordinator: $e');
+      AppErrorHandler.handleError(
+        'coordinator_restart_failed',
+        e,
+        severity: ErrorSeverity.error,
+      );
+    }
   }
 
   /// Handle state changes from the coordinator
@@ -1281,10 +1373,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   void _onSessionErrorCleared(
       SessionErrorCleared event, Emitter<ActiveSessionState> emit) {
     if (state is ActiveSessionFailure) {
-      // Potentially transition to a more stable state, e.g., ActiveSessionInitial
-      // or back to the previous running state if details are available and make sense.
-      // For simplicity, transitioning to initial.
-      emit(ActiveSessionInitial());
+      final failureState = state as ActiveSessionFailure;
+
+      // Try to recover to running state if we have session data
+      AppLogger.info('[SESSION_RECOVERY] Attempting to restore session from failure state');
+
+      // First, check for crashed session recovery
+      add(const CheckForCrashedSession());
+
+      // If no crashed session found, try to transition to initial state
+      // The CheckForCrashedSession will either restore a session or emit initial state
     } else if (state is ActiveSessionRunning &&
         (state as ActiveSessionRunning).errorMessage != null) {
       final currentState = state as ActiveSessionRunning;

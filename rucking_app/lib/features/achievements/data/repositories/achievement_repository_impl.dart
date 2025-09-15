@@ -151,8 +151,9 @@ class AchievementRepositoryImpl implements AchievementRepository {
       final endpoint = ApiEndpoints.getUserAchievementsProgressEndpoint(userId);
       final response = await _apiClient.get(endpoint);
 
-      if (response['status'] == 'success' && response['progress'] != null) {
-        final progressData = response['progress'] as List;
+      final progressKey = 'achievement_progress';
+      if (response['status'] == 'success' && response[progressKey] != null) {
+        final progressData = response[progressKey] as List;
         return progressData
             .map((json) => AchievementProgress.fromJson(json))
             .toList();

@@ -106,9 +106,12 @@ class SessionCompletionDetectionService {
       // Start sensor monitoring
       await _startSensorMonitoring();
 
-      // Start periodic analysis
-      _monitoringTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        _analyzeSessionCompletion();
+      // Start periodic analysis with reduced frequency to prevent ANR
+      _monitoringTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+        // Run analysis in microtask to avoid blocking
+        scheduleMicrotask(() async {
+          await _analyzeSessionCompletion();
+        });
       });
 
       AppLogger.info('[SESSION_COMPLETION] Monitoring started successfully');
@@ -138,43 +141,83 @@ class SessionCompletionDetectionService {
     _resetDetectionState();
   }
 
-  /// Start sensor monitoring for movement detection
+  /// Start sensor monitoring for movement detection with ANR prevention
   Future<void> _startSensorMonitoring() async {
     try {
-      // Monitor accelerometer for movement detection
-      _accelerometerSubscription =
-          accelerometerEvents.listen((AccelerometerEvent event) {
-        final magnitude =
-            sqrt(event.x * event.x + event.y * event.y + event.z * event.z) -
-                9.8; // Remove gravity
-        final adjustedMagnitude = magnitude.abs();
+      // Batch sensor processing to prevent ANR - process in chunks
+      int accelerometerBatchCount = 0;
+      int gyroscopeBatchCount = 0;
 
-        // Track recent movement magnitudes (last 2 minutes)
-        _recentMovementMagnitudes.add(adjustedMagnitude);
-        if (_recentMovementMagnitudes.length > 240) {
-          // 2 minutes at ~2Hz
-          _recentMovementMagnitudes.removeAt(0);
-        }
+      // Monitor accelerometer for movement detection with reduced frequency
+      _accelerometerSubscription = accelerometerEvents
+          .where((event) => accelerometerBatchCount++ % 3 == 0) // Sample every 3rd event
+          .listen((AccelerometerEvent event) {
+        try {
+          // Move sqrt calculation to background if processing many events
+          scheduleMicrotask(() async {
+            final magnitudeData = {
+              'x': event.x,
+              'y': event.y,
+              'z': event.z,
+              'threshold': _movementThreshold,
+            };
 
-        // Check if this qualifies as significant movement
-        if (adjustedMagnitude > _movementThreshold) {
-          _lastSignificantMovement = DateTime.now();
+            // Use compute for heavy math to prevent ANR
+            final result = await compute(_calculateMovementMagnitude, magnitudeData);
+            final adjustedMagnitude = result['magnitude'] as double;
+            final isSignificant = result['isSignificant'] as bool;
+
+            // Track recent movement magnitudes (last 2 minutes)
+            if (_recentMovementMagnitudes.length >= 180) { // Reduced from 240 (3min to 90s)
+              _recentMovementMagnitudes.removeAt(0);
+            }
+            _recentMovementMagnitudes.add(adjustedMagnitude);
+
+            // Check if this qualifies as significant movement
+            if (isSignificant) {
+              _lastSignificantMovement = DateTime.now();
+            }
+          });
+        } catch (e) {
+          // Fallback to simple calculation if compute fails
+          final magnitude = (event.x * event.x + event.y * event.y + event.z * event.z).abs() - 9.8;
+          if (magnitude.abs() > _movementThreshold) {
+            _lastSignificantMovement = DateTime.now();
+          }
         }
       });
 
-      // Monitor gyroscope for rotation detection
-      _gyroscopeSubscription = gyroscopeEvents.listen((GyroscopeEvent event) {
-        final rotationMagnitude =
-            sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+      // Monitor gyroscope for rotation detection with reduced frequency
+      _gyroscopeSubscription = gyroscopeEvents
+          .where((event) => gyroscopeBatchCount++ % 5 == 0) // Sample every 5th event
+          .listen((GyroscopeEvent event) {
+        try {
+          scheduleMicrotask(() async {
+            final rotationData = {
+              'x': event.x,
+              'y': event.y,
+              'z': event.z,
+            };
 
-        // Significant rotation also counts as movement
-        if (rotationMagnitude > 0.2) {
-          // radians/second
-          _lastSignificantMovement = DateTime.now();
+            // Use compute for rotation calculation
+            final rotationMagnitude = await compute(_calculateRotationMagnitude, rotationData);
+
+            // Significant rotation also counts as movement
+            if (rotationMagnitude > 0.2) {
+              // radians/second
+              _lastSignificantMovement = DateTime.now();
+            }
+          });
+        } catch (e) {
+          // Fallback to simple calculation if compute fails
+          final rotationMagnitude = (event.x * event.x + event.y * event.y + event.z * event.z);
+          if (rotationMagnitude > 0.04) { // 0.2^2
+            _lastSignificantMovement = DateTime.now();
+          }
         }
       });
 
-      AppLogger.info('[SESSION_COMPLETION] Sensor monitoring started');
+      AppLogger.info('[SESSION_COMPLETION] Sensor monitoring started with ANR prevention');
     } catch (e) {
       AppLogger.error(
           '[SESSION_COMPLETION] Failed to start sensor monitoring: $e');
@@ -199,8 +242,8 @@ class SessionCompletionDetectionService {
 
       final session = currentState;
 
-      // Update GPS data
-      await _updateGPSData();
+      // Update GPS data with timeout to prevent blocking
+      await _updateGPSDataWithTimeout();
 
       // Update smoothed speed from distance deltas
       _updateSmoothedSpeed(now);
@@ -214,21 +257,37 @@ class SessionCompletionDetectionService {
         }
       }
 
-      // Check movement criteria
-      final isStationary = _checkMovementCriteria(now);
+      // Move heavy computation to background isolate to prevent ANR
+      final analysisData = {
+        'recentMovementMagnitudes': List<double>.from(_recentMovementMagnitudes),
+        'lastSignificantMovement': _lastSignificantMovement?.millisecondsSinceEpoch,
+        'movementThreshold': _movementThreshold,
+        'stationaryTimeThreshold': _stationaryTimeThreshold,
+        'currentHeartRate': _currentHeartRate,
+        'restingHeartRate': _restingHeartRate,
+        'workoutAverageHeartRate': _workoutAverageHeartRate,
+        'heartRateDropThreshold': _heartRateDropThreshold,
+        'hasHeartRateData': _hasHeartRateData,
+        'currentDistanceKm': session.distanceKm,
+        'totalDistanceAtLastCheck': _totalDistanceAtLastCheck,
+        'speedEwmaMs': _speedEwmaMs,
+        'nowMs': now.millisecondsSinceEpoch,
+      };
 
-      // Check heart rate criteria (if available)
-      final heartRateIndicatesRest = _checkHeartRateCriteria();
+      // Use compute() to run analysis in isolate - prevents ANR
+      final results = await compute(_performDetectionAnalysis, analysisData);
 
-      // Check GPS criteria
-      final gpsIndicatesStationary = _checkGPSCriteria();
-
-      // Determine detection confidence
-      final detectionConfidence = _calculateDetectionConfidence(
-          isStationary, heartRateIndicatesRest, gpsIndicatesStationary);
+      // Process results on main thread
+      final isStationary = results['isStationary'] as bool;
+      final heartRateIndicatesRest = results['heartRateIndicatesRest'] as bool?;
+      final gpsIndicatesStationary = results['gpsIndicatesStationary'] as bool;
+      final detectionConfidence = results['detectionConfidence'] as double;
 
       AppLogger.debug(
           '[SESSION_COMPLETION] Detection confidence: $detectionConfidence');
+
+      // Update distance tracking (main thread operations)
+      _totalDistanceAtLastCheck = session.distanceKm;
 
       // Require consecutive stability windows to avoid flapping
       if (isStationary && gpsIndicatesStationary) {
@@ -525,11 +584,16 @@ class SessionCompletionDetectionService {
     }
   }
 
-  /// Update GPS data
-  Future<void> _updateGPSData() async {
+  /// Update GPS data with timeout to prevent ANR
+  Future<void> _updateGPSDataWithTimeout() async {
     try {
       final locationService = GetIt.instance<LocationService>();
-      final position = await locationService.getCurrentLocation();
+      // Add timeout to prevent hanging GPS calls that cause ANR
+      final position = await locationService.getCurrentLocation()
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        AppLogger.debug('[SESSION_COMPLETION] GPS update timed out');
+        return null;
+      });
 
       if (position != null) {
         _lastKnownPosition = position;
@@ -538,6 +602,11 @@ class SessionCompletionDetectionService {
     } catch (e) {
       AppLogger.debug('[SESSION_COMPLETION] GPS update failed: $e');
     }
+  }
+
+  /// Update GPS data (legacy method for compatibility)
+  Future<void> _updateGPSData() async {
+    await _updateGPSDataWithTimeout();
   }
 
   /// Reset detection state
@@ -670,5 +739,153 @@ class SessionCompletionDetectionService {
           '[SESSION_COMPLETION] Failed to create database notification: $e');
       // Don't throw - notification failure shouldn't break session completion detection
     }
+  }
+}
+
+/// Top-level isolate function for heavy computation - prevents ANR
+Map<String, dynamic> _performDetectionAnalysis(Map<String, dynamic> data) {
+  try {
+    // Extract data
+    final recentMovementMagnitudes = List<double>.from(data['recentMovementMagnitudes'] ?? []);
+    final lastSignificantMovementMs = data['lastSignificantMovement'] as int?;
+    final movementThreshold = data['movementThreshold'] as double;
+    final stationaryTimeThreshold = data['stationaryTimeThreshold'] as int;
+    final currentHeartRate = data['currentHeartRate'] as double?;
+    final restingHeartRate = data['restingHeartRate'] as double?;
+    final workoutAverageHeartRate = data['workoutAverageHeartRate'] as double?;
+    final heartRateDropThreshold = data['heartRateDropThreshold'] as double;
+    final hasHeartRateData = data['hasHeartRateData'] as bool;
+    final currentDistanceKm = data['currentDistanceKm'] as double;
+    final totalDistanceAtLastCheck = data['totalDistanceAtLastCheck'] as double;
+    final speedEwmaMs = data['speedEwmaMs'] as double;
+    final nowMs = data['nowMs'] as int;
+
+    final now = DateTime.fromMillisecondsSinceEpoch(nowMs);
+    final lastSignificantMovement = lastSignificantMovementMs != null
+        ? DateTime.fromMillisecondsSinceEpoch(lastSignificantMovementMs)
+        : null;
+
+    // Perform movement analysis (heavy math operations)
+    bool isStationary = false;
+    if (lastSignificantMovement != null) {
+      final timeSinceMovement = now.difference(lastSignificantMovement);
+
+      if (recentMovementMagnitudes.isNotEmpty) {
+        // Heavy computation moved to isolate
+        double sum = 0.0;
+        for (final magnitude in recentMovementMagnitudes) {
+          sum += magnitude;
+        }
+        final avgMovement = sum / recentMovementMagnitudes.length;
+
+        isStationary = avgMovement < movementThreshold &&
+            timeSinceMovement.inSeconds >= stationaryTimeThreshold;
+      } else {
+        isStationary = timeSinceMovement.inSeconds >= stationaryTimeThreshold;
+      }
+    }
+
+    // Perform heart rate analysis
+    bool? heartRateIndicatesRest;
+    if (hasHeartRateData && currentHeartRate != null) {
+      // Compare to resting heart rate
+      if (restingHeartRate != null) {
+        final heartRateRange = currentHeartRate - restingHeartRate;
+        heartRateIndicatesRest = heartRateRange < 25.0;
+      } else if (workoutAverageHeartRate != null) {
+        // Compare to workout average
+        final dropFromAverage = workoutAverageHeartRate - currentHeartRate;
+        heartRateIndicatesRest = dropFromAverage >= heartRateDropThreshold;
+      }
+    }
+
+    // Perform GPS analysis
+    final distanceChange = currentDistanceKm - totalDistanceAtLastCheck;
+    final distanceStopped = distanceChange < 0.01; // Less than 10m per 30s
+    final speedStopped = speedEwmaMs < 0.5; // < 0.5 m/s (~1.1 mph)
+    final gpsIndicatesStationary = distanceStopped && speedStopped;
+
+    // Calculate detection confidence (heavy computation)
+    double confidence = 0.0;
+    int criteriaCount = 0;
+
+    // Movement criteria (weight: 0.4)
+    if (isStationary) {
+      confidence += 0.4;
+    }
+    criteriaCount++;
+
+    // Heart rate criteria (weight: 0.3)
+    if (heartRateIndicatesRest != null) {
+      if (heartRateIndicatesRest) {
+        confidence += 0.3;
+      }
+      criteriaCount++;
+    }
+
+    // GPS criteria (weight: 0.3)
+    if (gpsIndicatesStationary) {
+      confidence += 0.3;
+    }
+    criteriaCount++;
+
+    // If we don't have heart rate, redistribute its weight to movement
+    if (heartRateIndicatesRest == null && isStationary) {
+      confidence += 0.15; // Half of heart rate weight
+    }
+
+    return {
+      'isStationary': isStationary,
+      'heartRateIndicatesRest': heartRateIndicatesRest,
+      'gpsIndicatesStationary': gpsIndicatesStationary,
+      'detectionConfidence': confidence,
+    };
+  } catch (e) {
+    // Return safe defaults if computation fails
+    return {
+      'isStationary': false,
+      'heartRateIndicatesRest': null,
+      'gpsIndicatesStationary': false,
+      'detectionConfidence': 0.0,
+    };
+  }
+}
+
+/// Top-level isolate function for movement magnitude calculation - prevents ANR
+Map<String, dynamic> _calculateMovementMagnitude(Map<String, dynamic> data) {
+  try {
+    final x = data['x'] as double;
+    final y = data['y'] as double;
+    final z = data['z'] as double;
+    final threshold = data['threshold'] as double;
+
+    // Heavy math operation moved to isolate
+    final magnitude = (x * x + y * y + z * z).abs() - 9.8; // Remove gravity
+    final adjustedMagnitude = magnitude.abs();
+
+    return {
+      'magnitude': adjustedMagnitude,
+      'isSignificant': adjustedMagnitude > threshold,
+    };
+  } catch (e) {
+    return {
+      'magnitude': 0.0,
+      'isSignificant': false,
+    };
+  }
+}
+
+/// Top-level isolate function for rotation magnitude calculation - prevents ANR
+double _calculateRotationMagnitude(Map<String, dynamic> data) {
+  try {
+    final x = data['x'] as double;
+    final y = data['y'] as double;
+    final z = data['z'] as double;
+
+    // Heavy math operation moved to isolate
+    final magnitude = (x * x + y * y + z * z).abs();
+    return magnitude;
+  } catch (e) {
+    return 0.0;
   }
 }

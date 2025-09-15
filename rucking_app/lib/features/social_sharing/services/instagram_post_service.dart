@@ -50,9 +50,14 @@ class InstagramPostService {
     DateTime? dateTo,
     required void Function(String) onDelta,
     void Function(Object)? onError,
+    bool? preferMetric, // Allow override, otherwise get from user settings
   }) async {
     try {
       AppLogger.info('[INSTAGRAM] Generating post for ${timeRange.value} with ${template.name} template');
+
+      // 0. Get user's unit preference
+      final useMetric = preferMetric ?? await _getUserMetricPreference();
+      AppLogger.info('[INSTAGRAM] Using ${useMetric ? 'metric' : 'imperial'} units');
 
       // 1. Fetch user insights for the time range
       final insights = await _fetchInsights(
@@ -60,6 +65,7 @@ class InstagramPostService {
         sessionId: sessionId,
         dateFrom: dateFrom,
         dateTo: dateTo,
+        useMetric: useMetric,
       );
 
       // 2. Generate visual content (route map or stats card)
@@ -69,6 +75,7 @@ class InstagramPostService {
         template: template,
         insights: insights,
         sessionId: sessionId,
+        useMetric: useMetric,
       );
 
       // Add visual content to insights for photo extraction
@@ -84,6 +91,7 @@ class InstagramPostService {
         insights: insights,
         timeRange: timeRange,
         template: template,
+        useMetric: useMetric,
       );
 
       // 4. Generate content using OpenAI
@@ -109,22 +117,111 @@ class InstagramPostService {
     }
   }
 
-  /// Fetch insights from the backend
+  /// Get user's metric preference from settings
+  Future<bool> _getUserMetricPreference() async {
+    try {
+      final response = await _apiClient.get('/api/users/profile');
+      final profile = Map<String, dynamic>.from(response as Map);
+      final preferMetric = profile['prefer_metric'] as bool? ?? true;
+      AppLogger.info('[INSTAGRAM] User metric preference: $preferMetric');
+      return preferMetric;
+    } catch (e) {
+      AppLogger.error('[INSTAGRAM] Failed to get user metric preference: $e');
+      return true; // Default to metric on error
+    }
+  }
+
+  /// Fetch session data from the correct endpoints
   Future<Map<String, dynamic>> _fetchInsights({
     required TimeRange timeRange,
     String? sessionId,
     DateTime? dateFrom,
     DateTime? dateTo,
+    required bool useMetric,
   }) async {
+    switch (timeRange) {
+      case TimeRange.lastRuck:
+        return await _fetchLastRuckData(sessionId, useMetric);
+      case TimeRange.week:
+      case TimeRange.month:
+      case TimeRange.allTime:
+        return await _fetchTimeRangeData(timeRange, dateFrom, dateTo, useMetric);
+    }
+  }
+
+  /// Fetch latest session data from /api/rucks
+  Future<Map<String, dynamic>> _fetchLastRuckData(String? sessionId, bool useMetric) async {
+    try {
+      Map<String, dynamic> queryParams = {
+        'limit': 1,
+      };
+
+      final response = await _apiClient.get(
+        '/api/rucks', // Use session endpoint, not insights
+        queryParams: queryParams,
+      );
+
+      final sessions = response as List? ?? [];
+      if (sessions.isEmpty) {
+        AppLogger.warning('[INSTAGRAM] No sessions found for last ruck');
+        return {};
+      }
+
+      final latestSession = Map<String, dynamic>.from(sessions.first as Map);
+      AppLogger.info('[INSTAGRAM] Found latest session: ${latestSession['id']}');
+
+      // Transform session data to expected format with unit conversion
+      final distanceKm = (latestSession['distance_km'] as num?)?.toDouble() ?? 0.0;
+      final elevationM = (latestSession['elevation_gain_m'] as num?)?.toDouble() ?? 0.0;
+      final ruckWeightKg = (latestSession['ruck_weight_kg'] as num?)?.toDouble() ?? 0.0;
+      final paceMinPerKm = (latestSession['pace_min_per_km'] as num?)?.toDouble();
+
+      return {
+        'session': latestSession,
+        'photos': await _fetchSessionPhotos(latestSession['id']?.toString()),
+        'stats': {
+          'distance': useMetric ? distanceKm : _kmToMiles(distanceKm),
+          'distance_unit': useMetric ? 'km' : 'mi',
+          'duration_seconds': latestSession['duration_seconds'] ?? 0,
+          'calories': latestSession['calories'] ?? 0,
+          'elevation_gain': useMetric ? elevationM : _metersToFeet(elevationM),
+          'elevation_unit': useMetric ? 'm' : 'ft',
+          'pace': useMetric ? paceMinPerKm : _paceKmToMiles(paceMinPerKm),
+          'pace_unit': useMetric ? 'min/km' : 'min/mi',
+          'completed_at': latestSession['completed_at'],
+          'ruck_weight': useMetric ? ruckWeightKg : _kgToLbs(ruckWeightKg),
+          'weight_unit': useMetric ? 'kg' : 'lbs',
+        },
+        'use_metric': useMetric,
+      };
+    } catch (e) {
+      AppLogger.error('[INSTAGRAM] Failed to fetch last ruck data: $e');
+      return {};
+    }
+  }
+
+  /// Unit conversion helpers
+  double _kmToMiles(double km) => km * 0.621371;
+  double _metersToFeet(double meters) => meters * 3.28084;
+  double _kgToLbs(double kg) => kg * 2.20462;
+  double? _paceKmToMiles(double? paceMinPerKm) {
+    if (paceMinPerKm == null) return null;
+    return paceMinPerKm / 0.621371; // Convert min/km to min/mile
+  }
+
+  /// Fetch time range data (can still use insights for aggregated data)
+  Future<Map<String, dynamic>> _fetchTimeRangeData(
+    TimeRange timeRange,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool useMetric,
+  ) async {
     final queryParams = <String, dynamic>{
       'time_range': timeRange.value,
       'fresh': 1,
       'include_photos': true,
     };
 
-    if (sessionId != null) {
-      queryParams['session_id'] = sessionId;
-    }
     if (dateFrom != null) {
       queryParams['date_from'] = dateFrom.toIso8601String().split('T')[0];
     }
@@ -133,12 +230,29 @@ class InstagramPostService {
     }
 
     final response = await _apiClient.get(
-      ApiEndpoints.userInsights,
+      ApiEndpoints.userInsights, // Use insights for aggregated data
       queryParams: queryParams,
     );
 
     final map = Map<String, dynamic>.from(response ?? {});
-    return Map<String, dynamic>.from(map['insights'] ?? {});
+    final insights = Map<String, dynamic>.from(map['insights'] ?? {});
+    insights['use_metric'] = useMetric;
+    return insights;
+  }
+
+  /// Fetch photos for a specific session
+  Future<List<String>> _fetchSessionPhotos(String? sessionId) async {
+    if (sessionId == null) return [];
+
+    try {
+      // TODO: Implement session photos endpoint call
+      // For now, return empty list
+      AppLogger.info('[INSTAGRAM] Would fetch photos for session: $sessionId');
+      return [];
+    } catch (e) {
+      AppLogger.error('[INSTAGRAM] Failed to fetch session photos: $e');
+      return [];
+    }
   }
 
   /// Build the OpenAI prompt
@@ -146,6 +260,7 @@ class InstagramPostService {
     required Map<String, dynamic> insights,
     required TimeRange timeRange,
     required PostTemplate template,
+    required bool useMetric,
   }) {
     final facts = insights['facts'] ?? {};
     final triggers = insights['triggers'] ?? {};
@@ -160,6 +275,7 @@ You are a data-focused fitness analyst creating an Instagram post for a serious 
 CONTEXT:
 Time Range: ${timeRange.displayName}
 Template Style: ${template.name}
+Units: ${useMetric ? 'Metric (km, m, kg)' : 'Imperial (miles, feet, lbs)'}
 ${stats.isNotEmpty ? 'Key Stats: ${jsonEncode(stats)}' : ''}
 ${achievements.isNotEmpty ? 'Recent Achievements: ${achievements.join(', ')}' : ''}
 
@@ -169,6 +285,7 @@ CONTENT APPROACH:
 - Lead with numbers and achievements
 - Be specific about performance improvements
 - Focus on factual progress rather than flowery descriptions
+- Use ${useMetric ? 'metric units (km, m, kg, min/km)' : 'imperial units (miles, feet, lbs, min/mile)'} throughout
 
 STYLE GUIDE for ${template.name}:
 ${_getTemplateGuidelines(template)}
@@ -177,7 +294,7 @@ REQUIREMENTS:
 1. Create a data-rich Instagram caption (max 2200 characters)
 2. Include @get.rucky naturally in the text
 3. Use minimal emojis (only for key stats/achievements)
-4. Generate exactly 3 highly relevant hashtags
+4. Generate exactly 3 highly relevant hashtags (without # symbol)
 5. ${_getTimeRangeRequirement(timeRange)}
 6. Include a brief, factual call-to-action
 7. Keep the tone ${_getTone(template)} but prioritize data over emotion
@@ -199,22 +316,22 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
   Map<String, dynamic> _extractStats(Map<String, dynamic> facts, TimeRange timeRange, Map<String, dynamic> insights) {
     switch (timeRange) {
       case TimeRange.lastRuck:
-        // Check if we have time_range data from backend (when time_range=last_ruck is specified)
-        if (insights['time_range'] != null) {
-          final timeRangeData = insights['time_range'] as Map<String, dynamic>;
-          // Convert backend format to expected frontend format
-          return {
-            'total_distance': timeRangeData['total_distance_km'],
-            'total_duration': timeRangeData['total_duration_seconds'],
-            'total_calories': timeRangeData['total_calories'],
-            'total_elevation_gain': timeRangeData['elevation_gain_m'],
-            'session_count': timeRangeData['sessions_count'],
-          };
+        // Use the session data we fetched from /api/rucks
+        if (insights['stats'] != null) {
+          return insights['stats'] as Map<String, dynamic>;
         }
-        // Fallback to recent_sessions format if available
-        final recentSessions = facts['recent_sessions'] as List? ?? [];
-        if (recentSessions.isNotEmpty) {
-          return recentSessions[0] as Map<String, dynamic>;
+        // Fallback to session data directly
+        if (insights['session'] != null) {
+          final session = insights['session'] as Map<String, dynamic>;
+          return {
+            'distance_km': session['distance_km'] ?? 0.0,
+            'duration_seconds': session['duration_seconds'] ?? 0,
+            'calories': session['calories'] ?? 0,
+            'elevation_gain_m': session['elevation_gain_m'] ?? 0,
+            'pace_min_per_km': session['pace_min_per_km'],
+            'completed_at': session['completed_at'],
+            'ruck_weight_kg': session['ruck_weight_kg'],
+          };
         }
         break;
       case TimeRange.week:
@@ -396,14 +513,15 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
     required PostTemplate template,
     required Map<String, dynamic> insights,
     String? sessionId,
+    required bool useMetric,
   }) async {
     try {
       if (timeRange == TimeRange.lastRuck && sessionId != null) {
         // Generate route map for Last Ruck
-        return await _generateRouteMapForSession(sessionId, template);
+        return await _generateRouteMapForSession(sessionId, template, useMetric);
       } else {
         // Generate stats card for aggregate time ranges
-        return await _generateStatsCard(insights, timeRange, template);
+        return await _generateStatsCard(insights, timeRange, template, useMetric);
       }
     } catch (e) {
       AppLogger.error('[INSTAGRAM] Error generating visual content: $e');
@@ -412,7 +530,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
   }
 
   /// Generate route map for a specific session
-  Future<String?> _generateRouteMapForSession(String sessionId, PostTemplate template) async {
+  Future<String?> _generateRouteMapForSession(String sessionId, PostTemplate template, bool useMetric) async {
     try {
       AppLogger.info('[INSTAGRAM] Generating route map for session: $sessionId');
 
@@ -432,7 +550,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
       // Generate route map image
       final imageBytes = await _routeMapService.generateInstagramRouteMap(
         session: session,
-        preferMetric: true, // TODO: Get from user preferences
+        preferMetric: useMetric,
       );
 
       if (imageBytes == null) {
@@ -455,6 +573,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
     Map<String, dynamic> insights,
     TimeRange timeRange,
     PostTemplate template,
+    bool useMetric,
   ) async {
     try {
       AppLogger.info('[INSTAGRAM] Generating stats card for ${timeRange.displayName}');
@@ -464,7 +583,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
         insights: insights,
         timeRange: timeRange,
         template: template,
-        preferMetric: true, // TODO: Get from user preferences
+        preferMetric: useMetric,
       );
 
       if (imageBytes == null) {

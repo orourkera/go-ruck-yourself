@@ -33,7 +33,7 @@ class TemplateSelector extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 110, // Reduce height slightly
+            height: 95, // Further reduce height to prevent overflow
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: PostTemplate.values.length,
@@ -58,8 +58,8 @@ class TemplateSelector extends StatelessWidget {
         onTap: () => onTemplateSelected(template),
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 120, // Reduce width slightly
-          padding: const EdgeInsets.all(10), // Reduce padding slightly
+          width: 110, // Further reduce width
+          padding: const EdgeInsets.all(8), // Reduce padding more
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -77,12 +77,12 @@ class TemplateSelector extends StatelessWidget {
             children: [
               Text(
                 template.emoji,
-                style: const TextStyle(fontSize: 24), // Reduce emoji size
+                style: const TextStyle(fontSize: 20), // Reduce emoji size more
               ),
-              const SizedBox(height: 6), // Reduce spacing
+              const SizedBox(height: 4), // Reduce spacing more
               Text(
                 template.name,
-                style: theme.textTheme.bodyMedium?.copyWith( // Use smaller text style
+                style: theme.textTheme.bodySmall?.copyWith( // Use even smaller text style
                   fontWeight: FontWeight.w600,
                   color: isSelected
                       ? theme.colorScheme.primary
@@ -90,16 +90,18 @@ class TemplateSelector extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 2), // Reduce spacing
-              Text(
-                template.description,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 10,
+              const SizedBox(height: 2), // Keep minimal spacing
+              Flexible( // Allow text to shrink if needed
+                child: Text(
+                  template.description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 9, // Make description text even smaller
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

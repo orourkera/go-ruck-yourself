@@ -11,6 +11,7 @@ import 'package:rucking_app/features/social_sharing/services/instagram_post_serv
 import 'package:rucking_app/features/social_sharing/widgets/time_range_selector.dart';
 import 'package:rucking_app/features/social_sharing/widgets/template_selector.dart';
 import 'package:rucking_app/features/social_sharing/widgets/photo_carousel.dart';
+import 'package:rucking_app/features/social_sharing/screens/share_edit_screen.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 class SharePreviewScreen extends StatefulWidget {
@@ -46,7 +47,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   void initState() {
     super.initState();
     _selectedTimeRange = widget.initialTimeRange ?? TimeRange.lastRuck;
-    _generatePost();
+    // Don't generate post immediately - wait for user to select options
   }
 
   @override
@@ -83,6 +84,9 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
         _selectedPhotos = post.photos.take(3).toList(); // Max 3 photos
         _isGenerating = false;
       });
+
+      // Navigate to edit screen after generation
+      _showEditScreen(post);
     } catch (e) {
       setState(() {
         _isGenerating = false;
@@ -234,6 +238,28 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
     );
   }
 
+  void _showEditScreen(InstagramPost post) {
+    if (!mounted) return;
+
+    // Navigate to a dedicated edit screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ShareEditScreen(
+          post: post,
+          selectedPhotos: _selectedPhotos,
+          blurRoute: _blurRoute,
+          hideLocation: _hideLocation,
+        ),
+      ),
+    ).then((result) {
+      // If user completed sharing, close this screen too
+      if (result == true && mounted) {
+        Navigator.pop(context, true);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -265,7 +291,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
             ? _buildGeneratingView()
             : _generatedPost != null
                 ? _buildPreviewView()
-                : _buildErrorView(),
+                : _buildSelectionView(),
       ),
     );
   }
@@ -464,7 +490,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                     runSpacing: 8,
                     children: _generatedPost!.hashtags
                         .map((tag) => Chip(
-                              label: Text('#$tag'),
+                              label: Text(tag.startsWith('#') ? tag : '#$tag'),
                               backgroundColor:
                                   theme.colorScheme.primaryContainer,
                               labelStyle: TextStyle(
@@ -551,6 +577,140 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
             ),
           ),
           const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectionView() {
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome,
+                      color: theme.colorScheme.onPrimaryContainer,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Create Instagram Post',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'AI will create an engaging post based on your selections',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Time Range Selector
+          TimeRangeSelector(
+            selectedRange: _selectedTimeRange,
+            onRangeSelected: (range) {
+              setState(() {
+                _selectedTimeRange = range;
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // Template Selector
+          TemplateSelector(
+            selectedTemplate: _selectedTemplate,
+            onTemplateSelected: (template) {
+              setState(() {
+                _selectedTemplate = template;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // Privacy Settings Preview
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Privacy Settings',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text('Blur route start/end'),
+                  subtitle: const Text('Hide first and last 500m'),
+                  value: _blurRoute,
+                  onChanged: (value) {
+                    setState(() {
+                      _blurRoute = value;
+                    });
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Hide exact location'),
+                  subtitle: const Text('Remove specific location tags'),
+                  value: _hideLocation,
+                  onChanged: (value) {
+                    setState(() {
+                      _hideLocation = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Generate Button
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: _generatePost,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Generate Post'),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

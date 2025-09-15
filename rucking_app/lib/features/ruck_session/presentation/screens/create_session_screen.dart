@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -168,7 +169,8 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       _aiCheerleaderPersonality =
           availablePersonalities.contains(savedPersonality)
               ? savedPersonality
-              : 'Supportive Friend';
+              : availablePersonalities[
+                  Random().nextInt(availablePersonalities.length)];
 
       _aiCheerleaderExplicitContent =
           prefs.getBool('aiCheerleaderExplicitContent') ?? false;

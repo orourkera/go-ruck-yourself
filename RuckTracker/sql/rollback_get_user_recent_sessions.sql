@@ -1,5 +1,5 @@
--- RPC function to get user's recent sessions with optimized route data
--- This reduces Redis memory usage for homepage recent sessions display
+-- ROLLBACK: Restore original get_user_recent_sessions function
+-- Run this if the optimized version causes issues
 
 CREATE OR REPLACE FUNCTION get_user_recent_sessions(
     p_limit INTEGER DEFAULT 20,
@@ -17,15 +17,15 @@ DECLARE
 BEGIN
     -- Use the provided user ID (defaults to auth.uid() from function signature)
     current_user_id := p_user_id;
-    
+
     -- Return empty result if no user ID available
     IF current_user_id IS NULL THEN
         RETURN '[]'::JSON;
     END IF;
-    
+
     -- Initialize the array
     sessions_json := ARRAY[]::JSON[];
-    
+
     FOR session_record IN
         SELECT
             rs.id,
@@ -41,9 +41,9 @@ BEGIN
             rs.is_public,
             rs.status,
             rs.is_manual,
-            -- Simple social counts - optimize later if needed
-            0 as like_count,   -- Skip social counts for performance on homepage
-            0 as comment_count -- Homepage doesn't need exact counts
+            -- ORIGINAL: Social counts for user's own sessions
+            (SELECT COUNT(*) FROM ruck_likes WHERE ruck_id = rs.id) as like_count,
+            (SELECT COUNT(*) FROM ruck_comments WHERE ruck_id = rs.id) as comment_count
         FROM ruck_session rs
         WHERE
             rs.user_id = current_user_id
@@ -51,43 +51,35 @@ BEGIN
         ORDER BY rs.completed_at DESC
         LIMIT p_limit
     LOOP
-        -- For homepage, use minimal route data to maximize performance
-        -- Users can get full route data when they view session details
-        BEGIN
-            -- Add timeout protection for route point queries
-            SELECT json_agg(
-                json_build_object(
-                    'latitude', latitude,
-                    'longitude', longitude,
-                    'timestamp', "timestamp"
-                )
-            ) INTO route_points
-            FROM get_sampled_route_points(
-                session_record.id,
-                -- Very aggressive sampling for homepage - just enough for thumbnail
-                CASE
-                    WHEN session_record.distance_km <= 5 THEN 20   -- Much more aggressive
-                    WHEN session_record.distance_km <= 10 THEN 30
-                    ELSE 40  -- Even long routes get minimal points
-                END,
-                -- Smart distance-based point allocation - maintain route quality for long distances
-                CASE
-                    WHEN session_record.distance_km IS NULL OR session_record.distance_km < 1 THEN 15
-                    WHEN session_record.distance_km <= 3 THEN 40   -- ~75m per point
-                    WHEN session_record.distance_km <= 5 THEN 60   -- ~83m per point
-                    WHEN session_record.distance_km <= 10 THEN 100 -- ~100m per point
-                    WHEN session_record.distance_km <= 15 THEN 150 -- ~100m per point
-                    WHEN session_record.distance_km <= 20 THEN 200 -- ~100m per point
-                    WHEN session_record.distance_km <= 30 THEN 250 -- ~120m per point
-                    -- For ultra-long distances, scale by ~100m per point but cap at reasonable limit
-                    ELSE LEAST(ROUND(session_record.distance_km * 8)::INTEGER, 350)
-                END
-            );
-        EXCEPTION WHEN OTHERS THEN
-            -- If route points query fails/times out, return empty array
-            route_points := '[]'::json;
-        END;
-        
+        -- ORIGINAL: Full route data with original sampling
+        SELECT json_agg(
+            json_build_object(
+                'latitude', latitude,
+                'longitude', longitude,
+                'timestamp', "timestamp"
+            )
+        ) INTO route_points
+        FROM get_sampled_route_points(
+            session_record.id,
+            -- ORIGINAL: Less aggressive sampling intervals
+            CASE
+                WHEN session_record.distance_km <= 3 THEN 4
+                WHEN session_record.distance_km <= 5 THEN 6
+                WHEN session_record.distance_km <= 10 THEN 8
+                WHEN session_record.distance_km <= 15 THEN 10
+                ELSE 12
+            END,
+            -- ORIGINAL: Higher max points
+            CASE
+                WHEN session_record.distance_km IS NULL OR session_record.distance_km < 1 THEN 60
+                WHEN session_record.distance_km <= 3 THEN 100
+                WHEN session_record.distance_km <= 5 THEN 150
+                WHEN session_record.distance_km <= 10 THEN 250
+                WHEN session_record.distance_km <= 15 THEN 350
+                ELSE 450  -- Original 20km+ routes
+            END
+        );
+
         -- Build session JSON object with all fields expected by homepage
         sessions_json := array_append(sessions_json, json_build_object(
             'id', session_record.id,
@@ -111,13 +103,12 @@ BEGIN
             'locationPoints', COALESCE(route_points, '[]'::json)
         ));
     END LOOP;
-    
+
     -- Return array of sessions (matching existing REST API response format)
-    -- Handle case where no sessions were found
     IF array_length(sessions_json, 1) IS NULL THEN
         RETURN '[]'::JSON;
     END IF;
-    
+
     RETURN array_to_json(sessions_json);
 END;
 $$;

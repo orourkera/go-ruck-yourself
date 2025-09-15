@@ -424,8 +424,9 @@ class CheckSessionAchievementsResource(Resource):
             
             elif criteria_type == 'session_weight':
                 target = criteria.get('target', 0)
-                # Convert target to kg if achievement is in standard (lbs)
-                target_kg = target if unit_pref in [None, 'metric'] else target * 0.45359237
+                # Targets are persisted in kilograms for both metric and standard achievements.
+                # Converting again for standard users caused underweight sessions to qualify.
+                target_kg = target
                 session_weight = session.get('ruck_weight_kg', 0)
                 result = session_weight >= target_kg
                 logger.info(f"WEIGHT CHECK: session_weight={session_weight}kg >= target_kg={target_kg} (orig={target} {'lb' if unit_pref=='standard' else 'kg'}), result={result}")

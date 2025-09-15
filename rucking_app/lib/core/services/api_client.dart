@@ -197,11 +197,30 @@ class ApiClient {
           return null;
         }
 
+        // Validate refresh token before using it
+        try {
+          if (JwtDecoder.isExpired(refreshToken)) {
+            debugPrint('[API] Refresh token is expired, cannot refresh');
+            await _storageService.removeSecure(AppConfig.tokenKey);
+            await _storageService.removeSecure(AppConfig.refreshTokenKey);
+            clearAuthToken();
+            return null;
+          }
+        } catch (e) {
+          debugPrint('[API] Invalid refresh token format: $e');
+          await _storageService.removeSecure(AppConfig.tokenKey);
+          await _storageService.removeSecure(AppConfig.refreshTokenKey);
+          clearAuthToken();
+          return null;
+        }
+
         // Create a new Dio instance to avoid interceptor loops
         final refreshDio = Dio(_dio.options);
         // Add extended timeouts for token refresh to handle poor network conditions
         refreshDio.options.connectTimeout = const Duration(seconds: 120);
         refreshDio.options.receiveTimeout = const Duration(seconds: 120);
+        // Remove auth header from refresh dio to prevent loops
+        refreshDio.options.headers.remove('Authorization');
 
         debugPrint(
             '[API] Attempting token refresh via dedicated method (attempt $attempt/3)');
@@ -211,24 +230,38 @@ class ApiClient {
         );
 
         if (response.statusCode == 200 && response.data != null) {
-          final newToken = response.data['token'] as String;
-          final newRefreshToken = response.data['refresh_token'] as String;
+          final responseData = response.data as Map<String, dynamic>;
+          final newToken = responseData['token'] as String?;
+          final newRefreshToken = responseData['refresh_token'] as String?;
 
-          if (newToken.isNotEmpty && newRefreshToken.isNotEmpty) {
-            // Save the new tokens
-            await _storageService.setSecureString(AppConfig.tokenKey, newToken);
-            await _storageService.setSecureString(
-                AppConfig.refreshTokenKey, newRefreshToken);
+          if (newToken != null && newToken.isNotEmpty &&
+              newRefreshToken != null && newRefreshToken.isNotEmpty) {
 
-            // Update the token in Dio
-            setAuthToken(newToken);
+            // Validate new token before saving
+            try {
+              if (!JwtDecoder.isExpired(newToken) &&
+                  JwtDecoder.getRemainingTime(newToken).inSeconds > 60) {
+                // Save the new tokens
+                await _storageService.setSecureString(AppConfig.tokenKey, newToken);
+                await _storageService.setSecureString(
+                    AppConfig.refreshTokenKey, newRefreshToken);
 
-            debugPrint(
-                '[API] Token refreshed successfully via refreshToken method (attempt $attempt)');
-            return newToken;
+                // Update the token in Dio
+                setAuthToken(newToken);
+
+                debugPrint(
+                    '[API] Token refreshed successfully via refreshToken method (attempt $attempt)');
+                return newToken;
+              } else {
+                debugPrint(
+                    '[API] Received expired/expiring token from refresh response (attempt $attempt)');
+              }
+            } catch (e) {
+              debugPrint('[API] Received invalid token format from refresh: $e');
+            }
           } else {
             debugPrint(
-                '[API] Received empty tokens from refresh response (attempt $attempt)');
+                '[API] Received null/empty tokens from refresh response (attempt $attempt)');
           }
         } else {
           debugPrint(
@@ -252,12 +285,15 @@ class ApiClient {
             (e is DioException &&
                 (e.type == DioExceptionType.connectionError ||
                     e.type == DioExceptionType.connectionTimeout ||
+                    e.type == DioExceptionType.receiveTimeout ||
+                    e.type == DioExceptionType.sendTimeout ||
                     e.response?.statusCode == 429 ||
-                    e.response?.statusCode == 503))) {
+                    e.response?.statusCode == 503 ||
+                    e.response?.statusCode == 502))) {
           final waitTime =
               Duration(seconds: attempt * 5); // 5s, 10s for attempts 1,2
           debugPrint(
-              '[API] Error ${e.response?.statusCode}, waiting ${waitTime.inSeconds}s before retry...');
+              '[API] Error ${e.response?.statusCode ?? e.type}, waiting ${waitTime.inSeconds}s before retry...');
           await Future.delayed(waitTime);
           continue; // Retry
         }
@@ -298,22 +334,26 @@ class ApiClient {
       if (authHeader.startsWith('Bearer ') && authHeader.length > 10) {
         final tokenPart = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-        // Check if token is expired
+        // Check if token is expired with buffer time
         try {
-          if (JwtDecoder.isExpired(tokenPart)) {
+          // Add 30 second buffer to prevent edge case expiration during request
+          if (JwtDecoder.isExpired(tokenPart) ||
+              JwtDecoder.getRemainingTime(tokenPart).inSeconds <= 30) {
             debugPrint(
-                '[API] 🔑 Current token is expired, clearing and refreshing');
+                '[API] 🔑 Current token is expired/expiring soon, clearing and refreshing');
             _dio.options.headers.remove('Authorization');
           } else {
             // Token is valid and not expired
-            debugPrint('[API] 🔑 Current token is valid and not expired');
+            debugPrint('[API] 🔑 Current token is valid and not expiring soon');
             return true;
           }
         } catch (e) {
-          // Invalid token format, clear it
+          // Invalid token format, clear it and report error
           debugPrint(
               '[API] 🔑 Invalid JWT token format detected, clearing: $e');
           _dio.options.headers.remove('Authorization');
+          // Clear invalid token from storage too
+          await _storageService.removeSecure(AppConfig.tokenKey);
         }
       } else {
         // Invalid header format, clear it and try again
@@ -331,16 +371,22 @@ class ApiClient {
       debugPrint('[API] 🔑 Found token in storage, validating');
       // Validate the token from storage before using it
       try {
-        if (!JwtDecoder.isExpired(token)) {
-          // Token is valid and not expired, set it
+        // Add buffer time to prevent edge case expiration
+        if (!JwtDecoder.isExpired(token) &&
+            JwtDecoder.getRemainingTime(token).inSeconds > 30) {
+          // Token is valid and not expiring soon, set it
           debugPrint('[API] 🔑 Stored token is valid, setting as auth token');
           setAuthToken(token);
           return true;
         } else {
-          debugPrint('[API] 🔑 Stored token is expired, attempting refresh');
+          debugPrint('[API] 🔑 Stored token is expired/expiring soon, attempting refresh');
+          // Clear expired token from storage
+          await _storageService.removeSecure(AppConfig.tokenKey);
         }
       } catch (e) {
         debugPrint('[API] 🔑 Invalid stored JWT token: $e');
+        // Clear invalid token from storage
+        await _storageService.removeSecure(AppConfig.tokenKey);
       }
     } else {
       debugPrint('[API] 🔑 No token found in storage');
@@ -349,10 +395,15 @@ class ApiClient {
     // No valid token in storage, try to refresh it
     debugPrint(
         '[API] 🔑 Attempting token refresh via ApiClient.refreshToken()');
-    final newToken = await refreshToken();
-    if (newToken != null && newToken.isNotEmpty) {
-      debugPrint('[API] 🔑 Token refresh successful');
-      return true; // refreshToken already sets the auth header
+    try {
+      final newToken = await refreshToken();
+      if (newToken != null && newToken.isNotEmpty) {
+        debugPrint('[API] 🔑 Token refresh successful');
+        return true; // refreshToken already sets the auth header
+      }
+    } catch (e) {
+      debugPrint('[API] 🔑 ApiClient refresh failed: $e');
+      // Continue to try AuthService callback
     }
 
     // If ApiClient refresh failed, try the AuthService refresh callback as a fallback
@@ -366,11 +417,14 @@ class ApiClient {
             await _storageService.getSecureString(AppConfig.tokenKey);
         if (refreshedToken != null && refreshedToken.isNotEmpty) {
           try {
-            if (!JwtDecoder.isExpired(refreshedToken)) {
+            if (!JwtDecoder.isExpired(refreshedToken) &&
+                JwtDecoder.getRemainingTime(refreshedToken).inSeconds > 30) {
               debugPrint(
                   '[API] 🔑 AuthService refresh successful, setting token');
               setAuthToken(refreshedToken);
               return true;
+            } else {
+              debugPrint('[API] 🔑 AuthService provided expired/expiring token');
             }
           } catch (e) {
             debugPrint('[API] 🔑 AuthService provided invalid token: $e');
