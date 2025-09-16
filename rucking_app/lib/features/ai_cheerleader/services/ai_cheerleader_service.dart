@@ -179,8 +179,10 @@ class AICheerleaderService {
         // Randomize cooldown between 8–12 minutes
         _lastHrSpikeCooldownSec =
             _randomInt(_timeCheckMinSec, _timeCheckMaxSec);
-        AppLogger.info(
-            '[AI_CHEERLEADER] Heart rate spike detected: ${currentHR}bpm (baseline: ${_hrBaseline!.round()}bpm, p=${p.toStringAsFixed(2)})');
+        // Heart rate spike logging reduced for performance
+        if (p > 0.8) { // Only log high-confidence spikes
+          AppLogger.info('[AI_CHEERLEADER] Heart rate spike: ${currentHR}bpm');
+        }
         return CheerleaderTrigger(
           type: TriggerType.heartRateSpike,
           data: {
@@ -259,11 +261,10 @@ class AICheerleaderService {
       bool explicitContent,
       {Map<String, dynamic>? history,
       Map<String, dynamic>? coachingPlan}) {
-    AppLogger.info(
-        '[AI_CONTEXT_DEBUG] Starting context assembly for trigger type: ${trigger.type}');
-    AppLogger.info('[AI_CONTEXT_DEBUG] User data: ${user.toJson()}');
-    AppLogger.info(
-        '[AI_CONTEXT_DEBUG] Session state - elapsed: ${state.elapsedSeconds}s, distance: ${state.distanceKm}km');
+    // Context assembly debug logging removed for performance
+    // AppLogger.info('[AI_CONTEXT_DEBUG] Starting context assembly for trigger type: ${trigger.type}');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] User data: ${user.toJson()}');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] Session state - elapsed: ${state.elapsedSeconds}s, distance: ${state.distanceKm}km');
     final Map<String, dynamic> context = <String, dynamic>{
       'trigger': <String, dynamic>{
         'type': trigger.type.name,
@@ -323,14 +324,13 @@ class AICheerleaderService {
       'coachingPlan': coachingPlan,
     };
 
-    AppLogger.info('[AI_CONTEXT_DEBUG] Final assembled context:');
-    AppLogger.info('[AI_CONTEXT_DEBUG] - Trigger: ${context['trigger']}');
-    AppLogger.info('[AI_CONTEXT_DEBUG] - Session: ${context['session']}');
-    AppLogger.info('[AI_CONTEXT_DEBUG] - User: ${context['user']}');
-    AppLogger.info(
-        '[AI_CONTEXT_DEBUG] - Environment: ${context['environment']}');
-    AppLogger.info(
-        '[AI_CONTEXT_DEBUG] - Environment runtimeType: ${context['environment']?.runtimeType}');
+    // Final context debug logging removed for performance - this was very verbose
+    // AppLogger.info('[AI_CONTEXT_DEBUG] Final assembled context:');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] - Trigger: ${context['trigger']}');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] - Session: ${context['session']}');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] - User: ${context['user']}');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] - Environment: ${context['environment']}');
+    // AppLogger.info('[AI_CONTEXT_DEBUG] - Environment runtimeType: ${context['environment']?.runtimeType}');
 
     return context;
   }
@@ -412,7 +412,8 @@ class AICheerleaderService {
     _lastMentionedLocation = location;
     _lastMentionedLatitude = latitude;
     _lastMentionedLongitude = longitude;
-    AppLogger.info('[AI_CHEERLEADER] Location mention recorded: $location');
+    // Location mention logging reduced for performance
+    // AppLogger.info('[AI_CHEERLEADER] Location mention recorded: $location');
   }
 
   /// Calculate distance between two coordinates in meters
@@ -445,7 +446,8 @@ class AICheerleaderService {
     _lastMentionedLocation = null;
     _lastMentionedLatitude = null;
     _lastMentionedLongitude = null;
-    AppLogger.info('[AI_CHEERLEADER] Service reset for new session');
+    // Service reset logging reduced for performance
+    // AppLogger.info('[AI_CHEERLEADER] Service reset for new session');
   }
 
   int _randomInt(int min, int max) => min + _rand.nextInt((max - min) + 1);

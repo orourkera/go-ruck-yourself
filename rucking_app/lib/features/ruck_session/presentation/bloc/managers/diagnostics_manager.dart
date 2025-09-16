@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import '../../../../../core/utils/app_logger.dart';
 import '../events/session_events.dart';
@@ -140,6 +141,13 @@ class DiagnosticsManager implements SessionManager {
   }
 
   void _startDiagnosticsReporting() {
+    // In release builds, avoid periodic diagnostics to reduce wakeups on low-end devices.
+    if (kReleaseMode) {
+      AppLogger.debug(
+          '[DIAGNOSTICS] Release mode: skipping periodic diagnostics timer');
+      return;
+    }
+
     _diagnosticsTimer?.cancel();
     _diagnosticsTimer = Timer.periodic(_diagnosticsReportInterval, (_) {
       _reportSessionDiagnostics();

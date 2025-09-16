@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'package:flutter/foundation.dart';
 
 import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/utils/app_logger.dart';
@@ -359,8 +360,14 @@ class HeartRateManager implements SessionManager {
       final unuploadedSamples =
           _heartRateSamples.length - _lastUploadedSampleIndex;
       if (unuploadedSamples > 0) {
-        AppLogger.error(
-            '[AI_DEBUG][HEART_RATE_MANAGER] PERIODIC_UPLOAD: ${unuploadedSamples} unuploaded samples, triggering periodic upload');
+        // Reduce log severity in release builds to avoid noisy logs on older devices
+        if (kReleaseMode) {
+          AppLogger.debug(
+              '[HEART_RATE_MANAGER] PERIODIC_UPLOAD: ${unuploadedSamples} unuploaded samples, triggering upload');
+        } else {
+          AppLogger.error(
+              '[AI_DEBUG][HEART_RATE_MANAGER] PERIODIC_UPLOAD: ${unuploadedSamples} unuploaded samples, triggering periodic upload');
+        }
         _triggerImmediateHeartRateUpload();
       }
     });
@@ -380,20 +387,35 @@ class HeartRateManager implements SessionManager {
   /// Trigger immediate heart rate upload to database
   void _triggerImmediateHeartRateUpload() {
     if (_activeSessionId == null) {
-      AppLogger.error(
-          '[AI_DEBUG][HEART_RATE_MANAGER] Cannot trigger upload - no active session ID');
+      if (kReleaseMode) {
+        AppLogger.debug(
+            '[HEART_RATE_MANAGER] Cannot trigger upload - no active session ID');
+      } else {
+        AppLogger.error(
+            '[AI_DEBUG][HEART_RATE_MANAGER] Cannot trigger upload - no active session ID');
+      }
       return;
     }
 
     try {
       final unuploadedSamples =
           _heartRateSamples.length - _lastUploadedSampleIndex;
-      AppLogger.error(
-          '[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_TRIGGER: Total samples: ${_heartRateSamples.length}, Last uploaded index: $_lastUploadedSampleIndex, Unuploaded: $unuploadedSamples');
+      if (kReleaseMode) {
+        AppLogger.debug(
+            '[HEART_RATE_MANAGER] UPLOAD_TRIGGER: total=${_heartRateSamples.length}, uploaded=$_lastUploadedSampleIndex, unuploaded=$unuploadedSamples');
+      } else {
+        AppLogger.error(
+            '[AI_DEBUG][HEART_RATE_MANAGER] UPLOAD_TRIGGER: Total samples: ${_heartRateSamples.length}, Last uploaded index: $_lastUploadedSampleIndex, Unuploaded: $unuploadedSamples');
+      }
 
       if (unuploadedSamples <= 0) {
-        AppLogger.error(
-            '[AI_DEBUG][HEART_RATE_MANAGER] No unuploaded samples to process');
+        if (kReleaseMode) {
+          AppLogger.debug(
+              '[HEART_RATE_MANAGER] No unuploaded samples to process');
+        } else {
+          AppLogger.error(
+              '[AI_DEBUG][HEART_RATE_MANAGER] No unuploaded samples to process');
+        }
         return;
       }
 

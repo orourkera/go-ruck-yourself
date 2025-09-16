@@ -433,9 +433,8 @@ class LocationServiceImpl implements LocationService {
           courseAccuracyDeg: position.headingAccuracy,
         );
 
-        // Log elevation data for debugging iOS vs Android differences
-        print(
-            '[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
+        // Elevation logging removed for performance (was causing ANR on Android)
+        // print('[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
 
         // Cross-platform location tracking diagnostics (sends to Crashlytics)
         final platform = Platform.isIOS ? 'iOS' : 'Android';
@@ -491,8 +490,8 @@ class LocationServiceImpl implements LocationService {
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
 
-        AppLogger.debug(
-            'Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
+        // Debug logging removed for performance - high frequency GPS updates cause ANR
+        // AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
       },
       onError: (error) async {
         // kCLErrorDomain code 1 (iOS) == permission denied. Treat differently so we don't spam Crashlytics.
@@ -759,9 +758,8 @@ class LocationServiceImpl implements LocationService {
           courseAccuracyDeg: position.headingAccuracy,
         );
 
-        // Log elevation data for debugging iOS vs Android differences
-        print(
-            '[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
+        // Elevation logging removed for performance (was causing ANR on Android)
+        // print('[ELEVATION] Location point created - Platform: ${Platform.isIOS ? 'iOS' : 'Android'}, Elevation: ${position.altitude}m, Accuracy: ${position.accuracy}m, AltAccuracy: ${position.altitudeAccuracy}m, HasAltitude: ${position.altitude != 0.0}');
 
         _locationBatch.add(locationPoint);
         _locationController
@@ -778,16 +776,16 @@ class LocationServiceImpl implements LocationService {
 
   /// Send a batch of location updates to the API
   void _sendBatchUpdate() {
-    AppLogger.info(
-        '🔄 Batch timer fired - checking for pending location points...');
+    // Verbose batch logging removed for performance
+    // AppLogger.info('🔄 Batch timer fired - checking for pending location points...');
 
     if (_locationBatch.isEmpty) {
-      AppLogger.info('📭 No location points to batch - skipping');
+      // AppLogger.info('📭 No location points to batch - skipping');
       return;
     }
 
     final batchCount = _locationBatch.length;
-    AppLogger.info('📦 Preparing to send batch of $batchCount location points');
+    // AppLogger.info('📦 Preparing to send batch of $batchCount location points');
 
     // Broadcast batch update event for active session to handle
     _batchController.add(List<LocationPoint>.from(_locationBatch));
@@ -795,8 +793,10 @@ class LocationServiceImpl implements LocationService {
     // Clear batch
     _locationBatch.clear();
 
-    AppLogger.info(
-        '✅ Batch update signal sent - $batchCount points queued for upload');
+    // Only log batch upload completion for critical debugging
+    if (batchCount > 50) { // Only log large batches
+      AppLogger.info('✅ Large batch sent: $batchCount points');
+    }
   }
 
   @override
@@ -807,8 +807,10 @@ class LocationServiceImpl implements LocationService {
     // CRITICAL: Send any pending location data before stopping
     // This prevents data loss when stopping location tracking
     if (_locationBatch.isNotEmpty) {
-      AppLogger.info(
-          '📤 Sending ${_locationBatch.length} pending location points before stopping');
+      // Reduced logging frequency for performance
+      if (_locationBatch.length > 10) {
+        AppLogger.info('📤 Sending ${_locationBatch.length} pending points before stopping');
+      }
       _sendBatchUpdate();
     }
 

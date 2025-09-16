@@ -84,8 +84,7 @@ class SessionCompletionDetectionService {
     if (_isMonitoring) return;
 
     try {
-      AppLogger.info(
-          '[SESSION_COMPLETION] Starting session completion monitoring');
+      AppLogger.info('[SESSION_COMPLETION] Starting monitoring');
 
       _isMonitoring = true;
       _resetDetectionState();
@@ -99,8 +98,8 @@ class SessionCompletionDetectionService {
         _totalDistanceAtLastCheck = currentState.distanceKm;
         // Capture session ID for database notifications and payload routing
         _currentSessionId = currentState.sessionId;
-        AppLogger.info(
-            '[SESSION_COMPLETION] Session started at: $_sessionStartTime');
+        // Session start time logging reduced for performance
+        // AppLogger.info('[SESSION_COMPLETION] Session started at: $_sessionStartTime');
       }
 
       // Start sensor monitoring
@@ -114,7 +113,8 @@ class SessionCompletionDetectionService {
         });
       });
 
-      AppLogger.info('[SESSION_COMPLETION] Monitoring started successfully');
+      // Success monitoring log reduced for performance
+      // AppLogger.info('[SESSION_COMPLETION] Monitoring started successfully');
     } catch (e) {
       AppLogger.error('[SESSION_COMPLETION] Failed to start monitoring: $e');
       _isMonitoring = false;
@@ -125,8 +125,7 @@ class SessionCompletionDetectionService {
   void stopMonitoring() {
     if (!_isMonitoring) return;
 
-    AppLogger.info(
-        '[SESSION_COMPLETION] Stopping session completion monitoring');
+    AppLogger.info('[SESSION_COMPLETION] Stopping monitoring');
 
     _isMonitoring = false;
     _monitoringTimer?.cancel();
@@ -217,7 +216,8 @@ class SessionCompletionDetectionService {
         }
       });
 
-      AppLogger.info('[SESSION_COMPLETION] Sensor monitoring started with ANR prevention');
+      // Reduced sensor monitoring logging for performance
+      // AppLogger.info('[SESSION_COMPLETION] Sensor monitoring started with ANR prevention');
     } catch (e) {
       AppLogger.error(
           '[SESSION_COMPLETION] Failed to start sensor monitoring: $e');
@@ -283,8 +283,8 @@ class SessionCompletionDetectionService {
       final gpsIndicatesStationary = results['gpsIndicatesStationary'] as bool;
       final detectionConfidence = results['detectionConfidence'] as double;
 
-      AppLogger.debug(
-          '[SESSION_COMPLETION] Detection confidence: $detectionConfidence');
+      // Debug logging removed for performance - high frequency analysis
+      // AppLogger.debug('[SESSION_COMPLETION] Detection confidence: $detectionConfidence');
 
       // Update distance tracking (main thread operations)
       _totalDistanceAtLastCheck = session.distanceKm;
@@ -591,7 +591,8 @@ class SessionCompletionDetectionService {
       // Add timeout to prevent hanging GPS calls that cause ANR
       final position = await locationService.getCurrentLocation()
           .timeout(const Duration(seconds: 5), onTimeout: () {
-        AppLogger.debug('[SESSION_COMPLETION] GPS update timed out');
+        // GPS timeout debug logging removed for performance
+        // AppLogger.debug('[SESSION_COMPLETION] GPS update timed out');
         return null;
       });
 
@@ -600,7 +601,8 @@ class SessionCompletionDetectionService {
         _lastPositionUpdate = DateTime.now();
       }
     } catch (e) {
-      AppLogger.debug('[SESSION_COMPLETION] GPS update failed: $e');
+      // GPS update error logging reduced for performance
+      // AppLogger.debug('[SESSION_COMPLETION] GPS update failed: $e');
     }
   }
 

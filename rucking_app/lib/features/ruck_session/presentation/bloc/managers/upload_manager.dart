@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 
 import '../../../../../core/services/api_client.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../../core/services/storage_service.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../../../core/models/location_point.dart';
@@ -135,8 +136,13 @@ class UploadManager implements SessionManager {
 
   Future<void> _onHeartRateBatchUploadRequested(
       HeartRateBatchUploadRequested event) async {
-    AppLogger.error(
-        '[AI_DEBUG][UPLOAD_MANAGER] 🔥 HEART RATE UPLOAD REQUESTED: ${event.samples.length} samples, sessionId: $_activeSessionId');
+    if (kReleaseMode) {
+      AppLogger.debug(
+          '[UPLOAD_MANAGER] HR upload requested: ${event.samples.length} samples');
+    } else {
+      AppLogger.error(
+          '[AI_DEBUG][UPLOAD_MANAGER] 🔥 HEART RATE UPLOAD REQUESTED: ${event.samples.length} samples, sessionId: $_activeSessionId');
+    }
 
     if (_activeSessionId == null || _activeSessionId!.startsWith('offline_')) {
       // Save offline for later sync
@@ -167,8 +173,13 @@ class UploadManager implements SessionManager {
           .length,
     ));
 
-    AppLogger.error(
-        '[AI_DEBUG][UPLOAD_MANAGER] Added heart rate batch to queue. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
+    if (kReleaseMode) {
+      AppLogger.debug(
+          '[UPLOAD_MANAGER] HR batch queued. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
+    } else {
+      AppLogger.error(
+          '[AI_DEBUG][UPLOAD_MANAGER] Added heart rate batch to queue. Pending HR batches: ${_uploadQueue.where((item) => item['type'] == 'heart_rate_batch').length}');
+    }
 
     // Trigger immediate upload for heart rate data (don't wait for timer)
     _processUploadQueue();

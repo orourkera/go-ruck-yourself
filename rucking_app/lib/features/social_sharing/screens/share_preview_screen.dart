@@ -11,6 +11,8 @@ import 'package:rucking_app/features/social_sharing/widgets/template_selector.da
 import 'package:rucking_app/features/social_sharing/widgets/photo_carousel.dart';
 import 'package:rucking_app/features/social_sharing/screens/share_edit_screen.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/social_sharing/services/reel_builder_service.dart';
+import 'package:path/path.dart' as p;
 
 class SharePreviewScreen extends StatefulWidget {
   final String sessionId;
@@ -38,10 +40,44 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   String _generatingText = '';
   bool _blurRoute = false;
   bool _hideLocation = false;
+  bool _isBuildingReel = false;
+  String? _builtReelPath;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  Future<void> _createAndShareReel() async {
+    if (_selectedPhotos.isEmpty) {
+      _showError('No photo selected');
+      return;
+    }
+
+    setState(() {
+      _isBuildingReel = true;
+      _builtReelPath = null;
+    });
+
+    try {
+      final builder = const ReelBuilderService();
+      final videoPath = await builder.buildReel(_selectedPhotos);
+      _builtReelPath = videoPath;
+
+      // Share the generated MP4 via system sheet (Instagram supports this)
+      await Share.shareXFiles([
+        XFile(videoPath, name: p.basename(videoPath), mimeType: 'video/mp4'),
+      ], text: _captionController.text);
+    } catch (e) {
+      AppLogger.error('[REEL] Build failed: $e', exception: e);
+      _showError('Failed to build reel: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBuildingReel = false;
+        });
+      }
+    }
   }
 
   @override
@@ -75,7 +111,10 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
       setState(() {
         _generatedPost = post;
         _captionController.text = post.caption;
-        _selectedPhotos = post.photos.take(3).toList();
+        // Force single-photo selection for Instagram sharing
+        _selectedPhotos = post.photos.isNotEmpty
+            ? [post.photos.first]
+            : <String>[];
         _isGenerating = false;
       });
 
@@ -223,9 +262,12 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   }
 
   Future<void> _shareSelectedPhoto(String selectedPhoto, String fullText) async {
+    // Override the selected photos to just the chosen one BEFORE opening share options,
+    // so the subsequent share action uses the user's selection.
+    setState(() {
+      _selectedPhotos = [selectedPhoto];
+    });
     await _showInstagramShareDialog(fullText);
-    // Override the selected photos to just the chosen one
-    _selectedPhotos = [selectedPhoto];
   }
 
   Future<void> _shareViaSystemSheet(String text) async {
@@ -458,6 +500,23 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              // Create Reel button (works with 1+ images)
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: _isBuildingReel
+                      ? null
+                      : () async {
+                          await _createAndShareReel();
+                        },
+                  icon: const Icon(Icons.movie_creation_outlined),
+                  label: Text(_isBuildingReel
+                      ? 'Building Reel...'
+                      : 'Create Reel (MP4)'),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
           ],
         ),

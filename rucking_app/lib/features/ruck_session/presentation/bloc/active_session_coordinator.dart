@@ -275,7 +275,8 @@ class ActiveSessionCoordinator
   /// Route events to appropriate managers
   Future<void> _routeEventToManagers(ActiveSessionEvent event) async {
     if (event is! Tick) {
-      AppLogger.debug('[COORDINATOR] Routing ${event.runtimeType} to managers');
+      // Event routing debug logging removed for performance
+      // AppLogger.debug('[COORDINATOR] Routing ${event.runtimeType} to managers');
     }
 
     // Convert main bloc events to manager events
@@ -809,16 +810,17 @@ class ActiveSessionCoordinator
     // Add recovered calories as baseline for crash recovery sessions
     final totalCalories = calories + (_recoveredCalories ?? 0.0);
 
-    AppLogger.debug('[COORDINATOR] CALORIE_CALCULATION: '
-        'distance=${distanceKm.toStringAsFixed(2)}km, '
-        'duration=${duration.inMinutes.toStringAsFixed(1)}min, '
-        'userWeight=${userWeightKg.toStringAsFixed(1)}kg, '
-        'ruckWeight=${ruckWeightKg.toStringAsFixed(1)}kg, '
-        'elevationGain=${elevationGain.toStringAsFixed(1)}m, '
-        'elevationLoss=${elevationLoss.toStringAsFixed(1)}m, '
-        'terrainMultiplier=${terrainMultiplier.toStringAsFixed(2)}x, '
-        'weather=[temp=${temperature?.toStringAsFixed(1)}°C, wind=${windSpeed?.toStringAsFixed(1)}kmh, humidity=${humidity?.toStringAsFixed(0)}%, rain=$isRaining], '
-        'sessionCalories=${calories.toStringAsFixed(0)}, recoveredCalories=${(_recoveredCalories ?? 0.0).toStringAsFixed(0)}, totalCalories=${totalCalories.toStringAsFixed(0)}');
+    // Calorie calculation debug logging removed for performance
+    // AppLogger.debug('[COORDINATOR] CALORIE_CALCULATION: '
+    //     'distance=${distanceKm.toStringAsFixed(2)}km, '
+    //     'duration=${duration.inMinutes.toStringAsFixed(1)}min, '
+    //     'userWeight=${userWeightKg.toStringAsFixed(1)}kg, '
+    //     'ruckWeight=${ruckWeightKg.toStringAsFixed(1)}kg, '
+    //     'elevationGain=${elevationGain.toStringAsFixed(1)}m, '
+    //     'elevationLoss=${elevationLoss.toStringAsFixed(1)}m, '
+    //     'terrainMultiplier=${terrainMultiplier.toStringAsFixed(2)}x, '
+    //     'weather=[temp=${temperature?.toStringAsFixed(1)}°C, wind=${windSpeed?.toStringAsFixed(1)}kmh, humidity=${humidity?.toStringAsFixed(0)}%, rain=$isRaining], '
+    //     'sessionCalories=${calories.toStringAsFixed(0)}, recoveredCalories=${(_recoveredCalories ?? 0.0).toStringAsFixed(0)}, totalCalories=${totalCalories.toStringAsFixed(0)}');
 
     return totalCalories;
   }
@@ -895,10 +897,11 @@ class ActiveSessionCoordinator
 
     final avgMultiplier = weightedMultiplier / totalDistance;
 
-    AppLogger.debug('[COORDINATOR] TERRAIN_MULTIPLIER: '
-        'segments=${terrainSegments.length}, '
-        'totalDistance=${totalDistance.toStringAsFixed(2)}km, '
-        'avgMultiplier=${avgMultiplier.toStringAsFixed(2)}x');
+    // Terrain multiplier debug logging removed for performance
+    // AppLogger.debug('[COORDINATOR] TERRAIN_MULTIPLIER: '
+    //     'segments=${terrainSegments.length}, '
+    //     'totalDistance=${totalDistance.toStringAsFixed(2)}km, '
+    //     'avgMultiplier=${avgMultiplier.toStringAsFixed(2)}x');
 
     return avgMultiplier;
   }
@@ -1192,7 +1195,8 @@ class ActiveSessionCoordinator
     LoadSessionForViewing event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.debug('[COORDINATOR] Loading session for viewing');
+    // Session loading debug logging removed for performance
+    // AppLogger.debug('[COORDINATOR] Loading session for viewing');
     await _routeEventToManagers(event);
     _aggregateAndEmitState();
   }

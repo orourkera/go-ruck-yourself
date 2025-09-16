@@ -431,12 +431,12 @@ class LocationTrackingManager implements SessionManager {
   }
 
   Future<void> _onLocationUpdated(LocationUpdated event) async {
-    AppLogger.info(
-        '[LOCATION_MANAGER] 🎯 PROCESSING location update: sessionId=${_activeSessionId}, paused=$_isPaused');
+    // High-frequency location processing logging removed for performance
+    // AppLogger.info('[LOCATION_MANAGER] 🎯 PROCESSING location update: sessionId=${_activeSessionId}, paused=$_isPaused');
 
     if (_isPaused) {
-      AppLogger.debug(
-          '[LOCATION_MANAGER] ⏸️ SKIPPING location update: session is paused');
+      // Paused session debug logging removed for performance
+      // AppLogger.debug('[LOCATION_MANAGER] ⏸️ SKIPPING location update: session is paused');
       return;
     }
     if (_activeSessionId == null) {
@@ -1538,7 +1538,19 @@ class LocationTrackingManager implements SessionManager {
               exception: uploadError);
 
           // Re-queue ALL failed chunks for retry - backend issues shouldn't stop local tracking
-          _pendingLocationPoints.addAll(chunk);
+          // But limit the pending queue to prevent unbounded memory growth
+          if (_pendingLocationPoints.length + chunk.length < 1000) {
+            _pendingLocationPoints.addAll(chunk);
+          } else {
+            // Drop oldest points if we're at the limit
+            final availableSpace = 1000 - _pendingLocationPoints.length;
+            if (availableSpace > 0) {
+              _pendingLocationPoints.addAll(chunk.take(availableSpace).toList());
+              AppLogger.warning('[LOCATION_MANAGER] Pending queue at limit, dropped ${chunk.length - availableSpace} points');
+            } else {
+              AppLogger.warning('[LOCATION_MANAGER] Pending queue full (1000 points), dropping ${chunk.length} failed points');
+            }
+          }
 
           // Log the specific error type for debugging
           final errorMsg = uploadError.toString().toLowerCase();
@@ -1561,9 +1573,20 @@ class LocationTrackingManager implements SessionManager {
       if (index < batch.length) {
         try {
           final remaining = batch.sublist(index);
-          _pendingLocationPoints.addAll(remaining);
-          AppLogger.warning(
-              '[LOCATION_MANAGER] Re-queued ${remaining.length} unprocessed points after error');
+          // Limit the pending queue to prevent unbounded memory growth
+          if (_pendingLocationPoints.length + remaining.length < 1000) {
+            _pendingLocationPoints.addAll(remaining);
+            AppLogger.warning(
+                '[LOCATION_MANAGER] Re-queued ${remaining.length} unprocessed points after error');
+          } else {
+            final availableSpace = 1000 - _pendingLocationPoints.length;
+            if (availableSpace > 0) {
+              _pendingLocationPoints.addAll(remaining.take(availableSpace).toList());
+              AppLogger.warning('[LOCATION_MANAGER] Re-queued ${availableSpace} of ${remaining.length} points (queue limit reached)');
+            } else {
+              AppLogger.warning('[LOCATION_MANAGER] Pending queue full, dropped ${remaining.length} unprocessed points');
+            }
+          }
         } catch (_) {}
       }
     } finally {
@@ -1891,17 +1914,17 @@ class LocationTrackingManager implements SessionManager {
 
   double _calculateCurrentPace(double speedMs) {
     // DEBUG: Log pace calculation inputs
-    AppLogger.debug(
-        '[PACE DEBUG] _calculateCurrentPace called with speedMs: $speedMs');
+    // Pace calculation start debug logging removed for performance
+    // AppLogger.debug('[PACE DEBUG] _calculateCurrentPace called with speedMs: $speedMs');
 
     // VERSION 2.5: Don't show pace for the first minute of the session
     if (_sessionStartTime != null) {
       final elapsedTime = DateTime.now().difference(_sessionStartTime!);
-      AppLogger.debug(
-          '[PACE DEBUG] Session elapsed time: ${elapsedTime.inSeconds} seconds');
+      // Session elapsed time debug logging removed for performance
+      // AppLogger.debug('[PACE DEBUG] Session elapsed time: ${elapsedTime.inSeconds} seconds');
       if (elapsedTime.inSeconds < 60) {
-        AppLogger.debug(
-            '[PACE DEBUG] Returning 0.0 - session less than 60 seconds old');
+        // Early session pace debug logging removed for performance
+        // AppLogger.debug('[PACE DEBUG] Returning 0.0 - session less than 60 seconds old');
         return 0.0; // No pace for first minute
       }
     }
@@ -1911,8 +1934,8 @@ class LocationTrackingManager implements SessionManager {
     if (_cachedCurrentPace != null && _lastPaceCalculation != null) {
       final timeSinceLastCalc = now.difference(_lastPaceCalculation!).inSeconds;
       if (timeSinceLastCalc < 5) {
-        AppLogger.debug(
-            '[PACE DEBUG] Returning cached pace: $_cachedCurrentPace');
+        // Cached pace debug logging removed for performance
+        // AppLogger.debug('[PACE DEBUG] Returning cached pace: $_cachedCurrentPace');
         return _cachedCurrentPace!;
       }
     }
@@ -1926,7 +1949,8 @@ class LocationTrackingManager implements SessionManager {
       double totalDistance = 0.0;
       int totalTime = 0;
 
-      AppLogger.debug('[PACE DEBUG] Using last 5 points for pace calculation');
+      // Pace calculation debug logging removed for performance
+      // AppLogger.debug('[PACE DEBUG] Using last 5 points for pace calculation');
 
       for (int i = 1; i < recentPoints.length; i++) {
         final prevPoint = recentPoints[i - 1];
@@ -1949,36 +1973,36 @@ class LocationTrackingManager implements SessionManager {
         }
       }
 
-      AppLogger.debug(
-          '[PACE DEBUG] Total distance over 5 points: ${totalDistance}km');
-      AppLogger.debug(
-          '[PACE DEBUG] Total time over 5 points: ${totalTime} seconds');
+      // Total distance debug logging removed for performance
+      // AppLogger.debug('[PACE DEBUG] Total distance over 5 points: ${totalDistance}km');
+      // Total time debug logging removed for performance
+      // AppLogger.debug('[PACE DEBUG] Total time over 5 points: ${totalTime} seconds');
 
       if (totalTime > 0 && totalDistance > 0.01) {
         // Require at least 10 meters total
         final paceMinutesPerKm = (totalTime / 60) / totalDistance;
         rawPace = paceMinutesPerKm * 60; // Convert to seconds per km
 
-        AppLogger.debug(
-            '[PACE DEBUG] Multi-point paceMinutesPerKm: $paceMinutesPerKm');
-        AppLogger.debug(
-            '[PACE DEBUG] Multi-point rawPace: $rawPace seconds/km');
+        // Multi-point pace debug logging removed for performance
+        // AppLogger.debug('[PACE DEBUG] Multi-point paceMinutesPerKm: $paceMinutesPerKm');
+        // Multi-point raw pace debug logging removed for performance
+        // AppLogger.debug('[PACE DEBUG] Multi-point rawPace: $rawPace seconds/km');
 
         // SANITY CHECK: Cap pace at reasonable values
         if (rawPace > 3600) {
           // More than 60 minutes per km is unrealistic
-          AppLogger.debug(
-              '[PACE DEBUG] Pace too slow ($rawPace), capping at 3600 seconds/km');
+          // Pace capping debug logging removed for performance
+          // AppLogger.debug('[PACE DEBUG] Pace too slow ($rawPace), capping at 3600 seconds/km');
           rawPace = 3600;
         } else if (rawPace < 120) {
           // Less than 2 minutes per km is unrealistic for rucking
-          AppLogger.debug(
-              '[PACE DEBUG] Pace too fast ($rawPace), capping at 120 seconds/km');
+          // Fast pace capping debug logging removed for performance
+          // AppLogger.debug('[PACE DEBUG] Pace too fast ($rawPace), capping at 120 seconds/km');
           rawPace = 120;
         }
       } else {
-        AppLogger.debug(
-            '[PACE DEBUG] Insufficient meaningful movement, using fallback method');
+        // Fallback method debug logging removed for performance
+        // AppLogger.debug('[PACE DEBUG] Insufficient meaningful movement, using fallback method');
         // Fallback to average pace if recent movement is too small
         rawPace = _calculateAveragePace(_lastKnownTotalDistance);
       }
@@ -1997,8 +2021,8 @@ class LocationTrackingManager implements SessionManager {
       final timeDiff =
           lastPoint.timestamp.difference(secondLastPoint.timestamp).inSeconds;
 
-      AppLogger.debug(
-          '[PACE DEBUG] Fallback 2-point method: distance=${distance}km, time=${timeDiff}s');
+      // Fallback method detail debug logging removed for performance
+      // AppLogger.debug('[PACE DEBUG] Fallback 2-point method: distance=${distance}km, time=${timeDiff}s');
 
       if (timeDiff > 0 && distance > 0.005) {
         // Require at least 5 meters
@@ -2008,13 +2032,13 @@ class LocationTrackingManager implements SessionManager {
         // Apply stricter caps for 2-point method (more noise-prone)
         if (rawPace > 2400 || rawPace < 180) {
           // 40 min/km max, 3 min/km min
-          AppLogger.debug(
-              '[PACE DEBUG] 2-point pace out of range ($rawPace), using average pace');
+          // 2-point pace range debug logging removed for performance
+          // AppLogger.debug('[PACE DEBUG] 2-point pace out of range ($rawPace), using average pace');
           rawPace = _calculateAveragePace(_lastKnownTotalDistance);
         }
       } else {
-        AppLogger.debug(
-            '[PACE DEBUG] Invalid 2-point data, using average pace');
+        // Invalid data debug logging removed for performance
+        // AppLogger.debug('[PACE DEBUG] Invalid 2-point data, using average pace');
         rawPace = _calculateAveragePace(_lastKnownTotalDistance);
       }
     }
@@ -2039,7 +2063,8 @@ class LocationTrackingManager implements SessionManager {
     _cachedCurrentPace = rawPace;
     _lastPaceCalculation = now;
 
-    AppLogger.debug('[PACE DEBUG] Final calculated pace: $rawPace seconds/km');
+    // Final pace debug logging removed for performance
+    // AppLogger.debug('[PACE DEBUG] Final calculated pace: $rawPace seconds/km');
     return rawPace;
   }
 

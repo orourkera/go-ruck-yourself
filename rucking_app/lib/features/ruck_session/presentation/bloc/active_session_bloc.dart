@@ -101,7 +101,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   DateTime _lastLocationTimestamp = DateTime.now();
 
   bool _isHeartRateMonitoringStarted = false;
-  final List<HeartRateSample> _allHeartRateSamples = [];
   int? _latestHeartRate;
   int? _minHeartRate;
   int? _maxHeartRate;
@@ -120,8 +119,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   // Batch upload system for real-time data uploads during session
   Timer? _batchUploadTimer;
-  final List<LocationPoint> _pendingLocationPoints = [];
-  final List<HeartRateSample> _pendingHeartRateSamples = [];
   static const Duration _batchUploadInterval = Duration(minutes: 5);
   DateTime? _lastBatchUploadTime;
   bool _isBatchUploadInProgress = false;
@@ -405,7 +402,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
       // Skip if already processing to prevent overlapping operations
       if (_isProcessingAICheerleader) {
-        AppLogger.info('[AI_DEBUG] Skipping AI check - already processing previous trigger');
+        // AI processing debug logging removed for performance
+        // AppLogger.info('[AI_DEBUG] Skipping AI check - already processing previous trigger');
         return;
       }
 
@@ -505,7 +503,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             '[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
         await _processAICheerleaderTrigger(trigger, state);
       } else {
-        AppLogger.info('[AI_DEBUG] No trigger detected this cycle');
+        // No trigger debug logging removed for performance (very frequent)
+        // AppLogger.info('[AI_DEBUG] No trigger detected this cycle');
       }
     } catch (e) {
       AppLogger.error('[AI_CHEERLEADER] Trigger detection failed: $e');
@@ -571,7 +570,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
     // Emit UI-visible message if available
     if (generatedMessage != null && generatedMessage.isNotEmpty) {
-      AppLogger.info('[AI_CHEERLEADER_UI] Emitting AI cheer message to UI');
+      // AI message emission debug logging reduced for performance
+      // AppLogger.info('[AI_CHEERLEADER_UI] Emitting AI cheer message to UI');
       emit(runningState.copyWith(aiCheerMessage: generatedMessage));
     } else {
       AppLogger.warning('[AI_CHEERLEADER_UI] No message generated to emit');
@@ -975,35 +975,10 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
   Future<void> _onTimerStarted(
       TimerStarted event, Emitter<ActiveSessionState> emit) async {
-    _ticker?.cancel();
-    _ticker = Timer.periodic(
-        const Duration(seconds: 1), (timer) => add(const Tick()));
-
-    _watchdogTimer?.cancel();
-    _watchdogTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (DateTime.now().difference(_lastLocationTimestamp).inSeconds > 60 &&
-          _validLocationCount > 0) {
-        AppLogger.warning(
-            'Watchdog: No valid location for 60s. Restarting location service.');
-        _locationService.stopLocationTracking();
-        if (state is ActiveSessionRunning) {
-          _startLocationUpdates((state as ActiveSessionRunning).sessionId);
-        }
-        _lastLocationTimestamp = DateTime.now();
-      }
-    });
-
-    _sessionPersistenceTimer?.cancel();
-    _sessionPersistenceTimer =
-        Timer.periodic(const Duration(minutes: 1), (timer) async {
-      if (state is ActiveSessionRunning) {
-        final currentState = state as ActiveSessionRunning;
-        await _activeSessionStorage.saveActiveSession(currentState);
-      }
-    });
-
-    // Start batch upload timer for real-time data uploads
-    _startBatchUploadTimer();
+    // Timers are coordinated by SessionLifecycleManager's TimerCoordinator.
+    // Avoid starting redundant bloc-level timers to reduce wakeups and crashes on older devices.
+    AppLogger.debug(
+        '[SESSION] Skipping bloc timers; TimerCoordinator manages ticks/watchdog/persistence/uploads');
   }
 
   void _stopTickerAndWatchdog() {

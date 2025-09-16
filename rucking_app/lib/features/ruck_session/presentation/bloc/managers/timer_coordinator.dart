@@ -23,12 +23,21 @@ class TimerCoordinator {
   int _paceTickCounter = 0;
 
   // Timer intervals (configurable)
-  Duration _mainInterval = const Duration(seconds: 1);
-  Duration _watchdogInterval = const Duration(seconds: 30);
-  Duration _persistenceInterval = const Duration(minutes: 1);
-  Duration _batchUploadInterval = const Duration(minutes: 2);
-  Duration _connectivityCheckInterval = const Duration(seconds: 15);
-  Duration _memoryCheckInterval = const Duration(seconds: 30);
+  // Defaults for active (foreground/running) mode
+  static const Duration _defaultMainInterval = Duration(seconds: 1);
+  static const Duration _defaultWatchdogInterval = Duration(seconds: 30);
+  static const Duration _defaultPersistenceInterval = Duration(minutes: 1);
+  static const Duration _defaultBatchUploadInterval = Duration(minutes: 2);
+  static const Duration _defaultConnectivityInterval = Duration(seconds: 15);
+  static const Duration _defaultMemoryInterval = Duration(seconds: 30);
+
+  // Current intervals (may be relaxed while paused)
+  Duration _mainInterval = _defaultMainInterval;
+  Duration _watchdogInterval = _defaultWatchdogInterval;
+  Duration _persistenceInterval = _defaultPersistenceInterval;
+  Duration _batchUploadInterval = _defaultBatchUploadInterval;
+  Duration _connectivityCheckInterval = _defaultConnectivityInterval;
+  Duration _memoryCheckInterval = _defaultMemoryInterval;
 
   // Timer health monitoring
   DateTime? _lastMainTick;
@@ -108,6 +117,8 @@ class TimerCoordinator {
     _mainTimer?.cancel();
     _mainTimer = null;
 
+    // Relax non-critical timers while paused to reduce wakeups on low-end devices
+    _applyPausedIntervals(paused: true);
     AppLogger.info('[TIMER_COORDINATOR] Main timer paused successfully');
   }
 
@@ -123,6 +134,9 @@ class TimerCoordinator {
 
     // Restart main timer
     _startMainTimer();
+
+    // Restore default intervals when resuming
+    _applyPausedIntervals(paused: false);
 
     AppLogger.info('[TIMER_COORDINATOR] Main timer resumed successfully');
   }
@@ -226,6 +240,40 @@ class TimerCoordinator {
     _memoryCheckTimer = Timer.periodic(_memoryCheckInterval, (timer) {
       _onMemoryCheck?.call();
     });
+  }
+
+  // Adjust intervals when session is paused vs active
+  void _applyPausedIntervals({required bool paused}) {
+    final bool wasPaused =
+        _watchdogInterval != _defaultWatchdogInterval ||
+        _persistenceInterval != _defaultPersistenceInterval ||
+        _batchUploadInterval != _defaultBatchUploadInterval ||
+        _connectivityCheckInterval != _defaultConnectivityInterval ||
+        _memoryCheckInterval != _defaultMemoryInterval;
+
+    if (paused) {
+      _watchdogInterval = const Duration(seconds: 60);
+      _persistenceInterval = const Duration(minutes: 2);
+      _batchUploadInterval = const Duration(minutes: 4);
+      _connectivityCheckInterval = const Duration(seconds: 45);
+      _memoryCheckInterval = const Duration(seconds: 60);
+    } else {
+      _watchdogInterval = _defaultWatchdogInterval;
+      _persistenceInterval = _defaultPersistenceInterval;
+      _batchUploadInterval = _defaultBatchUploadInterval;
+      _connectivityCheckInterval = _defaultConnectivityInterval;
+      _memoryCheckInterval = _defaultMemoryInterval;
+    }
+
+    // Restart specialized timers to apply interval changes
+    _startWatchdogTimer();
+    _startPersistenceTimer();
+    _startBatchUploadTimer();
+    _startConnectivityCheckTimer();
+    _startMemoryCheckTimer();
+
+    AppLogger.debug('[TIMER_COORDINATOR] Intervals ' +
+        (paused ? 'relaxed for pause' : 'restored for resume'));
   }
 
   /// Start timer health monitoring
