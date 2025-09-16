@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/social_sharing/screens/share_preview_screen.dart';
-import 'package:rucking_app/features/social_sharing/models/time_range.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Bottom sheet that prompts users to share their ruck
@@ -193,7 +192,6 @@ class QuickShareBottomSheet extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (context) => SharePreviewScreen(
                         sessionId: sessionId,
-                        initialTimeRange: TimeRange.lastRuck,
                       ),
                     ),
                   );

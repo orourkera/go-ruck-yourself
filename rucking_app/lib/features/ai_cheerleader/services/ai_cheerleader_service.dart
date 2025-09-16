@@ -103,6 +103,12 @@ class AICheerleaderService {
   /// Check for distance milestone achievements
   CheerleaderTrigger? _checkDistanceMilestone(ActiveSessionRunning state,
       {required bool preferMetric}) {
+    // Validate distance is valid before processing
+    if (state.distanceKm == null || state.distanceKm.isNaN || state.distanceKm.isInfinite || state.distanceKm < 0) {
+      AppLogger.warning('[AI_MILESTONE] Invalid distance: ${state.distanceKm}km, skipping milestone check');
+      return null;
+    }
+
     final distanceMeters = state.distanceKm * 1000.0;
     final base = preferMetric ? _milestoneIntervalMeters : 1609; // meters
 

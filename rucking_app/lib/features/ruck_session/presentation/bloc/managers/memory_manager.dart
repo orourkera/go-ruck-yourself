@@ -59,7 +59,7 @@ class MemoryManager implements SessionManager {
 
     // Initialize session data
     _sessionData['sessionId'] = _activeSessionId;
-    _sessionData['startTime'] = DateTime.now().toIso8601String();
+    _sessionData['startTime'] = DateTime.now().toUtc().toIso8601String();
     _sessionData['ruckWeightKg'] = event.ruckWeightKg;
     _sessionData['userWeightKg'] = event.userWeightKg;
 

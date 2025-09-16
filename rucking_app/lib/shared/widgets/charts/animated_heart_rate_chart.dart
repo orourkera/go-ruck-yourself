@@ -69,25 +69,33 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart>
   LineChartData _buildChartData(double animationValue) {
     // The check in build() method should ideally prevent this from being called with empty samples,
     // but as a safeguard, return empty data if it somehow still is.
-    if (widget.heartRateSamples.isEmpty) return LineChartData();
+    if (widget.heartRateSamples.isEmpty) {
+      print('[HR_CHART] ERROR: No heart rate samples provided to chart');
+      return LineChartData();
+    }
+    print('[HR_CHART] Building chart with ${widget.heartRateSamples.length} samples');
 
     // Ensure samples are sorted by timestamp to avoid truncation or miscomputed range
     final sortedSamples = [...widget.heartRateSamples]
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    // Base x-axis at the session start when available; otherwise fall back to first HR sample
-    final baseTimestamp =
-        (widget.sessionStartTime ?? sortedSamples.first.timestamp)
-            .millisecondsSinceEpoch
-            .toDouble();
+    // Base x-axis calculation with timestamp validation
+    // If session start is more than 5 minutes before first HR sample, use first HR sample instead
+    final sessionStart = widget.sessionStartTime?.toUtc().millisecondsSinceEpoch.toDouble();
+    final firstHRTimestamp = sortedSamples.first.timestamp.toUtc().millisecondsSinceEpoch.toDouble();
+
+    final baseTimestamp = (sessionStart != null &&
+        (firstHRTimestamp - sessionStart) < (5 * 60 * 1000)) // 5 minute tolerance
+        ? sessionStart
+        : firstHRTimestamp;
     final firstTimestamp =
-        sortedSamples.first.timestamp.millisecondsSinceEpoch.toDouble();
+        sortedSamples.first.timestamp.toUtc().millisecondsSinceEpoch.toDouble();
     final lastTimestamp =
-        sortedSamples.last.timestamp.millisecondsSinceEpoch.toDouble();
+        sortedSamples.last.timestamp.toUtc().millisecondsSinceEpoch.toDouble();
 
     // Build spots for ALL samples first
     final allSpots = sortedSamples.map((sample) {
       final timeOffset =
-          (sample.timestamp.millisecondsSinceEpoch - baseTimestamp) /
+          (sample.timestamp.toUtc().millisecondsSinceEpoch - baseTimestamp) /
               (1000 * 60);
       return FlSpot(timeOffset, sample.bpm.toDouble());
     }).toList();
@@ -127,9 +135,8 @@ class _AnimatedHeartRateChartState extends State<AnimatedHeartRateChart>
 
     // Apply animation over the (possibly extended) set of points so that when animation completes, the line spans the full width
     final int totalPoints = extendedSpots.length;
-    final int pointsToShow =
-        (totalPoints * animationValue).round().clamp(1, totalPoints);
-    final spots = extendedSpots.sublist(0, pointsToShow);
+    final int pointsToShow = totalPoints; // Show all points immediately, no animation truncation
+    final spots = extendedSpots;
 
     // DEBUG: Log computed ranges and sample bounds to validate no truncation
     try {

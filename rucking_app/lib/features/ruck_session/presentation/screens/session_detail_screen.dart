@@ -17,6 +17,7 @@ import 'package:rucking_app/core/utils/location_utils.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/heart_rate_sample.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/session_bloc.dart';
@@ -40,7 +41,7 @@ import 'package:rucking_app/shared/widgets/charts/animated_heart_rate_chart.dart
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
 import 'package:rucking_app/core/services/share_service.dart';
-import 'package:rucking_app/shared/widgets/share/share_preview_screen.dart';
+import 'package:rucking_app/features/social_sharing/screens/share_preview_screen.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -293,6 +294,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
   @override
   void initState() {
     super.initState();
+    _currentSession = widget.session;
     AppLogger.debug('[CASCADE_TRACE] SessionDetailScreen initState called.');
     _initZoneColors();
 
@@ -427,6 +429,20 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
   void dispose() {
     _photoRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  late RuckSession _currentSession;
+
+  void _updateSessionPhotos(List<RuckPhoto> newPhotos) {
+    if (mounted && newPhotos.isNotEmpty) {
+      setState(() {
+        _currentSession = _currentSession.copyWith(photos: newPhotos);
+        _uploadInProgress = false;
+        _photoRefreshTimer?.cancel();
+      });
+
+      AppLogger.info('[SESSION_DETAIL] Updated session photos: ${newPhotos.length} photos');
+    }
   }
 
   // Starts polling for photos after upload
@@ -605,6 +621,11 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
               AppLogger.debug(
                   '[CASCADE_TRACE] SessionDetailScreen BlocListener: State is ActiveSessionInitial with viewedSession loaded.');
               sessionReadyForPhotoLoad = true;
+
+              // Update session photos if they've changed
+              if (state.photos != null && state.photos!.isNotEmpty) {
+                _updateSessionPhotos(state.photos!);
+              }
             }
 
             if (sessionReadyForPhotoLoad) {
@@ -1080,12 +1101,13 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
                           Padding(
                             padding: const EdgeInsets.only(top: 8.0),
                             child: PhotoUploadSection(
-                              ruckId: widget.session.id!,
+                              ruckId: _currentSession.id!,
+                              existingPhotoUrls: _currentSession.photos?.map((p) => p.url).where((url) => url != null).cast<String>().toList(),
                               onPhotosSelected: (photos) {
                                 AppLogger.info(
                                     '[PHOTO_DEBUG] Session Detail: Preparing to dispatch UploadSessionPhotosRequested event with ${photos.length} photos');
                                 AppLogger.info(
-                                    '[PHOTO_DEBUG] Session ID: ${widget.session.id!}');
+                                    '[PHOTO_DEBUG] Session ID: ${_currentSession.id!}');
 
                                 final bloc = activeSessionBloc;
                                 AppLogger.info(
@@ -1810,60 +1832,27 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
     AppLogger.info('Sharing session ${widget.session.id}');
 
     try {
-      // Get user preferences for metric/imperial and lady mode
-      final authState = context.read<AuthBloc>().state;
-      final bool preferMetric =
-          authState is Authenticated ? authState.user.preferMetric : true;
-      final bool isLadyMode = authState is Authenticated
-          ? authState.user.gender == 'female'
-          : false;
-
-      // Get session photos for potential background and photo selection
-      String? backgroundImageUrl;
-      List<String> sessionPhotos = [];
-      final activeSessionState = context.read<ActiveSessionBloc>().state;
-
-      // Check both SessionPhotosLoadedForId and SessionSummaryGenerated states for photos
-      List<RuckPhoto> availablePhotos = [];
-      if (activeSessionState is SessionPhotosLoadedForId &&
-          activeSessionState.photos.isNotEmpty) {
-        availablePhotos = activeSessionState.photos;
-      } else if (activeSessionState is SessionSummaryGenerated &&
-          activeSessionState.photos.isNotEmpty) {
-        availablePhotos = activeSessionState.photos;
+      if (widget.session.id == null) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Session is still syncing. Please try sharing again shortly.',
+        );
+        return;
       }
 
-      if (availablePhotos.isNotEmpty) {
-        // Use the first photo as default background
-        backgroundImageUrl = availablePhotos.first.url;
-        // Extract all photo URLs for background selection, filtering out null values
-        sessionPhotos = availablePhotos
-            .map((photo) => photo.url)
-            .where((url) => url != null)
-            .cast<String>()
-            .toList();
-      }
-
-      // TODO: Get achievements from session data when achievement system is implemented
-      final List<String> achievements = [];
-
-      // Navigate to share preview screen with photo options
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => SharePreviewScreen(
-            session: widget.session,
-            preferMetric: preferMetric,
-            backgroundImageUrl: backgroundImageUrl,
-            achievements: achievements,
-            isLadyMode: isLadyMode,
-            sessionPhotos:
-                sessionPhotos, // Pass session photos for background selection
+            sessionId: widget.session.id!,
           ),
         ),
       );
     } catch (e) {
-      AppLogger.error('Failed to open share preview: $e', exception: e);
-      await _shareDirectly(context);
+      AppLogger.error('Failed to open Instagram share screen: $e', exception: e);
+      StyledSnackBar.showError(
+        context: context,
+        message: 'Failed to open share screen. Please try again.',
+      );
     }
   }
 
@@ -2304,47 +2293,82 @@ class _SessionRouteMap extends StatelessWidget {
 
   List<LatLng> _getRoutePoints() {
     print('[ROUTE_DEBUG] Session ${session.id} - Starting _getRoutePoints()');
-    print(
-        '[ROUTE_DEBUG] Session ${session.id} - locationPoints type: ${session.locationPoints.runtimeType}');
-    print(
-        '[ROUTE_DEBUG] Session ${session.id} - locationPoints length: ${session.locationPoints?.length ?? 0}');
-    print(
-        '[ROUTE_DEBUG] Session ${session.id} - locationPoints raw data: ${session.locationPoints}');
+    return [];
+  }
 
-    if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
-      print(
-          '[ROUTE_DEBUG] Session ${session.id} - First point: ${session.locationPoints!.first}');
-      print(
-          '[ROUTE_DEBUG] Session ${session.id} - First point type: ${session.locationPoints!.first.runtimeType}');
-      print(
-          '[ROUTE_DEBUG] Session ${session.id} - Last point: ${session.locationPoints!.last}');
-    }
+  Future<List<LatLng>> _getOptimizedRoutePoints(BuildContext context) async {
+    print('[ROUTE_DEBUG] Session ${session.id} - Getting optimized route via RPC');
 
-    final result = parseRoutePoints(session.locationPoints);
-    print(
-        '[ROUTE_DEBUG] Session ${session.id} - parseRoutePoints returned ${result.length} points');
+    try {
+      // Get current user ID from AuthBloc
+      String? currentUserId;
+      try {
+        final authState = context.read<AuthBloc>().state;
+        if (authState is Authenticated) {
+          currentUserId = authState.user.userId;
+        }
+      } catch (e) {
+        print('[ROUTE_DEBUG] Error getting current user ID: $e');
+      }
 
-    if (result.isNotEmpty) {
-      print(
-          '[ROUTE_DEBUG] Session ${session.id} - First parsed point: ${result.first}');
-      print(
-          '[ROUTE_DEBUG] Session ${session.id} - Last parsed point: ${result.last}');
-    } else {
-      print(
-          '[ROUTE_DEBUG] Session ${session.id} - No points parsed! Raw data analysis:');
-      if (session.locationPoints != null) {
-        for (int i = 0; i < session.locationPoints!.length && i < 3; i++) {
-          final point = session.locationPoints![i];
-          print('[ROUTE_DEBUG] Point $i: $point (type: ${point.runtimeType})');
-          if (point is Map) {
-            print('[ROUTE_DEBUG] Point $i keys: ${point.keys.toList()}');
+      // Call the same RPC as home screen to get optimized route data
+      final result = await supabase.Supabase.instance.client
+          .rpc('get_user_recent_sessions', params: {
+        'p_limit': 20, // Get recent sessions to find our session
+        if (currentUserId != null) 'p_user_id': currentUserId,
+      });
+
+      print('[ROUTE_DEBUG] RPC Response type: ${result.runtimeType}');
+
+      if (result is List) {
+        // Find our specific session in the results
+        for (final sessionData in result) {
+          if (sessionData is Map && sessionData['id'].toString() == session.id) {
+            print('[ROUTE_DEBUG] Found session ${session.id} in RPC results');
+
+            // Use the same route parsing logic as home screen
+            final dynamic rawRoute = sessionData['route'] ??
+                sessionData['location_points'] ??
+                sessionData['locationPoints'];
+
+            if (rawRoute is List && rawRoute.isNotEmpty) {
+              List<LatLng> routePoints = [];
+              for (final p in rawRoute) {
+                double? lat;
+                double? lng;
+                if (p is Map) {
+                  lat = p['latitude']?.toDouble() ?? p['lat']?.toDouble();
+                  lng = p['longitude']?.toDouble() ?? p['lng']?.toDouble() ?? p['lon']?.toDouble();
+                } else if (p is List && p.length >= 2) {
+                  lat = p[0]?.toDouble();
+                  lng = p[1]?.toDouble();
+                }
+                if (lat != null && lng != null) {
+                  routePoints.add(LatLng(lat, lng));
+                }
+              }
+              print('[ROUTE_DEBUG] Parsed ${routePoints.length} optimized route points from RPC');
+              return routePoints;
+            }
           }
         }
       }
+
+      print('[ROUTE_DEBUG] Session not found in RPC results, falling back to full route');
+    } catch (e) {
+      print('[ROUTE_DEBUG] RPC error: $e, falling back to full route');
     }
 
-    return result;
+    // Fallback to full route data if RPC fails
+    if (session.locationPoints != null && session.locationPoints!.isNotEmpty) {
+      final allPoints = parseRoutePoints(session.locationPoints);
+      print('[ROUTE_DEBUG] Using fallback route with ${allPoints.length} points');
+      return allPoints;
+    }
+
+    return [];
   }
+
 
   double _calculateFitZoom(List<LatLng> points) {
     if (points.isEmpty) return 16.0;
@@ -2385,24 +2409,37 @@ class _SessionRouteMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print('[ROUTE_DEBUG] Session ${session.id} - Building map widget');
-    final points = _getRoutePoints();
-    print(
-        '[ROUTE_DEBUG] Session ${session.id} - Map will render with ${points.length} points');
-    final center = points.isNotEmpty
-        ? LatLng(
-            points.map((p) => p.latitude).reduce((a, b) => a + b) /
-                points.length,
-            points.map((p) => p.longitude).reduce((a, b) => a + b) /
-                points.length,
-          )
-        : LatLng(40.421, -3.678); // Default center
-    final zoom = _calculateFitZoom(points);
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        height: 180,
+        height: 220,
         width: double.infinity,
-        child: FlutterMap(
+        child: FutureBuilder<List<LatLng>>(
+          future: _getOptimizedRoutePoints(context),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            final points = snapshot.data!;
+            print('[ROUTE_DEBUG] Session ${session.id} - Map will render with ${points.length} points');
+
+            final center = points.isNotEmpty
+                ? LatLng(
+                    points.map((p) => p.latitude).reduce((a, b) => a + b) /
+                        points.length,
+                    points.map((p) => p.longitude).reduce((a, b) => a + b) /
+                        points.length,
+                  )
+                : LatLng(40.421, -3.678); // Default center
+            final zoom = _calculateFitZoom(points);
+
+            return FlutterMap(
           options: MapOptions(
             initialCenter: center,
             initialZoom: zoom,
@@ -2440,6 +2477,25 @@ class _SessionRouteMap extends StatelessWidget {
                   points,
                   preferMetric: preferMetric,
                 );
+
+                // Debug privacy segmentation
+                print('[PRIVACY_DEBUG] Session details - Total points: ${points.length}');
+                print('[PRIVACY_DEBUG] Private start: ${privacySegments.privateStartSegment.length}');
+                print('[PRIVACY_DEBUG] Visible middle: ${privacySegments.visibleMiddleSegment.length}');
+                print('[PRIVACY_DEBUG] Private end: ${privacySegments.privateEndSegment.length}');
+
+                // Debug segment connectivity
+                if (privacySegments.privateStartSegment.isNotEmpty && privacySegments.visibleMiddleSegment.isNotEmpty) {
+                  final startLast = privacySegments.privateStartSegment.last;
+                  final middleFirst = privacySegments.visibleMiddleSegment.first;
+                  print('[PRIVACY_DEBUG] Start->Middle connection: ${startLast.latitude},${startLast.longitude} -> ${middleFirst.latitude},${middleFirst.longitude}');
+                }
+
+                if (privacySegments.visibleMiddleSegment.isNotEmpty && privacySegments.privateEndSegment.isNotEmpty) {
+                  final middleLast = privacySegments.visibleMiddleSegment.last;
+                  final endFirst = privacySegments.privateEndSegment.first;
+                  print('[PRIVACY_DEBUG] Middle->End connection: ${middleLast.latitude},${middleLast.longitude} -> ${endFirst.latitude},${endFirst.longitude}');
+                }
 
                 List<Polyline> polylines = [];
 
@@ -2483,6 +2539,8 @@ class _SessionRouteMap extends StatelessWidget {
               }(),
             ),
           ],
+        );
+          },
         ),
       ),
     );

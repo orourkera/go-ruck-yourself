@@ -126,6 +126,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   DateTime? _lastBatchUploadTime;
   bool _isBatchUploadInProgress = false;
 
+  // AI Cheerleader throttling to prevent blocking distance tracking
+  DateTime? _lastAICheerleaderCheck;
+  bool _isProcessingAICheerleader = false;
+  static const Duration _aiCheerleaderMinInterval = Duration(seconds: 30);
+
   int? _authRetryCounter;
 
   ActiveSessionBloc({
@@ -389,11 +394,29 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         coordinatorState is ActiveSessionRunning &&
         _aiCheerleaderPersonality != null &&
         _currentUser != null) {
+
+      // Throttle AI cheerleader checks to prevent blocking distance tracking
+      final now = DateTime.now();
+      if (_lastAICheerleaderCheck != null &&
+          now.difference(_lastAICheerleaderCheck!).inSeconds < _aiCheerleaderMinInterval.inSeconds) {
+        // Skip this check - too soon since last check
+        return;
+      }
+
+      // Skip if already processing to prevent overlapping operations
+      if (_isProcessingAICheerleader) {
+        AppLogger.info('[AI_DEBUG] Skipping AI check - already processing previous trigger');
+        return;
+      }
+
+      _lastAICheerleaderCheck = now;
+
       AppLogger.info(
           '[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
 
       // Fire and forget with complete isolation
       Future.microtask(() async {
+        _isProcessingAICheerleader = true;
         try {
           await _checkAICheerleaderTriggers(coordinatorState);
         } catch (e, stack) {
@@ -411,6 +434,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             },
             severity: ErrorSeverity.warning,
           );
+        } finally {
+          _isProcessingAICheerleader = false;
         }
       });
     } else {

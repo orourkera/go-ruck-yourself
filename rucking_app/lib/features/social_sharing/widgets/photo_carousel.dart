@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -152,37 +153,46 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
               },
               itemBuilder: (context, index) {
                 final photo = _photos[index];
+                final isRemoteImage = photo.startsWith('http') || photo.startsWith('https');
+                Widget imageWidget;
+                if (isRemoteImage) {
+                  imageWidget = CachedNetworkImage(
+                    imageUrl: photo,
+                    width: 120,
+                    height: 120,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 120,
+                      height: 120,
+                      color: theme.colorScheme.surfaceVariant,
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => _buildErrorPlaceholder(theme),
+                  );
+                } else {
+                  final file = File(photo);
+                  if (file.existsSync()) {
+                    imageWidget = Image.file(
+                      file,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                    );
+                  } else {
+                    imageWidget = _buildErrorPlaceholder(theme);
+                  }
+                }
+
                 return Container(
                   key: ValueKey(photo),
                   margin: const EdgeInsets.only(right: 8),
                   child: Stack(
                     children: [
-                      // Photo
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: photo,
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 120,
-                            height: 120,
-                            color: theme.colorScheme.surfaceVariant,
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            width: 120,
-                            height: 120,
-                            color: theme.colorScheme.surfaceVariant,
-                            child: Icon(
-                              Icons.broken_image,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
+                        child: imageWidget,
                       ),
 
                       // Order indicator
@@ -268,6 +278,18 @@ class _PhotoCarouselState extends State<PhotoCarousel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildErrorPlaceholder(ThemeData theme) {
+    return Container(
+      width: 120,
+      height: 120,
+      color: theme.colorScheme.surfaceVariant,
+      child: Icon(
+        Icons.broken_image,
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }

@@ -1127,15 +1127,19 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           'Navigating to share preview with ${locationPoints?.length ?? 0} location points and ${sessionPhotos.length} photos');
 
       // Navigate to share preview screen
+      if (sessionForSharing.id == null) {
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Session is still syncing—try sharing again in a moment.',
+        );
+        return;
+      }
+
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => SharePreviewScreen(
             session: sessionForSharing,
-            preferMetric: preferMetric,
-            backgroundImageUrl: backgroundImageUrl,
-            achievements: [], // Could populate with achievement strings if available
-            isLadyMode: isLadyMode,
-            sessionPhotos: sessionPhotos,
+            preferMetric: true, // You may want to pass the actual preference
           ),
         ),
       );

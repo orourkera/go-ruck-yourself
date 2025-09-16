@@ -356,31 +356,6 @@ class _ShareEditScreenState extends State<ShareEditScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Call to Action Display
-            if (widget.post.cta.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Call to Action',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.post.cta,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
             const SizedBox(height: 32),
 
             // Share Button

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlong;
@@ -131,6 +132,7 @@ class ActiveSessionCoordinator
     on<HeartRateUpdated>(_onHeartRateUpdated);
     on<TakePhotoRequested>(_onTakePhotoRequested);
     on<DeleteSessionPhotoRequested>(_onDeleteSessionPhotoRequested);
+    on<UploadSessionPhotosRequested>(_onUploadSessionPhotosRequested);
     on<LoadSessionForViewing>(_onLoadSessionForViewing);
     on<TimerStarted>(_onTimerStarted);
     on<Tick>(_onTick);
@@ -1159,6 +1161,30 @@ class ActiveSessionCoordinator
     Emitter<ActiveSessionState> emit,
   ) async {
     await _routeEventToManagers(event);
+    _aggregateAndEmitState();
+  }
+
+  Future<void> _onUploadSessionPhotosRequested(
+    UploadSessionPhotosRequested event,
+    Emitter<ActiveSessionState> emit,
+  ) async {
+    AppLogger.info('[COORDINATOR] Uploading ${event.photos.length} photos for session ${event.sessionId}');
+
+    try {
+      // Upload photos directly via session repository
+      final sessionRepository = GetIt.I<SessionRepository>();
+      await sessionRepository.uploadSessionPhotos(event.sessionId, event.photos);
+
+      AppLogger.info('[COORDINATOR] Photos uploaded successfully');
+
+      // Refresh session photos
+      final activeSessionBloc = GetIt.I<ActiveSessionBloc>();
+      activeSessionBloc.add(FetchSessionPhotosRequested(event.sessionId));
+
+    } catch (e) {
+      AppLogger.error('[COORDINATOR] Failed to upload photos: $e');
+    }
+
     _aggregateAndEmitState();
   }
 

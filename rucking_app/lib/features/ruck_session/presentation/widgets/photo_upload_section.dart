@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
@@ -23,6 +24,9 @@ class PhotoUploadSection extends StatefulWidget {
   /// Whether photos are currently being uploaded
   final bool isUploading;
 
+  /// Existing photos already uploaded to this session
+  final List<String>? existingPhotoUrls;
+
   const PhotoUploadSection({
     Key? key,
     required this.ruckId,
@@ -30,6 +34,7 @@ class PhotoUploadSection extends StatefulWidget {
     this.onUploadSuccess,
     this.maxPhotos = 5,
     this.isUploading = false,
+    this.existingPhotoUrls,
   }) : super(key: key);
 
   @override
@@ -40,6 +45,18 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
   final ImagePicker _imagePicker = ImagePicker();
   final List<File> _selectedPhotos = [];
   bool _showPhotoPreview = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Show photo preview if there are existing photos
+    if (widget.existingPhotoUrls != null && widget.existingPhotoUrls!.isNotEmpty) {
+      _showPhotoPreview = true;
+    }
+  }
+
+  int get _totalPhotoCount =>
+    _selectedPhotos.length + (widget.existingPhotoUrls?.length ?? 0);
 
   // Helper method to show styled snackbar
   void showStyledSnackBar(
@@ -125,16 +142,24 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
             mainAxisSpacing: 8,
             childAspectRatio: 1,
           ),
-          itemCount: _selectedPhotos.length +
-              (_selectedPhotos.length < widget.maxPhotos ? 1 : 0),
+          itemCount: _totalPhotoCount +
+              (_totalPhotoCount < widget.maxPhotos ? 1 : 0),
           itemBuilder: (context, index) {
             // Add photo button at the end if we haven't reached max
-            if (index == _selectedPhotos.length) {
+            if (index == _totalPhotoCount) {
               return _buildAddMorePhotosButton();
             }
 
-            // Photo preview with delete option
-            return _buildPhotoPreviewItem(index);
+            // Determine if this is an existing photo or new selection
+            final existingPhotosCount = widget.existingPhotoUrls?.length ?? 0;
+
+            if (index < existingPhotosCount) {
+              // Existing uploaded photo
+              return _buildExistingPhotoItem(index);
+            } else {
+              // New local photo selection
+              return _buildPhotoPreviewItem(index - existingPhotosCount);
+            }
           },
         ),
 
@@ -196,6 +221,36 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
     );
   }
 
+  Widget _buildExistingPhotoItem(int index) {
+    final photoUrl = widget.existingPhotoUrls![index];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: CachedNetworkImage(
+          imageUrl: photoUrl,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            color: Colors.grey.shade200,
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            color: Colors.grey.shade300,
+            child: const Icon(Icons.error),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAddMorePhotosButton() {
     return GestureDetector(
       onTap: widget.isUploading ? null : _selectPhotos,
@@ -219,7 +274,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
   }
 
   Future<void> _selectPhotos() async {
-    if (_selectedPhotos.length >= widget.maxPhotos) {
+    if (_totalPhotoCount >= widget.maxPhotos) {
       showStyledSnackBar(
         context,
         'Maximum ${widget.maxPhotos} photos allowed',
@@ -261,7 +316,7 @@ class _PhotoUploadSectionState extends State<PhotoUploadSection> {
 
   Future<void> _getImageFrom(ImageSource source) async {
     try {
-      final remainingSlots = widget.maxPhotos - _selectedPhotos.length;
+      final remainingSlots = widget.maxPhotos - _totalPhotoCount;
       AppLogger.info(
           '[PHOTO_UPLOAD] Selecting photos from ${source.toString()}, remaining slots: $remainingSlots');
 

@@ -97,9 +97,9 @@ if __name__ == "__main__":
     # Create the image
     og_image = create_og_image()
 
-    # Save to the static images directory
-    output_path = "/Users/rory/RuckingApp/RuckTracker/static/images/new_og_preview.png"
-    og_image.save(output_path, "PNG", quality=95)
+    # Save to the static images directory as JPG (as expected by landing.html)
+    output_path = "/Users/rory/RuckingApp/RuckTracker/static/images/new_og_preview.jpg"
+    og_image.save(output_path, "JPEG", quality=95)
     print(f"✅ Created new Open Graph image: {output_path}")
     print("📐 Size: 1200x630px")
     print("🎨 Professional design with app branding")

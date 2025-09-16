@@ -18,6 +18,7 @@ import 'package:rucking_app/features/social_sharing/services/route_map_service.d
 import 'package:rucking_app/features/social_sharing/services/stats_visualization_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InstagramPostService {
   final ApiClient _apiClient;
@@ -85,7 +86,11 @@ class InstagramPostService {
       if (visualContent != null) {
         final existingPhotos = normalizedInsights['photos'] as List? ?? [];
         normalizedInsights['photos'] = [visualContent, ...existingPhotos];
-        AppLogger.info('[INSTAGRAM] Added generated visual content as first photo');
+        print('[INSTAGRAM] Added generated visual content as first photo. Total photos now: ${normalizedInsights['photos']?.length ?? 0}');
+        print('[INSTAGRAM] Visual content path: $visualContent');
+        print('[INSTAGRAM] All photos: ${normalizedInsights['photos']}');
+      } else {
+        print('[INSTAGRAM] No visual content was generated');
       }
 
       // 3. Build the prompt for OpenAI
@@ -152,19 +157,14 @@ class InstagramPostService {
     }
   }
 
-  /// Fetch latest session data from /api/rucks
+  /// Fetch latest session data from /api/rucks (which includes photos)
   Future<Map<String, dynamic>> _fetchLastRuckData(String? sessionId, bool useMetric) async {
     try {
-      Map<String, dynamic> queryParams = {
-        'limit': 1,
-      };
+      AppLogger.info('[INSTAGRAM] Fetching last ruck data from /api/rucks');
 
-      final response = await _apiClient.get(
-        '/api/rucks', // Use session endpoint, not insights
-        queryParams: queryParams,
-      );
-
+      final response = await _apiClient.get('/api/rucks', queryParams: {'limit': 1});
       final sessions = response as List? ?? [];
+
       if (sessions.isEmpty) {
         AppLogger.warning('[INSTAGRAM] No sessions found for last ruck');
         return {};
@@ -172,6 +172,10 @@ class InstagramPostService {
 
       final latestSession = Map<String, dynamic>.from(sessions.first as Map);
       AppLogger.info('[INSTAGRAM] Found latest session: ${latestSession['id']}');
+
+      // Fetch photos using the correct photos endpoint
+      final photos = await _fetchPhotosForSession(latestSession['id']?.toString());
+      AppLogger.info('[INSTAGRAM] Found ${photos.length} photos for last ruck from photos endpoint');
 
       // Transform session data to expected format with unit conversion
       final distanceKm = (latestSession['distance_km'] as num?)?.toDouble() ?? 0.0;
@@ -181,7 +185,7 @@ class InstagramPostService {
 
       return {
         'session': latestSession,
-        'photos': await _fetchSessionPhotos(latestSession['id']?.toString()),
+        'photos': photos,
         'stats': {
           'distance': useMetric ? distanceKm : _kmToMiles(distanceKm),
           'distance_unit': useMetric ? 'km' : 'mi',
@@ -212,48 +216,104 @@ class InstagramPostService {
     return paceMinPerKm / 0.621371; // Convert min/km to min/mile
   }
 
-  /// Fetch time range data (can still use insights for aggregated data)
+  /// Fetch time range data using the SAME RPC as home screen to get photos
   Future<Map<String, dynamic>> _fetchTimeRangeData(
     TimeRange timeRange,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool useMetric,
   ) async {
-    final queryParams = <String, dynamic>{
-      'time_range': timeRange.value,
-      'fresh': 1,
-      'include_photos': true,
-    };
+    try {
+      AppLogger.info('[INSTAGRAM] Fetching time range data for ${timeRange.value} using /api/rucks');
 
-    if (dateFrom != null) {
-      queryParams['date_from'] = dateFrom.toIso8601String().split('T')[0];
+      // Use /api/rucks endpoint which includes photos
+      final response = await _apiClient.get('/api/rucks', queryParams: {'limit': 100});
+      final allSessions = (response as List? ?? []).cast<Map<String, dynamic>>();
+
+      // Filter sessions by time range
+      final filteredSessions = _filterSessionsByTimeRange(allSessions, timeRange);
+
+      AppLogger.info('[INSTAGRAM] Found ${filteredSessions.length} sessions for ${timeRange.value}');
+
+      // Extract photos from filtered sessions using correct photos endpoint
+      final photos = <String>[];
+      for (final session in filteredSessions) {
+        try {
+          final sessionPhotos = await _fetchPhotosForSession(session['id']?.toString());
+          photos.addAll(sessionPhotos);
+          AppLogger.info('[INSTAGRAM] Added ${sessionPhotos.length} photos from session ${session['id']}');
+        } catch (e) {
+          AppLogger.warning('[INSTAGRAM] Failed to fetch photos for session ${session['id']}: $e');
+        }
+      }
+
+      // Randomize and limit to 5 photos max
+      photos.shuffle();
+      final selectedPhotos = photos.take(5).toList();
+
+      AppLogger.info('[INSTAGRAM] Found ${photos.length} total photos for ${timeRange.value}, selected ${selectedPhotos.length}');
+
+      return {
+        'photos': selectedPhotos,
+        'recent_sessions': filteredSessions,
+        'use_metric': useMetric,
+      };
+    } catch (e) {
+      AppLogger.error('[INSTAGRAM] Error fetching time range data: $e');
+      return {'photos': [], 'recent_sessions': []};
     }
-    if (dateTo != null) {
-      queryParams['date_to'] = dateTo.toIso8601String().split('T')[0];
-    }
-
-    final response = await _apiClient.get(
-      ApiEndpoints.userInsights, // Use insights for aggregated data
-      queryParams: queryParams,
-    );
-
-    final map = Map<String, dynamic>.from(response ?? {});
-    final insights = Map<String, dynamic>.from(map['insights'] ?? {});
-    insights['use_metric'] = useMetric;
-    return insights;
   }
 
-  /// Fetch photos for a specific session
-  Future<List<String>> _fetchSessionPhotos(String? sessionId) async {
-    if (sessionId == null) return [];
+  /// Fetch photos for a specific session using the correct photos endpoint
+  Future<List<String>> _fetchPhotosForSession(String? sessionId) async {
+    AppLogger.info('[INSTAGRAM] _fetchPhotosForSession called with sessionId: $sessionId');
+
+    if (sessionId == null || sessionId.isEmpty) {
+      AppLogger.warning('[INSTAGRAM] Session ID is null or empty');
+      return [];
+    }
 
     try {
-      // TODO: Implement session photos endpoint call
-      // For now, return empty list
-      AppLogger.info('[INSTAGRAM] Would fetch photos for session: $sessionId');
-      return [];
+      AppLogger.info('[INSTAGRAM] Fetching photos for session: $sessionId');
+
+      // Parse session ID to integer as expected by the API
+      final parsedRuckId = int.tryParse(sessionId.trim());
+      if (parsedRuckId == null) {
+        AppLogger.error('[INSTAGRAM] Invalid session ID format: $sessionId');
+        return [];
+      }
+
+      // Call the photos endpoint with ruck_id parameter
+      final response = await _apiClient.get('/ruck-photos', queryParams: {
+        'ruck_id': parsedRuckId.toString(),
+      });
+
+      AppLogger.info('[INSTAGRAM] Photos API response for session $sessionId: $response');
+      AppLogger.info('[INSTAGRAM] Photos API response type: ${response.runtimeType}');
+
+      // The API returns {"success": true, "data": [...]} format
+      if (response is Map && response['data'] is List) {
+        final photoList = response['data'] as List;
+        final photoUrls = <String>[];
+
+        for (final photo in photoList) {
+          AppLogger.info('[INSTAGRAM] Processing photo data: $photo');
+          if (photo is Map && photo['url'] != null) {
+            final photoUrl = photo['url'].toString();
+            photoUrls.add(photoUrl);
+            AppLogger.info('[INSTAGRAM] Added photo URL: $photoUrl');
+          } else {
+            AppLogger.info('[INSTAGRAM] Photo data missing URL or not a Map: ${photo.runtimeType} - $photo');
+          }
+        }
+        AppLogger.info('[INSTAGRAM] Final photo URLs for session $sessionId: $photoUrls');
+        return photoUrls;
+      } else {
+        AppLogger.warning('[INSTAGRAM] Unexpected response format for photos: ${response.runtimeType} - $response');
+        return [];
+      }
     } catch (e) {
-      AppLogger.error('[INSTAGRAM] Failed to fetch session photos: $e');
+      AppLogger.error('[INSTAGRAM] Failed to fetch photos for session $sessionId: $e');
       return [];
     }
   }
@@ -518,24 +578,44 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
   List<String> _extractPhotos(Map<String, dynamic> insights) {
     final photos = <String>[];
 
+    AppLogger.info('[INSTAGRAM] Extracting photos from insights. Keys: ${insights.keys.toList()}');
+
     // Try different possible photo locations in the response
     if (insights['photos'] != null) {
       final photoList = insights['photos'] as List;
+      AppLogger.info('[INSTAGRAM] Found ${photoList.length} photos in insights[photos]');
       photos.addAll(photoList.map((p) => p.toString()));
     }
 
     if (insights['recent_sessions'] != null) {
       final sessions = insights['recent_sessions'] as List;
+      AppLogger.info('[INSTAGRAM] Found ${sessions.length} sessions in insights[recent_sessions]');
       for (final session in sessions) {
         if (session['photos'] != null) {
           final sessionPhotos = session['photos'] as List;
+          AppLogger.info('[INSTAGRAM] Found ${sessionPhotos.length} photos in session ${session['id']}');
           photos.addAll(sessionPhotos.map((p) => p.toString()));
         }
       }
     }
 
-    // Limit to 10 photos max
-    return photos.take(10).toList();
+    // Randomize and limit to 5 photos max
+    if (photos.isEmpty) {
+      AppLogger.warning('[INSTAGRAM] No photos found in insights');
+      return [];
+    }
+
+    // For Last Ruck, don't shuffle or limit - show all photos in order
+    // For time ranges, limit and randomize
+    if (photos.length <= 6) { // Assume if <= 6 photos, it's a single session (Last Ruck)
+      AppLogger.info('[INSTAGRAM] Selected ${photos.length} photos (no shuffle/limit for single session)');
+      return photos;
+    } else {
+      photos.shuffle(); // Randomize the order for time ranges
+      final selectedPhotos = photos.take(5).toList();
+      AppLogger.info('[INSTAGRAM] Selected ${selectedPhotos.length} photos from ${photos.length} total');
+      return selectedPhotos;
+    }
   }
 
   /// Generate default hashtags as fallback
@@ -556,12 +636,20 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
     required bool useMetric,
   }) async {
     try {
+      print('[INSTAGRAM] Generating visual content for timeRange: ${timeRange.value}, sessionId: $sessionId');
+
       if (timeRange == TimeRange.lastRuck && sessionId != null) {
+        print('[INSTAGRAM] Generating route map for Last Ruck with sessionId: $sessionId');
         // Generate route map for Last Ruck
-        return await _generateRouteMapForSession(sessionId, template, useMetric);
+        final result = await _generateRouteMapForSession(sessionId, template, useMetric);
+        print('[INSTAGRAM] Route map generation result: $result');
+        return result;
       } else {
+        print('[INSTAGRAM] Generating stats card for time range: ${timeRange.value}');
         // Generate stats card for aggregate time ranges
-        return await _generateStatsCard(insights, timeRange, template, useMetric);
+        final result = await _generateStatsCard(insights, timeRange, template, useMetric);
+        print('[INSTAGRAM] Stats card generation result: $result');
+        return result;
       }
     } catch (e) {
       AppLogger.error('[INSTAGRAM] Error generating visual content: $e');
@@ -574,29 +662,39 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
     try {
       AppLogger.info('[INSTAGRAM] Generating route map for session: $sessionId');
 
-      // Fetch the session with location points
-      final session = await _sessionRepository.fetchSessionById(sessionId);
-      if (session == null) {
+      // Fetch the session using the SAME RPC as home screen to get full route points
+      final sessionData = await _fetchSessionUsingRPC(sessionId);
+      if (sessionData == null) {
         AppLogger.warning('[INSTAGRAM] Session not found: $sessionId');
         return null;
       }
 
+      AppLogger.info('[INSTAGRAM] Session data found: ${sessionData['id']}, location points: ${sessionData['route']?.length ?? 0}');
+
+      // Convert RPC data to session object
+      final session = RuckSession.fromJson(sessionData);
+
       // Check if session has location points
       if (session.locationPoints?.isEmpty ?? true) {
-        AppLogger.info('[INSTAGRAM] Session has no location points, skipping route map');
+        AppLogger.warning('[INSTAGRAM] Session has no location points, skipping route map. locationPoints: ${session.locationPoints}');
         return null;
       }
+
+      AppLogger.info('[INSTAGRAM] Session has ${session.locationPoints!.length} location points, generating route map');
 
       // Generate route map image
       final imageBytes = await _routeMapService.generateInstagramRouteMap(
         session: session,
         preferMetric: useMetric,
+        applyPrivacyClipping: false, // Disable privacy clipping for now
       );
 
       if (imageBytes == null) {
         AppLogger.warning('[INSTAGRAM] Failed to generate route map image');
         return null;
       }
+
+      AppLogger.info('[INSTAGRAM] Route map image generated successfully, size: ${imageBytes.length} bytes');
 
       // Save image to temporary file and return path
       final imagePath = await _saveImageToTemp(imageBytes, 'route_map_$sessionId.png');
@@ -652,5 +750,69 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
       AppLogger.error('[INSTAGRAM] Error saving image to temp: $e');
       rethrow;
     }
+  }
+
+  /// Fetch session using the SAME RPC as home screen to get full route points
+  Future<Map<String, dynamic>?> _fetchSessionUsingRPC(String sessionId) async {
+    try {
+      AppLogger.info('[INSTAGRAM] Fetching session $sessionId using RPC');
+
+      // Use the EXACT same RPC call as home screen
+      final result = await Supabase.instance.client
+          .rpc('get_user_recent_sessions', params: {
+        'p_limit': 50, // Get more sessions to find the specific one
+      });
+
+      if (result is List) {
+        // Find the specific session by ID
+        for (final sessionData in result) {
+          if (sessionData is Map<String, dynamic> &&
+              sessionData['id'].toString() == sessionId) {
+            AppLogger.info('[INSTAGRAM] Found session $sessionId with ${sessionData['route']?.length ?? 0} route points');
+            return sessionData;
+          }
+        }
+      }
+
+      AppLogger.warning('[INSTAGRAM] Session $sessionId not found in RPC results');
+      return null;
+    } catch (e) {
+      AppLogger.error('[INSTAGRAM] Error fetching session via RPC: $e');
+      return null;
+    }
+  }
+
+  /// Filter sessions by time range
+  List<Map<String, dynamic>> _filterSessionsByTimeRange(
+    List<Map<String, dynamic>> sessions,
+    TimeRange timeRange,
+  ) {
+    final now = DateTime.now();
+    DateTime cutoffDate;
+
+    switch (timeRange) {
+      case TimeRange.week:
+        cutoffDate = now.subtract(const Duration(days: 7));
+        break;
+      case TimeRange.month:
+        cutoffDate = now.subtract(const Duration(days: 30));
+        break;
+      case TimeRange.allTime:
+        // For all-time, return all sessions
+        return sessions;
+      case TimeRange.lastRuck:
+        // Should not be called for lastRuck, but return first session as fallback
+        return sessions.take(1).toList();
+    }
+
+    return sessions.where((session) {
+      final dateString = session['started_at'] as String?;
+      if (dateString == null) return false;
+
+      final sessionDate = DateTime.tryParse(dateString);
+      if (sessionDate == null) return false;
+
+      return sessionDate.isAfter(cutoffDate);
+    }).toList();
   }
 }

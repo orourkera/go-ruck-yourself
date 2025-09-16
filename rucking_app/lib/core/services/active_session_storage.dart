@@ -48,7 +48,7 @@ class ActiveSessionStorage {
         'latest_heart_rate': latestHeartRate,
         'min_heart_rate': minHeartRate,
         'max_heart_rate': maxHeartRate,
-        'saved_at': DateTime.now().toIso8601String(),
+        'saved_at': DateTime.now().toUtc().toIso8601String(),
       };
 
       await _prefs.setString(_activeSessionKey, jsonEncode(sessionData));
@@ -284,7 +284,7 @@ class ActiveSessionStorage {
     try {
       final offlineSessionData = {
         'offlineSessionId': activeSessionState.sessionId,
-        'completedAt': DateTime.now().toIso8601String(),
+        'completedAt': DateTime.now().toUtc().toIso8601String(),
         'ruckWeightKg': activeSessionState.ruckWeightKg,
         'notes': activeSessionState.notes ?? '',
         'originalSessionStartTimeUtc':
@@ -349,7 +349,7 @@ class ActiveSessionStorage {
       for (final session in offlineSessions) {
         if (session['offlineSessionId'] == offlineSessionId) {
           session['synced'] = true;
-          session['syncedAt'] = DateTime.now().toIso8601String();
+          session['syncedAt'] = DateTime.now().toUtc().toIso8601String();
           break;
         }
       }

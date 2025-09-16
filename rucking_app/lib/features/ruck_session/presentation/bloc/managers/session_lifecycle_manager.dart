@@ -173,7 +173,7 @@ class SessionLifecycleManager implements SessionManager {
       }
 
       _activeSessionId = finalSessionId;
-      _sessionStartTime = DateTime.now();
+      _sessionStartTime = DateTime.now().toUtc();
 
       // CRITICAL: Set session ID in watch service BEFORE starting watch session
       _watchService.setCurrentSessionId(finalSessionId);
@@ -298,8 +298,8 @@ class SessionLifecycleManager implements SessionManager {
       // ENHANCED: Collect comprehensive session completion data
       Map<String, dynamic> completionData = {
         'duration_seconds': finalDuration.inSeconds,
-        'completed_at': DateTime.now().toIso8601String(),
-        'end_time': DateTime.now().toIso8601String(),
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
+        'end_time': DateTime.now().toUtc().toIso8601String(),
       };
 
       // Add start time if available
@@ -425,7 +425,7 @@ class SessionLifecycleManager implements SessionManager {
               await _storageService.setObject('lost_session_context', {
                 'original_session_id': _activeSessionId,
                 'error': e.toString(),
-                'timestamp': DateTime.now().toIso8601String(),
+                'timestamp': DateTime.now().toUtc().toIso8601String(),
                 'completion_data': completionData,
               });
 
@@ -523,7 +523,7 @@ class SessionLifecycleManager implements SessionManager {
 
     _updateState(_currentState.copyWith(
       isActive: true, // Keep session active - just mark as paused
-      pausedAt: DateTime.now(), // Use pausedAt to indicate paused state
+      pausedAt: DateTime.now().toUtc(), // Use pausedAt to indicate paused state
     ));
 
     AppLogger.info(
@@ -1012,7 +1012,7 @@ class SessionLifecycleManager implements SessionManager {
       'elapsed_seconds': _currentState.duration.inSeconds,
       'total_paused_duration_seconds':
           _currentState.totalPausedDuration.inSeconds,
-      'last_persisted_at': DateTime.now().toIso8601String(),
+      'last_persisted_at': DateTime.now().toUtc().toIso8601String(),
       'distance_km': totalDistance,
       'elevation_gain': elevationGain,
       'elevation_loss': elevationLoss,

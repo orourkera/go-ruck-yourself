@@ -2440,6 +2440,9 @@ class LocationTrackingManager implements SessionManager {
     _elevationGain = elevationGainM;
     _elevationLoss = elevationLossM;
 
+    // CRITICAL: Update the baseline distance for incremental calculations
+    _lastKnownTotalDistance = totalDistanceKm;
+
     _updateState(_currentState.copyWith(
       totalDistance: totalDistanceKm,
       elevationGain: elevationGainM,
