@@ -49,8 +49,15 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   }
 
   Future<void> _createAndShareReel() async {
+    AppLogger.info('[REEL_DEBUG] Starting reel creation');
+    AppLogger.info('[REEL_DEBUG] Selected photos count: ${_selectedPhotos.length}');
+    for (int i = 0; i < _selectedPhotos.length; i++) {
+      AppLogger.info('[REEL_DEBUG] Photo $i: ${_selectedPhotos[i]}');
+    }
+
     if (_selectedPhotos.isEmpty) {
-      _showError('No photo selected');
+      AppLogger.error('[REEL_DEBUG] No photos selected!');
+      _showError('No photos selected');
       return;
     }
 
@@ -60,16 +67,34 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
     });
 
     try {
+      AppLogger.info('[REEL_DEBUG] Building reel with FFmpeg...');
       final builder = const ReelBuilderService();
       final videoPath = await builder.buildReel(_selectedPhotos);
       _builtReelPath = videoPath;
 
-      // Share the generated MP4 via system sheet (Instagram supports this)
+      AppLogger.info('[REEL_DEBUG] Reel built successfully at: $videoPath');
+
+      // Check if file exists
+      final videoFile = File(videoPath);
+      if (await videoFile.exists()) {
+        final fileSize = await videoFile.length();
+        AppLogger.info('[REEL_DEBUG] Video file exists, size: ${fileSize / 1024 / 1024} MB');
+      } else {
+        AppLogger.error('[REEL_DEBUG] Video file does not exist at path: $videoPath');
+      }
+
+      // Note: Instagram on iOS doesn't support direct video sharing via share sheet
+      // Videos need to be saved to camera roll first, then shared from there
+      AppLogger.warning('[REEL_DEBUG] Sharing MP4 to Instagram via share sheet (may not work on iOS)');
+
+      // Share the generated MP4 via system sheet
       await Share.shareXFiles([
         XFile(videoPath, name: p.basename(videoPath), mimeType: 'video/mp4'),
       ], text: _captionController.text);
+
+      AppLogger.info('[REEL_DEBUG] Share sheet dismissed');
     } catch (e) {
-      AppLogger.error('[REEL] Build failed: $e', exception: e);
+      AppLogger.error('[REEL_DEBUG] Build failed: $e', exception: e);
       _showError('Failed to build reel: $e');
     } finally {
       if (mounted) {
