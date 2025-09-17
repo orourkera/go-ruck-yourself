@@ -462,7 +462,7 @@ class UploadManager implements SessionManager {
       existing.add({
         'sessionId': _activeSessionId,
         'type': upload['type'],
-        'timestamp': DateTime.now().toIso8601String(),
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
         'data': upload['data'],
       });
 
@@ -551,7 +551,7 @@ class UploadManager implements SessionManager {
       // The backend expects 'points' field for batch uploads
       await _apiClient.post('/rucks/$_activeSessionId/location', {
         'points': locationData,
-        'batch_timestamp': DateTime.now().toIso8601String(),
+        'batch_timestamp': DateTime.now().toUtc().toIso8601String(),
       });
 
       AppLogger.info('[UPLOAD_MANAGER] Location batch uploaded successfully');
@@ -591,7 +591,7 @@ class UploadManager implements SessionManager {
       final response =
           await _apiClient.post('/rucks/$_activeSessionId/heart-rate-chunk', {
         'heart_rate_samples': heartRateData,
-        'batch_timestamp': DateTime.now().toIso8601String(),
+        'batch_timestamp': DateTime.now().toUtc().toIso8601String(),
       });
 
       AppLogger.error(

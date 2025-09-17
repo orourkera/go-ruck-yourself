@@ -211,7 +211,27 @@ class RuckSession {
   static DateTime? parseDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
-    return DateTime.tryParse(value.toString());
+
+    // Parse the datetime string and ensure it's treated as UTC
+    final dateTime = DateTime.tryParse(value.toString());
+    if (dateTime == null) return null;
+
+    // If the parsed datetime doesn't have timezone info, assume it's UTC
+    // and convert it properly by creating a UTC datetime with the same values
+    if (!dateTime.isUtc && !value.toString().contains('Z') && !value.toString().contains('+')) {
+      return DateTime.utc(
+        dateTime.year,
+        dateTime.month,
+        dateTime.day,
+        dateTime.hour,
+        dateTime.minute,
+        dateTime.second,
+        dateTime.millisecond,
+        dateTime.microsecond,
+      );
+    }
+
+    return dateTime.isUtc ? dateTime : dateTime.toUtc();
   }
 
   factory RuckSession.fromJson(Map<String, dynamic> json) {

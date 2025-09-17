@@ -25,7 +25,7 @@ class ClubDeeplinkResource(Resource):
     <meta property="og:url" content="https://getrucky.com/clubs/{{ club_id }}">
     <meta property="og:title" content="Join This Ruck Club">
     <meta property="og:description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
-    <meta property="og:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=2">
+    <meta property="og:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Ruck Club - Join the Community">
@@ -41,7 +41,7 @@ class ClubDeeplinkResource(Resource):
     <meta property="twitter:url" content="https://getrucky.com/clubs/{{ club_id }}">
     <meta property="twitter:title" content="Join This Ruck Club">
     <meta property="twitter:description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
-    <meta property="twitter:image" content="https://getrucky.com/static/images/og_preview.png">
+    <meta property="twitter:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <style>
         body { 
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
@@ -157,7 +157,7 @@ class EventDeeplinkResource(Resource):
     <meta property="og:url" content="https://getrucky.com/events/{{ event_id }}">
     <meta property="og:title" content="Join This Ruck Event">
     <meta property="og:description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
-    <meta property="og:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=2">
+    <meta property="og:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Ruck Event - Join the Challenge">
@@ -173,7 +173,7 @@ class EventDeeplinkResource(Resource):
     <meta property="twitter:url" content="https://getrucky.com/events/{{ event_id }}">
     <meta property="twitter:title" content="Join This Ruck Event">
     <meta property="twitter:description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
-    <meta property="twitter:image" content="https://getrucky.com/static/images/og_preview.png">
+    <meta property="twitter:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <style>
         body { 
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 

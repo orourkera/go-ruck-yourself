@@ -581,7 +581,7 @@ class ActiveSessionCoordinator
         'user_weight_kg': lifecycleState.userWeightKg,
         'session_id': lifecycleState.sessionId,
         'start_time': lifecycleState.startTime?.toIso8601String(),
-        'completed_at': DateTime.now().toIso8601String(),
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
         'average_pace': finalDistance > 0
             ? (actualDuration.inMinutes / finalDistance)
             : 0.0,

@@ -155,10 +155,11 @@ class NotificationCard extends StatelessWidget {
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
-    final difference = now.difference(timestamp);
+    final localTimestamp = timestamp.toLocal();
+    final difference = now.difference(localTimestamp);
 
     if (difference.inDays > 7) {
-      return DateFormat('MMM d, yyyy').format(timestamp);
+      return DateFormat('MMM d, yyyy').format(localTimestamp);
     } else if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {

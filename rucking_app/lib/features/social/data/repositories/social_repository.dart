@@ -702,4 +702,12 @@ class SocialRepository {
       }
     }
   }
+
+  /// Clear all social cache
+  void clearCache() {
+    _likeStatusCache.clear();
+    _likeCountCache.clear();
+    _likeCacheTimestamps.clear();
+    _commentsCache.clear();
+  }
 }

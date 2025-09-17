@@ -435,7 +435,7 @@ class HeartRateManager implements SessionManager {
           'bpm': _ensureIntegerBpm(entry.value),
           'timestamp': timestamp.toIso8601String(),
           'session_id': _activeSessionId,
-          'uploaded_at': DateTime.now().toIso8601String(),
+          'uploaded_at': DateTime.now().toUtc().toIso8601String(),
         };
       }).toList();
 

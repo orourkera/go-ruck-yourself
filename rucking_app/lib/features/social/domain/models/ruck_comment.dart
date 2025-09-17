@@ -54,9 +54,9 @@ class RuckComment extends Equatable {
       userDisplayName: json['user_display_name'] ?? 'Anonymous',
       userAvatarUrl: json['user_avatar_url'],
       content: json['content'] ?? '',
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: DateTime.parse(json['created_at']).toUtc(),
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'])
+          ? DateTime.parse(json['updated_at']).toUtc()
           : null,
     );
   }

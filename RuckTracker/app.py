@@ -200,7 +200,8 @@ def block_bots():
     
     # Allowlisted well-known crawlers (UA substring match)
     allowed_crawlers = [
-        'googlebot', 'bingbot', 'applebot', 'duckduckbot', 'amazonbot'
+        'googlebot', 'bingbot', 'applebot', 'duckduckbot', 'amazonbot',
+        'facebookexternalhit', 'twitterbot', 'linkedinbot'
     ]
     # Public paths that crawlers may index
     crawler_allowed_paths = [

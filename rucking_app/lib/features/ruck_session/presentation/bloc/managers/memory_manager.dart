@@ -99,7 +99,7 @@ class MemoryManager implements SessionManager {
 
   Future<void> _onSessionPaused(SessionPaused event) async {
     _sessionData['isPaused'] = true;
-    _sessionData['pauseTime'] = DateTime.now().toIso8601String();
+    _sessionData['pauseTime'] = DateTime.now().toUtc().toIso8601String();
 
     await _saveSessionData();
 

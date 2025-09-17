@@ -52,7 +52,7 @@ class RuckLike extends Equatable {
       userId: json['user_id'] ?? '',
       userDisplayName: json['user_display_name'] ?? 'Anonymous',
       userAvatarUrl: json['user_avatar_url'],
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      createdAt: (DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now()).toUtc(),
     );
   }
 

@@ -1431,7 +1431,7 @@ class LocationTrackingManager implements SessionManager {
       final list = (existing['points'] as List<dynamic>? ?? <dynamic>[]);
       list.addAll(newPoints);
       existing['points'] = list;
-      existing['last_updated'] = DateTime.now().toIso8601String();
+      existing['last_updated'] = DateTime.now().toUtc().toIso8601String();
       await storage.setObject(key, existing);
 
       _journalLastIndex = _locationPoints.length; // advance watermark

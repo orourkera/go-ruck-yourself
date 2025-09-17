@@ -29,6 +29,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     on<UpdateRuckComment>(_onUpdateRuckComment);
     on<DeleteRuckComment>(_onDeleteRuckComment);
     on<ClearSocialError>(_onClearSocialError);
+    on<ClearSocialCache>(_onClearSocialCache);
   }
 
   /// Handler for loading likes for a ruck session
@@ -418,7 +419,7 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
           userId: '',
           userDisplayName: 'Deleted User',
           content: 'Comment removed',
-          createdAt: DateTime.now(),
+          createdAt: DateTime.now().toUtc(),
         );
 
         emit(CommentActionCompleted(
@@ -447,6 +448,16 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
     ClearSocialError event,
     Emitter<SocialState> emit,
   ) {
+    emit(SocialInitial());
+  }
+
+  /// Handler for clearing social cache
+  void _onClearSocialCache(
+    ClearSocialCache event,
+    Emitter<SocialState> emit,
+  ) {
+    // Clear cache in repository
+    _socialRepository.clearCache();
     emit(SocialInitial());
   }
 }

@@ -43,6 +43,10 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
       if (mounted) {
         debugPrint(
             '🐞 [_RuckBuddiesScreenState.initState] Dispatching FetchRuckBuddiesEvent.');
+
+        // Clear social cache to ensure fresh like/comment data
+        context.read<SocialBloc>().add(ClearSocialCache());
+
         context
             .read<RuckBuddiesBloc>()
             .add(const FetchRuckBuddiesEvent(limit: 10));
@@ -57,6 +61,9 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
 
     // Clear the cache to force fresh data
     RuckBuddiesRepositoryImpl.clearRuckBuddiesCache();
+
+    // Clear social cache to get fresh like/comment data
+    context.read<SocialBloc>().add(ClearSocialCache());
 
     // Fetch fresh data
     context.read<RuckBuddiesBloc>().add(const FetchRuckBuddiesEvent(limit: 10));

@@ -102,3 +102,6 @@ class DeleteRuckComment extends SocialEvent {
 
 /// Event to clear any error state
 class ClearSocialError extends SocialEvent {}
+
+/// Event to clear social cache (likes, comments)
+class ClearSocialCache extends SocialEvent {}

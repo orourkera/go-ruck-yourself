@@ -458,7 +458,7 @@ class _CommentsSectionState extends State<CommentsSection> {
     String formattedDate;
     try {
       formattedDate =
-          DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt);
+          DateFormat('MMM d, yyyy • h:mm a').format(comment.createdAt.toLocal());
     } catch (e) {
       debugPrint('Error formatting date: $e');
       formattedDate = 'Date unavailable';
