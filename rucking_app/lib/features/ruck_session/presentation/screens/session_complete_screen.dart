@@ -61,6 +61,7 @@ import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zon
 import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart';
 import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
 import 'package:rucking_app/shared/widgets/stat_row.dart';
+import 'package:rucking_app/features/social_sharing/services/share_prompt_logic.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -1307,6 +1308,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         GetIt.instance<ActiveSessionStorage>().clearSessionData();
       });
 
+      // Trigger share prompt after session completion if appropriate
+      _scheduleSharePromptCheck();
+
       // Upload photos in background if any are selected - using repository
       if (_selectedPhotos.isNotEmpty) {
         // Start background upload using repository's independent method
@@ -1324,6 +1328,44 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
         );
       }
     }
+  }
+
+  /// Schedule a share prompt check after session completion
+  void _scheduleSharePromptCheck() {
+    // Use a more significant delay to allow navigation to complete and context to be ready
+    Future.delayed(const Duration(seconds: 2), () async {
+      // Find the home screen context by getting the navigator's current context
+      final navigatorContext = Navigator.of(context, rootNavigator: true).context;
+      if (!navigatorContext.mounted) return;
+
+      try {
+        // Get session achievements if any
+        final authState = context.read<AuthBloc>().state;
+        String? achievement;
+        bool isPR = false;
+        int? sessionNumber;
+        bool? isRated5Stars;
+        int? streakDays;
+
+        // Check if this session has a 5-star rating
+        isRated5Stars = _rating == 5;
+
+        // Call SharePromptLogic to check if we should show the prompt
+        await SharePromptLogic.maybeShowPrompt(
+          context: navigatorContext,
+          sessionId: widget.ruckId,
+          distanceKm: widget.distance,
+          duration: widget.duration,
+          achievement: achievement,
+          isPR: isPR,
+          sessionNumber: sessionNumber,
+          isRated5Stars: isRated5Stars,
+          streakDays: streakDays,
+        );
+      } catch (e) {
+        AppLogger.error('[SHARE_PROMPT] Error scheduling share prompt: $e');
+      }
+    });
   }
 
   /// Check for achievements after session submission and navigation

@@ -24,14 +24,14 @@ class ClubDeeplinkResource(Resource):
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://getrucky.com/clubs/{{ club_id }}">
     <meta property="og:title" content="Join This Ruck Club">
-    <meta property="og:description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
+    <meta property="og:description" content="Join our rucking community and discover the power of weighted walking! Download the Ruck app to connect with fellow ruckers, track your workouts, join group events, and build strength while exploring your neighborhood.">
     <meta property="og:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Ruck Club - Join the Community">
     
     <!-- General Meta -->
-    <meta name="description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
+    <meta name="description" content="Join our rucking community and discover the power of weighted walking! Download the Ruck app to connect with fellow ruckers, track your workouts, join group events, and build strength while exploring your neighborhood.">
     <meta name="author" content="Ruck App">
     <meta name="robots" content="index, follow">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -40,7 +40,7 @@ class ClubDeeplinkResource(Resource):
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://getrucky.com/clubs/{{ club_id }}">
     <meta property="twitter:title" content="Join This Ruck Club">
-    <meta property="twitter:description" content="Join our rucking community! Download the Ruck app to connect with fellow ruckers, track your workouts, and join group events.">
+    <meta property="twitter:description" content="Join our rucking community and discover the power of weighted walking! Download the Ruck app to connect with fellow ruckers, track your workouts, join group events, and build strength while exploring your neighborhood.">
     <meta property="twitter:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <style>
         body { 
@@ -156,7 +156,7 @@ class EventDeeplinkResource(Resource):
     <meta property="og:type" content="event">
     <meta property="og:url" content="https://getrucky.com/events/{{ event_id }}">
     <meta property="og:title" content="Join This Ruck Event">
-    <meta property="og:description" content="You're invited to join a ruck event! Download the Ruck app to RSVP, track your progress, and connect with other participants.">
+    <meta property="og:description" content="You're invited to join an exciting ruck event! Download the Ruck app to RSVP, track your progress, connect with other participants, and challenge yourself with weighted walking in a supportive community environment.">
     <meta property="og:image" content="https://getrucky.com/static/images/new_og_preview.jpg?v=5">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">

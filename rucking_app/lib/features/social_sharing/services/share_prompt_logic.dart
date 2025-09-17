@@ -53,6 +53,12 @@ class SharePromptLogic {
         return false;
       }
 
+      // Check if we've already shown a prompt for this session
+      if (await hasPromptBeenShown(sessionId)) {
+        AppLogger.info('[SHARE_PROMPT] Prompt already shown for this session');
+        return false;
+      }
+
       // Check if snoozed
       final snoozedUntil = prefs.getString(_keySnoozedUntil);
       if (snoozedUntil != null) {
@@ -205,6 +211,33 @@ class SharePromptLogic {
     AppLogger.info('[SHARE_PROMPT] Tracked share for session $sessionId');
   }
 
+  /// Track that a prompt was shown for a session (to prevent multiple prompts for same session)
+  static Future<void> trackPromptShown(String sessionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    const String keyPromptedSessions = 'prompted_sessions';
+
+    final promptedSessions = prefs.getStringList(keyPromptedSessions) ?? [];
+    if (!promptedSessions.contains(sessionId)) {
+      promptedSessions.add(sessionId);
+      // Keep only last 50 sessions to avoid unbounded growth
+      if (promptedSessions.length > 50) {
+        promptedSessions.removeAt(0);
+      }
+      await prefs.setStringList(keyPromptedSessions, promptedSessions);
+    }
+
+    AppLogger.info('[SHARE_PROMPT] Tracked prompt shown for session $sessionId');
+  }
+
+  /// Check if we've already shown a prompt for this session
+  static Future<bool> hasPromptBeenShown(String sessionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    const String keyPromptedSessions = 'prompted_sessions';
+
+    final promptedSessions = prefs.getStringList(keyPromptedSessions) ?? [];
+    return promptedSessions.contains(sessionId);
+  }
+
   /// Show the share prompt if appropriate
   static Future<void> maybeShowPrompt({
     required BuildContext context,
@@ -234,6 +267,9 @@ class SharePromptLogic {
     );
 
     if (shouldShow && context.mounted) {
+      // Track that we're showing a prompt for this session
+      await trackPromptShown(sessionId);
+
       await QuickShareBottomSheet.show(
         context: context,
         sessionId: sessionId,

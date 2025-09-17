@@ -111,10 +111,8 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
       setState(() {
         _generatedPost = post;
         _captionController.text = post.caption;
-        // Force single-photo selection for Instagram sharing
-        _selectedPhotos = post.photos.isNotEmpty
-            ? [post.photos.first]
-            : <String>[];
+        // Keep all photos for reel generation
+        _selectedPhotos = post.photos;
         _isGenerating = false;
       });
 

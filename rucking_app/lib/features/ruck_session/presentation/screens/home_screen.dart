@@ -177,10 +177,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     //   context.read<PremiumBloc>().add(CheckPremiumStatus());
     // }
 
-    // Check if we should show share prompt when returning from a session
-    if (state == AppLifecycleState.resumed && mounted) {
-      _checkForSharePrompt();
-    }
+    // Share prompts are now handled directly after session completion
+    // No need to check on app resume to avoid spam
   }
 
   Future<void> _checkForSharePrompt() async {

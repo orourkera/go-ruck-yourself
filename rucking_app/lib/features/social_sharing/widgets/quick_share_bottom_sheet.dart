@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:rucking_app/features/social_sharing/screens/share_preview_screen.dart';
+import 'package:rucking_app/features/social_sharing/services/share_prompt_logic.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Bottom sheet that prompts users to share their ruck
@@ -187,6 +188,10 @@ class QuickShareBottomSheet extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   Navigator.pop(context);
+
+                  // Track that the user chose to share
+                  await SharePromptLogic.trackShare(sessionId);
+
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
