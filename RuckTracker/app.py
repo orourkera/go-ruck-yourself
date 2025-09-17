@@ -188,20 +188,19 @@ def block_bots():
         # Let AASA validator pass through regardless of generic bot rules
         return
     
-    # Bot user agent patterns
+    # Bot user agent patterns (be specific to avoid blocking legitimate browsers)
     bot_patterns = [
-        'bot', 'crawler', 'spider', 'scraper', 'facebookexternalhit',
-        'twitterbot', 'linkedinbot', 'whatsapp', 'telegram', 'discord',
-        'googlebot', 'bingbot', 'yandexbot', 'baiduspider', 'slurp',
-        'duckduckbot', 'applebot', 'facebot', 'ia_archiver', 'wayback',
-        'curl', 'wget', 'python-requests', 'go-http-client', 'php',
-        'postman', 'insomnia', 'axios', 'okhttp', 'apache-httpclient'
+        'crawler', 'spider', 'scraper', 'yandexbot', 'baiduspider', 'slurp',
+        'facebot', 'ia_archiver', 'wayback', 'curl', 'wget', 'python-requests',
+        'go-http-client', 'php', 'postman', 'insomnia', 'axios', 'okhttp',
+        'apache-httpclient', 'scrapy', 'httpunit', 'nutch', 'phpcrawl'
     ]
     
     # Allowlisted well-known crawlers (UA substring match)
     allowed_crawlers = [
         'googlebot', 'bingbot', 'applebot', 'duckduckbot', 'amazonbot',
-        'facebookexternalhit', 'twitterbot', 'linkedinbot'
+        'facebookexternalhit', 'twitterbot', 'linkedinbot',
+        'whatsapp', 'telegram', 'discord', 'signal'
     ]
     # Public paths that crawlers may index
     crawler_allowed_paths = [
