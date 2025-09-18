@@ -1054,23 +1054,29 @@ class SessionRepository {
           }
         }
       } catch (e) {
-        // 🔧 ENHANCED: Monitor H18-like errors with Sentry
-        await AppErrorHandler.handleCriticalError(
-          'photo_upload_timeout',
-          e,
-          context: {
-            'ruck_id': ruckId,
-            'photo_index': photoIndex,
-            'attempt': attempt,
-            'max_retries': maxRetries,
-            'error_type': e.runtimeType.toString(),
-            'is_timeout': e.toString().contains('timeout') ||
-                e.toString().contains('TimeoutException'),
-            'file_size_bytes': await photo.length(),
-            'file_path': photo.path,
-          },
-          userId: await getCurrentUserId(),
-        );
+        // Handle timeout specifically - these are expected for large files
+        if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+          AppLogger.warning(
+              '[PHOTO_DEBUG] Photo $photoIndex upload timeout (attempt $attempt) - this is expected for large files');
+          // Don't report timeouts to Sentry - they're expected network behavior
+        } else {
+          // Report other errors to Sentry
+          await AppErrorHandler.handleError(
+            'photo_upload_error',
+            e,
+            context: {
+              'ruck_id': ruckId,
+              'photo_index': photoIndex,
+              'attempt': attempt,
+              'max_retries': maxRetries,
+              'error_type': e.runtimeType.toString(),
+              'file_size_bytes': await photo.length(),
+              'file_path': photo.path,
+            },
+            userId: await getCurrentUserId(),
+            severity: ErrorSeverity.warning,  // Not critical since we retry
+          );
+        }
 
         AppLogger.error(
             '[PHOTO_DEBUG] Photo $photoIndex upload error (attempt $attempt): $e');

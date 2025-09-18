@@ -1,12 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/features/social_sharing/models/instagram_post.dart';
 import 'package:rucking_app/features/social_sharing/models/post_template.dart';
 import 'package:rucking_app/features/social_sharing/models/time_range.dart';
 import 'package:rucking_app/features/social_sharing/services/instagram_post_service.dart';
+import 'package:rucking_app/features/social_sharing/services/reel_builder_service.dart';
 import 'package:rucking_app/features/social_sharing/widgets/template_selector.dart';
 import 'package:rucking_app/features/social_sharing/widgets/photo_carousel.dart';
 import 'package:rucking_app/features/social_sharing/screens/share_edit_screen.dart';
@@ -42,60 +49,284 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
   bool _hideLocation = false;
   bool _isBuildingReel = false;
   String? _builtReelPath;
+  
+  Future<T> _runWithProgress<T>(
+    String initialMessage,
+    Future<T> Function(
+      void Function(String) updateText,
+      void Function(double) updateProgress,
+    ) task,
+  ) async {
+    final text = ValueNotifier<String>(initialMessage);
+    final progress = ValueNotifier<double>(0.02);
+    final fun = [
+      'Sweating…',
+      'Frappeing…',
+      'Smelting…',
+      'Grunting…',
+      'Cogitating…',
+      'Pontificating…',
+      'Scrambling…',
+      'Assembling…',
+      'Crunching…',
+      'Rendering…',
+      'Compressing…',
+      'Chiseling…',
+      'Buffing…',
+      'Calibrating…',
+      'Tightening straps…',
+      'Lacing boots…',
+      'Marching in place…',
+      'Mapping trails…',
+      'Taming pixels…',
+      'Sharpening axes…',
+      'Packing sand…',
+      'Stoking furnace…',
+      'Counting steps…',
+      'Herding cats…',
+    ];
+    fun.shuffle(math.Random());
+    int funIdx = 0;
+    DateTime lastManual = DateTime.now();
+
+    Timer? rot;
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ValueListenableBuilder<String>(
+                  valueListenable: text,
+                  builder: (_, v, __) => Text(v, style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(height: 12),
+                ValueListenableBuilder<double>(
+                  valueListenable: progress,
+                  builder: (_, p, __) => LinearProgressIndicator(value: p.clamp(0.0, 1.0)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      rot = Timer.periodic(const Duration(seconds: 2), (_) {
+        // Only rotate if no manual update in last ~1.5s
+        if (DateTime.now().difference(lastManual).inMilliseconds > 1500) {
+          funIdx = (funIdx + 1) % fun.length;
+          text.value = fun[funIdx];
+        }
+      });
+    }
+
+    void updateText(String v) {
+      lastManual = DateTime.now();
+      text.value = v;
+    }
+
+    void updateProgress(double v) {
+      progress.value = v;
+    }
+
+    try {
+      final res = await task(updateText, updateProgress);
+      return res;
+    } finally {
+      rot?.cancel();
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      text.dispose();
+      progress.dispose();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
   }
 
-  Future<void> _createAndShareReel() async {
-    AppLogger.info('[REEL_DEBUG] Starting reel creation');
-    AppLogger.info('[REEL_DEBUG] Selected photos count: ${_selectedPhotos.length}');
-    for (int i = 0; i < _selectedPhotos.length; i++) {
-      AppLogger.info('[REEL_DEBUG] Photo $i: ${_selectedPhotos[i]}');
-    }
+  Future<void> _shareToInstagram() async {
+    print('DEBUG: _shareToInstagram called');
+    print('DEBUG: _selectedPhotos.length = ${_selectedPhotos.length}');
+    print('DEBUG: _selectedPhotos = $_selectedPhotos');
 
     if (_selectedPhotos.isEmpty) {
-      AppLogger.error('[REEL_DEBUG] No photos selected!');
-      _showError('No photos selected');
+      print('DEBUG: No photos, showing error');
+      _showError('No photos to share');
       return;
     }
 
     setState(() {
-      _isBuildingReel = true;
-      _builtReelPath = null;
+      _isSharing = true;
     });
 
     try {
-      AppLogger.info('[REEL_DEBUG] Building reel with FFmpeg...');
-      final builder = const ReelBuilderService();
-      final videoPath = await builder.buildReel(_selectedPhotos);
-      _builtReelPath = videoPath;
+      // Copy caption to clipboard
+      final caption = _captionController.text;
+      final hashtags = _generatedPost?.hashtagString ?? '';
+      final cta = _generatedPost?.cta ?? '';
+      final fullText = '$caption\n\n$cta\n\n$hashtags';
 
-      AppLogger.info('[REEL_DEBUG] Reel built successfully at: $videoPath');
+      await Clipboard.setData(ClipboardData(text: fullText));
 
-      // Check if file exists
-      final videoFile = File(videoPath);
-      if (await videoFile.exists()) {
-        final fileSize = await videoFile.length();
-        AppLogger.info('[REEL_DEBUG] Video file exists, size: ${fileSize / 1024 / 1024} MB');
+      // For single photo, just share it
+      if (_selectedPhotos.length == 1) {
+        print('DEBUG: Single photo path');
+        final photo = _selectedPhotos.first;
+        XFile fileToShare;
+
+        if (photo.startsWith('http')) {
+          final response = await http.get(Uri.parse(photo));
+          if (response.statusCode == 200) {
+            final tempDir = await getTemporaryDirectory();
+            final tempFile = File('${tempDir.path}/instagram_share.jpg');
+            await tempFile.writeAsBytes(response.bodyBytes);
+            fileToShare = XFile(tempFile.path, mimeType: 'image/jpeg');
+          } else {
+            _showError('Failed to download image');
+            return;
+          }
+        } else {
+          fileToShare = XFile(photo, mimeType: 'image/jpeg');
+        }
+
+        await Share.shareXFiles([fileToShare], subject: 'Share to Instagram');
+
+        if (mounted) {
+          await _showSuccessDialog();
+          Navigator.pop(context, true);
+        }
       } else {
-        AppLogger.error('[REEL_DEBUG] Video file does not exist at path: $videoPath');
+        // Multiple photos - create MP4 reel
+        print('DEBUG: Multiple photos path - creating reel');
+        print('DEBUG: Calling _createAndShareReel...');
+        await _createAndShareReel();
+        print('DEBUG: _createAndShareReel completed');
+      }
+    } catch (e) {
+      AppLogger.error('[INSTAGRAM] Share failed: $e', exception: e);
+      _showError('Failed to share: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSharing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _createAndShareReel() async {
+    print('REEL: _createAndShareReel called with ${_selectedPhotos.length} photos');
+    AppLogger.info('[REEL] Creating MP4 from ${_selectedPhotos.length} photos');
+
+    setState(() {
+      _isBuildingReel = true;
+    });
+
+    try {
+      final videoPath = await _runWithProgress<String>('Preparing photos...', (update, setProg) async {
+        // Download remote images first
+        final localPhotos = <String>[];
+        for (int i = 0; i < _selectedPhotos.length; i++) {
+          update('Preparing photos ${i + 1}/${_selectedPhotos.length}');
+          setProg(((i + 1) / _selectedPhotos.length) * 0.4);
+          final photo = _selectedPhotos[i];
+          if (photo.startsWith('http')) {
+            final response = await http.get(Uri.parse(photo));
+            if (response.statusCode == 200) {
+              final tempDir = await getTemporaryDirectory();
+              final tempFile = File('${tempDir.path}/reel_image_$i.jpg');
+              await tempFile.writeAsBytes(response.bodyBytes);
+              localPhotos.add(tempFile.path);
+            }
+          } else {
+            localPhotos.add(photo);
+          }
+        }
+
+        if (localPhotos.isEmpty) {
+          throw Exception('No photos available to create reel');
+        }
+
+        update('Encoding video (~${(localPhotos.length * 2.5).round()}s)');
+        setProg(0.6);
+        final builder = const ReelBuilderService();
+        final path = await builder.buildReel(localPhotos);
+        setProg(0.9);
+        return path;
+      });
+
+      print('REEL: MP4 created at: $videoPath');
+      AppLogger.info('[REEL] MP4 created at: $videoPath');
+
+      // Save to camera roll first (best effort). If permission not granted, skip.
+      bool savedToGallery = false;
+      try {
+        // Check if we have permission first
+        final hasAccess = await Gal.hasAccess(toAlbum: true);
+        if (!hasAccess) {
+          await Gal.requestAccess(toAlbum: true);
+        }
+
+        // Inline quick modal for save step
+        await _runWithProgress('Saving reel to camera roll...', (update, setProg) async {
+          try {
+            await Gal.putVideo(
+              videoPath,
+              album: 'Ruck',
+            );
+            savedToGallery = true;
+          } catch (e) {
+            AppLogger.warning('[REEL] Failed to save video: $e');
+            savedToGallery = false;
+          }
+          setProg(1.0);
+          return 0; // dummy
+        });
+      } catch (e) {
+        AppLogger.warning('[REEL] Save to gallery skipped: $e');
       }
 
-      // Note: Instagram on iOS doesn't support direct video sharing via share sheet
-      // Videos need to be saved to camera roll first, then shared from there
-      AppLogger.warning('[REEL_DEBUG] Sharing MP4 to Instagram via share sheet (may not work on iOS)');
+      // Share the MP4 (whether saved to gallery or not)
+      await Share.shareXFiles(
+        [XFile(videoPath, mimeType: 'video/mp4')],
+        subject: 'Share Reel to Instagram',
+      );
 
-      // Share the generated MP4 via system sheet
-      await Share.shareXFiles([
-        XFile(videoPath, name: p.basename(videoPath), mimeType: 'video/mp4'),
-      ], text: _captionController.text);
-
-      AppLogger.info('[REEL_DEBUG] Share sheet dismissed');
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Reel Created!'),
+            content: Text(
+              savedToGallery
+                ? 'Your reel has been saved to camera roll!\n\n'
+                  'Caption copied to clipboard.\n'
+                  'Share as a Reel in Instagram and paste your caption.'
+                : 'Caption copied to clipboard!\n\n'
+                  'Share the video to Instagram as a Reel and paste your caption.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(this.context, true);
+                },
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
-      AppLogger.error('[REEL_DEBUG] Build failed: $e', exception: e);
-      _showError('Failed to build reel: $e');
+      AppLogger.error('[REEL] Failed to create reel: $e', exception: e);
+      _showError('Failed to create reel: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -103,6 +334,73 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
         });
       }
     }
+  }
+
+  Future<void> _showSuccessDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Caption Copied!'),
+        content: const Text(
+          'Your caption has been copied to clipboard.\n\n'
+          'Paste it in Instagram to complete your post!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _showPhotoSelectionDialog() async {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Photo to Share'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _selectedPhotos.length,
+            itemBuilder: (context, index) {
+              final photo = _selectedPhotos[index];
+              final isRemoteImage = photo.startsWith('http');
+
+              return GestureDetector(
+                onTap: () => Navigator.pop(context, photo),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: isRemoteImage
+                        ? Image.network(photo, fit: BoxFit.cover)
+                        : Image.file(File(photo), fit: BoxFit.cover),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -150,42 +448,7 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
     }
   }
 
-  Future<void> _shareToInstagram() async {
-    if (_generatedPost == null) return;
-
-    setState(() {
-      _isSharing = true;
-    });
-
-    try {
-      final caption = _captionController.text;
-      final hashtags = _generatedPost!.hashtagString;
-      final fullText = '$caption\n\n${_generatedPost!.cta}\n\n$hashtags';
-
-      await Clipboard.setData(ClipboardData(text: fullText));
-
-      // If multiple photos, let user select which one to share
-      if (_selectedPhotos.length > 1) {
-        await _showPhotoSelectionDialog(fullText);
-      } else {
-        await _showInstagramShareDialog(fullText);
-      }
-
-      AppLogger.info('[SHARE] Post shared to Instagram');
-
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    } catch (e) {
-      _showError('Failed to share: $e');
-    } finally {
-      setState(() {
-        _isSharing = false;
-      });
-    }
-  }
-
-  Future<void> _showPhotoSelectionDialog(String fullText) async {
+  Future<void> _showPhotoSelectionDialogOld(String fullText) async {
     final selectedPhoto = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -517,26 +780,13 @@ class _SharePreviewScreenState extends State<SharePreviewScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _isSharing ? null : _shareToInstagram,
-                  icon: const Icon(Icons.share),
-                  label: Text(_isSharing ? 'Sharing...' : 'Post to Insta'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Create Reel button (works with 1+ images)
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: _isBuildingReel
+                  onPressed: (_isSharing || _selectedPhotos.isEmpty)
                       ? null
-                      : () async {
-                          await _createAndShareReel();
-                        },
-                  icon: const Icon(Icons.movie_creation_outlined),
-                  label: Text(_isBuildingReel
-                      ? 'Building Reel...'
-                      : 'Create Reel (MP4)'),
+                      : _shareToInstagram,
+                  icon: const Icon(Icons.share),
+                  label: Text(_isSharing
+                      ? 'Sharing...'
+                      : 'Share to Instagram'),
                 ),
               ),
               const SizedBox(height: 8),

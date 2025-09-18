@@ -247,9 +247,9 @@ class InstagramPostService {
         }
       }
 
-      // Randomize and limit to 5 photos max
+      // Randomize and limit to 10 photos max (for Instagram Reels)
       photos.shuffle();
-      final selectedPhotos = photos.take(5).toList();
+      final selectedPhotos = photos.take(10).toList();
 
       AppLogger.info('[INSTAGRAM] Found ${photos.length} total photos for ${timeRange.value}, selected ${selectedPhotos.length}');
 
@@ -599,20 +599,20 @@ IMPORTANT: Return ONLY valid JSON, no additional text.
       }
     }
 
-    // Randomize and limit to 5 photos max
+    // Randomize and limit to 10 photos max (for Instagram Reels)
     if (photos.isEmpty) {
       AppLogger.warning('[INSTAGRAM] No photos found in insights');
       return [];
     }
 
-    // For Last Ruck, don't shuffle or limit - show all photos in order
-    // For time ranges, limit and randomize
-    if (photos.length <= 6) { // Assume if <= 6 photos, it's a single session (Last Ruck)
-      AppLogger.info('[INSTAGRAM] Selected ${photos.length} photos (no shuffle/limit for single session)');
+    // For Last Ruck, don't shuffle - show all photos in order (up to 10)
+    // For time ranges, shuffle and limit to 10
+    if (photos.length <= 10) { // Single session or small collection
+      AppLogger.info('[INSTAGRAM] Selected ${photos.length} photos (no shuffle for small collections)');
       return photos;
     } else {
-      photos.shuffle(); // Randomize the order for time ranges
-      final selectedPhotos = photos.take(5).toList();
+      photos.shuffle(); // Randomize the order for larger collections
+      final selectedPhotos = photos.take(10).toList();
       AppLogger.info('[INSTAGRAM] Selected ${selectedPhotos.length} photos from ${photos.length} total');
       return selectedPhotos;
     }

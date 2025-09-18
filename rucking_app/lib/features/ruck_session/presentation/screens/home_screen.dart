@@ -409,12 +409,7 @@ class _HomeTabState extends State<_HomeTab>
       // Removed automatic permission requests - only request when actually needed
       _checkForAppUpdates(); // Check for app updates
 
-      // TEMPORARY: Force show Instagram share bottom sheet for testing
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          _showInstagramTimeRangeBottomSheet();
-        }
-      });
+      // Removed forced Instagram bottom sheet popup on homepage
     });
   }
 

@@ -59,15 +59,11 @@ class QuickShareBottomSheet extends StatelessWidget {
         duration: duration,
         achievement: achievement,
         onDismiss: () async {
-          // Track dismissal
-          await prefs.setInt(
-            'share_prompt_dismiss_count',
-            dismissCount + 1,
-          );
-          await prefs.setString(
-            'share_prompt_last_dismiss',
-            DateTime.now().toIso8601String(),
-          );
+          // Track dismissal (legacy counters)
+          await prefs.setInt('share_prompt_dismiss_count', dismissCount + 1);
+          await prefs.setString('share_prompt_last_dismiss', DateTime.now().toIso8601String());
+          // Advance staged backoff logic
+          await SharePromptLogic.recordDismiss();
           Navigator.pop(context);
         },
       ),

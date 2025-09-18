@@ -189,22 +189,42 @@ def block_bots():
         return
     
     # Bot user agent patterns (be specific to avoid blocking legitimate browsers)
+    # NOTE: Remove legitimate SEO bots from this list - they're in allowed_crawlers
     bot_patterns = [
-        'crawler', 'spider', 'scraper', 'yandexbot', 'baiduspider', 'slurp',
-        'facebot', 'ia_archiver', 'wayback', 'curl', 'wget', 'python-requests',
+        'crawler', 'spider', 'scraper', 'ia_archiver', 'wayback', 'curl', 'wget', 'python-requests',
         'go-http-client', 'php', 'postman', 'insomnia', 'axios', 'okhttp',
         'apache-httpclient', 'scrapy', 'httpunit', 'nutch', 'phpcrawl'
     ]
-    
-    # Allowlisted well-known crawlers (UA substring match)
+
+    # Allowlisted well-known crawlers (UA substring match) - EXPANDED LIST
     allowed_crawlers = [
-        'googlebot', 'bingbot', 'applebot', 'duckduckbot', 'amazonbot',
-        'facebookexternalhit', 'twitterbot', 'linkedinbot',
-        'whatsapp', 'telegram', 'discord', 'signal'
+        # Search Engines (Critical for SEO)
+        'googlebot', 'bingbot', 'slurp',  # Google, Bing, Yahoo
+        'yandexbot', 'baiduspider',  # Yandex, Baidu
+        'duckduckbot', 'qwantify',  # DuckDuckGo, Qwant
+
+        # Social Media (Critical for link previews)
+        'facebookexternalhit', 'facebookcatalog',
+        'twitterbot', 'linkedinbot', 'pinterest', 'pinterestbot',
+        'whatsapp', 'telegram', 'discord', 'signal',
+        'slackbot', 'redditbot', 'tumblr', 'flipboard',
+
+        # Other legitimate crawlers
+        'applebot', 'amazonbot', 'alexa',  # Apple, Amazon
+        'semrushbot', 'ahrefsbot', 'dotbot',  # SEO tools
+        'chrome-lighthouse', 'gtmetrix',  # Performance tools
+        'mj12bot',  # Majestic SEO
+
+        # Special: Allow Alibaba Cloud (potential Baidu/Asian search engines)
+        # Note: This is handled by IP range below
     ]
-    # Public paths that crawlers may index
+
+    # Public paths that crawlers may index - EXPANDED
     crawler_allowed_paths = [
-        '/', '/blog', '/blog/', '/static/', '/favicon.ico', '/robots.txt', '/sitemap.xml'
+        '/', '/blog', '/blog/', '/static/', '/favicon.ico', '/robots.txt', '/sitemap.xml',
+        '/terms', '/privacy', '/support', '/about',
+        '/rucking-calorie-calculator', '/index.html',
+        # Any path starting with /blog should be allowed
     ]
     
     # Malicious/bot URL patterns
@@ -218,13 +238,40 @@ def block_bots():
     # Allow legitimate requests to robots.txt, sitemap.xml, favicon.ico
     if request_path in ['/robots.txt', '/sitemap.xml', '/favicon.ico']:
         return
-    
+
+    # IP-based whitelisting for known bot ranges
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip:
+        # Get first IP if it's a comma-separated list
+        client_ip = client_ip.split(',')[0].strip()
+        ip_parts = client_ip.split('.')
+        if len(ip_parts) >= 2:
+            ip_prefix = '.'.join(ip_parts[:2])
+            # Whitelist major search engine IP ranges
+            bot_ip_prefixes = [
+                '66.249',   # Google
+                '66.102',   # Google
+                '52.173',   # Microsoft Azure (Bing)
+                '52.178',   # Microsoft Azure (Bing)
+                '52.167',   # Microsoft Azure (Bing)
+                '20.0',     # Microsoft Azure (Bing)
+                '20.25',    # Microsoft Azure (Bing)
+                '20.169',   # Microsoft Azure (Bing)
+                '18.97',    # AWS (Amazon/Alexa)
+                '18.206',   # AWS (Amazon/Alexa)
+                '173.252',  # Facebook
+                '185.191',  # Semrush
+                '47.128',   # Alibaba Cloud (Asian search engines)
+            ]
+            if ip_prefix in bot_ip_prefixes and request_path.startswith(('/blog', '/terms', '/privacy', '/about', '/rucking')):
+                return  # Allow crawl from known bot IPs on public content
+
     # Allow known crawlers on public paths
     if any(ua in user_agent for ua in allowed_crawlers):
-        if any(
-            request_path == p or request_path.startswith(p.rstrip('/'))
-            for p in crawler_allowed_paths
-        ):
+        # Broader path matching for blog content
+        if (request_path.startswith('/blog') or
+            any(request_path == p or request_path.startswith(p.rstrip('/'))
+                for p in crawler_allowed_paths)):
             return  # allow crawl
         # Otherwise fall through to normal bot handling
     

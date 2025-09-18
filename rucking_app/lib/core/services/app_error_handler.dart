@@ -41,6 +41,33 @@ class AppErrorHandler {
       return;
     }
 
+    // Skip reporting photo upload timeouts - these are expected with large files
+    if (error is TimeoutException &&
+        (operation.contains('photo_upload') ||
+            operation.contains('ruck-photos') ||
+            error.toString().contains('25.000000') ||
+            error.toString().contains('25:000000'))) {
+      AppLogger.warning('Photo upload timeout - expected for large files: $error');
+      return;
+    }
+
+    // Skip reporting general network timeouts - these are common and not app bugs
+    if (error is TimeoutException) {
+      AppLogger.info('Network timeout occurred: $operation - $error');
+      // Don't report to Sentry but still log locally
+      return;
+    }
+
+    // Skip reporting OSError connection issues - these are network problems, not app bugs
+    if (error.toString().contains('OSError') &&
+        (error.toString().contains('connection abort') ||
+            error.toString().contains('errno = 103') ||
+            error.toString().contains('Network is unreachable') ||
+            error.toString().contains('errno = 7'))) {
+      AppLogger.info('Network connection issue - not reporting: $error');
+      return;
+    }
+
     // Skip reporting iOS location permission denials as they're user choice, not app errors
     if (error.toString().contains('kCLErrorDomain error 1') ||
         error.toString().contains('Location permission required')) {
@@ -60,9 +87,30 @@ class AppErrorHandler {
 
     // Skip reporting offline mode transitions as they're normal app behavior, not errors
     if (error.toString().contains('offline mode') ||
-        error.toString().contains('No network connection')) {
+        error.toString().contains('No network connection') ||
+        error.toString().contains('NetworkException') ||
+        error.toString().contains('No internet connection')) {
       AppLogger.info(
-          'Offline mode transition - not reporting as error: $error');
+          'Network connectivity issue - not reporting as error: $error');
+      return;
+    }
+
+    // Skip reporting authentication errors - these are expected when tokens expire
+    if ((error.toString().contains('UnauthorizedException') ||
+            error.toString().contains('Not authenticated') ||
+            error.toString().contains('please log in') ||
+            error.toString().contains('401')) &&
+        !operation.contains('login')) {  // Still report login failures
+      AppLogger.info(
+          'Authentication required - not reporting as error: $error');
+      return;
+    }
+
+    // Skip reporting generic API errors without details
+    if (error.toString().contains('ApiException: ApiException: Unknown API error') ||
+        error.toString().contains('ApiException: Unknown API error')) {
+      AppLogger.info(
+          'Generic API error without details - not reporting: $error');
       return;
     }
 

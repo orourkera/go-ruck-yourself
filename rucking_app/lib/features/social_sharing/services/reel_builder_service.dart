@@ -58,10 +58,9 @@ class ReelBuilderService {
 
       final clause = StringBuffer()
         ..write(labelIn)
-        ..write(
-            'scale=${width}:${height}:force_original_aspect_ratio=cover,setsar=1,')
-        ..write(
-            "zoompan=z='if(eq(on,0),${zoomStart.toStringAsFixed(3)},min(max(pzoom,${zoomStart.toStringAsFixed(3)})+${zoomRate.toStringAsFixed(5)},${zoomEnd.toStringAsFixed(3)}))':d=${frames}:s=${width}x${height}:fps=${fps},")
+        ..write('scale=${width}:${height}:force_original_aspect_ratio=increase,')
+        ..write('crop=${width}:${height},setsar=1,')
+        ..write("zoompan=z='if(eq(on,0),${zoomStart.toStringAsFixed(3)},min(max(pzoom,${zoomStart.toStringAsFixed(3)})+${zoomRate.toStringAsFixed(5)},${zoomEnd.toStringAsFixed(3)}))':d=${frames}:s=${width}x${height}:fps=${fps},")
         ..write('format=yuv420p')
         ..write(labelOut)
         ..write(';');
@@ -110,7 +109,7 @@ class ReelBuilderService {
     }
     final concatFilter = StringBuffer();
     for (var i = 0; i < imagePaths.length; i++) {
-      concatFilter.write('[$i:v]scale=${width}:${height}:force_original_aspect_ratio=cover,setsar=1,format=yuv420p[v$i];');
+      concatFilter.write('[$i:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v$i];');
     }
     final concatLabels = List.generate(imagePaths.length, (i) => '[v$i]').join();
     concatFilter.write('${concatLabels}concat=n=${imagePaths.length}:v=1:a=0[v]');
@@ -127,9 +126,60 @@ class ReelBuilderService {
       return outPath;
     }
 
+    // Final fallback: generate per-image MP4 clips then concat (no complex filters)
+    final segments = <String>[];
+    for (var i = 0; i < imagePaths.length; i++) {
+      final segPath = p.join(reelsDir.path, 'seg_${DateTime.now().millisecondsSinceEpoch}_$i.mp4');
+      final img = imagePaths[i];
+      final segCmd = StringBuffer()
+        ..write('-loop 1 -t ${clipSeconds.toStringAsFixed(3)} -r $fps -i ')
+        ..write(_quote(img))
+        ..write(' -vf ')
+        ..write(_quote('scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p'))
+        ..write(' -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -movflags +faststart -an ')
+        ..write(_quote(segPath));
+
+      final segSession = await FFmpegKit.execute(segCmd.toString());
+      if (!ReturnCode.isSuccess(await segSession.getReturnCode())) {
+        final logs = await segSession.getAllLogsAsString();
+        throw Exception('FFmpeg segment encode failed for $img\n$logs');
+      }
+      segments.add(segPath);
+    }
+
+    // Write concat list
+    final listPath = p.join(reelsDir.path, 'concat_${DateTime.now().millisecondsSinceEpoch}.txt');
+    final listFile = File(listPath);
+    final listContent = segments.map((s) => "file ${_quoteForConcat(s)}").join("\n");
+    await listFile.writeAsString(listContent);
+
+    final concatCmd = StringBuffer()
+      ..write('-f concat -safe 0 -i ')
+      ..write(_quote(listPath))
+      ..write(' -c copy -movflags +faststart ')
+      ..write(_quote(outPath));
+
+    final concatSession = await FFmpegKit.execute(concatCmd.toString());
+    final crc = await concatSession.getReturnCode();
+    if (ReturnCode.isSuccess(crc)) {
+      return outPath;
+    }
+
     final logs = await session.getAllLogsAsString();
     final flog = await fallbackSession.getAllLogsAsString();
-    throw Exception('FFmpeg failed. primary=${rc?.getValue()} fallback=${frc?.getValue()}\n$logs\n----\n$flog');
+    final clog = await concatSession.getAllLogsAsString();
+    throw Exception('FFmpeg failed. primary=${rc?.getValue()} fallback=${frc?.getValue()} concat=${crc?.getValue()}\n$logs\n----\n$flog\n----\n$clog');
+  }
+
+  String _quote(String path) {
+    if (path.contains(' ')) {
+      return '\'' + path.replaceAll("'", "'\\''") + '\'';
+    }
+    return path;
+  }
+
+  String _quoteForConcat(String path) {
+    // Concat list requires quoted paths if spaces exist
+    return '\'' + path.replaceAll("'", "'\\''") + '\'';
   }
 }
-

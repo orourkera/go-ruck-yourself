@@ -19,6 +19,11 @@ class SharePromptLogic {
   static const String _keyLastDismiss = 'share_prompt_last_dismiss';
   static const String _keySessionsShared = 'sessions_shared';
   static const String _keyPromptsDisabled = 'share_prompts_disabled';
+  // New keys for staged backoff logic
+  static const String _keyRuckCount = 'sp_ruck_count';
+  static const String _keyStage = 'sp_stage'; // 0: every ruck, 1: every 3rd, 2: every 10th, 3: monthly
+  static const String _keyEngagedAlways = 'sp_engaged_always';
+  static const String _keyLastMonthlyShown = 'sp_last_monthly_shown';
 
   /// Check if we should show the share prompt for this session
   static Future<bool> shouldShowPrompt({
@@ -81,35 +86,47 @@ class SharePromptLogic {
         }
       }
 
-      // Check frequency based on user engagement
-      final frequency = _getFrequency(prefs);
-      final canShow = await _checkFrequencyLimit(prefs, frequency);
-      if (!canShow) {
-        AppLogger.info('[SHARE_PROMPT] Frequency limit reached');
-        return false;
-      }
+      // Increment ruck counter (one call per completed ruck)
+      final currentCount = (prefs.getInt(_keyRuckCount) ?? 0) + 1;
+      await prefs.setInt(_keyRuckCount, currentCount);
 
-      // Determine if this is a significant session
-      final isSignificant = _isSignificantSession(
-        hasAchievement: hasAchievement,
-        isPR: isPR,
-        sessionNumber: sessionNumber,
-        isRated5Stars: isRated5Stars,
-        streakDays: streakDays,
-        frequency: frequency,
-      );
-
-      if (isSignificant) {
-        AppLogger.info('[SHARE_PROMPT] Significant session detected - will show prompt');
-        // Update last shown time
-        await prefs.setString(
-          _keyLastPromptShown,
-          DateTime.now().toIso8601String(),
-        );
+      // If user engaged previously, show after every ruck
+      if (prefs.getBool(_keyEngagedAlways) ?? false) {
+        await prefs.setString(_keyLastPromptShown, DateTime.now().toIso8601String());
         return true;
       }
 
-      AppLogger.info('[SHARE_PROMPT] Session not significant enough for current frequency');
+      // Determine stage
+      final stage = prefs.getInt(_keyStage) ?? 0;
+      bool allow = false;
+      if (stage == 0) {
+        // First time after a ruck
+        allow = true;
+      } else if (stage == 1) {
+        // Every 3rd ruck
+        allow = currentCount % 3 == 0;
+      } else if (stage == 2) {
+        // Every 10th ruck
+        allow = currentCount % 10 == 0;
+      } else {
+        // Monthly
+        final lastMonthly = prefs.getString(_keyLastMonthlyShown);
+        if (lastMonthly == null) {
+          allow = true;
+        } else {
+          final last = DateTime.parse(lastMonthly);
+          allow = DateTime.now().difference(last).inDays >= 30;
+        }
+      }
+
+      if (allow) {
+        await prefs.setString(_keyLastPromptShown, DateTime.now().toIso8601String());
+        if (stage == 3) {
+          await prefs.setString(_keyLastMonthlyShown, DateTime.now().toIso8601String());
+        }
+        return true;
+      }
+
       return false;
     } catch (e) {
       AppLogger.error('[SHARE_PROMPT] Error checking prompt logic: $e');
@@ -208,6 +225,9 @@ class SharePromptLogic {
     final totalShares = prefs.getInt(_keyTotalShares) ?? 0;
     await prefs.setInt(_keyTotalShares, totalShares + 1);
 
+    // Mark user as engaged so we show after every ruck going forward
+    await prefs.setBool(_keyEngagedAlways, true);
+
     AppLogger.info('[SHARE_PROMPT] Tracked share for session $sessionId');
   }
 
@@ -227,6 +247,20 @@ class SharePromptLogic {
     }
 
     AppLogger.info('[SHARE_PROMPT] Tracked prompt shown for session $sessionId');
+  }
+
+  /// Record an explicit dismissal to advance the backoff stage.
+  static Future<void> recordDismiss() async {
+    final prefs = await SharedPreferences.getInstance();
+    int stage = prefs.getInt(_keyStage) ?? 0;
+    if (stage < 3) {
+      stage += 1; // 0->1 (every 3rd), 1->2 (every 10th), 2->3 (monthly)
+      await prefs.setInt(_keyStage, stage);
+      AppLogger.info('[SHARE_PROMPT] Dismissed, advancing stage to $stage');
+    } else {
+      // monthly stage: update last monthly timestamp to avoid immediate re-show
+      await prefs.setString(_keyLastMonthlyShown, DateTime.now().toIso8601String());
+    }
   }
 
   /// Check if we've already shown a prompt for this session

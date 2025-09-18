@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:rucking_app/features/social_sharing/services/reel_builder_service.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,6 +41,95 @@ class _ShareEditScreenState extends State<ShareEditScreen> {
   bool _isSharing = false;
   late List<String> _selectedPhotos;
 
+  Future<T> _runWithProgress<T>(
+    String initialMessage,
+    Future<T> Function(
+      void Function(String) updateText,
+      void Function(double) updateProgress,
+    ) task,
+  ) async {
+    final text = ValueNotifier<String>(initialMessage);
+    final progress = ValueNotifier<double>(0.02);
+    final fun = [
+      'Sweating…',
+      'Frappeing…',
+      'Smelting…',
+      'Grunting…',
+      'Cogitating…',
+      'Pontificating…',
+      'Scrambling…',
+      'Assembling…',
+      'Crunching…',
+      'Rendering…',
+      'Compressing…',
+      'Chiseling…',
+      'Buffing…',
+      'Calibrating…',
+      'Tightening straps…',
+      'Lacing boots…',
+      'Marching in place…',
+      'Mapping trails…',
+      'Taming pixels…',
+      'Sharpening axes…',
+      'Packing sand…',
+      'Stoking furnace…',
+      'Counting steps…',
+      'Herding cats…',
+    ];
+    fun.shuffle(math.Random());
+    int funIdx = 0;
+    DateTime lastManual = DateTime.now();
+    Timer? rot;
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ValueListenableBuilder<String>(
+                  valueListenable: text,
+                  builder: (_, v, __) => Text(v, style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(height: 12),
+                ValueListenableBuilder<double>(
+                  valueListenable: progress,
+                  builder: (_, p, __) => LinearProgressIndicator(value: p.clamp(0.0, 1.0)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      rot = Timer.periodic(const Duration(seconds: 2), (_) {
+        if (DateTime.now().difference(lastManual).inMilliseconds > 1500) {
+          funIdx = (funIdx + 1) % fun.length;
+          text.value = fun[funIdx];
+        }
+      });
+    }
+    void updateText(String v) {
+      lastManual = DateTime.now();
+      text.value = v;
+    }
+    void updateProgress(double v) {
+      progress.value = v;
+    }
+    try {
+      final res = await task(updateText, updateProgress);
+      return res;
+    } finally {
+      rot?.cancel();
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      text.dispose();
+      progress.dispose();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +149,12 @@ class _ShareEditScreenState extends State<ShareEditScreen> {
     });
 
     try {
+      // If multiple photos are selected, build a Reel (MP4) and share it, skipping the modal
+      if (_selectedPhotos.length > 1) {
+        await _createAndShareReelFromSelection();
+        return;
+      }
+
       // Get the updated caption from the text field
       final caption = _captionController.text;
       final hashtags = widget.post.hashtagString;
@@ -120,6 +223,77 @@ class _ShareEditScreenState extends State<ShareEditScreen> {
       setState(() {
         _isSharing = false;
       });
+    }
+  }
+
+  /// Build an MP4 from the currently selected photos and share via system sheet
+  Future<void> _createAndShareReelFromSelection() async {
+    try {
+      final videoPath = await _runWithProgress<String>('Preparing photos...', (update, setProg) async {
+        // Copy caption to clipboard for convenience
+        final caption = _captionController.text;
+        final hashtags = widget.post.hashtagString;
+        await Clipboard.setData(ClipboardData(text: '$caption\n\n${widget.post.cta}\n\n$hashtags'));
+
+        // Ensure all photos are local paths
+        final localPhotos = <String>[];
+        for (int i = 0; i < _selectedPhotos.length; i++) {
+          update('Preparing photos ${i + 1}/${_selectedPhotos.length}');
+          setProg(((i + 1) / _selectedPhotos.length) * 0.4);
+          final src = _selectedPhotos[i];
+          if (src.startsWith('http')) {
+            final resp = await http.get(Uri.parse(src));
+            if (resp.statusCode == 200) {
+              final dir = await getTemporaryDirectory();
+              final f = File('${dir.path}/reel_img_$i.jpg');
+              await f.writeAsBytes(resp.bodyBytes);
+              localPhotos.add(f.path);
+            }
+          } else {
+            localPhotos.add(src);
+          }
+        }
+
+        if (localPhotos.isEmpty) {
+          throw Exception('No photos available to create reel');
+        }
+
+        update('Encoding video (~${(localPhotos.length * 2.5).round()}s)');
+        setProg(0.6);
+        final builder = const ReelBuilderService();
+        final path = await builder.buildReel(localPhotos);
+        setProg(0.9);
+        return path;
+      });
+
+      // Attempt to save to camera roll (best effort). Skip if permission denied.
+      try {
+        // Check if we have permission first
+        final hasAccess = await Gal.hasAccess(toAlbum: true);
+        if (!hasAccess) {
+          await Gal.requestAccess(toAlbum: true);
+        }
+
+        await _runWithProgress('Saving reel to camera roll...', (update, setProg) async {
+          try {
+            await Gal.putVideo(
+              videoPath,
+              album: 'Ruck',
+            );
+          } catch (e) {
+            AppLogger.warning('[REEL] Failed to save video: $e');
+          }
+          setProg(1.0);
+          return 0;
+        });
+      } catch (_) {}
+
+      // Share the MP4 via system share
+      await Share.shareXFiles([XFile(videoPath, mimeType: 'video/mp4')]);
+    } catch (e) {
+      _showError('Failed to create reel: $e');
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
   }
 
