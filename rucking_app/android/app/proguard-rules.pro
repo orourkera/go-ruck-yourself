@@ -6,12 +6,9 @@
 -keep class io.flutter.** { *; }
 -keep class io.flutter.plugins.** { *; }
 
-# Gal package
+# Gal package - for saving to camera roll
 -keep class com.natsune.gal.** { *; }
-
-# FFmpeg kit
--keep class com.arthenica.** { *; }
--keep class com.arthenica.ffmpegkit.** { *; }
+-dontwarn com.natsune.gal.**
 
 # Keep all Flutter plugins
 -dontwarn io.flutter.embedding.**
@@ -117,10 +114,26 @@
 # Sensors Plus plugin
 -keep class dev.fluttercommunity.plus.sensors.** { *; }
 
-# FFmpeg Kit Flutter
+# FFmpeg Kit Flutter - CRITICAL for preventing splash screen freeze
 -keep class com.arthenica.ffmpegkit.** { *; }
 -keep class com.arthenica.mobileffmpeg.** { *; }
 -keep class com.arthenica.smartexception.** { *; }
+
+# FFmpeg native libraries and JNI - CRITICAL
+-keep class ffmpegkit.** { *; }
+-keep class mobileffmpeg.** { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Prevent stripping of FFmpeg JNI methods
+-keepclasseswithmembers class * {
+    @com.arthenica.ffmpegkit.* <methods>;
+}
+
+# Keep FFmpeg plugin initialization
+-keep class io.flutter.plugins.ffmpegkitflutter.** { *; }
+-keep class com.arthenica.ffmpegkit.flutter.** { *; }
 
 # Image compression
 -keep class com.fluttercandies.flutter_image_compress.** { *; }

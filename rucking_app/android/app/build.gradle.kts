@@ -33,6 +33,11 @@ android {
         
         // Enable core library desugaring for java.time.* APIs
         multiDexEnabled = true
+
+        ndk {
+            // Limit bundled ABIs to keep ffmpeg kit extraction time manageable
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
     
     signingConfigs {
@@ -65,6 +70,13 @@ android {
         }
         debug {
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Required for ffmpeg kit to avoid long startup extraction stalls
+            useLegacyPackaging = true
         }
     }
 }

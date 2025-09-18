@@ -16,7 +16,7 @@ publish_to: 'none'
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 3.6.3+171
+version: 3.6.3+173
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -127,8 +127,8 @@ dependencies:
   audioplayers: ^6.1.0
   flutter_tts: ^4.2.0
   carousel_slider: ^5.0.0
-  # FFmpeg workaround - using maintained community fork
-  ffmpeg_kit_flutter_new: ^3.2.0
+  # FFmpeg workaround - using maintained community fork (min GPL flavor)
+  ffmpeg_kit_flutter_min_gpl: '5.1.0-LTS'
   gal: ^2.3.0
   
 dev_dependencies:
