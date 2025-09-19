@@ -602,13 +602,54 @@ class CheckSessionAchievementsResource(Resource):
                 target = criteria.get('target', 8)
                 current_streak = self._calculate_weekly_streak(supabase, user_id)
                 return current_streak >= target
-        
+
             elif criteria_type == 'weekend_streak':
                 # Check for consecutive weekend rucks
                 target = criteria.get('target', 4)
                 current_streak = self._calculate_weekend_streak(supabase, user_id)
                 return current_streak >= target
-        
+
+            elif criteria_type == 'sessions_in_window':
+                try:
+                    target = criteria.get('target', 3)
+                    window_days = max(criteria.get('window_days', 7), 1)
+                    min_duration = criteria.get('min_duration_s', 300)
+                    min_distance = criteria.get('min_distance_km', 0.5)
+
+                    started_at_raw = session.get('started_at')
+                    if not started_at_raw:
+                        return False
+
+                    session_start = datetime.fromisoformat(
+                        started_at_raw.replace('Z', '+00:00'),
+                    )
+                    window_start = session_start - timedelta(days=window_days - 1)
+
+                    resp = (
+                        supabase.table('ruck_session')
+                        .select('id', count='exact')
+                        .eq('user_id', user_id)
+                        .eq('status', 'completed')
+                        .gte('duration_seconds', min_duration)
+                        .gte('distance_km', min_distance)
+                        .gte('started_at', window_start.isoformat())
+                        .lte('started_at', session_start.isoformat())
+                        .execute()
+                    )
+
+                    completed_count = getattr(resp, 'count', None) or 0
+                    logger.info(
+                        "SESSIONS_IN_WINDOW CHECK: user=%s window=%sd target=%s count=%s",
+                        user_id,
+                        window_days,
+                        target,
+                        completed_count,
+                    )
+                    return completed_count >= target
+                except Exception as e:
+                    logger.error(f"Error checking sessions_in_window: {e}")
+                    return False
+
             elif criteria_type == 'monthly_consistency':
                 # Check for consistent monthly activity
                 target = criteria.get('target', 3)  # months

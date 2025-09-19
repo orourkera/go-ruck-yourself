@@ -194,7 +194,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       // Check if we've already shown the prompt
       final prefs = await SharedPreferences.getInstance();
-      final hasShownCoachingPrompt = prefs.getBool('hasShownCoachingPrompt') ?? false;
+      final hasShownCoachingPrompt =
+          prefs.getBool('hasShownCoachingPrompt') ?? false;
 
       if (hasShownCoachingPrompt) {
         return;
@@ -217,11 +218,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (sessions.isEmpty) {
         isNewUser = true;
       } else {
-        // Check if all rucks are under 5 minutes (300 seconds)
-        final hasQualifyingRuck = sessions.any((session) =>
-          session.duration.inSeconds >= 300
-        );
-        isNewUser = !hasQualifyingRuck;
+        // Count rucks that are at least 5 minutes (300 seconds)
+        final qualifyingRucks = sessions
+            .where(
+              (session) => session.duration.inSeconds >= 300,
+            )
+            .length;
+
+        // Treat users with zero or one qualifying ruck as "new" to surface coaching sooner
+        isNewUser = qualifyingRucks <= 1;
       }
 
       if (isNewUser && mounted) {
@@ -244,7 +249,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Get the most recent session to check if it was just completed
     try {
       final repository = GetIt.instance<SessionRepository>();
-      final sessions = await repository.fetchSessionHistory(limit: 1, offset: 0);
+      final sessions =
+          await repository.fetchSessionHistory(limit: 1, offset: 0);
 
       if (sessions.isNotEmpty) {
         final lastSession = sessions.first;
@@ -1345,7 +1351,9 @@ class _HomeTabState extends State<_HomeTab>
                   const SizedBox(height: 24),
 
                   // Coaching Plan Card - only show if user doesn't have a plan
-                  CoachingPlanCard(key: ValueKey('coaching_plan_card_${DateTime.now().millisecondsSinceEpoch}')),
+                  CoachingPlanCard(
+                      key: ValueKey(
+                          'coaching_plan_card_${DateTime.now().millisecondsSinceEpoch}')),
 
                   const SizedBox(height: 24),
 
@@ -1726,10 +1734,14 @@ class _HomeTabState extends State<_HomeTab>
                                                         );
 
                                                         // Debug privacy segmentation
-                                                        print('[PRIVACY_DEBUG] Home screen - Total points: ${routePoints.length}');
-                                                        print('[PRIVACY_DEBUG] Private start: ${privacySegments.privateStartSegment.length}');
-                                                        print('[PRIVACY_DEBUG] Visible middle: ${privacySegments.visibleMiddleSegment.length}');
-                                                        print('[PRIVACY_DEBUG] Private end: ${privacySegments.privateEndSegment.length}');
+                                                        print(
+                                                            '[PRIVACY_DEBUG] Home screen - Total points: ${routePoints.length}');
+                                                        print(
+                                                            '[PRIVACY_DEBUG] Private start: ${privacySegments.privateStartSegment.length}');
+                                                        print(
+                                                            '[PRIVACY_DEBUG] Visible middle: ${privacySegments.visibleMiddleSegment.length}');
+                                                        print(
+                                                            '[PRIVACY_DEBUG] Private end: ${privacySegments.privateEndSegment.length}');
 
                                                         List<Polyline>
                                                             polylines = [];

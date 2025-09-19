@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
+import 'package:rucking_app/features/coaching/domain/models/coaching_personality.dart';
+import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
+import 'package:rucking_app/features/coaching/presentation/screens/plan_creation_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
-import 'package:rucking_app/features/coaching/presentation/screens/plan_creation_screen.dart';
 
-class NewUserCoachingSheet extends StatelessWidget {
+class NewUserCoachingSheet extends StatefulWidget {
   const NewUserCoachingSheet({Key? key}) : super(key: key);
 
   static Future<void> show(BuildContext context) {
@@ -14,6 +18,13 @@ class NewUserCoachingSheet extends StatelessWidget {
       builder: (context) => const NewUserCoachingSheet(),
     );
   }
+
+  @override
+  State<NewUserCoachingSheet> createState() => _NewUserCoachingSheetState();
+}
+
+class _NewUserCoachingSheetState extends State<NewUserCoachingSheet> {
+  bool _isCreatingQuickStart = false;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +50,6 @@ class NewUserCoachingSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Drag handle
               Center(
                 child: Container(
                   width: 40,
@@ -51,8 +61,6 @@ class NewUserCoachingSheet extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Title in Bangers font
               Text(
                 'New to rucking? Start here.',
                 style: AppTextStyles.displayMedium.copyWith(
@@ -60,41 +68,38 @@ class NewUserCoachingSheet extends StatelessWidget {
                   fontSize: 28,
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Bullet points
-              _buildBulletPoint(
-                icon: Icons.star,
-                title: 'Personalized, science based, plans to get you started',
-                color: AppColors.success,
-              ),
               const SizedBox(height: 16),
+              Text(
+                'Kick off with a 7-day quick start (three short rucks this week), then upgrade to a fully personalized plan whenever you want.',
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: Colors.grey[700],
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
               _buildBulletPoint(
-                icon: Icons.notifications_active,
-                title: 'Custom notifications',
+                icon: Icons.flag,
+                title: 'Quick 7-day challenge: stay consistent with 3 rucks',
                 color: AppColors.primary,
               ),
               const SizedBox(height: 16),
               _buildBulletPoint(
-                icon: Icons.sync,
-                title: 'Real time plan changes to fit your life',
+                icon: Icons.notifications_active,
+                title: 'Daily coaching nudges to keep momentum up',
                 color: AppColors.secondary,
               ),
+              const SizedBox(height: 16),
+              _buildBulletPoint(
+                icon: Icons.tune,
+                title: 'Upgrade to a full science-backed plan anytime',
+                color: AppColors.success,
+              ),
               const SizedBox(height: 32),
-
-              // CTA Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Close bottom sheet
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PlanCreationScreen(),
-                      ),
-                    );
-                  },
+                  onPressed:
+                      _isCreatingQuickStart ? null : _startQuickStartPlan,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -104,16 +109,66 @@ class NewUserCoachingSheet extends StatelessWidget {
                     ),
                     elevation: 4,
                   ),
+                  child: _isCreatingQuickStart
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Starting your 7-day challenge...',
+                              style: AppTextStyles.titleMedium.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          'Start 7-Day Quick Start',
+                          style: AppTextStyles.titleLarge.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PlanCreationScreen(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(color: AppColors.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                   child: Text(
-                    'Get Started',
-                    style: AppTextStyles.titleLarge.copyWith(
-                      color: Colors.white,
+                    'Build a full personalized plan',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
               ),
-
-              // Skip button
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
@@ -167,6 +222,86 @@ class NewUserCoachingSheet extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _startQuickStartPlan() async {
+    setState(() {
+      _isCreatingQuickStart = true;
+    });
+
+    final coachingService = GetIt.instance<CoachingService>();
+    final personalization = _buildQuickStartPersonalization();
+
+    try {
+      await coachingService.createCoachingPlan(
+        basePlanId: 'daily-discipline',
+        coachingPersonality: CoachingPersonality.supportiveFriend.id,
+        personalization: personalization,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Your 7-day quick start is ready! Let\'s hit 3 rucks this week.',
+          ),
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isCreatingQuickStart = false;
+      });
+
+      final message = error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Couldn\'t start quick challenge: $message'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  PlanPersonalization _buildQuickStartPersonalization() {
+    final preferredDays = <String>[];
+    final now = DateTime.now();
+
+    for (int i = 0; i < 7 && preferredDays.length < 3; i++) {
+      final futureDate = now.add(Duration(days: i));
+      final weekdayIndex = (futureDate.weekday - 1)
+          .clamp(0, PlanPersonalization.weekdays.length - 1);
+      final weekdayName = PlanPersonalization.weekdays[weekdayIndex];
+      if (!preferredDays.contains(weekdayName)) {
+        preferredDays.add(weekdayName);
+      }
+    }
+
+    return PlanPersonalization(
+      why: const ['Build a rucking habit'],
+      successDefinition: 'Complete 3 rucks in 7 days',
+      trainingDaysPerWeek: 3,
+      preferredDays: preferredDays,
+      challenges: const ['Time', 'Motivation'],
+      minimumSessionMinutes: 25,
+      unloadedOk: true,
+      streakTargetDays: 7,
+      streakTargetRucks: 3,
+      streakTimeframeDays: 7,
+      equipmentType: 'none',
+      equipmentWeight: 0.0,
     );
   }
 }
