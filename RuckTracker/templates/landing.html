@@ -188,10 +188,26 @@
     <div class="subtitle">Load Up. Level Up. Advanced ruck analytics and a community who gets it.</div>
     
     <div class="download-links">
-      <a class="store-badge" href="https://apps.apple.com/us/app/go-ruck-yourself/id6744974620" target="_blank" rel="noopener">
+      <a class="store-badge"
+         href="https://apps.apple.com/us/app/go-ruck-yourself/id6744974620"
+         target="_blank"
+         rel="noopener"
+         data-platform="ios"
+         {% if ads_conversion_id and ios_conversion_label %}
+         data-conversion-id="{{ ads_conversion_id }}"
+         data-conversion-label="{{ ios_conversion_label }}"
+         {% endif %}>
         <img src="{{ url_for('static', filename='images/app-store-badge.png') }}" alt="Download on the App Store" class="store-img">
       </a>
-      <a class="store-badge" href="https://play.google.com/store/apps/details?id=com.ruck.app" target="_blank" rel="noopener">
+      <a class="store-badge"
+         href="https://play.google.com/store/apps/details?id=com.ruck.app"
+         target="_blank"
+         rel="noopener"
+         data-platform="android"
+         {% if ads_conversion_id and android_conversion_label %}
+         data-conversion-id="{{ ads_conversion_id }}"
+         data-conversion-label="{{ android_conversion_label }}"
+         {% endif %}>
         <img src="{{ url_for('static', filename='images/google-play-badge.png') }}" alt="Get it on Google Play" class="store-img">
       </a>
     </div>
@@ -287,6 +303,43 @@
     </div>
   </footer>
   
+  <script>
+    (function () {
+      const storeLinks = document.querySelectorAll('[data-platform]');
+      if (!storeLinks.length) {
+        return;
+      }
+
+      const trackClick = function (event) {
+        try {
+          if (typeof gtag === 'function') {
+            const platform = event.currentTarget.dataset.platform || 'unknown';
+            gtag('event', 'app_store_click', {
+              event_category: 'engagement',
+              event_label: platform,
+              platform,
+            });
+
+            const conversionId = event.currentTarget.dataset.conversionId;
+            const conversionLabel = event.currentTarget.dataset.conversionLabel;
+            if (conversionId && conversionLabel) {
+              gtag('event', 'conversion', {
+                send_to: `${conversionId}/${conversionLabel}`,
+                platform,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('App store tracking failed', err);
+        }
+      };
+
+      storeLinks.forEach((link) => {
+        link.addEventListener('click', trackClick, { capture: true });
+      });
+    })();
+  </script>
+
   <script>
     // Reviews carousel functionality (show 3 at a time)
     document.addEventListener('DOMContentLoaded', function() {

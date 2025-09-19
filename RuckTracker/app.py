@@ -968,7 +968,12 @@ api.add_resource(WellKnownResource, '/.well-known/<string:filename>')
 # Add route for homepage (remains unprefixed)
 @app.route('/')
 def landing():
-    return render_template('landing.html')
+    return render_template(
+        'landing.html',
+        ads_conversion_id=os.getenv('GOOGLE_ADS_CONVERSION_ID'),
+        ios_conversion_label=os.getenv('GOOGLE_ADS_IOS_CONVERSION_LABEL'),
+        android_conversion_label=os.getenv('GOOGLE_ADS_ANDROID_CONVERSION_LABEL'),
+    )
 
 # SEO: robots.txt
 @app.route('/robots.txt')
