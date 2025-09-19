@@ -535,7 +535,8 @@ Coaching Plan Context:
 - Plan Progress: ${coachingPlan['adherence_percentage'] ?? 0}% adherence
 - Status: ${(coachingPlan['adherence_percentage'] ?? 0) >= 70 ? 'ON TRACK' : 'BEHIND SCHEDULE'}
 
-IMPORTANT: Reference the coaching plan context in your summary. If user is on track, acknowledge their plan adherence. If behind, encourage them to get back on track.'''
+IMPORTANT: Reference the coaching plan context in your summary. If user is on track, acknowledge their plan adherence. If behind, encourage them to get back on track.
+When the plan includes scientific sources, occasionally cite them to build trust (e.g., "Your plan follows Daniels' Running Formula principles for aerobic development").'''
         : '';
 
     final guidelines = [
@@ -662,7 +663,8 @@ Response Requirements:
 - Output 2-3 sentences, maximum 75 words total, no emojis, no hashtags.
 - Reference at least one specific, relevant data point from the context/history.
 - Vary your approach and focus different aspects of their performance for variety.
-${coachingPlan != null ? '- PRIORITIZE coaching plan context - reference their plan progress and encourage adherence.' : ''}
+${coachingPlan != null ? '''- PRIORITIZE coaching plan context - reference their plan progress and encourage adherence.
+- If sources are available in the plan, occasionally cite them naturally (e.g., "Following Maffetone Method for your base building")''' : ''}
 
 Respond with your motivational message:''';
   }
@@ -925,6 +927,17 @@ Respond with your motivational message:''';
       final recommendations = coachingPlan['recommendations'];
       if (recommendations is List && recommendations.isNotEmpty) {
         contextText += "\nCoach Notes: ${recommendations.join('; ')}";
+      }
+
+      // Add scientific backing and hydration guidance
+      final sources = coachingPlan['sources'];
+      if (sources is List && sources.isNotEmpty) {
+        contextText += "\nPlan based on: ${sources.join(', ')}";
+      }
+
+      final hydrationFueling = coachingPlan['hydration_fueling'];
+      if (hydrationFueling is Map && hydrationFueling.isNotEmpty) {
+        contextText += "\nHydration/Fueling guidance available";
       }
     }
 

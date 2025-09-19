@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
 
 class CoachingService {
@@ -7,25 +8,7 @@ class CoachingService {
 
   CoachingService(this._apiClient);
 
-  /// Map plan type IDs to backend template IDs
-  int _getTemplateId(String planTypeId) {
-    switch (planTypeId) {
-      case 'fat-loss':
-        return 1;
-      case 'get-faster':
-        return 2;
-      case 'event-prep':
-        return 3;
-      case 'daily-discipline':
-        return 4;
-      case 'age-strong':
-        return 5;
-      case 'load-capacity':
-        return 6;
-      default:
-        return 1; // Default to fat-loss
-    }
-  }
+  // Template ID mapping no longer needed - we send plan IDs directly
 
   /// Create a new personalized coaching plan
   Future<Map<String, dynamic>> createCoachingPlan({
@@ -35,13 +18,11 @@ class CoachingService {
   }) async {
     try {
       final responseData = await _apiClient.post(
-        '/user-coaching-plans',
+        '/coaching-plans',  // Correct endpoint
         {
-          'template_id': _getTemplateId(
-              basePlanId), // Map plan type ID to backend template ID
-          'personality':
-              coachingPersonality, // Fixed parameter name to match backend
-          'start_date': DateTime.now().toIso8601String().split('T')[0], // Today
+          'base_plan_id': basePlanId,  // Use the plan type ID directly
+          'coaching_personality': coachingPersonality,  // Match backend field name
+          'personalization': personalization.toJson(),  // Include all personalization data!
         },
       );
 
@@ -70,10 +51,19 @@ class CoachingService {
   Future<Map<String, dynamic>?> getActiveCoachingPlan() async {
     try {
       final responseData = await _apiClient.get('/user-coaching-plans');
+      AppLogger.info('[COACHING_SERVICE] API response: $responseData');
 
-      // Our API returns null if no active plan, or the plan data
-      return responseData;
+      // API returns {"active_plan": null} or {"active_plan": {...}}
+      if (responseData != null && responseData is Map<String, dynamic>) {
+        final activePlan = responseData['active_plan'];
+        AppLogger.info('[COACHING_SERVICE] Active plan extracted: ${activePlan != null ? "EXISTS" : "NULL"}');
+        return activePlan as Map<String, dynamic>?;
+      }
+
+      AppLogger.info('[COACHING_SERVICE] Invalid response format, returning null');
+      return null;
     } catch (e) {
+      AppLogger.error('[COACHING_SERVICE] Error fetching plan: $e');
       throw Exception('Failed to fetch active coaching plan: $e');
     }
   }

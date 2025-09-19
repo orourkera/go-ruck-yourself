@@ -26,7 +26,13 @@ def _get_coaching_plan_templates(supabase_client) -> Dict[str, Any]:
                 'progression_rules': template['progression_rules'],
                 'non_negotiables': template['non_negotiables'],
                 'retests': template['retests'],
-                'personalization_knobs': template['personalization_knobs']
+                'personalization_knobs': template['personalization_knobs'],
+                # New columns for better plan generation
+                'weekly_template': template.get('weekly_template', []),
+                'hydration_fueling': template.get('hydration_fueling', {}),
+                'weekly_volume_increase_cap': template.get('weekly_volume_increase_cap', 10.0),
+                'no_dual_progressions': template.get('no_dual_progressions', False),
+                'sources': template.get('sources', [])
             }
         
         return templates
@@ -133,8 +139,8 @@ def _analyze_user_history(facts: Dict[str, Any]) -> Dict[str, Any]:
     
     return analysis
 
-def _apply_history_adaptations(personalized_structure: Dict[str, Any], adaptations: List[str], 
-                              user_analysis: Dict[str, Any], base_plan_id: str) -> None:
+def _apply_history_adaptations(personalized_structure: Dict[str, Any], adaptations: List[str],
+                              user_analysis: Dict[str, Any], base_plan_id: str, user_insights: Optional[Dict[str, Any]] = None) -> None:
     """Apply adaptations based on user's historical patterns"""
     experience = user_analysis.get('experience_level', 'beginner')
     consistency = user_analysis.get('consistency_score', 0.0)
@@ -221,6 +227,177 @@ def _apply_history_adaptations(personalized_structure: Dict[str, Any], adaptatio
     if avg_distance > 0 and avg_weekly > 0:
         adaptations.append(f"Plan tailored to your pattern: {avg_weekly:.1f} sessions/week averaging {avg_distance:.1f}km")
 
+def _calculate_specific_weights_and_times(personalization: Dict[str, Any], user_analysis: Dict[str, Any], base_plan_id: str) -> Dict[str, Any]:
+    """Calculate specific weights and times based on user input and history"""
+    calculations = {
+        'max_weight_kg': 0,
+        'starting_weight_kg': 0,
+        'progression_weight_kg': 0,
+        'session_times': {},
+        'difficulty_assessment': 'appropriate'
+    }
+    
+    # Get user's maximum comfortable weight
+    equipment_weight = personalization.get('equipment_weight', 0)
+    if equipment_weight > 0:
+        calculations['max_weight_kg'] = equipment_weight
+        
+        # Calculate starting weight based on experience and history
+        experience = user_analysis.get('experience_level', 'beginner') if user_analysis else 'beginner'
+        avg_distance = user_analysis.get('avg_session_distance', 0) if user_analysis else 0
+        
+        if experience == 'beginner' or avg_distance == 0:
+            # Start conservative: 40-50% of max weight
+            calculations['starting_weight_kg'] = round(equipment_weight * 0.45, 1)
+            calculations['progression_weight_kg'] = round(equipment_weight * 0.1, 1)  # 10% increments
+        elif experience == 'intermediate':
+            # Start moderate: 50-60% of max weight
+            calculations['starting_weight_kg'] = round(equipment_weight * 0.55, 1)
+            calculations['progression_weight_kg'] = round(equipment_weight * 0.08, 1)  # 8% increments
+        else:  # advanced
+            # Start higher: 60-70% of max weight
+            calculations['starting_weight_kg'] = round(equipment_weight * 0.65, 1)
+            calculations['progression_weight_kg'] = round(equipment_weight * 0.06, 1)  # 6% increments
+    
+    # Calculate session times based on history and constraints
+    min_session_time = personalization.get('minimum_session_minutes', 30)
+    training_days = personalization.get('training_days_per_week', 3)
+    
+    if user_analysis:
+        avg_weekly_sessions = user_analysis.get('avg_weekly_sessions', 0)
+        consistency = user_analysis.get('consistency_score', 0)
+        
+        # Assess if current plan difficulty is appropriate
+        if avg_weekly_sessions > 0:
+            if training_days > avg_weekly_sessions * 1.5:
+                calculations['difficulty_assessment'] = 'too_hard'
+            elif training_days < avg_weekly_sessions * 0.8:
+                calculations['difficulty_assessment'] = 'too_easy'
+        
+        # Calculate realistic session times
+        if base_plan_id == 'fat-loss':
+            if consistency > 0.8:
+                calculations['session_times']['long_ruck'] = max(45, min_session_time + 15)
+                calculations['session_times']['balance_ruck'] = max(30, min_session_time)
+                calculations['session_times']['speed_ruck'] = max(25, min_session_time - 5)
+            else:
+                calculations['session_times']['long_ruck'] = max(35, min_session_time + 5)
+                calculations['session_times']['balance_ruck'] = max(25, min_session_time - 5)
+                calculations['session_times']['speed_ruck'] = max(20, min_session_time - 10)
+    
+    return calculations
+
+def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Dict[str, Any], 
+                                           personalization: Dict[str, Any], user_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Generate weekly template with specific weights and times instead of placeholders"""
+    weekly_template = []
+    
+    start_weight = calculations.get('starting_weight_kg', 20)
+    progression_weight = calculations.get('progression_weight_kg', 2)
+    session_times = calculations.get('session_times', {})
+    
+    # Get user constraints
+    min_session_time = personalization.get('minimum_session_minutes', 30)
+    training_days = personalization.get('training_days_per_week', 3)
+    equipment_type = personalization.get('equipment_type', 'rucksack')
+    
+    if base_plan_id == 'posture-balance-age-strong':
+        # Tuesday: Long Posture Ruck
+        tuesday_weight = start_weight * 0.8  # 80% of starting weight for posture work
+        tuesday_time = session_times.get('long_ruck', max(40, min_session_time + 10))
+        
+        weekly_template.append({
+            'day': 'tuesday',
+            'session_type': 'Long Posture Ruck',
+            'duration_minutes': f'{tuesday_time}-{tuesday_time + 10}',
+            'weight_kg': round(tuesday_weight, 1),
+            'description': f'{tuesday_time}-{tuesday_time + 10} min @ {round(tuesday_weight, 1)}kg, steady pace',
+            'notes': 'Every 10 min, pause for 1 min suitcase carry (switch hands)',
+            'equipment': equipment_type
+        })
+        
+        # Thursday: Balance & Mobility Ruck
+        thursday_weight = start_weight * 0.6  # 60% for balance work
+        thursday_time = session_times.get('balance_ruck', max(30, min_session_time))
+        
+        weekly_template.append({
+            'day': 'thursday',
+            'session_type': 'Balance & Mobility Ruck',
+            'duration_minutes': thursday_time,
+            'weight_kg': round(thursday_weight, 1),
+            'description': f'{thursday_time} min @ {round(thursday_weight, 1)}kg',
+            'notes': '2x stair step-ups (5 min unloaded), 2x sit-to-stand after ruck',
+            'equipment': equipment_type
+        })
+        
+        # Saturday: Speed/Confidence Ruck
+        saturday_weight = start_weight * 1.0  # Full starting weight for confidence
+        saturday_time = session_times.get('speed_ruck', max(20, min_session_time - 10))
+        
+        weekly_template.append({
+            'day': 'saturday',
+            'session_type': 'Speed/Confidence Ruck',
+            'duration_minutes': f'{saturday_time}-{saturday_time + 10}',
+            'weight_kg': round(saturday_weight, 1),
+            'description': f'{saturday_time}-{saturday_time + 10} min @ {round(saturday_weight, 1)}kg',
+            'notes': 'Brisk pace (can talk, not sing), focus on upright posture',
+            'equipment': equipment_type
+        })
+        
+        # Sunday: Form Walk
+        weekly_template.append({
+            'day': 'sunday',
+            'session_type': 'Form Walk',
+            'duration_minutes': 20,
+            'weight_kg': 0,
+            'description': '20 min unloaded (rain/recovery option)',
+            'notes': 'Focus on posture and breathing patterns',
+            'equipment': 'none'
+        })
+    
+    elif base_plan_id == 'fat-loss':
+        # Generate fat-loss specific template with calculated weights/times
+        base_ruck_time = session_times.get('long_ruck', max(45, min_session_time + 15))
+        
+        weekly_template.extend([
+            {
+                'day': 'monday',
+                'session_type': 'Base Ruck',
+                'duration_minutes': base_ruck_time,
+                'weight_kg': round(start_weight * 0.7, 1),
+                'description': f'{base_ruck_time} min @ {round(start_weight * 0.7, 1)}kg, conversational pace',
+                'equipment': equipment_type
+            },
+            {
+                'day': 'wednesday',
+                'session_type': 'Interval Ruck',
+                'duration_minutes': 35,
+                'weight_kg': round(start_weight * 0.8, 1),
+                'description': f'35 min @ {round(start_weight * 0.8, 1)}kg, 5x (3min brisk / 2min easy)',
+                'equipment': equipment_type
+            },
+            {
+                'day': 'friday',
+                'session_type': 'Recovery Ruck',
+                'duration_minutes': 25,
+                'weight_kg': round(start_weight * 0.5, 1),
+                'description': f'25 min @ {round(start_weight * 0.5, 1)}kg, very easy pace',
+                'equipment': equipment_type
+            }
+        ])
+    
+    # Add difficulty assessment to each session
+    difficulty = calculations.get('difficulty_assessment', 'appropriate')
+    for session in weekly_template:
+        if difficulty == 'too_hard':
+            session['difficulty_note'] = 'Reduced intensity based on your current training frequency'
+        elif difficulty == 'too_easy':
+            session['difficulty_note'] = 'Can progress faster given your training history'
+        else:
+            session['difficulty_note'] = 'Appropriate challenge level for your experience'
+    
+    return weekly_template
+
 def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabase_client, user_id: str = None) -> Dict[str, Any]:
     """
     Generate a personalized plan based on the base plan, user's personalization data, and historical patterns
@@ -239,13 +416,39 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
             user_analysis = _analyze_user_history(user_insights['facts'])
             logger.info(f"User analysis for {user_id}: {user_analysis}")
     
+    # Calculate specific weights and times
+    calculations = _calculate_specific_weights_and_times(personalization, user_analysis, base_plan_id)
+    
     # Start with the base structure
     personalized_structure = json.loads(json.dumps(base_plan['base_structure']))  # Deep copy
     adaptations = []
+
+    # Generate specific weekly template with calculated weights and times
+    specific_weekly_template = _generate_weekly_template_with_specifics(
+        base_plan_id, calculations, personalization, user_analysis
+    )
     
+    # Add new template fields to personalized structure
+    personalized_structure['weekly_template'] = specific_weekly_template
+    personalized_structure['hydration_fueling'] = base_plan.get('hydration_fueling', {})
+    personalized_structure['weekly_volume_cap'] = base_plan.get('weekly_volume_increase_cap', 10.0)
+    personalized_structure['no_dual_progressions'] = base_plan.get('no_dual_progressions', False)
+    personalized_structure['sources'] = base_plan.get('sources', [])
+
     # Apply history-based adaptations first
     if user_analysis:
-        _apply_history_adaptations(personalized_structure, adaptations, user_analysis, base_plan_id)
+        _apply_history_adaptations(personalized_structure, adaptations, user_analysis, base_plan_id, user_insights)
+
+        # Apply volume cap based on user's recent increases
+        if personalized_structure.get('weekly_volume_cap'):
+            volume_cap = personalized_structure['weekly_volume_cap']
+            # If user has been increasing volume too quickly, enforce the cap
+            adaptations.append(f"Volume increases capped at {volume_cap}% per week for safe progression")
+
+        # Apply no dual progressions rule if set
+        if personalized_structure.get('no_dual_progressions'):
+            adaptations.append("Focusing on one progression variable at a time (distance OR weight, not both)")
+            personalized_structure['progression_strategy'] = 'single_variable'
     
     # Apply personalization based on the 6 questions
     
@@ -312,14 +515,24 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
             personalized_structure['equipment_notes'] = 'Alternate between ruck and vest for different stimulus'
 
         if equipment_weight and equipment_weight > 0:
-            # Convert to percentage of assumed bodyweight (assume 70kg/155lbs average)
-            weight_percentage = (equipment_weight / 70) * 100
-            if weight_percentage < 15:
-                personalized_structure['starting_load']['percentage'] = '5-8% bodyweight'
-                adaptations.append(f"Conservative loading based on {equipment_weight}kg max capacity")
-            elif weight_percentage > 40:
-                personalized_structure['starting_load']['percentage'] = '12-15% bodyweight'
-                adaptations.append(f"Progressive loading available with {equipment_weight}kg capacity")
+            # Use calculated specific weights instead of percentages
+            start_weight = calculations['starting_weight_kg']
+            progression_weight = calculations['progression_weight_kg']
+            
+            personalized_structure['starting_load'] = {
+                'weight_kg': start_weight,
+                'progression_kg': progression_weight,
+                'max_weight_kg': equipment_weight
+            }
+            
+            # Add difficulty assessment
+            difficulty = calculations['difficulty_assessment']
+            if difficulty == 'too_hard':
+                adaptations.append(f"Starting conservatively at {start_weight}kg (reduced from typical progression) based on your current training frequency")
+            elif difficulty == 'too_easy':
+                adaptations.append(f"Starting at {start_weight}kg with faster progression available given your consistent training history")
+            else:
+                adaptations.append(f"Starting at {start_weight}kg with {progression_weight}kg increments, progressing toward your {equipment_weight}kg capacity")
 
     # 5. Adjust based on success definition (affects focus areas)
     success_definition = personalization.get('success_definition', '')
@@ -338,6 +551,13 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
     # 6. Preferred days scheduling
     training_schedule = []
     preferred_days = personalization.get('preferred_days', [])
+
+    # Use weekly_template to structure the week if available
+    if personalized_structure.get('weekly_template'):
+        weekly_template = personalized_structure['weekly_template']
+        if weekly_template and len(weekly_template) > 0:
+            # Map template sessions to preferred days
+            adaptations.append("Using science-based weekly template for optimal recovery and progression")
     if preferred_days:
         sessions_per_week = personalized_structure.get('sessions_per_week', {})
         total_sessions = sum([
@@ -355,12 +575,21 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
                 'flexible': True
             })
     
+    # Add hydration/fueling guidance if available
+    hydration_fueling_guidance = personalized_structure.get('hydration_fueling', {})
+    if hydration_fueling_guidance:
+        adaptations.append("Includes specific hydration and fueling recommendations")
+
     return {
         'base_plan_id': base_plan_id,
         'personalized_structure': personalized_structure,
         'training_schedule': training_schedule,
         'adaptations': adaptations,
-        'user_analysis': user_analysis
+        'user_analysis': user_analysis,
+        'calculations': calculations,
+        'hydration_fueling': hydration_fueling_guidance,
+        'weekly_template': specific_weekly_template,
+        'sources': personalized_structure.get('sources', [])
     }
 
 class CoachingPlanTemplatesResource(Resource):
@@ -405,7 +634,15 @@ class CoachingPlansResource(Resource):
             
             # Get Supabase client
             supabase = get_supabase_client()
-            
+
+            # Check if user already has an active coaching plan
+            existing_plan = supabase.table('user_coaching_plans').select('id').eq(
+                'user_id', g.user_id
+            ).eq('current_status', 'active').limit(1).execute()
+
+            if existing_plan.data:
+                return error_response("User already has an active coaching plan", 409)
+
             # Get coaching plan templates from database
             templates = _get_coaching_plan_templates(supabase)
             
@@ -441,7 +678,22 @@ class CoachingPlansResource(Resource):
                 "status": "active"
             }
 
-            response = supabase.table("coaching_plans").insert(plan_data).execute()
+            # Insert into user_coaching_plans table (not coaching_plans!)
+            user_plan_data = {
+                "user_id": g.user_id,
+                "coaching_plan_id": base_plan_id,  # This references the template ID
+                "coaching_personality": coaching_personality,
+                "start_date": datetime.now().isoformat(),
+                "current_week": 1,
+                "current_status": "active",
+                "plan_modifications": {
+                    "personalization": personalization,
+                    "plan_structure": personalized_plan['personalized_structure'],
+                    "adaptations": personalized_plan['adaptations']
+                }
+            }
+
+            response = supabase.table("user_coaching_plans").insert(user_plan_data).execute()
 
             # Also save equipment preferences to user profile
             equipment_type = personalization.get('equipment_type')
@@ -479,7 +731,7 @@ class CoachingPlansResource(Resource):
             status = request.args.get('status')
             
             supabase = get_supabase_client()
-            query = supabase.table("coaching_plans").select("*").eq("user_id", g.user_id)
+            query = supabase.table("user_coaching_plans").select("*").eq("user_id", g.user_id)
             
             if status:
                 query = query.eq("status", status)

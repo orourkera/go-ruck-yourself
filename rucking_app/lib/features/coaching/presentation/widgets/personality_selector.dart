@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_personality.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 
@@ -21,11 +22,13 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
   CoachingPersonality? _selectedPersonality;
   bool _isPlayingAudio = false;
   late ElevenLabsService _elevenLabsService;
+  late AIAudioService _audioService;
 
   @override
   void initState() {
     super.initState();
     _elevenLabsService = GetIt.instance<ElevenLabsService>();
+    _audioService = GetIt.instance<AIAudioService>();
   }
 
   Future<void> _playPersonalityExample(CoachingPersonality personality) async {
@@ -42,13 +45,18 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
       );
 
       if (audioBytes != null) {
-        // For now, just synthesize the speech - playing would require AudioService
-        // This at least validates the voice synthesis works
-        debugPrint('Personality example synthesized successfully');
+        // Initialize and play the audio
+        await _audioService.initialize();
+        await _audioService.playCheerleaderAudio(
+          audioBytes: audioBytes,
+          fallbackText: personality.example,
+          personality: personality.id,
+        );
+        debugPrint('Personality example played successfully');
       }
     } catch (e) {
       // Silent fail - audio is not critical
-      debugPrint('Failed to synthesize personality example: $e');
+      debugPrint('Failed to play personality example: $e');
     } finally {
       if (mounted) {
         setState(() {

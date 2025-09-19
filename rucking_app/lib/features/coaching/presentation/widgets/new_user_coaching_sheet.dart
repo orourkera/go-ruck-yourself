@@ -65,7 +65,7 @@ class NewUserCoachingSheet extends StatelessWidget {
               // Bullet points
               _buildBulletPoint(
                 icon: Icons.star,
-                title: 'Personalized plan to get you started',
+                title: 'Personalized, science based, plans to get you started',
                 color: AppColors.success,
               ),
               const SizedBox(height: 16),

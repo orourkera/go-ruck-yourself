@@ -5,6 +5,7 @@ import 'package:rucking_app/features/coaching/domain/models/coaching_personality
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/coaching/presentation/widgets/weekly_schedule_view.dart';
 
 class CoachingPlanDetailsScreen extends StatefulWidget {
   const CoachingPlanDetailsScreen({Key? key}) : super(key: key);
@@ -20,9 +21,7 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
   bool _isEditing = false;
 
   // Editable fields
-  int _trainingDaysPerWeek = 3;
   String _selectedPersonality = 'Supportive Friend';
-  List<String> _selectedDays = [];
 
   @override
   void initState() {
@@ -36,10 +35,10 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
       if (data != null) {
         setState(() {
           _planData = data;
-          // Extract current values
-          _trainingDaysPerWeek = data['training_days_per_week'] ?? 3;
-          _selectedPersonality = data['personality'] ?? 'Supportive Friend';
-          _selectedDays = List<String>.from(data['preferred_days'] ?? []);
+          // Extract current values (personality is at root level in API response)
+          _selectedPersonality = data['personality'] ??
+                                data['coaching_personality'] ??
+                                'Supportive Friend';
           _isLoading = false;
         });
       } else {
@@ -182,7 +181,9 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _planData!['plan_name'] ?? 'Custom Plan',
+                              _planData!['template']?['name'] ??
+                              _planData!['plan_name'] ??
+                              'Custom Plan',
                               style: AppTextStyles.titleLarge.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -208,7 +209,7 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
 
           const SizedBox(height: 20),
 
-          // Training Schedule Card
+          // Weekly Schedule Card
           Card(
             elevation: 4,
             shape: RoundedRectangleBorder(
@@ -219,80 +220,32 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Training Schedule',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Days per week
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Days per week',
-                        style: AppTextStyles.bodyLarge,
-                      ),
-                      if (_isEditing)
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: _trainingDaysPerWeek > 1
-                                  ? () => setState(() => _trainingDaysPerWeek--)
-                                  : null,
-                              color: AppColors.primary,
-                            ),
-                            Text(
-                              '$_trainingDaysPerWeek',
-                              style: AppTextStyles.titleMedium.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              onPressed: _trainingDaysPerWeek < 7
-                                  ? () => setState(() => _trainingDaysPerWeek++)
-                                  : null,
-                              color: AppColors.primary,
-                            ),
-                          ],
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '$_trainingDaysPerWeek days',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
+                        'Weekly Schedule',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.calendar_month,
+                          color: AppColors.primary,
+                        ),
+                        onPressed: () {
+                          // Could open full calendar view
+                        },
+                      ),
                     ],
                   ),
-
                   const SizedBox(height: 16),
 
-                  // Preferred days
-                  Text(
-                    'Preferred days',
-                    style: AppTextStyles.bodyLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _buildDayChips(),
+                  // Full weekly schedule
+                  WeeklyScheduleView(
+                    planData: _planData!,
+                    currentWeek: _planData!['current_week'] ?? 1,
                   ),
                 ],
               ),
@@ -388,95 +341,15 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
             ),
           ),
 
-          const SizedBox(height: 20),
-
-          // Next Scheduled Activity Card
-          Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Next Activity',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Tomorrow - Base Ruck',
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '45 minutes • 30 lbs • Zone 2',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  List<Widget> _buildDayChips() {
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    return days.map((day) {
-      final isSelected = _selectedDays.contains(day);
-
-      return FilterChip(
-        label: Text(day),
-        selected: isSelected,
-        onSelected: _isEditing
-            ? (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedDays.add(day);
-                  } else {
-                    _selectedDays.remove(day);
-                  }
-                });
-              }
-            : null,
-        selectedColor: AppColors.primary.withOpacity(0.2),
-        checkmarkColor: AppColors.primary,
-        backgroundColor: Colors.grey[100],
-        disabledColor: isSelected
-            ? AppColors.primary.withOpacity(0.1)
-            : Colors.grey[100],
-        labelStyle: TextStyle(
-          color: isSelected ? AppColors.primary : Colors.grey[700],
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-        ),
-      );
-    }).toList();
-  }
-
   Widget _buildProgressIndicator() {
     final weeksCompleted = _calculateWeeksCompleted();
-    final totalWeeks = _planData!['duration_weeks'] ?? 8;
+    final totalWeeks = _planData!['template']?['duration_weeks'] ??
+                      _planData!['duration_weeks'] ?? 8;
     final progress = weeksCompleted / totalWeeks;
 
     return Column(
@@ -520,6 +393,11 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
   }
 
   int _calculateWeeksCompleted() {
+    // Try current_week first (from API), then calculate from start_date
+    if (_planData?['current_week'] != null) {
+      return _planData!['current_week'];
+    }
+
     if (_planData?['start_date'] == null) return 1;
 
     try {

@@ -735,34 +735,36 @@ Keep it under 200 words, motivational, and specific to their answers.
   Widget _buildGreetingStep() {
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            // Streaming text bubble
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    spreadRadius: 2,
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                // Streaming text bubble
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    _streamingText + (_isStreaming ? '▌' : ''),
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        _streamingText + (_isStreaming ? '▌' : ''),
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                   if (_isStreaming)
                     Container(
                       margin: const EdgeInsets.only(top: 16),
@@ -848,6 +850,23 @@ Keep it under 200 words, motivational, and specific to their answers.
             ],
           ],
         ),
+      ),
+          // Close button positioned at top right
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton(
+              icon: Icon(
+                Icons.close,
+                color: Colors.grey[600],
+                size: 28,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

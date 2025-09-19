@@ -68,6 +68,7 @@ import 'package:rucking_app/features/ruck_session/presentation/widgets/ai_insigh
 import 'package:rucking_app/core/config/feature_flags.dart';
 import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/new_user_coaching_sheet.dart';
+import 'package:rucking_app/features/coaching/presentation/widgets/coaching_plan_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
@@ -1340,6 +1341,11 @@ class _HomeTabState extends State<_HomeTab>
 
                   // Achievements summary
                   const AchievementSummary(),
+
+                  const SizedBox(height: 24),
+
+                  // Coaching Plan Card - only show if user doesn't have a plan
+                  CoachingPlanCard(key: ValueKey('coaching_plan_card_${DateTime.now().millisecondsSinceEpoch}')),
 
                   const SizedBox(height: 24),
 

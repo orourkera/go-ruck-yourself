@@ -13,6 +13,7 @@ import 'package:rucking_app/features/achievements/data/models/achievement_model.
 import 'package:rucking_app/features/achievements/presentation/widgets/achievement_progress_card.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/coaching/presentation/screens/plan_creation_screen.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
 class AchievementsHubScreen extends StatefulWidget {
@@ -34,6 +35,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
   final ScrollController _scrollController = ScrollController();
   String? _targetAchievementId;
   bool _hasScrolledToTarget = false;
+  bool _hasCoachingPlan = false;
 
   // Map to store GlobalKeys for each achievement
   final Map<String, GlobalKey> _achievementKeys = {};
@@ -43,6 +45,7 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _targetAchievementId = widget.initialAchievementId;
+    _checkForCoachingPlan();
 
     // Debug logging
     if (_targetAchievementId != null) {
@@ -100,6 +103,25 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         context
             .read<AchievementBloc>()
             .add(LoadAchievementStats(userId, unitPreference: 'standard'));
+      }
+    }
+  }
+
+  Future<void> _checkForCoachingPlan() async {
+    try {
+      final coachingService = GetIt.instance<CoachingService>();
+      final plan = await coachingService.getActiveCoachingPlan();
+      if (mounted) {
+        setState(() {
+          _hasCoachingPlan = plan != null;
+        });
+      }
+    } catch (e) {
+      // No plan or error - don't show the button
+      if (mounted) {
+        setState(() {
+          _hasCoachingPlan = false;
+        });
       }
     }
   }
@@ -251,31 +273,34 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.psychology),
-              label: const Text('Start AI Coaching Plan'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                textStyle: AppTextStyles.titleSmall,
+          if (!_hasCoachingPlan) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.psychology),
+                label: const Text('Start AI Coaching Plan'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  textStyle: AppTextStyles.titleSmall,
+                ),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => const PlanCreationScreen(),
+                    ),
+                  );
+                  if (result == true && mounted) {
+                    // Refresh achievements data and plan status
+                    _loadAchievementData();
+                    _checkForCoachingPlan();
+                  }
+                },
               ),
-              onPressed: () async {
-                final result = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => const PlanCreationScreen(),
-                  ),
-                );
-                if (result == true && mounted) {
-                  // Refresh achievements data after plan creation
-                  _loadAchievementData();
-                }
-              },
             ),
-          ),
+          ],
 
           const SizedBox(height: 24),
 

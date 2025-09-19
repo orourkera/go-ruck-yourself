@@ -97,6 +97,11 @@ class _AICoachingSessionWidgetState extends State<AICoachingSessionWidget> {
 
       final personality = widget.coachingPersonality ?? 'Supportive Friend';
 
+      // Get plan sources if available
+      final sources = widget.coachingPlan?['sources'] as List? ?? [];
+      final hydrationFueling = widget.coachingPlan?['hydration_fueling'] as Map? ?? {};
+      final volumeCap = widget.coachingPlan?['weekly_volume_cap'] as num?;
+
       final prompt = '''
 You are an AI coaching assistant with the personality of "$personality" helping $username prepare for their ruck session.
 
@@ -110,11 +115,16 @@ ${distanceStr.isNotEmpty ? '- Target Distance: $distanceStr' : ''}
 ${durationMinutes != null ? '- Target Duration: ${durationMinutes} minutes' : ''}
 ${weightStr.isNotEmpty ? '- Recommended Weight: $weightStr' : ''}
 ${notes.isNotEmpty ? '- Coach Notes: $notes' : ''}
+${sources.isNotEmpty ? '- Plan Design Based On: ${sources.join(', ')}' : ''}
+${volumeCap != null ? '- Weekly Volume Cap: $volumeCap% (safe progression)' : ''}
+${hydrationFueling.isNotEmpty ? '- Hydration guidance available' : ''}
 
 Generate a brief, motivating message (2-3 sentences max) that:
 1. Acknowledges their progress so far (be specific about their ${adherence}% adherence)
 2. Briefly explains what today's $sessionType session will do for them
 3. Gives ONE specific, actionable tip for this session
+
+${sources.isNotEmpty ? 'If relevant, you may briefly cite the science (e.g., "This follows [source] principles for...")' : ''}
 
 Match the "$personality" coaching style exactly. Keep it concise and focused on THIS specific session.
 ''';

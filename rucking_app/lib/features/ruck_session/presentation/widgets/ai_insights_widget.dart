@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/core/services/ai_insights_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -32,6 +33,7 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
   bool _hasError = false;
   bool _isStreaming = false;
   String _streamingText = '';
+  Map<String, dynamic>? _activeCoachingPlan;
 
   String? _extractRecommendationFromStream(String buf) {
     try {
@@ -74,7 +76,209 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
   @override
   void initState() {
     super.initState();
-    _generateInsights();
+    _checkCoachingPlan();
+  }
+
+  Future<void> _checkCoachingPlan() async {
+    try {
+      final coachingService = GetIt.instance<CoachingService>();
+      final plan = await coachingService.getActiveCoachingPlan();
+
+      if (mounted) {
+        setState(() {
+          _activeCoachingPlan = plan;
+        });
+
+        // If user has a plan, show next workout. Otherwise generate AI insights
+        if (plan != null) {
+          _showNextPlannedWorkout(plan);
+        } else {
+          _generateInsights();
+        }
+      }
+    } catch (e) {
+      AppLogger.error('[AI_INSIGHTS_WIDGET] Failed to check coaching plan: $e');
+      // Fall back to regular insights
+      _generateInsights();
+    }
+  }
+
+  void _showNextPlannedWorkout(Map<String, dynamic> plan) async {
+    try {
+      // Get progress data for adherence stats
+      Map<String, dynamic>? progressData;
+      try {
+        final coachingService = GetIt.instance<CoachingService>();
+        progressData = await coachingService.getCoachingPlanProgress();
+      } catch (e) {
+        AppLogger.error('[AI_INSIGHTS_WIDGET] Failed to fetch progress: $e');
+      }
+
+      // Extract next session from plan data or progress data
+      final nextSession = progressData?['next_session'] ??
+                         plan['next_session'] ??
+                         plan['recent_sessions']?.firstWhere(
+                           (s) => s['completion_status'] == 'planned',
+                           orElse: () => null,
+                         );
+
+      String insight = "";
+      String recommendation = "Loading next workout...";
+      String motivation = "";
+
+      // Build detailed progress insight
+      final currentWeek = plan['current_week'] ?? 1;
+      final totalWeeks = plan['duration_weeks'] ?? 8;
+      final planName = plan['plan_name'] ?? 'Training Plan';
+
+      // Get adherence data
+      final adherence = progressData?['adherence_percentage'] ?? 0;
+      final completedSessions = progressData?['completed_sessions'] ?? 0;
+      final totalSessions = progressData?['total_sessions'] ?? 0;
+      final weeklyStreak = progressData?['weekly_streak'] ?? 0;
+
+      // Build progress narrative
+      String progressStatus = "";
+      if (adherence >= 80) {
+        progressStatus = "You're crushing it with ${adherence}% adherence!";
+      } else if (adherence >= 60) {
+        progressStatus = "Good progress at ${adherence}% adherence";
+      } else if (adherence > 0) {
+        progressStatus = "Building momentum with ${adherence}% adherence";
+      } else {
+        progressStatus = "Ready to start your journey";
+      }
+
+      insight = "$planName • Week $currentWeek of $totalWeeks\n$progressStatus";
+      if (completedSessions > 0) {
+        insight += " • $completedSessions/$totalSessions sessions this week";
+      }
+      if (weeklyStreak > 1) {
+        insight += " • $weeklyStreak week streak! 🔥";
+      }
+
+      if (nextSession != null) {
+        // Get detailed session info from the recommendation object
+        final sessionRecommendation = nextSession['recommendation'] ?? {};
+        final sessionType = nextSession['session_type'] ??
+                          nextSession['planned_session_type'] ??
+                          nextSession['type'] ??
+                          'training';
+
+        // Format the session type nicely
+        String sessionTitle = _formatSessionType(sessionType);
+
+        // Extract details from recommendation
+        final duration = sessionRecommendation['duration'] ??
+                        (nextSession['duration_minutes'] != null ? "${nextSession['duration_minutes']} min" : null);
+        final intensity = sessionRecommendation['intensity'];
+        final load = sessionRecommendation['load'];
+        final description = sessionRecommendation['description'] ?? sessionTitle;
+
+        // Build detailed recommendation
+        recommendation = "Today: $description";
+
+        List<String> details = [];
+        if (duration != null) details.add(duration);
+        if (intensity != null) details.add(intensity);
+        if (load != null) details.add(load);
+
+        if (details.isNotEmpty) {
+          recommendation += "\n" + details.join(' • ');
+        }
+
+        // Add motivational text based on personality
+        final personality = plan['coaching_personality'] ?? plan['personality'] ?? 'Supportive Friend';
+        motivation = _getPersonalityMotivation(personality, sessionType);
+
+        // Add context based on performance
+        if (adherence < 50 && completedSessions < totalSessions / 2) {
+          motivation += " Every session counts!";
+        } else if (adherence >= 80) {
+          motivation += " Keep that streak alive!";
+        }
+      } else {
+        // Check if it's a rest day or plan complete
+        if (currentWeek >= totalWeeks) {
+          recommendation = "Plan complete! Time to celebrate your achievement 🎉";
+          motivation = "You've completed your ${totalWeeks}-week plan. Incredible work!";
+        } else {
+          recommendation = "Rest day - recovery is part of the journey";
+          motivation = "Use today to stretch, hydrate, and prepare for your next session";
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentInsight = AIInsight(
+            greeting: "Your Plan Progress",
+            insight: insight,
+            recommendation: recommendation,
+            motivation: motivation,
+            emoji: "📋",
+            generatedAt: DateTime.now(),
+          );
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      AppLogger.error('[AI_INSIGHTS_WIDGET] Failed to parse next workout: $e');
+      // Fall back to regular insights
+      _generateInsights();
+    }
+  }
+
+  String _formatSessionType(String type) {
+    switch (type) {
+      case 'base_aerobic':
+        return 'Base Ruck';
+      case 'tempo':
+        return 'Tempo Ruck';
+      case 'intervals':
+        return 'Speed Intervals';
+      case 'recovery':
+        return 'Recovery';
+      case 'long_slow':
+        return 'Long Ruck';
+      case 'hill_work':
+        return 'Hill Training';
+      case 'test':
+        return 'Test/Time Trial';
+      default:
+        return 'Training Session';
+    }
+  }
+
+  String _getPersonalityMotivation(String personality, String sessionType) {
+    final isHard = sessionType.contains('interval') ||
+                   sessionType.contains('tempo') ||
+                   sessionType.contains('hill');
+
+    switch (personality.toLowerCase()) {
+      case 'drill_sergeant':
+      case 'drill sergeant':
+        return isHard ? "No excuses! Time to push your limits!" : "Stay disciplined, soldier!";
+      case 'supportive_friend':
+      case 'supportive friend':
+        return isHard ? "You've got this! I believe in you!" : "Great job staying consistent!";
+      case 'southern_redneck':
+      case 'southern redneck':
+        return isHard ? "Time to get after it, partner!" : "Keep on truckin'!";
+      case 'yoga_instructor':
+      case 'yoga instructor':
+        return isHard ? "Embrace the challenge with mindfulness" : "Focus on your breath and form";
+      case 'british_butler':
+      case 'british butler':
+        return isHard ? "A splendid opportunity to excel, sir" : "Steady progress, as always";
+      case 'cowboy':
+      case 'cowboy/cowgirl':
+        return isHard ? "Saddle up for a tough ride!" : "Keep movin' down the trail";
+      case 'nature_lover':
+      case 'nature lover':
+        return isHard ? "Channel the mountain's strength" : "Enjoy the journey";
+      default:
+        return "Stay focused on your goals!";
+    }
   }
 
   @override
@@ -422,9 +626,10 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
                 setState(() {
                   _currentInsight = null; // Force refresh
                 });
-                _generateInsights(force: true);
+                // Check for coaching plan first
+                _checkCoachingPlan();
               },
-              tooltip: 'Refresh insights',
+              tooltip: 'Refresh',
               visualDensity: VisualDensity.compact,
             ),
           ],

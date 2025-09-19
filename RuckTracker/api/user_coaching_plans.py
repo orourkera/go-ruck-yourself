@@ -13,6 +13,21 @@ from ..utils.api_response import check_auth_and_respond
 
 logger = logging.getLogger(__name__)
 
+def _add_seconds_to_pace(pace_str, seconds):
+    """Add seconds to a pace string (e.g., '7:30' + 30 = '8:00')"""
+    try:
+        parts = pace_str.split(':')
+        minutes = int(parts[0])
+        secs = int(parts[1]) if len(parts) > 1 else 0
+
+        total_seconds = minutes * 60 + secs + seconds
+        new_minutes = total_seconds // 60
+        new_seconds = total_seconds % 60
+
+        return f"{new_minutes}:{new_seconds:02d}"
+    except:
+        return pace_str
+
 class UserCoachingPlansResource(Resource):
     """Manage user's active coaching plans"""
     
@@ -92,7 +107,11 @@ class UserCoachingPlansResource(Resource):
             return {"error": "Failed to get coaching plan"}, 500
     
     def post(self):
-        """Create new coaching plan from template"""
+        """DEPRECATED - Use /api/coaching-plans POST instead for personalized plan creation"""
+        return {"error": "This endpoint is deprecated. Use POST /api/coaching-plans for creating personalized coaching plans"}, 410
+
+    def post_deprecated(self):
+        """[DEPRECATED] Create new coaching plan from template - kept for reference only"""
         try:
             user_id = get_current_user_id()
             auth_response = check_auth_and_respond(user_id)
@@ -413,56 +432,219 @@ def _calculate_comprehensive_progress(plan, template, sessions):
     }
 
 
+def _get_user_performance_baseline(user_id):
+    """Get user's recent performance metrics from user_insights"""
+    try:
+        client = get_supabase_admin_client()
+
+        # Get user insights
+        result = client.table('user_insights').select('facts').eq('user_id', user_id).single().execute()
+
+        if result.data and 'facts' in result.data:
+            facts = result.data['facts']
+
+            # Calculate averages from 30-day data
+            sessions_30d = facts.get('totals_30d', {}).get('sessions', 0)
+            distance_30d = facts.get('totals_30d', {}).get('distance_km', 0)
+            duration_30d = facts.get('totals_30d', {}).get('duration_s', 0)
+
+            # Get last session data
+            last_weight = facts.get('recency', {}).get('last_ruck_weight_kg', 0)
+            last_distance = facts.get('recency', {}).get('last_ruck_distance_km', 0)
+
+            # Get pace data from splits
+            splits_data = facts.get('splits', {})
+            pace_by_idx = splits_data.get('avg_pace_s_per_km_by_idx_1_10', [])
+
+            # Calculate average pace from first few splits
+            avg_pace_s_per_km = 510  # Default 8:30 per km
+            if pace_by_idx and len(pace_by_idx) > 0:
+                # Average the pace of first 3 splits for a good baseline
+                first_splits = pace_by_idx[:3]
+                if first_splits:
+                    total_pace = sum(s.get('avg', 510) for s in first_splits)
+                    avg_pace_s_per_km = total_pace / len(first_splits)
+            elif duration_30d > 0 and distance_30d > 0:
+                # Fallback: calculate from totals
+                avg_pace_s_per_km = duration_30d / distance_30d
+
+            # Calculate averages
+            avg_distance_km = distance_30d / sessions_30d if sessions_30d > 0 else 0
+
+            # Check if they're getting faster (negative splits)
+            is_improving = splits_data.get('negative_split_frequency', 0) > 0.5
+
+            return {
+                'has_data': sessions_30d > 0,
+                'avg_distance_km': avg_distance_km if avg_distance_km > 0 else 5.0,
+                'avg_pace_s_per_km': avg_pace_s_per_km,
+                'last_weight_kg': last_weight if last_weight > 0 else 9.0,
+                'last_distance_km': last_distance,
+                'sessions_30d': sessions_30d,
+                'is_improving': is_improving
+            }
+    except Exception as e:
+        logger.error(f"Failed to get user performance baseline: {e}")
+
+    # Return defaults if no data
+    return {
+        'has_data': False,
+        'avg_distance_km': 5.0,
+        'avg_pace_s_per_km': 510,  # 8:30 per km
+        'last_weight_kg': 9.0,
+        'last_distance_km': 0,
+        'sessions_30d': 0,
+        'is_improving': False
+    }
+
+
 def _get_next_session_recommendation(plan, sessions):
-    """Get recommendation for next session"""
+    """Get recommendation for next session with specific targets based on user's actual performance"""
     current_week = _calculate_weeks_elapsed(plan['start_date'])
-    
+
     # Find next planned session
     next_planned = None
     for session in sessions:
         if session['completion_status'] == 'planned' and session['planned_week'] <= current_week:
             next_planned = session
             break
-            
+
     if not next_planned:
         return {"message": "No upcoming sessions in current week"}
-        
-    # Generate recommendation based on session type
+
+    week_number = next_planned['planned_week']
+
+    # Get user's actual baseline from user_insights
+    user_id = plan.get('user_id')
+    user_baseline = _get_user_performance_baseline(user_id)
+
+    # Use actual data or smart defaults
+    if user_baseline['has_data']:
+        # Use their actual recent performance with progressive overload
+        avg_distance_km = user_baseline['avg_distance_km']
+        avg_pace_s_per_km = user_baseline['avg_pace_s_per_km']
+        last_weight_kg = user_baseline['last_weight_kg']
+
+        # Progressive overload based on their actual baseline
+        # Week 1: Match their average
+        # Each week: Add 5-10% distance, 2-3% weight
+        progress_factor = 1.0 + (week_number * 0.05)  # 5% per week
+        weight_factor = 1.0 + (week_number * 0.02)   # 2% per week
+
+        base_distance_km = avg_distance_km * progress_factor
+        base_weight_kg = last_weight_kg * weight_factor if last_weight_kg > 0 else 9.0
+
+        # Calculate duration from distance and pace
+        base_duration_min = (base_distance_km * avg_pace_s_per_km) / 60
+
+        # Format pace for display (e.g., "7:30")
+        base_pace_min = int(avg_pace_s_per_km // 60)
+        base_pace_sec = int(avg_pace_s_per_km % 60)
+        user_pace_str = f"{base_pace_min}:{base_pace_sec:02d}"
+
+    else:
+        # No history - use conservative defaults
+        base_distance_km = 3.0 + (week_number * 0.3)  # More conservative progression
+        base_duration_min = 30 + (week_number * 5)
+        base_weight_kg = 9 + (week_number * 0.5)
+        user_pace_str = "8:30"  # Conservative default pace
+
+    # Generate recommendation based on session type with SPECIFIC personalized targets
     recommendations = {
         'base_aerobic': {
             'description': 'Easy aerobic base building',
-            'duration': '45-60 minutes',
+            'duration': f'{int(base_duration_min)}-{int(base_duration_min + 15)} minutes',
+            'duration_minutes': int(base_duration_min),
+            'distance_km': round(base_distance_km * 1.2, 1),  # Longer distance for base
             'intensity': 'Conversational pace (Zone 2)',
-            'load': 'Light to moderate'
+            'pace_per_km': f'{user_pace_str}-{_add_seconds_to_pace(user_pace_str, 60)} min/km' if user_baseline['has_data'] else '8:00-9:00 min/km',
+            'load': f'{round(base_weight_kg, 1)} kg',
+            'weight_kg': base_weight_kg,
+            'notes': 'Focus on maintaining steady breathing and good posture throughout',
+            'personalized': user_baseline['has_data']
         },
         'recovery': {
             'description': 'Active recovery session',
             'duration': '20-30 minutes',
+            'duration_minutes': 25,
+            'distance_km': round(base_distance_km * 0.6, 1),  # Shorter for recovery
             'intensity': 'Very easy pace',
-            'load': 'Bodyweight or very light'
+            'pace_per_km': '9:00-10:00 min/km',
+            'load': f'{round(base_weight_kg * 0.5, 1)} kg or bodyweight',
+            'weight_kg': base_weight_kg * 0.5,
+            'notes': 'This should feel easy - prioritize movement quality over speed'
         },
         'tempo': {
             'description': 'Controlled tempo effort',
-            'duration': '40-50 minutes',
+            'duration': f'{int(base_duration_min)}-{int(base_duration_min + 10)} minutes',
+            'duration_minutes': int(base_duration_min),
+            'distance_km': round(base_distance_km, 1),
             'intensity': 'Comfortably hard pace',
-            'load': 'Moderate'
+            'pace_per_km': f'{_add_seconds_to_pace(user_pace_str, -30)}-{user_pace_str} min/km' if user_baseline['has_data'] else '7:00-7:30 min/km',
+            'load': f'{round(base_weight_kg * 1.2, 1)} kg',
+            'weight_kg': base_weight_kg * 1.2,
+            'notes': 'Push yourself but maintain consistent pace - no heroics',
+            'personalized': user_baseline['has_data']
         },
         'hill_work': {
             'description': 'Hill power development',
-            'duration': '30-45 minutes',
+            'duration': f'{base_duration_min - 5}-{base_duration_min + 5} minutes',
+            'duration_minutes': base_duration_min,
+            'distance_km': round(base_distance_km * 0.8, 1),  # Less distance due to hills
             'intensity': 'Varied based on terrain',
-            'load': 'Light to moderate'
+            'pace_per_km': 'N/A - focus on effort',
+            'load': f'{round(base_weight_kg * 0.8, 1)} kg',
+            'weight_kg': base_weight_kg * 0.8,
+            'notes': 'Find hills with 4-6% grade, power walk up, recover on the way down'
+        },
+        'long_slow': {
+            'description': 'Long slow distance ruck',
+            'duration': f'{base_duration_min * 2}-{base_duration_min * 2 + 30} minutes',
+            'duration_minutes': base_duration_min * 2,
+            'distance_km': round(base_distance_km * 2.5, 1),
+            'intensity': 'Easy sustainable pace',
+            'pace_per_km': '9:00-10:00 min/km',
+            'load': f'{round(base_weight_kg * 0.8, 1)} kg',
+            'weight_kg': base_weight_kg * 0.8,
+            'notes': 'Build endurance - take breaks if needed, focus on completing the distance'
+        },
+        'intervals': {
+            'description': 'Speed interval training',
+            'duration': f'{base_duration_min} minutes total',
+            'duration_minutes': base_duration_min,
+            'distance_km': round(base_distance_km * 0.9, 1),
+            'intensity': 'Alternating hard/easy',
+            'pace_per_km': '6:30 hard / 8:30 easy',
+            'load': f'{round(base_weight_kg * 0.7, 1)} kg',
+            'weight_kg': base_weight_kg * 0.7,
+            'notes': '5min warmup, then 8x (2min hard/2min easy), 5min cooldown'
         }
     }
-    
+
     session_type = next_planned['planned_session_type']
     recommendation = recommendations.get(session_type, recommendations['base_aerobic'])
-    
+
+    # Add personalized message if using their data
+    personalized_message = None
+    if user_baseline['has_data']:
+        if user_baseline['is_improving']:
+            personalized_message = f"Based on your recent {user_baseline['sessions_30d']} sessions averaging {user_baseline['avg_distance_km']:.1f}km at {user_pace_str}/km pace. You're getting faster - keep it up!"
+        else:
+            personalized_message = f"Based on your recent {user_baseline['sessions_30d']} sessions averaging {user_baseline['avg_distance_km']:.1f}km. Today's targets will push you just beyond your comfort zone."
+
     return {
         "session_type": session_type,
+        "type": session_type.replace('_', ' ').title(),
         "scheduled_date": next_planned['scheduled_date'],
         "week": next_planned['planned_week'],
-        "recommendation": recommendation
+        "recommendation": recommendation,
+        # Include top-level for easier access
+        "distance_km": recommendation['distance_km'],
+        "duration_minutes": recommendation['duration_minutes'],
+        "weight_kg": recommendation['weight_kg'],
+        "notes": recommendation['notes'],
+        "personalized": user_baseline['has_data'],
+        "personalized_message": personalized_message
     }
 
 

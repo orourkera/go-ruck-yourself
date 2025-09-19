@@ -28,6 +28,7 @@ import 'package:rucking_app/core/utils/push_notification_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/gear/presentation/widgets/profile_gear_sections.dart';
 import 'package:rucking_app/features/coaching/presentation/screens/coaching_plan_details_screen.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -40,10 +41,27 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String? _selectedUnit;
   User? _currentUser; // Track current user to avoid losing state during loading
+  bool _hasCoachingPlan = false; // Track if user has an active coaching plan
+  Map<String, dynamic>? _activeCoachingPlan; // Cached active plan details
+  bool _isFetchingCoachingPlan = false;
 
   // Constants for conversion
   static const double kgToLbs = 2.20462;
   static const double cmToInches = 0.393701;
+  static const List<String> _monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
   Widget _buildCountColumn(BuildContext context,
       {required String label, required int count, VoidCallback? onTap}) {
@@ -68,6 +86,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _checkForCoachingPlan();
+  }
+
+  Future<void> _checkForCoachingPlan() async {
+    try {
+      if (mounted) {
+        setState(() {
+          _isFetchingCoachingPlan = true;
+        });
+      }
+      final coachingService = GetIt.instance<CoachingService>();
+      final plan = await coachingService.getActiveCoachingPlan();
+      if (mounted) {
+        setState(() {
+          _hasCoachingPlan = plan != null;
+          _activeCoachingPlan = plan;
+          _isFetchingCoachingPlan = false;
+        });
+      }
+    } catch (e) {
+      // No plan or error - don't show the menu item
+      if (mounted) {
+        setState(() {
+          _hasCoachingPlan = false;
+          _activeCoachingPlan = null;
+          _isFetchingCoachingPlan = false;
+        });
+      }
+    }
   }
 
   @override
@@ -264,7 +311,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 : AppColors.textDarkSecondary,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        if (_isFetchingCoachingPlan)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_activeCoachingPlan != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: _buildCoachingPlanOverview(
+                              context,
+                              isLadyMode: isLadyMode,
+                              isDark: isDark,
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 24),
                         _buildSection(
                           title: 'Personal Information',
                           children: [
@@ -470,19 +534,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 },
                               ),
                             ),
-                            const Divider(),
-                            _buildClickableItem(
-                              icon: Icons.fitness_center,
-                              label: 'Coaching Plan',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const CoachingPlanDetailsScreen(),
-                                  ),
-                                );
-                              },
-                            ),
+                            // Only show Coaching Plan if user has one
+                            if (_hasCoachingPlan) ...[
+                              const Divider(),
+                              _buildClickableItem(
+                                icon: Icons.fitness_center,
+                                label: 'Coaching Plan',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CoachingPlanDetailsScreen(),
+                                    ),
+                                  ).then((_) => _checkForCoachingPlan());
+                                },
+                              ),
+                            ],
                             const Divider(),
                             _buildClickableItem(
                               icon: Icons.notifications_outlined,
@@ -1029,6 +1097,205 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildCoachingPlanOverview(BuildContext context,
+      {required bool isLadyMode, required bool isDark}) {
+    final plan = _activeCoachingPlan!;
+    final template = plan['template'] as Map<String, dynamic>?;
+
+    final String planName = (template?['name'] as String?) ??
+        (plan['plan_name'] as String?) ??
+        'Coaching Plan';
+    final int currentWeek = (plan['current_week'] as num?)?.toInt() ?? 1;
+    final int totalWeeks = (template?['duration_weeks'] as num?)?.toInt() ??
+        (plan['duration_weeks'] as num?)?.toInt() ??
+        currentWeek;
+    final String personality =
+        _formatPersonality(plan['personality'] ?? plan['coaching_personality']);
+    final double progressPercent =
+        ((plan['progress_percent'] as num?)?.toDouble() ?? 0).clamp(0, 100);
+    final Map<String, dynamic>? adherenceStats =
+        plan['adherence_stats'] as Map<String, dynamic>?;
+    final int completedSessions =
+        (adherenceStats?['completed_sessions'] as num?)?.toInt() ?? 0;
+    final int totalSessions =
+        (adherenceStats?['total_sessions'] as num?)?.toInt() ?? 0;
+    final double adherencePercent =
+        (adherenceStats?['overall_adherence'] as num?)?.toDouble() ?? 0;
+    final String? startDateLabel =
+        _formatPlanStartDate(plan['start_date'] as String?);
+
+    final Color accentColor =
+        isLadyMode ? AppColors.ladyPrimary : AppColors.primary;
+    final Color secondaryText = isDark
+        ? const Color(0xFF728C69).withOpacity(0.8)
+        : AppColors.textDarkSecondary;
+
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.emoji_events,
+                    color: accentColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        planName,
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Week $currentWeek of $totalWeeks • $personality',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: secondaryText,
+                        ),
+                      ),
+                      if (startDateLabel != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Started $startDateLabel',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: secondaryText,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Plan Progress',
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progressPercent / 100,
+                minHeight: 8,
+                backgroundColor: accentColor.withOpacity(0.15),
+                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${progressPercent.toStringAsFixed(0)}% complete',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: secondaryText,
+                  ),
+                ),
+                Text(
+                  totalSessions > 0
+                      ? '$completedSessions/$totalSessions sessions'
+                      : '$completedSessions sessions',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: secondaryText,
+                  ),
+                ),
+              ],
+            ),
+            if (adherenceStats != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.insights,
+                    size: 18,
+                    color: accentColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Adherence ${adherencePercent.toStringAsFixed(0)}%',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CoachingPlanDetailsScreen(),
+                    ),
+                  ).then((_) => _checkForCoachingPlan());
+                },
+                icon: Icon(
+                  Icons.visibility_outlined,
+                  color: accentColor,
+                ),
+                label: Text(
+                  'View details',
+                  style: TextStyle(color: accentColor),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _formatPlanStartDate(String? raw) {
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final parsed = DateTime.parse(raw);
+      final month = parsed.month >= 1 && parsed.month <= 12
+          ? _monthNames[parsed.month - 1]
+          : parsed.month.toString();
+      return '$month ${parsed.day}, ${parsed.year}';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatPersonality(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      final parts = value.split('_');
+      return parts
+          .map((part) =>
+              part.isEmpty ? '' : part[0].toUpperCase() + part.substring(1))
+          .join(' ')
+          .trim();
+    }
+    return 'Coach';
   }
 
   void _showCustomAboutDialog(BuildContext context) async {
