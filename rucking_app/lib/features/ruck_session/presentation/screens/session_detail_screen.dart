@@ -40,8 +40,8 @@ import 'package:rucking_app/core/services/service_locator.dart'; // For 'getIt' 
 import 'package:rucking_app/shared/widgets/charts/animated_heart_rate_chart.dart'; // Added import for AnimatedHeartRateChart
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/widgets/splits_display.dart';
+import 'package:rucking_app/core/config/social_feature_toggles.dart';
 import 'package:rucking_app/core/services/share_service.dart';
-import 'package:rucking_app/features/social_sharing/screens/share_preview_screen.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -699,39 +699,56 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
                     break;
                 }
               },
-              itemBuilder: (BuildContext context) => [
-                PopupMenuItem<String>(
-                  value: 'share',
-                  child: Row(
-                    children: [
-                      Icon(Icons.share, size: 20, color: Colors.grey.shade700),
-                      SizedBox(width: 12),
-                      Text('Share session'),
-                    ],
+              itemBuilder: (BuildContext context) {
+                final items = <PopupMenuEntry<String>>[];
+
+                if (SocialFeatureToggles.instagramSharingEnabled) {
+                  items.add(
+                    PopupMenuItem<String>(
+                      value: 'share',
+                      child: Row(
+                        children: [
+                          Icon(Icons.share,
+                              size: 20, color: Colors.grey.shade700),
+                          SizedBox(width: 12),
+                          const Text('Share session'),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                items.add(
+                  PopupMenuItem<String>(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit,
+                            size: 20, color: Colors.grey.shade700),
+                        SizedBox(width: 12),
+                        const Text('Edit session'),
+                      ],
+                    ),
                   ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20, color: Colors.grey.shade700),
-                      SizedBox(width: 12),
-                      Text('Edit session'),
-                    ],
+                );
+
+                items.add(
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline,
+                            size: 20, color: Colors.red),
+                        const SizedBox(width: 12),
+                        const Text('Delete session',
+                            style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
                   ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                      SizedBox(width: 12),
-                      Text('Delete session',
-                          style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
+                );
+
+                return items;
+              },
             ),
           ],
         ),
@@ -1828,32 +1845,21 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
     );
   }
 
-  void _shareSession(BuildContext context) async {
-    AppLogger.info('Sharing session ${widget.session.id}');
-
-    try {
-      if (widget.session.id == null) {
-        StyledSnackBar.showError(
-          context: context,
-          message: 'Session is still syncing. Please try sharing again shortly.',
-        );
-        return;
-      }
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => SharePreviewScreen(
-            sessionId: widget.session.id!,
-          ),
-        ),
-      );
-    } catch (e) {
-      AppLogger.error('Failed to open Instagram share screen: $e', exception: e);
-      StyledSnackBar.showError(
+  void _shareSession(BuildContext context) {
+    if (!SocialFeatureToggles.instagramSharingEnabled) {
+      StyledSnackBar.show(
         context: context,
-        message: 'Failed to open share screen. Please try again.',
+        message: 'Instagram sharing is currently disabled.',
       );
+      return;
     }
+
+    // Safety fallback in case the toggle is re-enabled without wiring to the
+    // new implementation yet.
+    StyledSnackBar.show(
+      context: context,
+      message: 'Sharing is temporarily unavailable.',
+    );
   }
 
   /// Fallback method to share directly without preview

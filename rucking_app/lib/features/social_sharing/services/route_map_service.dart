@@ -20,13 +20,13 @@ class RouteMapService {
   static const ui.Color _fallbackBackgroundBottom = ui.Color(0xFF43A047);
   static const ui.Color _fallbackRouteColor = ui.Color(0xFFFF6B35);
 
-  Future<Uint8List?> generateInstagramRouteMap({
+  Future<Uint8List?> generateShareableRouteMap({
     required RuckSession session,
     bool preferMetric = true,
     bool applyPrivacyClipping = true,
   }) async {
     try {
-      AppLogger.info('[ROUTE_MAP] Generating Instagram route map for session ${session.id}');
+      AppLogger.info('[ROUTE_MAP] Generating shareable route map for session ${session.id}');
 
       // Get API key
       String apiKey = dotenv.env['STADIA_MAPS_API_KEY'] ?? '';
@@ -67,7 +67,7 @@ class RouteMapService {
           preferMetric: preferMetric,
         );
 
-        // Only show the visible middle segment for Instagram sharing
+        // Only show the visible middle segment for social sharing
         if (privacySegments.visibleMiddleSegment.isNotEmpty) {
           routeToDisplay = privacySegments.visibleMiddleSegment;
           AppLogger.info('[ROUTE_MAP] Applied privacy clipping - using ${routeToDisplay.length} points from visible middle segment');

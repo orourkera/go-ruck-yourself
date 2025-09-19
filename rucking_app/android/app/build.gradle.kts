@@ -67,6 +67,10 @@ android {
             ndk {
                 debugSymbolLevel = "FULL"
             }
+            // Temporarily disable Crashlytics mapping upload if network issues
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
         debug {
             signingConfig = signingConfigs.getByName("debug")

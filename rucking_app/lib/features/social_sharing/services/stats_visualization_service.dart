@@ -11,7 +11,7 @@ class StatsVisualizationService {
   static const double _cardWidth = 1080.0;
   static const double _cardHeight = 1080.0;
 
-  /// Generate a stats visualization card for Instagram sharing
+  /// Generate a stats visualization card for social sharing
   /// Returns the image as bytes, or null if generation fails
   Future<Uint8List?> generateStatsCard({
     required Map<String, dynamic> insights,

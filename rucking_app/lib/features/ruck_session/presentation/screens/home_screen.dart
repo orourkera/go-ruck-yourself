@@ -21,6 +21,7 @@ import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/config/social_feature_toggles.dart';
 import 'package:rucking_app/core/error_messages.dart' as error_msgs;
 import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/create_session_screen.dart';
@@ -182,6 +183,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _checkForSharePrompt() async {
+    if (!SocialFeatureToggles.instagramSharingEnabled) {
+      return;
+    }
+
     // Get the most recent session to check if it was just completed
     try {
       final repository = GetIt.instance<SessionRepository>();
@@ -409,7 +414,7 @@ class _HomeTabState extends State<_HomeTab>
       // Removed automatic permission requests - only request when actually needed
       _checkForAppUpdates(); // Check for app updates
 
-      // Removed forced Instagram bottom sheet popup on homepage
+      // Removed forced share bottom sheet popup on homepage
     });
   }
 
@@ -2183,150 +2188,6 @@ class _HomeTabState extends State<_HomeTab>
     } catch (e) {
       AppLogger.error('[HOME] Error during early permission requests: $e');
       // Don't crash the app if permission requests fail
-    }
-  }
-
-  /// Show Instagram time range selection bottom sheet for testing
-  void _showInstagramTimeRangeBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(20),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Share to Instagram',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Choose what to share',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Time range options
-              ..._buildTimeRangeOptions(),
-
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildTimeRangeOptions() {
-    final timeRanges = [
-      {'range': 'last_ruck', 'title': '🎯 My Last Ruck', 'subtitle': 'Share details from your most recent ruck'},
-      {'range': 'week', 'title': '📅 This Week', 'subtitle': 'Summarize your weekly progress'},
-      {'range': 'month', 'title': '📆 This Month', 'subtitle': 'Showcase your monthly achievements'},
-      {'range': 'all_time', 'title': '🚀 Since I Started', 'subtitle': 'Tell your complete rucking journey'},
-    ];
-
-    return timeRanges.map((option) =>
-      ListTile(
-        title: Text(option['title']!),
-        subtitle: Text(option['subtitle']!),
-        onTap: () async {
-          Navigator.pop(context);
-
-          // Determine TimeRange from selection
-          TimeRange selectedTimeRange;
-          switch (option['range']) {
-            case 'last_ruck':
-              selectedTimeRange = TimeRange.lastRuck;
-              break;
-            case 'week':
-              selectedTimeRange = TimeRange.week;
-              break;
-            case 'month':
-              selectedTimeRange = TimeRange.month;
-              break;
-            case 'all_time':
-              selectedTimeRange = TimeRange.allTime;
-              break;
-            default:
-              selectedTimeRange = TimeRange.lastRuck;
-          }
-
-          // For "Last Ruck", get the most recent session ID
-          if (option['range'] == 'last_ruck') {
-            String? lastSessionId = await _getLastSessionId();
-            if (lastSessionId != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SharePreviewScreen(
-                    sessionId: lastSessionId,
-                    timeRange: selectedTimeRange,
-                  ),
-                ),
-              );
-            } else {
-              // No recent sessions found
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No recent sessions found to share')),
-              );
-            }
-          } else {
-            // For other time ranges, use empty sessionId (will generate stats card)
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SharePreviewScreen(
-                  sessionId: '', // Empty for general time range sharing
-                  timeRange: selectedTimeRange,
-                ),
-              ),
-            );
-          }
-        },
-      ),
-    ).toList();
-  }
-
-  /// Get the most recent session ID for "Last Ruck" sharing
-  Future<String?> _getLastSessionId() async {
-    try {
-      if (_recentSessions.isNotEmpty) {
-        // Use the first session from already loaded data
-        final firstSession = _recentSessions.first;
-        if (firstSession is Map<String, dynamic>) {
-          return firstSession['id']?.toString();
-        }
-      }
-      return null;
-    } catch (e) {
-      AppLogger.error('[HOME] Error getting last session ID: $e');
-      return null;
     }
   }
 } // Closes _HomeTabState class

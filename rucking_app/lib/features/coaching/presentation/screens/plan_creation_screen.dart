@@ -681,33 +681,7 @@ Keep it under 200 words, motivational, and specific to their answers.
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            // AI Coach avatar
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.psychology,
-                size: 60,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 32),
-
+            const SizedBox(height: 16),
             // Streaming text bubble
             Container(
               padding: const EdgeInsets.all(20),

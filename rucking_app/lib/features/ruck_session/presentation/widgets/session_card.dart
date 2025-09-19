@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/config/social_feature_toggles.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/social_sharing/screens/share_preview_screen.dart';
@@ -127,30 +128,30 @@ class SessionCard extends StatelessWidget {
                       value: weightDisplay,
                     ),
                   ),
-                  // Share button
-                  IconButton(
-                    icon: Icon(
-                      Icons.share,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                    onPressed: () {
-                      if (session.id == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Session not ready for sharing yet.')),
-                        );
-                        return;
-                      }
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SharePreviewScreen(
-                            sessionId: session.id!,
+                  if (SocialFeatureToggles.instagramSharingEnabled)
+                    IconButton(
+                      icon: Icon(
+                        Icons.share,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      onPressed: () {
+                        if (session.id == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Session not ready for sharing yet.')),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SharePreviewScreen(
+                              sessionId: session.id!,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    tooltip: 'Share to Instagram',
-                  ),
+                        );
+                      },
+                      tooltip: 'Share Session',
+                    ),
                 ],
               ),
             ],

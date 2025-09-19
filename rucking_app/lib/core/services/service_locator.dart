@@ -48,7 +48,6 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/features/ruck_buddies/di/ruck_buddies_injection_container.dart';
 import 'package:rucking_app/features/social/di/social_injection_container.dart';
-import 'package:rucking_app/features/social_sharing/services/instagram_post_service.dart';
 import 'package:rucking_app/features/health_integration/bloc/health_bloc.dart';
 import 'package:rucking_app/features/notifications/di/notification_injection_container.dart';
 import 'package:rucking_app/features/achievements/di/achievement_injection_container.dart';
@@ -85,7 +84,6 @@ import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/core/services/goals_api_service.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
-import 'package:rucking_app/features/social_sharing/services/instagram_post_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_coordinator.dart';
 import 'package:rucking_app/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:rucking_app/features/profile/domain/repositories/profile_repository.dart';
@@ -265,8 +263,6 @@ Future<void> setupServiceLocator() async {
     getIt.registerSingleton<ActiveSessionStorage>(
         ActiveSessionStorage(getIt<SharedPreferences>()));
 
-    // Instagram Post Service (needs SessionRepository)
-    getIt.registerSingleton<InstagramPostService>(InstagramPostService());
 
     // Session cleanup service for defensive maintenance
     getIt.registerSingleton<SessionCleanupService>(

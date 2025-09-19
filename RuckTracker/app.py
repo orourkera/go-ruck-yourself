@@ -257,13 +257,15 @@ def block_bots():
                 '20.0',     # Microsoft Azure (Bing)
                 '20.25',    # Microsoft Azure (Bing)
                 '20.169',   # Microsoft Azure (Bing)
+                '135.237',  # Additional Microsoft/Bot IP
                 '18.97',    # AWS (Amazon/Alexa)
                 '18.206',   # AWS (Amazon/Alexa)
                 '173.252',  # Facebook
                 '185.191',  # Semrush
                 '47.128',   # Alibaba Cloud (Asian search engines)
             ]
-            if ip_prefix in bot_ip_prefixes and request_path.startswith(('/blog', '/terms', '/privacy', '/about', '/rucking')):
+            if ip_prefix in bot_ip_prefixes and (request_path.startswith(('/blog', '/terms', '/privacy', '/about', '/rucking')) or
+                                                  request_path == '/rucking-calorie-calculator'):
                 return  # Allow crawl from known bot IPs on public content
 
     # Allow known crawlers on public paths

@@ -586,7 +586,7 @@ class ShareCardWidget extends StatelessWidget {
             style: AppTextStyles.displayLarge.copyWith(
               color: Colors.white, // Changed back to white
               fontWeight: FontWeight.bold,
-              fontSize: 40, // Smaller for better fit in Instagram post
+              fontSize: 40, // Optimized for social media sharing
             ),
           ),
 
