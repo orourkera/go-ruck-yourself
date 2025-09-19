@@ -30,6 +30,7 @@ import 'package:rucking_app/features/ruck_session/data/repositories/session_repo
 import 'package:latlong2/latlong.dart' as latlong;
 import '../widgets/active_session_dialog.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/plan_session_recommendations.dart';
+import 'package:rucking_app/features/coaching/presentation/widgets/ai_coaching_session_widget.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -89,6 +90,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   // Coaching plan data
   Map<String, dynamic>? _coachingPlan;
   Map<String, dynamic>? _nextSession;
+  Map<String, dynamic>? _coachingProgress;
   final TextEditingController _offlineDurationMinutesController =
       TextEditingController();
   final TextEditingController _offlineDurationSecondsController =
@@ -210,12 +212,14 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       if (planResponse.isNotEmpty) {
         _coachingPlan = planResponse;
 
-        // Fetch next session recommendations
+        // Fetch coaching plan progress
         final progressResponse = await apiClient
             .get('/user-coaching-plans/${_coachingPlan!['id']}/progress');
-        if (progressResponse != null &&
-            progressResponse['nextSession'] != null) {
-          _nextSession = progressResponse['nextSession'];
+        if (progressResponse != null) {
+          _coachingProgress = progressResponse;
+          if (progressResponse['nextSession'] != null) {
+            _nextSession = progressResponse['nextSession'];
+          }
         }
       }
     } catch (e) {
@@ -1226,6 +1230,15 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   style: AppTextStyles.titleLarge, // headline6 -> titleLarge
                 ),
                 const SizedBox(height: 24),
+
+                // AI Coaching guidance
+                AICoachingSessionWidget(
+                  coachingPlan: _coachingPlan,
+                  nextSession: _nextSession,
+                  progress: _coachingProgress,
+                  preferMetric: _preferMetric,
+                  coachingPersonality: _coachingPlan?['personality'],
+                ),
 
                 // Coaching plan recommendations
                 PlanSessionRecommendations(

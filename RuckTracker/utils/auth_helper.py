@@ -147,7 +147,10 @@ def get_user_from_token(token: str) -> Optional[dict]:
         User information dictionary if valid, None otherwise
     """
     try:
-        jwt_secret = os.environ.get('JWT_SECRET', 'your-secret-key')
+        jwt_secret = os.environ.get('JWT_SECRET')
+        if not jwt_secret:
+            logger.error("JWT_SECRET environment variable not set")
+            return None
         payload = jwt.decode(token, jwt_secret, algorithms=['HS256'])
         
         return {

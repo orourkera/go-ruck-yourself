@@ -1,6 +1,6 @@
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:get_it/get_it.dart';
 
 /// Enhanced API client wrapper that automatically handles errors with Sentry

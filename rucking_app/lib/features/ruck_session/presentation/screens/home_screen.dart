@@ -67,6 +67,8 @@ import 'package:rucking_app/features/ruck_session/presentation/screens/active_se
 import 'package:rucking_app/features/ruck_session/presentation/widgets/ai_insights_widget.dart';
 import 'package:rucking_app/core/config/feature_flags.dart';
 import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
+import 'package:rucking_app/features/coaching/presentation/widgets/new_user_coaching_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -158,6 +160,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Non-critical, continue without completion service
       developer.log('Failed to start duel completion service: $e');
     }
+
+    // Check if user is new and should see coaching prompt
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkNewUserCoachingPrompt();
+    });
   }
 
   @override
@@ -180,6 +187,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Share prompts are now handled directly after session completion
     // No need to check on app resume to avoid spam
+  }
+
+  Future<void> _checkNewUserCoachingPrompt() async {
+    try {
+      // Check if we've already shown the prompt
+      final prefs = await SharedPreferences.getInstance();
+      final hasShownCoachingPrompt = prefs.getBool('hasShownCoachingPrompt') ?? false;
+
+      if (hasShownCoachingPrompt) {
+        return;
+      }
+
+      // Check if user has any qualifying rucks
+      final repository = GetIt.instance<SessionRepository>();
+      final authState = context.read<AuthBloc>().state;
+
+      if (authState is! Authenticated) {
+        return;
+      }
+
+      // Get all user sessions
+      final sessions = await repository.getUserSessions(authState.user.id);
+
+      // Check if user has 0 rucks or only rucks under 5 minutes
+      bool isNewUser = false;
+
+      if (sessions.isEmpty) {
+        isNewUser = true;
+      } else {
+        // Check if all rucks are under 5 minutes (300 seconds)
+        final hasQualifyingRuck = sessions.any((session) =>
+          session.durationSeconds != null && session.durationSeconds! >= 300
+        );
+        isNewUser = !hasQualifyingRuck;
+      }
+
+      if (isNewUser && mounted) {
+        // Show the bottom sheet
+        await NewUserCoachingSheet.show(context);
+
+        // Mark as shown
+        await prefs.setBool('hasShownCoachingPrompt', true);
+      }
+    } catch (e) {
+      developer.log('Error checking for new user coaching prompt: $e');
+    }
   }
 
   Future<void> _checkForSharePrompt() async {

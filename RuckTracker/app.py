@@ -680,17 +680,20 @@ def load_user():
                 logger.error(log_msg)
 
         # Fallback to mock user flow happens below for dev environments
-        
-    # In development, create a mock user when no valid token is present
-    if is_development:
-        logger.debug("Creating mock user for development (no valid auth)")
+
+    # In development ONLY and when explicitly enabled, create a mock user
+    # This should NEVER be active in production
+    if is_development and os.environ.get('ENABLE_DEV_MOCK_USER') == 'true':
+        logger.debug("Creating mock user for development (ENABLE_DEV_MOCK_USER=true)")
         from types import SimpleNamespace
         g.user = SimpleNamespace(
             id="dev-user-id",
-            email="dev@example.com", 
+            email="dev@example.com",
             user_metadata={"name": "Development User"}
         )
         g.user_id = "dev-user-id"
+    elif is_development:
+        logger.debug("Development mode but mock user disabled (set ENABLE_DEV_MOCK_USER=true to enable)")
         g.access_token = None
     
 

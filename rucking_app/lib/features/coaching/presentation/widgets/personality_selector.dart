@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_personality.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 
@@ -17,6 +19,38 @@ class PersonalitySelector extends StatefulWidget {
 
 class _PersonalitySelectorState extends State<PersonalitySelector> {
   CoachingPersonality? _selectedPersonality;
+  bool _isPlayingAudio = false;
+  late ElevenLabsService _elevenLabsService;
+
+  @override
+  void initState() {
+    super.initState();
+    _elevenLabsService = GetIt.instance<ElevenLabsService>();
+  }
+
+  Future<void> _playPersonalityExample(CoachingPersonality personality) async {
+    if (_isPlayingAudio) return;
+
+    setState(() {
+      _isPlayingAudio = true;
+    });
+
+    try {
+      await _elevenLabsService.speak(
+        text: personality.example,
+        personality: personality.id,
+      );
+    } catch (e) {
+      // Silent fail - audio is not critical
+      debugPrint('Failed to play personality example: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPlayingAudio = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +69,8 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                 setState(() {
                   _selectedPersonality = personality;
                 });
+                // Play the example audio when selected
+                _playPersonalityExample(personality);
                 // Don't call widget.onPersonalitySelected immediately - let user see the example first
               },
               child: Container(
@@ -148,7 +184,7 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
 
                 const SizedBox(height: 20),
 
-                // Example quote
+                // Example quote with play button
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -174,6 +210,25 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
                             fontStyle: FontStyle.italic,
                             color: AppColors.primary.withOpacity(0.9),
                             height: 1.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Play/replay button
+                      GestureDetector(
+                        onTap: _isPlayingAudio
+                            ? null
+                            : () => _playPersonalityExample(_selectedPersonality!),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _isPlayingAudio ? Icons.volume_up : Icons.play_arrow,
+                            color: AppColors.primary,
+                            size: 20,
                           ),
                         ),
                       ),

@@ -303,6 +303,17 @@ BLOG_POSTS = [
         "template": "blog/posts/weighted-vest-form-and-fitting.html",
         "image": "images/blog/gear.jpg",
     },
+    {
+        "slug": "weighted-vests-menopause-hormones",
+        "title": "Weighted Vests, Menopause, and Hormones: What the Science Actually Says",
+        "description": "Evidence-based guide on weighted vests for postmenopausal women: bone density, biomarkers, and safe programming with narrative tips and practical steps.",
+        "date": "2025-09-19",
+        "author": "rory@getrucky.com",
+        "tags": ["menopause", "weighted vest", "bone density", "women"],
+        "read_time": 9,
+        "template": "blog/posts/weighted-vests-menopause-hormones.html",
+        "image": "images/blog/vest.jpg",
+    },
 ]
 
 # Build a quick lookup

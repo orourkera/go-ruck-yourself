@@ -8,7 +8,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:get_it/get_it.dart';
 

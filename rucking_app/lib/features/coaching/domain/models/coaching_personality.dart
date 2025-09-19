@@ -134,9 +134,7 @@ class CoachingPersonality {
     southernRedneck,
     yogaInstructor,
     britishButler,
-    sportsCommentator,
     cowboyCowgirl,
     natureLover,
-    sessionAnalyst,
   ];
 }

@@ -6,7 +6,7 @@ import 'package:latlong2/latlong.dart' as latlong;
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/core/utils/met_calculator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/services/location_service.dart';

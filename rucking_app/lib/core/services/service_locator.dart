@@ -4,8 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/enhanced_api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
-import 'package:rucking_app/core/services/auth_service_wrapper.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart' as auth;
 import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
@@ -125,14 +124,13 @@ Future<void> setupServiceLocator() async {
     getIt.registerSingleton<GoalsApiService>(GoalsApiService(apiClient));
     // Coaching service
     getIt.registerSingleton<CoachingService>(CoachingService(apiClient));
-    // 🚩 FEATURE-FLAGGED AUTH SERVICE
-    // This wrapper allows safe switching between legacy auth and simplified Supabase auth
-    // Feature flags control which implementation is used - see feature_flags.dart
-    getIt.registerSingleton<AuthService>(
-        AuthServiceWrapper(getIt<ApiClient>(), getIt<StorageService>()));
+    // Consolidated Auth Service - single, unified implementation
+    // Uses Supabase for authentication with custom profile management
+    getIt.registerSingleton<auth.AuthService>(
+        auth.AuthService(getIt<ApiClient>(), getIt<StorageService>()));
     getIt.registerSingleton<EnhancedApiClient>(EnhancedApiClient(apiClient));
     getIt.registerSingleton<AvatarService>(AvatarService(
-      authService: getIt<AuthService>(),
+      authService: getIt<auth.AuthService>(),
       apiClient: getIt<ApiClient>(),
     ));
 
@@ -146,7 +144,7 @@ Future<void> setupServiceLocator() async {
 
     // Add token refresh interceptor after auth service is initialized
     final tokenRefreshInterceptor = TokenRefreshInterceptor(
-        getIt<Dio>(), getIt<AuthService>(), getIt<StorageService>());
+        getIt<Dio>(), getIt<auth.AuthService>(), getIt<StorageService>());
     getIt<Dio>().interceptors.add(tokenRefreshInterceptor);
 
     getIt.registerSingleton<LocationService>(LocationServiceImpl());
@@ -159,7 +157,7 @@ Future<void> setupServiceLocator() async {
       WatchService(
         getIt<LocationService>(),
         getIt<HealthService>(),
-        getIt<AuthService>(),
+        getIt<auth.AuthService>(),
       ),
     );
 
@@ -245,7 +243,7 @@ Future<void> setupServiceLocator() async {
 
     // Repositories
     getIt.registerSingleton<AuthRepository>(
-        AuthRepositoryImpl(getIt<AuthService>()));
+        AuthRepositoryImpl(getIt<auth.AuthService>()));
 
     // Clubs repository
     getIt.registerSingleton<ClubsRepository>(
@@ -298,7 +296,7 @@ Future<void> setupServiceLocator() async {
     final coordinator = () => ActiveSessionCoordinator(
           sessionRepository: getIt<SessionRepository>(),
           locationService: getIt<LocationService>(),
-          authService: getIt<AuthService>(),
+          authService: getIt<auth.AuthService>(),
           watchService: getIt<WatchService>(),
           storageService: getIt<StorageService>(),
           apiClient: getIt<ApiClient>(),
@@ -360,7 +358,7 @@ Future<void> setupServiceLocator() async {
           routesRepository: getIt<RoutesRepository>(),
           plannedRucksRepository: getIt<PlannedRucksRepository>(),
           gpxService: getIt<GpxService>(),
-          authService: getIt<AuthService>(),
+          authService: getIt<auth.AuthService>(),
         ));
     getIt.registerFactory<ProfileBloc>(() => ProfileBloc(
           avatarService: getIt<AvatarService>(),

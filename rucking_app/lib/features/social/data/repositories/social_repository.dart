@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 

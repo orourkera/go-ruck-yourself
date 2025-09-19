@@ -19,7 +19,7 @@ import 'package:rucking_app/core/models/location_point.dart';
 import 'package:rucking_app/core/models/terrain_segment.dart';
 import 'package:rucking_app/core/models/user.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';

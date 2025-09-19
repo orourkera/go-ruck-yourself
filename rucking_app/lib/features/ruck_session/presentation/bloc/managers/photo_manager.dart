@@ -5,7 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../../core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import '../../../../../core/services/storage_service.dart';
 import '../../../../../core/utils/app_logger.dart';
 import '../../../data/repositories/session_repository.dart';

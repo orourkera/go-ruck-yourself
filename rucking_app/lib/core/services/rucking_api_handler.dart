@@ -4,7 +4,7 @@ import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:flutter/material.dart'; // For GlobalKey, NavigatorState
 import 'package:get_it/get_it.dart'; // For GetIt
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Implementation of the RuckingApi for handling watch messages

@@ -6,7 +6,7 @@ import 'package:get_it/get_it.dart';
 
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/features/ruck_buddies/data/models/ruck_buddy_model.dart';
 
 abstract class RuckBuddiesRemoteDataSource {

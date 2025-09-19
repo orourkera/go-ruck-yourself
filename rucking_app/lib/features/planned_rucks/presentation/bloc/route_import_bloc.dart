@@ -10,7 +10,7 @@ import 'package:rucking_app/core/models/planned_ruck.dart';
 import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/core/repositories/planned_rucks_repository.dart';
 import 'package:rucking_app/core/services/gpx_service.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 // Events

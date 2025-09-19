@@ -14,8 +14,10 @@ import 'package:rucking_app/features/coaching/presentation/widgets/plan_type_car
 import 'package:rucking_app/features/coaching/presentation/widgets/personality_selector.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/plan_preview_card.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
+import 'package:rucking_app/features/coaching/domain/models/science_based_plan.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/personalization_questions.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
+import 'package:rucking_app/features/coaching/presentation/screens/coaching_plan_details_screen.dart';
 
 enum PlanCreationStep {
   greeting,
@@ -156,18 +158,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
       FocusScope.of(context).unfocus();
       FocusManager.instance.primaryFocus?.unfocus();
 
-      // Method 3: Clear all focus nodes
-      if (FocusScope.of(context).hasFocus) {
-        FocusScope.of(context).requestFocus(FocusNode());
-      }
-
-      // Method 4: Widget tree level unfocus
+      // Method 3: Widget tree level unfocus
       WidgetsBinding.instance.focusManager.primaryFocus?.unfocus();
-
-      // Method 5: Create a new unfocusable node and focus it
-      final FocusNode dummyNode = FocusNode();
-      FocusScope.of(context).requestFocus(dummyNode);
-      dummyNode.dispose();
     } catch (e) {
       // If anything fails, at least try the basic approaches
       try {
@@ -368,36 +360,109 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     final username =
         authState is Authenticated ? authState.user.username : 'Rucker';
 
+    // Get the actual plan structure from the database
+    final sciencePlan = ScienceBasedPlan.getPlanById(_selectedPlanType!.id);
+    final baseStructure = sciencePlan?.baseStructure ?? {};
+    final progressionRules = sciencePlan?.progressionRules ?? {};
+
+    // Convert baseStructure to readable format for the prompt
+    final structureDetails = baseStructure.entries
+        .map((e) => '${e.key}: ${e.value}')
+        .join('\n');
+
     final prompt = '''
-Create a detailed personalized training plan brief for ${username}'s ${_selectedPlanType!.name} goal in a motivational coaching tone.
+Create a concise, personalized RUCKING training plan for ${username}'s ${_selectedPlanType!.name} goal using markdown formatting optimized for mobile.
 
-Goal: ${_selectedPlanType!.name}
-Goal Description: ${_selectedPlanType!.description}
-Duration: ${_selectedPlanType!.duration}
+Goal: ${_selectedPlanType!.name} (${_selectedPlanType!.duration})
+Training: ${_personalization!.trainingDaysPerWeek} days/week on ${_personalization!.preferredDays?.join(', ')}
+Plan Type: ${_selectedPlanType!.id}
 
-User Details:
-- Why: ${_personalization!.why?.join(', ')}
-- Success Definition: ${_personalization!.successDefinition}
-- Training Days: ${_personalization!.trainingDaysPerWeek} days per week
-- Preferred Days: ${_personalization!.preferredDays?.join(', ')}
-- Challenges: ${_personalization!.challenges?.join(', ')}
-- Minimum Session: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}${_getStreakTargetDescription()}
+BASE PLAN STRUCTURE FROM DATABASE:
+$structureDetails
 
-Generate a comprehensive plan brief that includes:
+USER PERSONALIZATION (CRITICAL - ADAPT THE BASE PLAN USING THESE):
+1. Why they're doing this: ${_personalization!.why?.join(', ')}
+2. Success definition: ${_personalization!.successDefinition}
+3. Available days: ${_personalization!.trainingDaysPerWeek} days/week on ${_personalization!.preferredDays?.join(', ')}
+4. Main challenges: ${_personalization!.challenges?.join(', ')}
+5. Minimum session time: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}${_getStreakTargetDescription()}
 
-1. MISSION: Why they're here (${_personalization!.why?.join(', ')}) and what success looks like (${_personalization!.successDefinition})
+IMPORTANT: Start with the base plan structure above, then ADAPT it based on their personalization:
+- Adjust volume/intensity based on their available training days
+- Modify workouts to address their specific challenges
+- Ensure sessions fit their time constraints
+- Align progression with their success definition
 
-2. WEEKLY RHYTHM: Specific ${_personalization!.trainingDaysPerWeek}-day training schedule using their preferred days (${_personalization!.preferredDays?.join(', ')}). Include what happens each training day with specific durations, intensities, and session types appropriate for ${_selectedPlanType!.name}.
+Generate a PERSONALIZED RUCKING plan with these sections using BULLETS ONLY:
 
-3. SAFETY GATES: How to handle their specific challenges (${_personalization!.challenges?.join(', ')}). Include red/amber/green decision rules before each session.
+## 🎯 MISSION
+• **Why**: ${_personalization!.why?.join(', ')}
+• **Win**: ${_personalization!.successDefinition}
+• **Timeline**: ${_selectedPlanType!.duration}
 
-4. PROGRESSION: How the plan evolves over ${_selectedPlanType!.duration} with specific rules for increasing difficulty safely.
+## 📅 WEEKLY RUCKING RHYTHM
+ADAPT the base plan to fit ${_personalization!.trainingDaysPerWeek} days on ${_personalization!.preferredDays?.join(', ')}.
+List ONLY their selected days with specific rucking workouts adapted from the base structure:
 
-5. WHAT TO EXPECT: Timeline of what they'll feel each phase of the ${_selectedPlanType!.duration} plan.
+[For each of their preferred days, create a specific ruck workout that:
+- Fits their available time (consider minimum session: ${_personalization!.minimumSessionMinutes} min)
+- Addresses their challenges: ${_personalization!.challenges?.join(', ')}
+- Progresses toward their goal: ${_personalization!.successDefinition}]
 
-6. MINIMUM DAYS: How their ${_personalization!.minimumSessionMinutes}-minute minimum sessions${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''} fit into the plan for busy days.${_getStreakTargetInstruction()}
+## ⚠️ CHALLENGE PROTOCOLS
+For: ${_personalization!.challenges?.join(', ')}
 
-Write in plain text with clear headings - no asterisks, no markdown formatting. Be specific about actual training sessions they'll do. Address their personal challenges directly. Keep it around 400-500 words, detailed and actionable.
+**Green**: [when to go normal]
+**Yellow**: [when to modify]
+**Red**: [when to rest]
+
+## 📈 RUCKING PROGRESSION PATH
+
+**Weeks 1-2: Foundation**
+• Focus: [Base aerobic capacity with light weight]
+• Weight: [Starting weight in lbs/kg]
+• Volume: [X miles/km per week]
+• Milestone: [Complete X continuous rucks]
+
+**Weeks 3-4: Building**
+• Focus: [Increase weight or distance]
+• Weight: [+5-10 lbs/2-5kg]
+• Volume: [+20% distance]
+• Milestone: [First long ruck of X miles/km]
+
+**Weeks 5-6: Pushing**
+• Focus: [Speed work or hills]
+• Weight: [Target training weight]
+• Volume: [Peak weekly mileage]
+• Milestone: [Hit pace goal with weight]
+
+**Weeks 7-8: Peak**
+• Focus: [Event simulation or goal attempt]
+• Weight: [Goal weight]
+• Volume: [Taper if needed]
+• Milestone: [Achieve ${_personalization!.successDefinition}]
+
+## 🔧 MINIMUM RUCK DAYS
+When you only have ${_personalization!.minimumSessionMinutes} min:
+• Option A: [Quick weighted walk, X lbs for X min]
+• Option B: [Stair climbs with ruck, X rounds]${_getStreakTargetInstruction()}
+
+## 💪 EXPECTATIONS
+
+**Week 1-2**: [what you'll feel]
+**Week 3-4**: [what changes]
+**Week 5-6**: [breakthrough point]
+**Final**: [victory state]
+
+Keep under 300 words. Use bullet points, bold text, and clear headers. Be specific with rucking weights, distances, paces.
+
+For ${_selectedPlanType!.id} plan specifically:
+- Fat Loss: Focus on longer duration, moderate weight, steady pace rucks
+- Performance: Focus on speed work, intervals, and heavy carries
+- Daily Discipline: Focus on consistency with manageable daily rucks
+- Base Building: Focus on progressive volume with moderate weights
+
+ALL sessions must be RUCKING (weighted backpack walking/hiking).
 ''';
 
     setState(() {
@@ -409,7 +474,7 @@ Write in plain text with clear headings - no asterisks, no markdown formatting. 
       await _openAiService.stream(
         model: 'gpt-4.1',
         instructions:
-            'You are an enthusiastic AI fitness coach creating a personalized plan summary for ${username}. Address them by name throughout. Be motivational, specific, and exciting. Use plain text formatting only - no markdown, no asterisks, no special formatting. Write in clear paragraphs with proper headings.',
+            'You are a RUCKING coach personalizing a plan for ${username}. CRITICAL: Take the base plan structure provided and ADAPT it based on their 6 personalization responses - their why, success metric, available days, challenges, and time constraints. ALL workouts must be rucking (weighted backpack walking). Use markdown bullets (•), bold text, ## headers. Specify exact ruck weights, distances, paces. Make it truly personalized, not generic.',
         input: prompt,
         temperature: 0.7,
         maxOutputTokens: 650,
@@ -552,13 +617,6 @@ Keep it under 200 words, motivational, and specific to their answers.
         if (mounted) {
           setState(() {
             _currentStep = PlanCreationStep.complete;
-          });
-
-          // Navigate back with success after a brief delay
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) {
-              Navigator.of(context).pop(true);
-            }
           });
         }
       }
@@ -869,36 +927,9 @@ Keep it under 200 words, motivational, and specific to their answers.
       return const SizedBox.shrink();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(12.0),
       child: Column(
         children: [
-          // AI Coach avatar
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.secondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
-                  blurRadius: 15,
-                  spreadRadius: 3,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.psychology,
-              size: 50,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 24),
-
           // Goal title with emoji
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -908,7 +939,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                 style: const TextStyle(fontSize: 32),
               ),
               const SizedBox(width: 12),
-              Flexible(
+              Expanded(
                 child: Text(
                   _selectedPlanType!.name,
                   style: AppTextStyles.headlineMedium.copyWith(
@@ -923,61 +954,66 @@ Keep it under 200 words, motivational, and specific to their answers.
           const SizedBox(height: 32),
 
           // AI-generated personalized summary
-          Flexible(
-            child: Container(
-              width: double.infinity,
-              constraints: BoxConstraints(
-                minHeight: 300,
-                maxHeight: MediaQuery.of(context).size.height * 0.6,
-              ),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Text(
-                      _planPreviewSummary + (_isGeneratingPreview ? '▌' : ''),
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        height: 1.6,
-                      ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MarkdownBody(
+                  data: _planPreviewSummary + (_isGeneratingPreview ? '▌' : ''),
+                  styleSheet: MarkdownStyleSheet(
+                    p: AppTextStyles.bodyLarge.copyWith(height: 1.6),
+                    h2: AppTextStyles.titleLarge.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
                     ),
-                    if (_isGeneratingPreview) ...[
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.primary),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'AI Coach is creating your plan...',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
+                    strong: AppTextStyles.bodyLarge.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    tableHead: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    tableBody: AppTextStyles.bodyMedium,
+                    listBullet: AppTextStyles.bodyLarge,
+                  ),
+                ),
+                if (_isGeneratingPreview) ...[
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AI Coach is creating your plan...',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
-                  ],
-                ),
-              ),
+                  ),
+                ],
+              ],
             ),
           ),
 
@@ -1461,11 +1497,90 @@ Keep it under 200 words, motivational, and specific to their answers.
             ),
           ),
 
+          const SizedBox(height: 32),
+
+          // Action buttons
+          Column(
+            children: [
+              // Primary button - Go to Homepage
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Navigate to homepage
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.home, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Go to Homepage',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Secondary button - View Your Plan
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const CoachingPlanDetailsScreen(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: BorderSide(
+                      color: AppColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.calendar_month, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'View Your Plan',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
           const SizedBox(height: 24),
 
           // Bottom message
           Text(
-            'Check your homepage for personalized insights and session recommendations.',
+            'Your next scheduled activity will appear on the homepage.',
             style: AppTextStyles.bodyMedium.copyWith(
               color: Colors.grey[600],
             ),

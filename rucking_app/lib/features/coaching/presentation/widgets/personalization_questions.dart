@@ -24,7 +24,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   final PageController _pageController = PageController();
   int _currentQuestionIndex = 0;
 
-  PlanPersonalization _personalization = const PlanPersonalization();
+  // Provide sensible defaults so controls like sliders start in an enabled state
+  PlanPersonalization _personalization =
+      const PlanPersonalization(trainingDaysPerWeek: 4);
 
   List<String> get _questions {
     final baseQuestions = [
@@ -33,6 +35,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       "How many days/week can you realistically train?",
       "Which days usually work best?",
       "What's your biggest challenge to hitting this goal?",
+      "What equipment do you have?",
     ];
 
     // Add streak question for Daily Discipline plan
@@ -61,7 +64,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       // Additional fallback methods
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          FocusScope.of(context).requestFocus(FocusNode());
+          FocusScope.of(context).unfocus();
         }
       });
 
@@ -122,6 +125,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       _buildTrainingDaysQuestion(),
       _buildPreferredDaysQuestion(),
       _buildChallengesQuestion(),
+      _buildEquipmentQuestion(),
     ];
 
     // Add streak question for Daily Discipline plan
@@ -136,8 +140,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   bool _canProceed() {
     final isDailyDiscipline = widget.planType?.id == 'daily-discipline';
-    final streakQuestionIndex = isDailyDiscipline ? 5 : -1;
-    final minSessionIndex = isDailyDiscipline ? 6 : 5;
+    final streakQuestionIndex = isDailyDiscipline ? 6 : -1;
+    final minSessionIndex = isDailyDiscipline ? 7 : 6;
 
     switch (_currentQuestionIndex) {
       case 0:
@@ -154,6 +158,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         return _personalization.challenges != null &&
             _personalization.challenges!.isNotEmpty;
       case 5:
+        // Equipment question - always allow proceed (has a default selected)
+        return true;
+      case 6:
         if (isDailyDiscipline) {
           // This is the streak question - require either daily streak or flexible frequency
           return (_personalization.streakTargetDays != null) ||
@@ -163,7 +170,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           // This is the minimum session question - always allow proceed
           return true;
         }
-      case 6:
+      case 7:
         // This is the minimum session question for daily discipline - always allow proceed
         return true;
       default:
@@ -181,7 +188,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       child: Scaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
-          title: Text('Personalize Your Plan (${_currentQuestionIndex + 1}/6)'),
+          title: Text('Personalize Your Plan (${_currentQuestionIndex + 1}/${_questions.length})'),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -807,8 +814,152 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     );
   }
 
+  Widget _buildEquipmentQuestion() {
+    return _buildQuestionCard(
+      question: _questions[5],
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select your available equipment:',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Equipment type selection
+          RadioListTile<String>(
+            title: const Text('I have a rucksack/backpack'),
+            value: 'ruck',
+            groupValue: _personalization.equipmentType ?? 'none',
+            activeColor: AppColors.primary,
+            onChanged: (value) {
+              setState(() {
+                _personalization = _personalization.copyWith(
+                  equipmentType: value,
+                );
+              });
+            },
+          ),
+          RadioListTile<String>(
+            title: const Text('I have a weighted vest'),
+            value: 'vest',
+            groupValue: _personalization.equipmentType ?? 'none',
+            activeColor: AppColors.primary,
+            onChanged: (value) {
+              setState(() {
+                _personalization = _personalization.copyWith(
+                  equipmentType: value,
+                );
+              });
+            },
+          ),
+          RadioListTile<String>(
+            title: const Text('I have both'),
+            value: 'both',
+            groupValue: _personalization.equipmentType ?? 'none',
+            activeColor: AppColors.primary,
+            onChanged: (value) {
+              setState(() {
+                _personalization = _personalization.copyWith(
+                  equipmentType: value,
+                );
+              });
+            },
+          ),
+          RadioListTile<String>(
+            title: const Text('I don\'t have equipment yet'),
+            value: 'none',
+            groupValue: _personalization.equipmentType ?? 'none',
+            activeColor: AppColors.primary,
+            onChanged: (value) {
+              setState(() {
+                _personalization = _personalization.copyWith(
+                  equipmentType: value,
+                  equipmentWeight: null,
+                );
+              });
+            },
+          ),
+
+          // Weight input if they have equipment
+          if (_personalization.equipmentType != null &&
+              _personalization.equipmentType != 'none') ...[
+            const SizedBox(height: 24),
+            Text(
+              'What\'s the maximum weight you can comfortably carry?',
+              style: AppTextStyles.titleSmall.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'Weight',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.primary),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      final weight = double.tryParse(value);
+                      if (weight != null && weight > 0) {
+                        setState(() {
+                          _personalization = _personalization.copyWith(
+                            equipmentWeight: weight,
+                          );
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    'lbs',
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Common starting weights: 20-30 lbs for beginners, 30-45 lbs for intermediate',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildMinimumSessionQuestion() {
-    final questionIndex = widget.planType?.id == 'daily-discipline' ? 6 : 5;
+    final questionIndex = widget.planType?.id == 'daily-discipline' ? 7 : 6;
     return _buildQuestionCard(
       question: _questions[questionIndex],
       content: Column(

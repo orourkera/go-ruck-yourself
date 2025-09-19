@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/auth_service_consolidated.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../data/models/duel_model.dart';
 import '../../domain/entities/duel.dart';

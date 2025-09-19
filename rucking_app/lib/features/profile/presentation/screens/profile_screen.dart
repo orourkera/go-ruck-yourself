@@ -27,6 +27,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:rucking_app/core/utils/push_notification_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/gear/presentation/widgets/profile_gear_sections.dart';
+import 'package:rucking_app/features/coaching/presentation/screens/coaching_plan_details_screen.dart';
 
 /// Screen for displaying and managing user profile
 class ProfileScreen extends StatefulWidget {
@@ -468,6 +469,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       );
                                 },
                               ),
+                            ),
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.fitness_center,
+                              label: 'Coaching Plan',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const CoachingPlanDetailsScreen(),
+                                  ),
+                                );
+                              },
                             ),
                             const Divider(),
                             _buildClickableItem(

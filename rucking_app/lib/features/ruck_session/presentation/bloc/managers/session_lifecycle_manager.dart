@@ -13,7 +13,7 @@ import '../../../../../core/config/app_config.dart';
 import '../../../../../core/models/location_point.dart';
 import '../../../../../core/services/location_service.dart';
 import '../../../../../core/services/api_client.dart';
-import '../../../../../core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import '../../../../../core/services/storage_service.dart';
 import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/services/connectivity_service.dart';

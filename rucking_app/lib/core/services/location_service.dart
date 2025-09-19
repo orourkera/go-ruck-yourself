@@ -133,12 +133,84 @@ class LocationServiceImpl implements LocationService {
   StreamSubscription<Position>? _significantSubscription;
   bool _usingSignificantFallback = false;
 
+  Future<void> _startSignificantChangeFallbackIfNeeded(String reason) async {
+    if (!Platform.isIOS || _usingSignificantFallback) {
+      return;
+    }
+    AppLogger.info('iOS significant-change fallback engaged ($reason)');
+    try {
+      await startSignificantFallback();
+    } catch (e) {
+      AppLogger.error('Failed to start significant-change fallback',
+          exception: e);
+    }
+  }
+
+  Future<void> _stopSignificantChangeFallbackIfNeeded() async {
+    if (!Platform.isIOS || !_usingSignificantFallback) {
+      return;
+    }
+    try {
+      await stopSignificantFallback();
+      AppLogger.info('Significant-change fallback disabled after GPS recovery');
+    } catch (e) {
+      AppLogger.error('Failed to stop significant-change fallback',
+          exception: e);
+    }
+  }
+
   @override
   Stream<List<LocationPoint>> get batchedLocationUpdates =>
       _batchController.stream;
 
   @override
   LocationTrackingConfig get currentTrackingConfig => _currentConfig;
+
+  LocationSettings _buildLocationSettings({
+    Duration? intervalOverride,
+    String? androidNotificationText,
+  }) {
+    if (Platform.isAndroid) {
+      final interval = intervalOverride ?? const Duration(seconds: 5);
+      return AndroidSettings(
+        accuracy: _currentConfig.accuracy,
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
+        intervalDuration: interval,
+        forceLocationManager: false,
+        useMSLAltitude: true,
+        foregroundNotificationConfig: _canStartForegroundService
+            ? ForegroundNotificationConfig(
+                notificationTitle: 'Ruck in Progress',
+                notificationText:
+                    androidNotificationText ?? 'Tracking your ruck session - tap to return to app',
+                enableWakeLock: true,
+                enableWifiLock: true,
+                notificationChannelName: 'Ruck Session Tracking',
+                notificationIcon:
+                    const AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+                setOngoing: true,
+                color: const Color.fromARGB(255, 255, 165, 0),
+              )
+            : null,
+      );
+    }
+
+    if (Platform.isIOS) {
+      return AppleSettings(
+        accuracy: _currentConfig.accuracy,
+        distanceFilter: _currentConfig.distanceFilter.toInt(),
+        pauseLocationUpdatesAutomatically: false,
+        activityType: ActivityType.fitness,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    }
+
+    return LocationSettings(
+      accuracy: _currentConfig.accuracy,
+      distanceFilter: _currentConfig.distanceFilter.toInt(),
+    );
+  }
 
   @override
   Future<bool> hasLocationPermission() async {
@@ -364,51 +436,7 @@ class LocationServiceImpl implements LocationService {
     _isTracking = true;
     _lastLocationUpdate = DateTime.now();
 
-    // Configure location settings based on platform
-    late LocationSettings locationSettings;
-
-    if (Platform.isAndroid) {
-      locationSettings = AndroidSettings(
-        accuracy: _currentConfig.accuracy,
-        distanceFilter: _currentConfig.distanceFilter.toInt(),
-        intervalDuration: const Duration(seconds: 5), // Force frequent updates
-        forceLocationManager:
-            false, // Use FusedLocationProvider for better battery
-        useMSLAltitude: true, // Use MSL altitude if available
-        foregroundNotificationConfig: _canStartForegroundService
-            ? const ForegroundNotificationConfig(
-                notificationTitle: 'Ruck in Progress',
-                notificationText:
-                    'Tracking your ruck session - tap to return to app',
-                enableWakeLock: true, // Prevent CPU sleep
-                enableWifiLock: true, // Prevent WiFi sleep
-                notificationChannelName: 'Ruck Session Tracking',
-                notificationIcon:
-                    AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
-                setOngoing: true, // Prevents dismissal during active sessions
-                color: Color.fromARGB(
-                    255, 255, 165, 0), // Orange color for high visibility
-              )
-            : null,
-      );
-    } else if (Platform.isIOS) {
-      locationSettings = AppleSettings(
-        accuracy: _currentConfig.accuracy,
-        distanceFilter: _currentConfig.distanceFilter.toInt(),
-        pauseLocationUpdatesAutomatically:
-            false, // Critical: Keep GPS active in background
-        activityType: ActivityType.fitness, // Optimize for fitness tracking
-        showBackgroundLocationIndicator:
-            true, // Required for background location
-        allowBackgroundLocationUpdates: true, // Enable background updates
-      );
-    } else {
-      // Fallback for other platforms
-      locationSettings = LocationSettings(
-        accuracy: _currentConfig.accuracy,
-        distanceFilter: _currentConfig.distanceFilter.toInt(),
-      );
-    }
+    final locationSettings = _buildLocationSettings();
 
     // Raw position stream with platform-specific settings
     final positionStream = Geolocator.getPositionStream(
@@ -489,6 +517,7 @@ class LocationServiceImpl implements LocationService {
         // Update last location update timestamp
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
+        _stopSignificantChangeFallbackIfNeeded();
 
         // Debug logging removed for performance - high frequency GPS updates cause ANR
         // AppLogger.debug('Location update: ${position.latitude}, ${position.longitude} (±${position.accuracy}m) - added to batch (${_locationBatch.length} total)');
@@ -635,6 +664,7 @@ class LocationServiceImpl implements LocationService {
           DateTime.now().difference(_lastLocationUpdate!).inSeconds >
               _locationTimeoutSeconds) {
         AppLogger.warning('Location timeout detected - attempting restart');
+        _startSignificantChangeFallbackIfNeeded('timeout');
         _restartLocationTracking();
       }
     });
@@ -653,6 +683,7 @@ class LocationServiceImpl implements LocationService {
         if (timeDiff > _stalenessCheckSeconds) {
           AppLogger.warning(
               'Stale location detected (${timeDiff}s old) - requesting fresh location');
+          _startSignificantChangeFallbackIfNeeded('staleness');
           _requestFreshLocation();
         }
       }
@@ -664,6 +695,10 @@ class LocationServiceImpl implements LocationService {
     if (!_isTracking) return;
 
     AppLogger.info('Restarting location tracking...');
+
+    if (Platform.isIOS) {
+      _startSignificantChangeFallbackIfNeeded('restart');
+    }
 
     // Safely cancel existing subscription
     try {
@@ -680,22 +715,8 @@ class LocationServiceImpl implements LocationService {
 
     // Restart the position stream
     try {
-      final locationSettings = AndroidSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: _currentConfig.distanceFilter.toInt(),
-        intervalDuration: const Duration(seconds: 5),
-        foregroundNotificationConfig: _canStartForegroundService
-            ? const ForegroundNotificationConfig(
-                notificationTitle: 'Ruck in Progress',
-                notificationText: 'GPS reconnected - tracking resumed',
-                enableWakeLock: true,
-                enableWifiLock: true,
-                notificationChannelName: 'Ruck Session Tracking',
-                notificationIcon:
-                    AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
-                setOngoing: true,
-              )
-            : null,
+      final locationSettings = _buildLocationSettings(
+        androidNotificationText: 'GPS reconnected - tracking resumed',
       );
 
       final positionStream =
@@ -723,6 +744,7 @@ class LocationServiceImpl implements LocationService {
               .add(locationPoint); // For UI updates (distance, elevation, map)
           _lastLocationUpdate = DateTime.now();
           _lastValidLocation = locationPoint;
+          _stopSignificantChangeFallbackIfNeeded();
 
           AppLogger.info('Location tracking resumed successfully');
         },
@@ -766,6 +788,7 @@ class LocationServiceImpl implements LocationService {
             .add(locationPoint); // For UI updates (distance, elevation, map)
         _lastLocationUpdate = DateTime.now();
         _lastValidLocation = locationPoint;
+        _stopSignificantChangeFallbackIfNeeded();
 
         AppLogger.info('Fresh location obtained');
       }
@@ -849,6 +872,8 @@ class LocationServiceImpl implements LocationService {
       // Log but don't crash - background service stop failures are common
       AppLogger.warning('Background service stop failed (safe to ignore): $e');
     }
+
+    await _stopSignificantChangeFallbackIfNeeded();
 
     // Clear tracking state
     _lastLocationUpdate = null;
@@ -968,9 +993,8 @@ class LocationServiceImpl implements LocationService {
       }
 
       // Start tracking with new configuration
-      final locationSettings = LocationSettings(
-        accuracy: _currentConfig.accuracy,
-        distanceFilter: _currentConfig.distanceFilter.toInt(),
+      final locationSettings = _buildLocationSettings(
+        androidNotificationText: 'Ruck in Progress',
       );
 
       _rawLocationSubscription = Geolocator.getPositionStream(
@@ -995,6 +1019,7 @@ class LocationServiceImpl implements LocationService {
             _locationController.add(locationPoint);
             _lastLocationUpdate = DateTime.now();
             _lastValidLocation = locationPoint;
+            _stopSignificantChangeFallbackIfNeeded();
           }
         },
         onError: (error) {
@@ -1105,5 +1130,7 @@ class LocationServiceImpl implements LocationService {
     } catch (e) {
       AppLogger.debug('Safe to ignore - dispose batch controller close: $e');
     }
+
+    _stopSignificantChangeFallbackIfNeeded();
   }
 }

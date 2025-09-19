@@ -3,7 +3,7 @@ import 'package:rucking_app/features/planned_rucks/presentation/bloc/route_impor
 import 'package:rucking_app/core/repositories/planned_rucks_repository.dart';
 import 'package:rucking_app/core/repositories/routes_repository.dart';
 import 'package:rucking_app/core/services/gpx_service.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:dio/dio.dart';
@@ -129,7 +129,7 @@ class _ServiceLocator {
       } else if (T == GpxService) {
         _services[T] = GpxService();
       } else if (T == AuthService) {
-        _services[T] = AuthServiceImpl(
+        _services[T] = AuthService(
           call<ApiClient>(),
           call<StorageService>(),
         );

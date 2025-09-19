@@ -3,7 +3,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:rucking_app/core/services/api_client.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

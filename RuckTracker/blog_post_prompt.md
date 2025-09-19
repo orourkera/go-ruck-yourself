@@ -54,6 +54,8 @@ Create engaging, SEO-optimized blog posts about rucking that educate, inspire, a
 - **Bullet points and numbered lists** for easy scanning
 - **Short paragraphs** (2-4 sentences max)
 - **Include relevant stats in callout boxes**
+ - **Narrative-first rule (REQUIRED):** Each H2 section must include at least two narrative paragraphs. Lists must never stand alone—always write a lead-in paragraph before a list and a closing paragraph after it to interpret and transition.
+ - **Balance requirement:** Maintain approximately **70% narrative / 30% lists** overall. If a section is drifting to all bullets, convert key bullets into prose.
 
 ## Content Guidelines
 
@@ -321,6 +323,8 @@ Include these internal links where relevant:
 ```
 
 ## Final Checklist Before Publishing:
+- [ ] Narrative-first structure: every H2 section has ≥2 narrative paragraphs
+- [ ] Lists are bracketed by paragraphs (no sections consisting only of bullets)
 - [ ] Primary keyword in title, H1, first paragraph, conclusion
 - [ ] 3+ semantic/related keywords used naturally
 - [ ] Meta description written and optimized

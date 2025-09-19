@@ -1,5 +1,5 @@
 import 'package:rucking_app/core/models/user.dart';
-import 'package:rucking_app/core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
@@ -37,16 +37,9 @@ class AuthRepositoryImpl implements AuthRepository {
     String? dateOfBirth,
     String? gender,
   }) async {
-    return await _authService.googleRegister(
-      email: email,
-      displayName: displayName,
-      username: username,
-      preferMetric: preferMetric,
-      weightKg: weightKg,
-      heightCm: heightCm,
-      dateOfBirth: dateOfBirth,
-      gender: gender,
-    );
+    // Google sign-in handles registration automatically
+    // The consolidated auth service creates profile on first login
+    return await _authService.googleSignIn();
   }
 
   @override

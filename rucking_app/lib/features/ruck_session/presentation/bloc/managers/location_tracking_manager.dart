@@ -9,7 +9,7 @@ import 'package:get_it/get_it.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import '../../../../../core/services/api_client.dart';
-import '../../../../../core/services/auth_service.dart';
+import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import '../../../../../core/services/location_service.dart';
 import '../../../../../core/services/watch_service.dart';
 import '../../../../../core/services/barometer_service.dart';
