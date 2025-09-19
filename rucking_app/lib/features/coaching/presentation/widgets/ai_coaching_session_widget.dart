@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -35,12 +35,12 @@ class _AICoachingSessionWidgetState extends State<AICoachingSessionWidget> {
   String _aiMessage = '';
   bool _isLoading = true;
   bool _isStreaming = false;
-  late OpenAIResponsesService _openAiService;
+  late OpenAIService _openAiService;
 
   @override
   void initState() {
     super.initState();
-    _openAiService = GetIt.instance<OpenAIResponsesService>();
+    _openAiService = GetIt.instance<OpenAIService>();
     _generateAIGuidance();
   }
 
@@ -121,31 +121,28 @@ Match the "$personality" coaching style exactly. Keep it concise and focused on 
 
       setState(() {
         _aiMessage = '';
-        _isStreaming = true;
-        _isLoading = false;
+        _isLoading = true;
       });
 
-      await _openAiService.stream(
-        model: 'gpt-4o-mini',
-        instructions: 'You are a concise rucking coach. Keep responses under 50 words. Be specific and actionable.',
-        input: prompt,
-        temperature: 0.7,
-        maxOutputTokens: 150,
-        onDelta: (delta) {
-          if (mounted) {
-            setState(() {
-              _aiMessage += delta;
-            });
-          }
+      // Use generateMessage instead of non-existent stream method
+      final response = await _openAiService.generateMessage(
+        context: {
+          'prompt': prompt,
+          'trigger': {'type': 'coaching_session'},
+          'user': {'personality': 'coach'},
         },
-        onDone: () {
-          if (mounted) {
-            setState(() {
-              _isStreaming = false;
-            });
-          }
-        },
+        personality: 'coach',
+        modelOverride: 'gpt-4o-mini',
+        maxTokensOverride: 150,
+        temperatureOverride: 0.7,
       );
+
+      if (mounted) {
+        setState(() {
+          _aiMessage = response ?? 'Unable to generate coaching advice at this time.';
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       AppLogger.error('Failed to generate AI coaching guidance: $e');
       if (mounted) {

@@ -62,8 +62,8 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Plan updated successfully!'),
+      SnackBar(
+        content: const Text('Plan updated successfully!'),
         backgroundColor: AppColors.success,
       ),
     );

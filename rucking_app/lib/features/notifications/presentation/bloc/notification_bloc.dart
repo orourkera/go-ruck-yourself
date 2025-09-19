@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vibration/vibration.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
-import 'package:rucking_app/features/notifications/domain/entities/app_notification.dart';
 import 'package:rucking_app/features/notifications/domain/repositories/notification_repository.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_event.dart';
 import 'package:rucking_app/features/notifications/presentation/bloc/notification_state.dart';

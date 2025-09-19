@@ -208,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
 
       // Get all user sessions
-      final sessions = await repository.getUserSessions(authState.user.id);
+      final sessions = await repository.fetchSessionHistory();
 
       // Check if user has 0 rucks or only rucks under 5 minutes
       bool isNewUser = false;
@@ -218,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       } else {
         // Check if all rucks are under 5 minutes (300 seconds)
         final hasQualifyingRuck = sessions.any((session) =>
-          session.durationSeconds != null && session.durationSeconds! >= 300
+          session.duration.inSeconds >= 300
         );
         isNewUser = !hasQualifyingRuck;
       }

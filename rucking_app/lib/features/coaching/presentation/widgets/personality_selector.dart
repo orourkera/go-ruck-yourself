@@ -36,13 +36,19 @@ class _PersonalitySelectorState extends State<PersonalitySelector> {
     });
 
     try {
-      await _elevenLabsService.speak(
+      final audioBytes = await _elevenLabsService.synthesizeSpeech(
         text: personality.example,
         personality: personality.id,
       );
+
+      if (audioBytes != null) {
+        // For now, just synthesize the speech - playing would require AudioService
+        // This at least validates the voice synthesis works
+        debugPrint('Personality example synthesized successfully');
+      }
     } catch (e) {
       // Silent fail - audio is not critical
-      debugPrint('Failed to play personality example: $e');
+      debugPrint('Failed to synthesize personality example: $e');
     } finally {
       if (mounted) {
         setState(() {

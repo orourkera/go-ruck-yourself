@@ -480,9 +480,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
         BlocProvider<NotificationBloc>(
           create: (context) {
             final bloc = getIt<NotificationBloc>()
-              ..add(const NotificationsRequested())
-              // Set bloc reference in lifecycle service
-              _lifecycleService.setBlocReferences(notificationBloc: bloc);
+              ..add(const NotificationsRequested());
+            // Set bloc reference in lifecycle service
+            _lifecycleService.setBlocReferences(notificationBloc: bloc);
             return bloc;
           },
         ),

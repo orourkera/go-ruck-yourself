@@ -9,6 +9,8 @@ class PlanPersonalization {
   final int? streakTargetDays;
   final int? streakTargetRucks;
   final int? streakTimeframeDays;
+  final String? equipmentType;
+  final double? equipmentWeight;
 
   const PlanPersonalization({
     this.why,
@@ -21,6 +23,8 @@ class PlanPersonalization {
     this.streakTargetDays,
     this.streakTargetRucks,
     this.streakTimeframeDays,
+    this.equipmentType,
+    this.equipmentWeight,
   });
 
   PlanPersonalization copyWith({
@@ -34,6 +38,8 @@ class PlanPersonalization {
     int? streakTargetDays,
     int? streakTargetRucks,
     int? streakTimeframeDays,
+    String? equipmentType,
+    double? equipmentWeight,
   }) {
     return PlanPersonalization(
       why: why ?? this.why,
@@ -47,6 +53,8 @@ class PlanPersonalization {
       streakTargetDays: streakTargetDays ?? this.streakTargetDays,
       streakTargetRucks: streakTargetRucks ?? this.streakTargetRucks,
       streakTimeframeDays: streakTimeframeDays ?? this.streakTimeframeDays,
+      equipmentType: equipmentType ?? this.equipmentType,
+      equipmentWeight: equipmentWeight ?? this.equipmentWeight,
     );
   }
 
@@ -62,6 +70,8 @@ class PlanPersonalization {
       'streakTargetDays': streakTargetDays,
       'streakTargetRucks': streakTargetRucks,
       'streakTimeframeDays': streakTimeframeDays,
+      'equipmentType': equipmentType,
+      'equipmentWeight': equipmentWeight,
     };
   }
 
@@ -77,6 +87,8 @@ class PlanPersonalization {
       streakTargetDays: json['streakTargetDays'] as int?,
       streakTargetRucks: json['streakTargetRucks'] as int?,
       streakTimeframeDays: json['streakTimeframeDays'] as int?,
+      equipmentType: json['equipmentType'] as String?,
+      equipmentWeight: (json['equipmentWeight'] as num?)?.toDouble(),
     );
   }
 

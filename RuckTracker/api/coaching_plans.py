@@ -296,7 +296,32 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
                 personalized_structure['starting_load']['percentage'] = '8-12% bodyweight'
                 adaptations.append("Conservative load progression for injury prevention")
     
-    # 4. Adjust based on success definition (affects focus areas)
+    # 4. Handle equipment preferences
+    equipment_type = personalization.get('equipment_type')
+    equipment_weight = personalization.get('equipment_weight')
+
+    if equipment_type:
+        if equipment_type == 'none':
+            adaptations.append("Bodyweight and alternative loading methods emphasized until equipment acquired")
+            personalized_structure['equipment_notes'] = 'Start with household items in a regular backpack'
+        elif equipment_type == 'vest':
+            adaptations.append("Weighted vest adaptations provided for all sessions")
+            personalized_structure['equipment_notes'] = 'Vest-specific form cues included'
+        elif equipment_type == 'both':
+            adaptations.append("Mix of ruck and vest sessions for variety")
+            personalized_structure['equipment_notes'] = 'Alternate between ruck and vest for different stimulus'
+
+        if equipment_weight and equipment_weight > 0:
+            # Convert to percentage of assumed bodyweight (assume 70kg/155lbs average)
+            weight_percentage = (equipment_weight / 70) * 100
+            if weight_percentage < 15:
+                personalized_structure['starting_load']['percentage'] = '5-8% bodyweight'
+                adaptations.append(f"Conservative loading based on {equipment_weight}kg max capacity")
+            elif weight_percentage > 40:
+                personalized_structure['starting_load']['percentage'] = '12-15% bodyweight'
+                adaptations.append(f"Progressive loading available with {equipment_weight}kg capacity")
+
+    # 5. Adjust based on success definition (affects focus areas)
     success_definition = personalization.get('success_definition', '')
     if success_definition:
         success_lower = success_definition.lower()
@@ -310,7 +335,7 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
             # Performance-oriented modifications
             adaptations.append("Performance-focused pacing and tempo work emphasized")
     
-    # 5. Preferred days scheduling
+    # 6. Preferred days scheduling
     training_schedule = []
     preferred_days = personalization.get('preferred_days', [])
     if preferred_days:
@@ -415,8 +440,20 @@ class CoachingPlansResource(Resource):
                 "coaching_personality": coaching_personality,
                 "status": "active"
             }
-            
+
             response = supabase.table("coaching_plans").insert(plan_data).execute()
+
+            # Also save equipment preferences to user profile
+            equipment_type = personalization.get('equipment_type')
+            equipment_weight = personalization.get('equipment_weight')
+            if equipment_type or equipment_weight:
+                user_update = {}
+                if equipment_type:
+                    user_update['equipment_type'] = equipment_type
+                if equipment_weight:
+                    user_update['equipment_weight_kg'] = equipment_weight
+
+                supabase.table("users").update(user_update).eq("id", g.user_id).execute()
             
             if not response.data:
                 return error_response("Failed to create coaching plan", 500)
