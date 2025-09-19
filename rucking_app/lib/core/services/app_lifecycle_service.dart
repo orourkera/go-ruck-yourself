@@ -10,6 +10,7 @@ import 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/features/health_integration/domain/health_service.dart';
+import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 
 /// Service to handle app lifecycle events and manage background services
 class AppLifecycleService with WidgetsBindingObserver {
@@ -32,6 +33,8 @@ class AppLifecycleService with WidgetsBindingObserver {
   ActiveSessionBloc? _activeSessionBloc;
   NotificationBloc? _notificationBloc;
   AuthBloc? _authBloc;
+
+  NotificationBloc? get notificationBloc => _notificationBloc;
 
   /// Initialize the lifecycle service
   void initialize() {
@@ -177,8 +180,10 @@ class AppLifecycleService with WidgetsBindingObserver {
       if (_notificationBloc != null && authState is Authenticated) {
         AppLogger.info('User authenticated - resuming notification polling');
         _notificationBloc!.add(const NotificationsRequested());
-        _notificationBloc!.resumePolling(interval: const Duration(seconds: 30));
+        _notificationBloc!.resumePolling();
       }
+
+      FirebaseMessagingService().processQueuedNotificationRefresh();
     } catch (e) {
       AppLogger.error('Error handling app resume: $e');
     }

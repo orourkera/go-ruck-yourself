@@ -11,8 +11,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:get_it/get_it.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
+import 'package:rucking_app/core/services/app_lifecycle_service.dart';
 import 'package:rucking_app/core/services/navigation_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import '../../features/notifications/util/notification_navigation.dart';
@@ -34,6 +36,8 @@ class FirebaseMessagingService {
   String? _deviceToken;
   int _notificationIdCounter = 1000; // Start from 1000 to avoid conflicts
   RemoteMessage? _pendingInitialMessage;
+  static const String _pendingRefreshKey =
+      'rucking_app.pending_notification_refresh';
 
   /// Initialize Firebase Messaging
   Future<void> initialize() async {
@@ -41,13 +45,13 @@ class FirebaseMessagingService {
 
     try {
       final isProduction = !kDebugMode;
-      print('🔔 Starting Firebase Messaging initialization...');
-      print('🔔 Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}');
+      AppLogger.info('Starting Firebase Messaging initialization');
+      AppLogger.debug('FCM environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}');
 
       // Request permission for notifications (non-blocking)
-      _requestNotificationPermissions().catchError((e) {
-        print('⚠️ Permission request failed: $e');
-      });
+      _requestNotificationPermissions().catchError(
+        (e) => AppLogger.warning('Notification permission request failed: $e'),
+      );
 
       // Initialize local notifications
       await _initializeLocalNotifications();
@@ -86,19 +90,15 @@ class FirebaseMessagingService {
       _deviceToken = await _getTokenWithRetry();
 
       if (_deviceToken == null) {
-        print('⚠️ Warning: Failed to obtain FCM token after multiple attempts');
-        print(
-            '📱 Push notifications will be unavailable until token is obtained');
-        // Don't throw exception - allow app to continue without push notifications
-        // Token can be retried later when network conditions improve
-
-        // Schedule background retry after 30 seconds
-        Future.delayed(const Duration(seconds: 30), () {
-          retryTokenInBackground();
-        });
+        AppLogger.warning(
+            'Failed to obtain FCM token after multiple attempts; enabling fallback polling');
+        AppLifecycleService.instance.notificationBloc
+            ?.startFallbackPolling(interval: const Duration(minutes: 2));
+        Future.delayed(const Duration(seconds: 30), retryTokenInBackground);
+      } else {
+        AppLogger.info('FCM token obtained successfully');
+        AppLifecycleService.instance.notificationBloc?.stopPolling();
       }
-
-      print('🔔 FCM Token result: ${_deviceToken ?? "STILL NULL"}');
 
       if (_deviceToken == null) {
         print(
@@ -128,11 +128,12 @@ class FirebaseMessagingService {
 
       // Listen for token refresh
       _firebaseMessaging.onTokenRefresh.listen((newToken) async {
-        print('🔔 FCM Token refreshed: $newToken');
+        AppLogger.info('FCM token refreshed');
         _deviceToken = newToken;
-        _registerDeviceTokenIfAuthenticated(newToken).catchError((e) {
-          print('⚠️ Token refresh registration failed: $e');
-        });
+        AppLifecycleService.instance.notificationBloc?.stopPolling();
+        _registerDeviceTokenIfAuthenticated(newToken).catchError(
+          (e) => AppLogger.warning('Token refresh registration failed: $e'),
+        );
       });
 
       // Handle foreground messages
@@ -149,7 +150,8 @@ class FirebaseMessagingService {
       }
 
       _isInitialized = true;
-      print('✅ Firebase Messaging initialized successfully');
+      await processQueuedNotificationRefresh();
+      AppLogger.info('Firebase Messaging initialized successfully');
     } catch (e) {
       // Monitor Firebase messaging initialization failures (critical for notifications)
       await AppErrorHandler.handleCriticalError(
@@ -378,13 +380,9 @@ class FirebaseMessagingService {
 
   /// Handle foreground messages (when app is open)
   void _handleForegroundMessage(RemoteMessage message) {
-    print('🔔 Received foreground message: ${message.messageId}');
-    print('🔔 Title: ${message.notification?.title}');
-    print('🔔 Body: ${message.notification?.body}');
-    print('🔔 Data: ${message.data}');
-
-    // Show local notification
+    AppLogger.debug('Received foreground message: ${message.messageId}');
     _showLocalNotification(message);
+    _triggerImmediateRefresh();
   }
 
   /// Show local notification for foreground messages
@@ -428,8 +426,9 @@ class FirebaseMessagingService {
 
   /// Handle background message taps (when app is in background)
   void _handleBackgroundMessageTap(RemoteMessage message) {
-    print('Background message tapped: ${message.messageId}');
+    AppLogger.debug('Background message tapped: ${message.messageId}');
     _navigateFromNotification(message.data);
+    _triggerImmediateRefresh();
   }
 
   /// Handle local notification taps
@@ -813,19 +812,22 @@ class FirebaseMessagingService {
       return; // Already have token
     }
 
-    print('🔄 Attempting background FCM token retrieval...');
+    AppLogger.debug('Attempting background FCM token retrieval');
 
     try {
       _deviceToken = await _getTokenWithRetry(maxAttempts: 2);
 
       if (_deviceToken != null) {
         await _registerDeviceToken(_deviceToken!);
-        print('✅ Background FCM token retrieval successful');
+        AppLogger.info('Background FCM token retrieval successful');
+        AppLifecycleService.instance.notificationBloc?.stopPolling();
       } else {
-        print('❌ Background FCM token retrieval failed');
+        AppLogger.warning('Background FCM token retrieval failed');
+        AppLifecycleService.instance.notificationBloc
+            ?.startFallbackPolling(interval: const Duration(minutes: 2));
       }
     } catch (e) {
-      print('❌ Background FCM token retry error: $e');
+      AppLogger.error('Background FCM token retry error: $e');
     }
   }
 
@@ -905,26 +907,30 @@ class FirebaseMessagingService {
 
   /// Handle background messages (called from main.dart)
   static Future<void> handleBackgroundMessage(RemoteMessage message) async {
-    print('Handling background message: ${message.messageId}');
-    // Background message handling logic here
-    // Note: Background handlers must be top-level functions or static methods
+    try {
+      await Firebase.initializeApp();
+    } catch (_) {
+      // ignore if already initialized
+    }
+    await _queueRefreshFlag();
+    AppLogger.debug('Queued notification refresh for background message');
   }
 
   /// Manually register device token after authentication
   Future<void> registerTokenAfterAuth() async {
     if (_deviceToken != null) {
-      print('🔔 Registering device token after authentication...');
+      AppLogger.debug('Registering device token after authentication');
       await _registerDeviceToken(_deviceToken!);
     } else {
-      print('⚠️ No device token available to register after authentication');
+      AppLogger.warning(
+          'No device token available to register after authentication');
     }
   }
 
   /// Background message handler (must be top-level function)
   @pragma('vm:entry-point')
   Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-    print('Background message received: ${message.messageId}');
-    // Handle background message processing here if needed
+    await handleBackgroundMessage(message);
   }
 
   /// Process pending initial message when app launches from notification
@@ -942,5 +948,30 @@ class FirebaseMessagingService {
 
     _handleBackgroundMessageTap(_pendingInitialMessage!);
     _pendingInitialMessage = null;
+  }
+
+  void _triggerImmediateRefresh() {
+    final bloc = AppLifecycleService.instance.notificationBloc;
+    if (bloc != null) {
+      bloc.add(const NotificationsRequested());
+    } else {
+      _queueRefreshFlag();
+    }
+  }
+
+  static Future<void> _queueRefreshFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_pendingRefreshKey, true);
+  }
+
+  Future<void> processQueuedNotificationRefresh() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getBool(_pendingRefreshKey) ?? false;
+    if (!pending) return;
+    await prefs.remove(_pendingRefreshKey);
+    final bloc = AppLifecycleService.instance.notificationBloc;
+    if (bloc != null) {
+      bloc.add(const NotificationsRequested());
+    }
   }
 }

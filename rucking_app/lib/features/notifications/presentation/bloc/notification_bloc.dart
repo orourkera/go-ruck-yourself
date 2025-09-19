@@ -13,7 +13,9 @@ export 'package:rucking_app/features/notifications/presentation/bloc/notificatio
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final NotificationRepository repository;
   int _previousUnreadCount = -1; // -1 means uninitialized
-  Timer? _pollingTimer;
+  Timer? _fallbackTimer;
+  bool _isFallbackPolling = false;
+  Duration _fallbackInterval = const Duration(minutes: 2);
 
   NotificationBloc({
     required this.repository,
@@ -150,51 +152,54 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
   /// Start polling for new notifications
   /// Default interval is 90 seconds to stay under the 50/hour rate limit
-  void startPolling({Duration interval = const Duration(seconds: 90)}) {
-    AppLogger.sessionCompletion('Starting notification polling', context: {
-      'interval_seconds': interval.inSeconds,
-      'existing_timer_active': _pollingTimer?.isActive ?? false,
-    });
+  bool get isFallbackPolling => _isFallbackPolling;
 
-    // Immediately fetch notifications so UI badge is up-to-date on app launch
-    add(const NotificationsRequested());
-    // Cancel any existing timer
-    _pollingTimer?.cancel();
-
-    // Create new timer with appropriate interval
-    _pollingTimer = Timer.periodic(interval, (_) {
-      add(const NotificationsRequested());
-    });
-
-    AppLogger.sessionCompletion('Notification polling started successfully',
+  void startFallbackPolling({Duration interval = const Duration(minutes: 2)}) {
+    AppLogger.sessionCompletion('Starting fallback notification polling',
         context: {
           'interval_seconds': interval.inSeconds,
+          'already_active': _fallbackTimer?.isActive ?? false,
         });
+
+    _isFallbackPolling = true;
+    _fallbackInterval = interval;
+    _fallbackTimer?.cancel();
+    add(const NotificationsRequested());
+    _fallbackTimer = Timer.periodic(interval, (_) {
+      add(const NotificationsRequested());
+    });
   }
 
   /// Stop polling for new notifications
   void stopPolling() {
-    AppLogger.sessionCompletion('Stopping notification polling', context: {
-      'timer_was_active': _pollingTimer?.isActive ?? false,
-    });
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
+    AppLogger.sessionCompletion('Stopping fallback notification polling',
+        context: {
+          'timer_was_active': _fallbackTimer?.isActive ?? false,
+        });
+    _fallbackTimer?.cancel();
+    _fallbackTimer = null;
+    _isFallbackPolling = false;
   }
 
   /// Pause polling (for app lifecycle management)
   void pausePolling() {
-    AppLogger.sessionCompletion('Pausing notification polling', context: {
-      'timer_was_active': _pollingTimer?.isActive ?? false,
-    });
-    stopPolling();
+    if (!_isFallbackPolling) return;
+    AppLogger.sessionCompletion('Pausing fallback notification polling',
+        context: {
+          'timer_was_active': _fallbackTimer?.isActive ?? false,
+        });
+    _fallbackTimer?.cancel();
+    _fallbackTimer = null;
   }
 
   /// Resume polling (for app lifecycle management)
-  void resumePolling({Duration interval = const Duration(seconds: 90)}) {
-    AppLogger.sessionCompletion('Resuming notification polling', context: {
-      'interval_seconds': interval.inSeconds,
-    });
-    startPolling(interval: interval);
+  void resumePolling({Duration? interval}) {
+    if (!_isFallbackPolling) return;
+    AppLogger.sessionCompletion('Resuming fallback notification polling',
+        context: {
+          'interval_seconds': (interval ?? _fallbackInterval).inSeconds,
+        });
+    startFallbackPolling(interval: interval ?? _fallbackInterval);
   }
 
   Future<void> _vibrateForNewNotification() async {

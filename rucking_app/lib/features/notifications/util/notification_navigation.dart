@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:rucking_app/features/notifications/domain/entities/app_notification.dart';
 import 'package:rucking_app/features/notifications/util/notification_types.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
-import 'package:rucking_app/features/ruck_buddies/domain/entities/ruck_buddy.dart';
-import 'package:rucking_app/features/ruck_buddies/domain/entities/user_info.dart';
 import 'package:rucking_app/features/duels/presentation/screens/duel_detail_screen.dart';
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
@@ -41,35 +39,11 @@ class NotificationNavigation {
             .ruckActivity: // Ruck activity notifications (when others comment/like rucks you've interacted with)
         final ruckId = notification.data!['ruck_id']?.toString();
         if (ruckId != null) {
-          // Create a minimal RuckBuddy with just the ruck ID
-          // The detail screen will fetch the complete ruck data including the owner's profile
-          final ruckBuddy = RuckBuddy(
-            id: ruckId,
-            userId:
-                '', // Leave empty - let detail screen fetch the correct ruck owner
-            ruckWeightKg: 0,
-            durationSeconds: 0,
-            distanceKm: 0,
-            caloriesBurned: 0,
-            elevationGainM: 0,
-            elevationLossM: 0,
-            createdAt: DateTime.now(),
-            user: UserInfo(
-              id: '', // Leave empty - will be populated with ruck owner's info
-              username:
-                  '', // Leave empty to trigger full data fetch in detail screen
-              gender:
-                  '', // Leave empty, will be properly set when profile is fetched
-            ),
-            locationPoints: null, // Will be loaded by detail screen
-            photos: null, // Will be loaded by detail screen
-          );
-
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => RuckBuddyDetailScreen(
-                ruckBuddy: ruckBuddy,
+              builder: (context) => RuckBuddyDetailScreen.fromRuckId(
+                ruckId,
                 focusComment: _isCommentNotification(notification.type),
               ),
             ),
@@ -144,32 +118,11 @@ class NotificationNavigation {
         final ruckId = notification.data!['ruck_id']
             ?.toString(); // Fallback to ruck if present
         if (ruckId != null) {
-          // Reuse the same minimal RuckBuddy creation and navigation as above
-          final ruckBuddy = RuckBuddy(
-            id: ruckId,
-            userId:
-                '', // Leave empty - let detail screen fetch the correct ruck owner
-            ruckWeightKg: 0,
-            durationSeconds: 0,
-            distanceKm: 0,
-            caloriesBurned: 0,
-            elevationGainM: 0,
-            elevationLossM: 0,
-            createdAt: DateTime.now(),
-            user: UserInfo(
-              id: '', // Leave empty - will be populated with ruck owner's info
-              username:
-                  '', // Leave empty to trigger full data fetch in detail screen
-              gender:
-                  '', // Leave empty, will be properly set when profile is fetched
-            ),
-            locationPoints: null, // Will be loaded by detail screen
-            photos: null, // Will be loaded by detail screen
-          );
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => RuckBuddyDetailScreen(ruckBuddy: ruckBuddy),
+              builder: (context) =>
+                  RuckBuddyDetailScreen.fromRuckId(ruckId),
             ),
           );
         } else if (clubId != null) {

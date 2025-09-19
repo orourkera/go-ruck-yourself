@@ -37,7 +37,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     // When leaving screen, restart polling with a delay to ensure our reads are processed
     Future.delayed(const Duration(seconds: 3), () {
       if (_notificationBloc.state is NotificationState) {
-        _notificationBloc.startPolling();
+        _notificationBloc.add(const NotificationsRequested());
       }
     });
     super.dispose();

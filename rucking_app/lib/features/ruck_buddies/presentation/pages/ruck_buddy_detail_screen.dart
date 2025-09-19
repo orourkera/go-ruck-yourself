@@ -47,6 +47,33 @@ class RuckBuddyDetailScreen extends StatefulWidget {
     this.focusComment = false, // Added parameter to trigger comment field focus
   }) : super(key: key);
 
+  RuckBuddyDetailScreen.fromRuckId(
+    String ruckId, {
+    Key? key,
+    bool focusComment = false,
+  }) : this(
+          key: key,
+          focusComment: focusComment,
+          ruckBuddy: RuckBuddy(
+            id: ruckId,
+            userId: '',
+            ruckWeightKg: 0,
+            durationSeconds: 0,
+            distanceKm: 0,
+            caloriesBurned: 0,
+            elevationGainM: 0,
+            elevationLossM: 0,
+            createdAt: DateTime.now(),
+            user: const UserInfo(
+              id: '',
+              username: '',
+              gender: '',
+            ),
+            locationPoints: null,
+            photos: null,
+          ),
+        );
+
   @override
   State<RuckBuddyDetailScreen> createState() => _RuckBuddyDetailScreenState();
 }
