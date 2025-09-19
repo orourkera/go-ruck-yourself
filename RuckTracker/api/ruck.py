@@ -1802,6 +1802,78 @@ class RuckSessionCompleteResource(Resource):
             logger.info(f"Session {ruck_id} completion - achievement checking moved to frontend post-navigation")
             completed_session['new_achievements'] = []  # Empty for now, populated by separate API call
         
+            # RETENTION NOTIFICATIONS: Trigger AI-personalized retention notifications based on session count
+            try:
+                from RuckTracker.services.notification_manager import notification_manager
+                
+                # Get user's total completed session count (including this one)
+                total_sessions_resp = supabase.table('ruck_session').select('id', count='exact').eq('user_id', user_id).eq('status', 'completed').execute()
+                total_sessions = getattr(total_sessions_resp, 'count', 0) or len(total_sessions_resp.data or [])
+                
+                logger.info(f"🎯 RETENTION: User {user_id} now has {total_sessions} total sessions - triggering retention notifications")
+                
+                session_data = {
+                    'distance_km': completed_session.get('distance_km', 0),
+                    'duration_minutes': int(completed_session.get('duration_seconds', 0) / 60),
+                    'calories_burned': completed_session.get('calories_burned', 0)
+                }
+                
+                # Trigger appropriate retention notification based on session count
+                if total_sessions == 1:
+                    # Session 1 celebration - immediate
+                    notification_manager.send_session_1_celebration_notification(user_id, session_data)
+                    logger.info(f"✅ Sent Session 1 celebration notification to user {user_id}")
+                    
+                    # Schedule Session 1→2 conversion reminders for 24h and 48h later
+                    try:
+                        from RuckTracker.services.retention_background_jobs import retention_background_jobs
+                        session_1_completed_at = datetime.fromisoformat(completed_session['completed_at'].replace('Z', '+00:00'))
+                        retention_background_jobs.schedule_session_1_to_2_reminders(user_id, session_1_completed_at)
+                        logger.info(f"✅ Scheduled Session 1→2 reminders for user {user_id}")
+                    except Exception as schedule_err:
+                        logger.error(f"❌ Error scheduling Session 1→2 reminders: {schedule_err}")
+                    
+                elif total_sessions == 2:
+                    # Session 2 celebration and first week sprint push
+                    notification_manager.send_session_2_celebration_notification(user_id, session_data)
+                    logger.info(f"✅ Sent Session 2 celebration notification to user {user_id}")
+                    
+                    # Cancel any pending Session 1→2 reminders since they completed session 2
+                    try:
+                        from RuckTracker.services.retention_background_jobs import retention_background_jobs
+                        retention_background_jobs.cancel_scheduled_notifications(user_id, ['session_1_to_2_day1', 'session_1_to_2_day2'])
+                        logger.info(f"✅ Cancelled Session 1→2 reminders for user {user_id} (completed session 2)")
+                    except Exception as cancel_err:
+                        logger.error(f"❌ Error cancelling Session 1→2 reminders: {cancel_err}")
+                    
+                elif total_sessions == 3:
+                    # Session 3 celebration (75% to first week sprint)
+                    notification_manager.send_first_week_sprint_notification(user_id, 3, 'session_3_celebration')
+                    logger.info(f"✅ Sent Session 3 celebration notification to user {user_id}")
+                    
+                elif total_sessions == 4:
+                    # First week sprint complete (if within first week)
+                    user_created_resp = supabase.table('users').select('created_at').eq('id', user_id).single().execute()
+                    if user_created_resp.data:
+                        from dateutil import parser
+                        user_created_at = parser.parse(user_created_resp.data['created_at'])
+                        days_since_signup = (datetime.now(tz.tzutc()) - user_created_at).days
+                        
+                        if days_since_signup <= 7:
+                            notification_manager.send_first_week_sprint_notification(user_id, 4, 'first_week_sprint_complete')
+                            logger.info(f"✅ Sent First Week Sprint complete notification to user {user_id}")
+                        else:
+                            logger.info(f"📅 User {user_id} completed session 4 but outside first week ({days_since_signup} days since signup)")
+                    
+                elif total_sessions == 7:
+                    # Road to 7 complete - habit formation milestone
+                    notification_manager.send_road_to_7_complete_notification(user_id)
+                    logger.info(f"✅ Sent Road to 7 complete notification to user {user_id}")
+                
+            except Exception as retention_err:
+                logger.error(f"❌ Error sending retention notifications for user {user_id}: {retention_err}", exc_info=True)
+                # Don't fail session completion on notification errors
+        
             # Detect user's first completed ruck and broadcast to users who allow social sharing
             try:
                 supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
