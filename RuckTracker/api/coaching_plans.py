@@ -653,7 +653,11 @@ class CoachingPlansResource(Resource):
             base_plan = templates[base_plan_id]
             
             # Generate personalized plan with user history
-            personalized_plan = personalize_plan(base_plan_id, personalization, supabase, g.user_id)
+            try:
+                personalized_plan = personalize_plan(base_plan_id, personalization, supabase, g.user_id)
+            except Exception as e:
+                logger.error(f"Error in personalize_plan: {e}")
+                return error_response(f"Error personalizing plan: {str(e)}", 500)
             
             # Check if user already has an active plan of this type
             existing_response = supabase.table("coaching_plans").select("id").eq(
@@ -712,8 +716,16 @@ class CoachingPlansResource(Resource):
             
             created_plan = response.data[0]
             
+            # Clean response data to prevent JSON serialization errors
+            clean_plan = {}
+            for key, value in created_plan.items():
+                if hasattr(value, '__dict__') and hasattr(value, 'data'):
+                    # Skip Supabase Response objects
+                    continue
+                clean_plan[key] = value
+            
             return success_response({
-                "coaching_plan": created_plan,
+                "coaching_plan": clean_plan,
                 "personalized_adaptations": personalized_plan['adaptations'],
                 "training_schedule": personalized_plan['training_schedule']
             })
