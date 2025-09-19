@@ -354,10 +354,16 @@ class NotificationManager:
     def send_session_1_to_2_reminder_notification(self, recipient_id: str, days_since_first: int) -> bool:
         """Send AI-personalized Session 1→2 conversion reminder"""
         user_profile = self._get_user_coaching_profile(recipient_id)
-        coaching_tone = user_profile.get('coaching_tone', 'supportive_friend')
+        coaching_tone = user_profile.get('coaching_tone')
         
         notification_type = f'session_1_to_2_day{days_since_first}'
-        content = self._get_retention_notification_content(notification_type, coaching_tone, {'days_since_first': days_since_first})
+        
+        # If user has no coaching tone set, generate AI-personalized content
+        if not coaching_tone:
+            content = self._generate_ai_retention_notification(recipient_id, notification_type, {'days_since_first': days_since_first})
+        else:
+            # Use predefined templates for users with coaching tone preference
+            content = self._get_retention_notification_content(notification_type, coaching_tone, {'days_since_first': days_since_first})
         
         return self.send_notification(
             recipients=[recipient_id],
@@ -424,15 +430,183 @@ class NotificationManager:
             body=content['body'],
             data={
                 'retention_type': 'road_to_7_complete',
-                'milestone': 'habit_formation_complete',
                 'click_action': 'FLUTTER_NOTIFICATION_CLICK'
             }
         )
     
-    def _get_user_coaching_profile(self, user_id: str) -> Dict[str, Any]:
-        """Get user's coaching profile for personalization"""
+    def _generate_ai_retention_notification(self, user_id: str, notification_type: str, context: Dict[str, Any]) -> Dict[str, str]:
+        """Generate AI-personalized retention notification using user insights and current context"""
         try:
-            from RuckTracker.supabase_client import get_supabase_admin_client
+            from ..supabase_client import get_supabase_admin_client
+            import requests
+            import json
+            import os
+            
+            # Get user insights (last ruck data)
+            supabase = get_supabase_admin_client()
+            
+            # Fetch user's last ruck session for context
+            last_ruck_resp = supabase.table('ruck_session').select(
+                'completed_at, distance_km, duration_seconds, calories_burned, weather_conditions, location_name'
+            ).eq('user_id', user_id).eq('status', 'completed').order('completed_at', desc=True).limit(1).execute()
+            
+            last_ruck = last_ruck_resp.data[0] if last_ruck_resp.data else None
+            
+            # Get current weather for user's location (if available)
+            current_weather = self._get_current_weather_for_user(user_id)
+            
+            # Build context for AI
+            ai_context = {
+                'notification_type': notification_type,
+                'days_since_first': context.get('days_since_first', 1),
+                'last_ruck': last_ruck,
+                'current_weather': current_weather,
+                'user_id': user_id
+            }
+            
+            # Generate AI content using OpenAI
+            content = self._call_openai_for_retention_notification(ai_context)
+            
+            if content:
+                return content
+            else:
+                # Fallback to default supportive_friend tone if AI fails
+                return self._get_retention_notification_content(notification_type, 'supportive_friend', context)
+                
+        except Exception as e:
+            logger.error(f"Error generating AI retention notification: {e}")
+            # Fallback to default supportive_friend tone
+            return self._get_retention_notification_content(notification_type, 'supportive_friend', context)
+    
+    def _get_current_weather_for_user(self, user_id: str) -> Dict[str, Any]:
+        """Get current weather for user's location"""
+        try:
+            # Get user's last known location or preferred location
+            from ..supabase_client import get_supabase_admin_client
+            supabase = get_supabase_admin_client()
+            
+            # Try to get location from last session
+            location_resp = supabase.table('ruck_session').select(
+                'location_name, weather_conditions'
+            ).eq('user_id', user_id).eq('status', 'completed').order('completed_at', desc=True).limit(1).execute()
+            
+            if location_resp.data and location_resp.data[0].get('location_name'):
+                location = location_resp.data[0]['location_name']
+                
+                # Simple weather API call (you can replace with your preferred weather service)
+                import os
+                weather_api_key = os.getenv('OPENWEATHER_API_KEY')
+                if weather_api_key:
+                    import requests
+                    weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={location}&appid={weather_api_key}&units=metric"
+                    weather_resp = requests.get(weather_url, timeout=5)
+                    
+                    if weather_resp.status_code == 200:
+                        weather_data = weather_resp.json()
+                        return {
+                            'temperature': weather_data['main']['temp'],
+                            'description': weather_data['weather'][0]['description'],
+                            'location': location
+                        }
+            
+            return {}
+            
+        except Exception as e:
+            logger.warning(f"Could not fetch weather for user {user_id}: {e}")
+            return {}
+    
+    def _call_openai_for_retention_notification(self, context: Dict[str, Any]) -> Dict[str, str]:
+        """Call OpenAI to generate personalized retention notification"""
+        try:
+            import openai
+            import os
+            import json
+            
+            openai_api_key = os.getenv('OPENAI_API_KEY')
+            if not openai_api_key:
+                logger.warning("OpenAI API key not configured")
+                return None
+            
+            client = openai.OpenAI(api_key=openai_api_key)
+            
+            # Build prompt based on notification type
+            if context['notification_type'] == 'session_1_to_2_day1':
+                system_prompt = """You are a motivational rucking coach generating a push notification to encourage someone to complete their second ruck session. They completed their first ruck 24 hours ago and need encouragement to continue their journey.
+
+Generate a push notification with:
+- A compelling title (max 50 characters)
+- An encouraging body message (max 120 characters)
+- Reference their last ruck performance if available
+- Include weather context if provided
+- Be motivational but not pushy
+- Focus on momentum and the fact that session 2 is often easier than session 1
+
+Return JSON format: {"title": "...", "body": "..."}"""
+            
+            elif context['notification_type'] == 'session_1_to_2_day2':
+                system_prompt = """You are a motivational rucking coach generating a push notification to encourage someone to complete their second ruck session. They completed their first ruck 48 hours ago and are at risk of losing momentum.
+
+Generate a push notification with:
+- An urgent but supportive title (max 50 characters)
+- A motivating body message (max 120 characters)
+- Reference their last ruck performance if available
+- Include weather context if provided
+- Emphasize the importance of not losing momentum
+- Make it feel achievable and worthwhile
+
+Return JSON format: {"title": "...", "body": "..."}"""
+            
+            else:
+                return None
+            
+            # Build user prompt with context
+            user_prompt_parts = [f"Generate a retention notification for: {context['notification_type']}"]
+            
+            if context.get('last_ruck'):
+                last_ruck = context['last_ruck']
+                distance = last_ruck.get('distance_km', 0)
+                duration_mins = (last_ruck.get('duration_seconds', 0) // 60)
+                user_prompt_parts.append(f"Their last ruck: {distance:.1f}km in {duration_mins} minutes")
+                
+                if last_ruck.get('location_name'):
+                    user_prompt_parts.append(f"Location: {last_ruck['location_name']}")
+            
+            if context.get('current_weather'):
+                weather = context['current_weather']
+                user_prompt_parts.append(f"Current weather: {weather.get('temperature', 'N/A')}°C, {weather.get('description', 'N/A')}")
+            
+            user_prompt = "\n".join(user_prompt_parts)
+            
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            content = response.choices[0].message.content.strip()
+            
+            # Parse JSON response
+            try:
+                parsed_content = json.loads(content)
+                if 'title' in parsed_content and 'body' in parsed_content:
+                    return parsed_content
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse OpenAI JSON response: {content}")
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"OpenAI API call failed: {e}")
+            return None
+    
+    def _get_user_coaching_profile(self, user_id: str) -> Dict[str, Any]:
+        """Get user's coaching profile preferences"""
+        try:
+            from ..supabase_client import get_supabase_admin_client
             admin_client = get_supabase_admin_client()
             
             response = admin_client.table('user_profiles').select(
@@ -442,11 +616,11 @@ class NotificationManager:
             if response.data:
                 return response.data[0]
             
-            return {'coaching_tone': 'supportive_friend', 'coaching_style': 'balanced'}
+            return {'coaching_tone': None, 'coaching_style': 'balanced'}
             
         except Exception as e:
             logger.error(f"❌ Error getting user coaching profile: {e}")
-            return {'coaching_tone': 'supportive_friend', 'coaching_style': 'balanced'}
+            return {'coaching_tone': None, 'coaching_style': 'balanced'}
     
     def _get_retention_notification_content(self, notification_type: str, coaching_tone: str, context: Dict[str, Any]) -> Dict[str, str]:
         """Get AI-personalized retention notification content"""
