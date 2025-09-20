@@ -751,17 +751,19 @@ class CoachingPlansResource(Resource):
                 logger.error(f"Error in personalize_plan: {e}")
                 return error_response(f"Error personalizing plan: {str(e)}", 500)
             
-            # Check if user already has an active plan of this type
-            existing_response = supabase.table("user_coaching_plans").select("id").eq(
+            # Check if user already has any active plan (regardless of type)
+            admin_supabase = get_supabase_admin_client()
+            existing_response = admin_supabase.table("user_coaching_plans").select("id").eq(
                 "user_id", g.user_id
-            ).eq("coaching_plan_id", base_plan['id']).eq("current_status", "active").execute()
+            ).eq("current_status", "active").execute()
 
             if existing_response.data:
-                # Archive the existing plan using admin client
-                admin_supabase = get_supabase_admin_client()
-                admin_supabase.table("user_coaching_plans").update({
-                    "current_status": "archived"
-                }).eq("id", existing_response.data[0]["id"]).execute()
+                # Archive ALL existing active plans for this user
+                for existing_plan in existing_response.data:
+                    admin_supabase.table("user_coaching_plans").update({
+                        "current_status": "archived"
+                    }).eq("id", existing_plan["id"]).execute()
+                    logger.info(f"Archived existing coaching plan {existing_plan['id']} for user {g.user_id}")
             
             # Create new coaching plan
             plan_data = {
@@ -842,7 +844,11 @@ class CoachingPlansResource(Resource):
             
         except Exception as e:
             logger.error(f"Error creating coaching plan: {str(e)}")
-            return error_response(f"Error creating coaching plan: {str(e)}", 500)
+            # Clean the error message to avoid Response object serialization
+            error_msg = str(e)
+            if hasattr(e, 'details') and isinstance(e.details, dict):
+                error_msg = e.details.get('message', str(e))
+            return error_response(f"Error creating coaching plan: {error_msg}", 500)
     
     def get(self):
         """Get all coaching plans for the current user"""
