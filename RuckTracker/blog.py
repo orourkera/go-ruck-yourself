@@ -314,6 +314,17 @@ BLOG_POSTS = [
         "template": "blog/posts/weighted-vests-menopause-hormones.html",
         "image": "images/blog/vest.jpg",
     },
+    {
+        "slug": "science-based-coaching-plans",
+        "title": "Science‑Based Rucking Coaching Plans: Personalized, Progressive, Proven",
+        "description": "Inside Ruck!’s coaching plans: age-strong, fat loss, speed, capacity, events—personalized progressions grounded in exercise science and load‑carriage research.",
+        "date": "2025-09-20",
+        "author": "rory@getrucky.com",
+        "tags": ["coaching", "plans", "training", "personalization", "science"],
+        "read_time": 11,
+        "template": "blog/posts/science-based-coaching-plans.html",
+        "image": "images/blog/coaching.jpg",
+    },
 ]
 
 # Build a quick lookup

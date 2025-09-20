@@ -2,13 +2,12 @@ from flask import request, g
 from flask_restful import Resource
 import logging
 from typing import Dict, List, Any, Optional
-import math
 from datetime import datetime
-import uuid
 import json
 
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..utils.api_response import success_response, error_response
+from .user_coaching_plans import _generate_plan_sessions
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +287,7 @@ def _calculate_specific_weights_and_times(personalization: Dict[str, Any], user_
     
     return calculations
 
-def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Dict[str, Any], 
+def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Dict[str, Any],
                                            personalization: Dict[str, Any], user_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Generate weekly template with specific weights and times instead of placeholders"""
     weekly_template = []
@@ -302,7 +301,7 @@ def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Di
     training_days = personalization.get('training_days_per_week', 3)
     equipment_type = personalization.get('equipment_type', 'rucksack')
     
-    if base_plan_id == 'posture-balance-age-strong':
+    if base_plan_id in ('age-strong', 'posture-balance-age-strong'):
         # Tuesday: Long Posture Ruck
         tuesday_weight = start_weight * 0.8  # 80% of starting weight for posture work
         tuesday_time = session_times.get('long_ruck', max(40, min_session_time + 10))
@@ -399,14 +398,21 @@ def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Di
     
     return weekly_template
 
-def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabase_client, user_id: str = None) -> Dict[str, Any]:
+def personalize_plan(
+    base_plan_id: str,
+    personalization: Dict[str, Any],
+    supabase_client,
+    user_id: str = None,
+    base_plan: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Generate a personalized plan based on the base plan, user's personalization data, and historical patterns
     """
-    templates = _get_coaching_plan_templates(supabase_client)
-    base_plan = templates.get(base_plan_id)
-    if not base_plan:
-        raise ValueError(f"Unknown base plan: {base_plan_id}")
+    if base_plan is None:
+        templates = _get_coaching_plan_templates(supabase_client)
+        base_plan = templates.get(base_plan_id)
+        if not base_plan:
+            raise ValueError(f"Unknown base plan: {base_plan_id}")
     
     # Get user insights for history-aware personalization
     user_insights = None
@@ -746,7 +752,13 @@ class CoachingPlansResource(Resource):
             
             # Generate personalized plan with user history
             try:
-                personalized_plan = personalize_plan(base_plan_id, personalization, supabase, g.user_id)
+                personalized_plan = personalize_plan(
+                    base_plan_id,
+                    personalization,
+                    supabase,
+                    g.user_id,
+                    base_plan=base_plan
+                )
             except Exception as e:
                 logger.error(f"Error in personalize_plan: {e}")
                 return error_response(f"Error personalizing plan: {str(e)}", status_code=500)
@@ -765,24 +777,14 @@ class CoachingPlansResource(Resource):
                     }).eq("id", existing_plan["id"]).execute()
                     logger.info(f"Archived existing coaching plan {existing_plan['id']} for user {g.user_id}")
             
-            # Create new coaching plan
-            plan_data = {
-                "user_id": g.user_id,
-                "base_plan_id": base_plan_id,
-                "plan_name": base_plan["name"],
-                "duration_weeks": base_plan["duration_weeks"],
-                "personalization": personalization,
-                "plan_structure": personalized_plan['personalized_structure'],
-                "coaching_personality": coaching_personality,
-                "status": "active"
-            }
-
             # Insert into user_coaching_plans table (not coaching_plans!)
+            plan_start_date = datetime.utcnow().date()
+
             user_plan_data = {
                 "user_id": g.user_id,
                 "coaching_plan_id": base_plan['id'],  # Use the integer ID from the template
                 "coaching_personality": coaching_personality,
-                "start_date": datetime.now().isoformat(),
+                "start_date": plan_start_date.isoformat(),
                 "current_week": 1,
                 "current_status": "active",
                 "plan_modifications": {
@@ -797,22 +799,35 @@ class CoachingPlansResource(Resource):
             admin_supabase = get_supabase_admin_client()
             response = admin_supabase.table("user_coaching_plans").insert(user_plan_data).execute()
 
-            # Also save equipment preferences to user profile
+            # Also persist profile preferences for downstream personalization
             equipment_type = personalization.get('equipment_type')
             equipment_weight = personalization.get('equipment_weight')
-            if equipment_type or equipment_weight:
-                user_update = {}
-                if equipment_type:
-                    user_update['equipment_type'] = equipment_type
-                if equipment_weight:
-                    user_update['equipment_weight_kg'] = equipment_weight
-
+            user_update = {}
+            if equipment_type:
+                user_update['equipment_type'] = equipment_type
+            if equipment_weight:
+                user_update['equipment_weight_kg'] = equipment_weight
+            if user_update:
                 admin_supabase.table("users").update(user_update).eq("id", g.user_id).execute()
+
+            profile_payload = {
+                "user_id": g.user_id,
+                "coaching_tone": coaching_personality
+            }
+            admin_supabase.table("user_profiles").upsert(
+                profile_payload,
+                on_conflict='user_id'
+            ).execute()
             
             if not response.data:
                 return error_response("Failed to create coaching plan", status_code=500)
             
             created_plan = response.data[0]
+            
+            try:
+                _generate_plan_sessions(created_plan['id'], base_plan, plan_start_date)
+            except Exception as session_error:
+                logger.error(f"Failed to seed plan sessions for plan {created_plan['id']}: {session_error}")
             
             # Clean response data to prevent JSON serialization errors
             def clean_data(obj):
@@ -828,7 +843,12 @@ class CoachingPlansResource(Resource):
                             cleaned[k] = cleaned_value
                     return cleaned
                 elif isinstance(obj, list):
-                    return [clean_data(item) for item in obj if clean_data(item) is not None]
+                    cleaned_items = []
+                    for item in obj:
+                        cleaned_value = clean_data(item)
+                        if cleaned_value is not None:
+                            cleaned_items.append(cleaned_value)
+                    return cleaned_items
                 else:
                     return obj
             
@@ -862,7 +882,7 @@ class CoachingPlansResource(Resource):
             query = supabase.table("user_coaching_plans").select("*").eq("user_id", g.user_id)
             
             if status:
-                query = query.eq("status", status)
+                query = query.eq("current_status", status)
             
             query = query.order("created_at", desc=True)
             response = query.execute()
