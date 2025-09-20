@@ -70,7 +70,7 @@ class _NewUserCoachingSheetState extends State<NewUserCoachingSheet> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Kick off with a 7-day quick start (three short rucks this week), then upgrade to a fully personalized plan whenever you want.',
+                'Kick off with a 7-day quick start (four short rucks this week), then upgrade to a fully personalized plan whenever you want.',
                 style: AppTextStyles.bodyLarge.copyWith(
                   color: Colors.grey[700],
                   height: 1.4,
@@ -79,7 +79,7 @@ class _NewUserCoachingSheetState extends State<NewUserCoachingSheet> {
               const SizedBox(height: 24),
               _buildBulletPoint(
                 icon: Icons.flag,
-                title: 'Quick 7-day challenge: stay consistent with 3 rucks',
+                title: 'Quick 7-day challenge: complete 4 rucks to build your habit',
                 color: AppColors.primary,
               ),
               const SizedBox(height: 16),
@@ -247,7 +247,7 @@ class _NewUserCoachingSheetState extends State<NewUserCoachingSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
-            'Your 7-day quick start is ready! Let\'s hit 3 rucks this week.',
+            'Your 7-day quick start is ready! Let\'s hit 4 rucks this week to build your habit.',
           ),
           backgroundColor: AppColors.primary,
           duration: const Duration(seconds: 4),
@@ -279,7 +279,7 @@ class _NewUserCoachingSheetState extends State<NewUserCoachingSheet> {
     final preferredDays = <String>[];
     final now = DateTime.now();
 
-    for (int i = 0; i < 7 && preferredDays.length < 3; i++) {
+    for (int i = 0; i < 7 && preferredDays.length < 4; i++) {
       final futureDate = now.add(Duration(days: i));
       final weekdayIndex = (futureDate.weekday - 1)
           .clamp(0, PlanPersonalization.weekdays.length - 1);
@@ -291,14 +291,14 @@ class _NewUserCoachingSheetState extends State<NewUserCoachingSheet> {
 
     return PlanPersonalization(
       why: const ['Build a rucking habit'],
-      successDefinition: 'Complete 3 rucks in 7 days',
-      trainingDaysPerWeek: 3,
+      successDefinition: 'Complete 4 rucks in 7 days to activate habit formation',
+      trainingDaysPerWeek: 4,
       preferredDays: preferredDays,
       challenges: const ['Time', 'Motivation'],
       minimumSessionMinutes: 25,
       unloadedOk: true,
       streakTargetDays: 7,
-      streakTargetRucks: 3,
+      streakTargetRucks: 4,
       streakTimeframeDays: 7,
       equipmentType: 'none',
       equipmentWeight: 0.0,

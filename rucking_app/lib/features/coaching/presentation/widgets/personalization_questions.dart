@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_plan_type.dart';
+import 'package:rucking_app/features/coaching/domain/models/plan_custom_questions.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 
@@ -29,23 +30,44 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       const PlanPersonalization(trainingDaysPerWeek: 4);
 
   List<String> get _questions {
-    final baseQuestions = [
-      "What's your why for this goal?",
-      "In 8–12 weeks, what would make you say this was a win?",
-      "How many days/week can you realistically train?",
-      "Which days usually work best?",
-      "What's your biggest challenge to hitting this goal?",
-      "What equipment do you have?",
-    ];
+    final questions = <String>[];
 
-    // Add streak question for Daily Discipline plan
+    // For Daily Discipline, start with custom questions
     if (widget.planType?.id == 'daily-discipline') {
-      baseQuestions.add("How many days in a row are you aiming for?");
+      final customQuestions = PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
+      for (final question in customQuestions) {
+        questions.add(question.prompt);
+      }
+
+      // Then add relevant base questions (skip training days/week, preferred days, and equipment)
+      questions.addAll([
+        "Why is this streak important to you?",
+        "In 8–12 weeks, what would make you say this was a win?", // This will be dynamically updated in _buildSuccessQuestion
+        "What's your biggest challenge to hitting this goal?",
+      ]);
+    } else {
+      // For all other plans, standard order
+      questions.addAll([
+        "What's your why for this goal?",
+        "In 8–12 weeks, what would make you say this was a win?",
+        "How many days/week can you realistically train?",
+        "Which days usually work best?",
+        "What's your biggest challenge to hitting this goal?",
+        "What equipment do you have?",
+      ]);
+
+      // Add custom questions from code-based definitions
+      if (widget.planType != null) {
+        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
+        for (final question in customQuestions) {
+          questions.add(question.prompt);
+        }
+      }
+
+      questions.add("On tough days, what's your minimum viable session?");
     }
 
-    baseQuestions.add("On tough days, what's your minimum viable session?");
-
-    return baseQuestions;
+    return questions;
   }
 
   @override
@@ -119,62 +141,91 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   }
 
   List<Widget> _buildQuestionPages() {
-    final pages = [
-      _buildWhyQuestion(),
-      _buildSuccessQuestion(),
-      _buildTrainingDaysQuestion(),
-      _buildPreferredDaysQuestion(),
-      _buildChallengesQuestion(),
-      _buildEquipmentQuestion(),
-    ];
+    final pages = <Widget>[];
 
-    // Add streak question for Daily Discipline plan
+    // For Daily Discipline, start with custom questions first
     if (widget.planType?.id == 'daily-discipline') {
-      pages.add(_buildStreakQuestion());
-    }
+      final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
+      for (final questionConfig in customQuestionMaps) {
+        pages.add(_buildCustomQuestion(questionConfig));
+      }
 
-    pages.add(_buildMinimumSessionQuestion());
+      // Then add relevant base questions (no preferred days for streak)
+      pages.addAll([
+        _buildWhyQuestion(),
+        _buildSuccessQuestion(),
+        _buildChallengesQuestion(),
+      ]);
+    } else {
+      // For all other plans, use standard order
+      pages.addAll([
+        _buildWhyQuestion(),
+        _buildSuccessQuestion(),
+        _buildTrainingDaysQuestion(),
+        _buildPreferredDaysQuestion(),
+        _buildChallengesQuestion(),
+        _buildEquipmentQuestion(),
+      ]);
+
+      // Add custom questions after base questions
+      if (widget.planType != null) {
+        final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
+        for (final questionConfig in customQuestionMaps) {
+          pages.add(_buildCustomQuestion(questionConfig));
+        }
+      }
+
+      pages.add(_buildMinimumSessionQuestion());
+    }
 
     return pages;
   }
 
   bool _canProceed() {
     final isDailyDiscipline = widget.planType?.id == 'daily-discipline';
-    final streakQuestionIndex = isDailyDiscipline ? 6 : -1;
-    final minSessionIndex = isDailyDiscipline ? 7 : 6;
 
-    switch (_currentQuestionIndex) {
-      case 0:
-        return _personalization.why != null && _personalization.why!.isNotEmpty;
-      case 1:
-        return _personalization.successDefinition != null &&
-            _personalization.successDefinition!.isNotEmpty;
-      case 2:
-        return _personalization.trainingDaysPerWeek != null;
-      case 3:
-        return _personalization.preferredDays != null &&
-            _personalization.preferredDays!.isNotEmpty;
-      case 4:
-        return _personalization.challenges != null &&
-            _personalization.challenges!.isNotEmpty;
-      case 5:
-        // Equipment question - always allow proceed (has a default selected)
-        return true;
-      case 6:
-        if (isDailyDiscipline) {
-          // This is the streak question - require either daily streak or flexible frequency
-          return (_personalization.streakTargetDays != null) ||
-              (_personalization.streakTargetRucks != null &&
-                  _personalization.streakTimeframeDays != null);
-        } else {
-          // This is the minimum session question - always allow proceed
+    if (isDailyDiscipline) {
+      // For Daily Discipline, custom questions come first (0-2), then base questions (3-5)
+      switch (_currentQuestionIndex) {
+        case 0: // How many days to ruck?
+          return _personalization.customResponses != null &&
+              _personalization.customResponses!['streak_days'] != null;
+        case 1: // Rest days (optional)
+          return true; // Optional question
+        case 2: // Minimum session length
+          return true; // Has default value
+        case 3: // Why question
+          return _personalization.why != null && _personalization.why!.isNotEmpty;
+        case 4: // Success definition (optional)
+          return true; // Optional question
+        case 5: // Challenges
+          return _personalization.challenges != null &&
+              _personalization.challenges!.isNotEmpty;
+        default:
+          return false;
+      }
+    } else {
+      // For other plans, base questions first, then custom
+      switch (_currentQuestionIndex) {
+        case 0: // Why
+          return _personalization.why != null && _personalization.why!.isNotEmpty;
+        case 1: // Success
+          return _personalization.successDefinition != null &&
+              _personalization.successDefinition!.isNotEmpty;
+        case 2: // Training days
+          return _personalization.trainingDaysPerWeek != null;
+        case 3: // Preferred days
+          return _personalization.preferredDays != null &&
+              _personalization.preferredDays!.isNotEmpty;
+        case 4: // Challenges
+          return _personalization.challenges != null &&
+              _personalization.challenges!.isNotEmpty;
+        case 5: // Equipment
+          return true; // Has default
+        default:
+          // Custom questions and minimum session - allow proceed
           return true;
-        }
-      case 7:
-        // This is the minimum session question for daily discipline - always allow proceed
-        return true;
-      default:
-        return false;
+      }
     }
   }
 
@@ -275,8 +326,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   }
 
   Widget _buildWhyQuestion() {
+    // Get the correct question text based on current index
     return _buildQuestionCard(
-      question: _questions[0],
+      question: _questions[_currentQuestionIndex],
       content: Column(
         children: [
           // Suggested chips (multi-select)
@@ -360,8 +412,19 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   }
 
   Widget _buildSuccessQuestion() {
+    // Dynamically get question text based on whether it's Daily Discipline and the streak duration
+    String questionText = _questions[_currentQuestionIndex];
+
+    // For Daily Discipline, customize based on streak duration
+    if (widget.planType?.id == 'daily-discipline' &&
+        _personalization.customResponses != null &&
+        _personalization.customResponses!['streak_days'] != null) {
+      final streakDays = _personalization.customResponses!['streak_days'];
+      questionText = "After $streakDays days, what would make you say this was a win? (Optional)";
+    }
+
     return _buildQuestionCard(
-      question: _questions[1],
+      question: questionText,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -377,7 +440,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             autofocus: false,
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
-              hintText: 'What would success look like?',
+              hintText: widget.planType?.id == 'daily-discipline'
+                ? 'Optional - What would success look like?'
+                : 'What would success look like?',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -402,7 +467,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   Widget _buildTrainingDaysQuestion() {
     return _buildQuestionCard(
-      question: _questions[2],
+      question: _questions[_currentQuestionIndex],
       content: Column(
         children: [
           Text(
@@ -489,13 +554,28 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   }
 
   Widget _buildPreferredDaysQuestion() {
+    // Get the correct question index and text
+    final isDailyDiscipline = widget.planType?.id == 'daily-discipline';
+    final questionIndex = isDailyDiscipline ? 5 : 3;
+    String questionText = _questions[questionIndex];
+
+    // For Daily Discipline, customize based on streak duration
+    if (isDailyDiscipline &&
+        _personalization.customResponses != null &&
+        _personalization.customResponses!['streak_days'] != null) {
+      final streakDays = _personalization.customResponses!['streak_days'];
+      questionText = "Which days usually work best for your $streakDays-day journey? (Optional)";
+    }
+
     return _buildQuestionCard(
-      question: _questions[3],
+      question: questionText,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Select your preferred training days (you can choose multiple):',
+            isDailyDiscipline
+              ? 'Select any days that work particularly well for you (skip if flexible):'
+              : 'Select your preferred training days (you can choose multiple):',
             style: AppTextStyles.bodyMedium.copyWith(
               color: Colors.grey[600],
             ),
@@ -538,7 +618,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   Widget _buildChallengesQuestion() {
     return _buildQuestionCard(
-      question: _questions[4],
+      question: _questions[_currentQuestionIndex],
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -816,7 +896,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   Widget _buildEquipmentQuestion() {
     return _buildQuestionCard(
-      question: _questions[5],
+      question: _questions[_currentQuestionIndex],
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -958,10 +1038,518 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     );
   }
 
-  Widget _buildMinimumSessionQuestion() {
-    final questionIndex = widget.planType?.id == 'daily-discipline' ? 7 : 6;
+  // Generic builders for custom questions from database
+  Widget _buildCustomQuestion(Map<String, dynamic> questionConfig) {
+    final type = questionConfig['type'] as String;
+
+    switch (type) {
+      case 'slider':
+        return _buildSliderQuestion(questionConfig);
+      case 'chips':
+        return _buildChipsQuestion(questionConfig);
+      case 'number':
+        return _buildNumberQuestion(questionConfig);
+      case 'text':
+        return _buildTextQuestion(questionConfig);
+      case 'date':
+        return _buildDateQuestion(questionConfig);
+      case 'rest_days':
+        return _buildRestDaysQuestion(questionConfig);
+      default:
+        // Fallback to text input
+        return _buildTextQuestion(questionConfig);
+    }
+  }
+
+  Widget _buildSliderQuestion(Map<String, dynamic> config) {
+    final id = config['id'] as String;
+    final prompt = config['prompt'] as String;
+    final min = (config['min'] as num).toDouble();
+    final max = (config['max'] as num).toDouble();
+    final step = (config['step'] as num?)?.toDouble() ?? 1.0;
+    final unit = config['unit'] as String?;
+    final defaultValue = (config['default'] as num?)?.toDouble() ?? min;
+    final helperText = config['helper_text'] as String?;
+
+    // Get current value from customResponses
+    final currentValue = (_personalization.customResponses?[id] as num?)?.toDouble() ?? defaultValue;
+
     return _buildQuestionCard(
-      question: _questions[questionIndex],
+      question: prompt,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (helperText != null) ...[
+            Text(
+              helperText,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Text(
+            '${currentValue.round()}${unit != null ? ' $unit' : ''}',
+            style: AppTextStyles.titleLarge.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Slider(
+            value: currentValue,
+            min: min,
+            max: max,
+            divisions: ((max - min) / step).round(),
+            activeColor: AppColors.primary,
+            onChanged: (value) {
+              setState(() {
+                final customResponses = Map<String, dynamic>.from(
+                  _personalization.customResponses ?? {},
+                );
+                customResponses[id] = value;
+                _personalization = _personalization.copyWith(
+                  customResponses: customResponses,
+                );
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipsQuestion(Map<String, dynamic> config) {
+    final id = config['id'] as String;
+    final prompt = config['prompt'] as String;
+    final options = config['options'] as List<dynamic>;
+    final multiple = config['multiple'] ?? false;
+    final required = config['required'] ?? false;
+    final helperText = config['helper_text'] as String?;
+
+    // Get current value(s) from customResponses
+    final currentValue = _personalization.customResponses?[id];
+
+    // Check if custom is selected for special handling
+    final isCustomSelected = currentValue == 'custom' ||
+        (currentValue is int && !options.any((opt) =>
+            (opt is Map ? opt['value'] : opt) == currentValue));
+
+    return _buildQuestionCard(
+      question: prompt,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (helperText != null) ...[
+            Text(
+              helperText,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.map((option) {
+              final label = option is Map ? option['label'] : option.toString();
+              final value = option is Map ? option['value'] : option;
+
+              bool isSelected;
+              if (value == 'custom') {
+                isSelected = isCustomSelected;
+              } else if (multiple) {
+                final selectedList = currentValue as List<dynamic>? ?? [];
+                isSelected = selectedList.contains(value);
+              } else {
+                isSelected = currentValue == value;
+              }
+
+              return FilterChip(
+                label: Text(label.toString()),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    final customResponses = Map<String, dynamic>.from(
+                      _personalization.customResponses ?? {},
+                    );
+
+                    if (multiple) {
+                      final selectedList = List<dynamic>.from(
+                        customResponses[id] as List<dynamic>? ?? [],
+                      );
+                      if (selected) {
+                        selectedList.add(value);
+                      } else {
+                        selectedList.remove(value);
+                      }
+                      customResponses[id] = selectedList;
+                    } else {
+                      customResponses[id] = selected ? value : null;
+                    }
+
+                    _personalization = _personalization.copyWith(
+                      customResponses: customResponses,
+                    );
+                  });
+                },
+                backgroundColor: Colors.white,
+                selectedColor: AppColors.primary.withOpacity(0.2),
+                checkmarkColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          // Show custom input field when "Custom" is selected
+          if (isCustomSelected && id == 'streak_days') ...[
+            const SizedBox(height: 16),
+            TextField(
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Enter number of days',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
+              ),
+              onChanged: (value) {
+                final days = int.tryParse(value);
+                if (days != null && days > 0) {
+                  setState(() {
+                    final customResponses = Map<String, dynamic>.from(
+                      _personalization.customResponses ?? {},
+                    );
+                    customResponses[id] = days;
+                    _personalization = _personalization.copyWith(
+                      customResponses: customResponses,
+                    );
+                  });
+                }
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNumberQuestion(Map<String, dynamic> config) {
+    final id = config['id'] as String;
+    final prompt = config['prompt'] as String;
+    final unit = config['unit'] as String?;
+    final validation = config['validation'] as Map<String, dynamic>?;
+    final helperText = config['helper_text'] as String?;
+    final placeholder = config['placeholder'] as String?;
+
+    return _buildQuestionCard(
+      question: prompt,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (helperText != null) ...[
+            Text(
+              helperText,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          TextField(
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: placeholder ?? 'Enter value',
+              suffixText: unit,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary),
+              ),
+            ),
+            onChanged: (value) {
+              final numValue = num.tryParse(value);
+              if (numValue != null) {
+                setState(() {
+                  final customResponses = Map<String, dynamic>.from(
+                    _personalization.customResponses ?? {},
+                  );
+                  customResponses[id] = numValue;
+                  _personalization = _personalization.copyWith(
+                    customResponses: customResponses,
+                  );
+                });
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextQuestion(Map<String, dynamic> config) {
+    final id = config['id'] as String;
+    final prompt = config['prompt'] as String;
+    final helperText = config['helper_text'] as String?;
+    final placeholder = config['placeholder'] as String?;
+
+    return _buildQuestionCard(
+      question: prompt,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (helperText != null) ...[
+            Text(
+              helperText,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          TextField(
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: placeholder ?? 'Enter your response',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary),
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                final customResponses = Map<String, dynamic>.from(
+                  _personalization.customResponses ?? {},
+                );
+                customResponses[id] = value;
+                _personalization = _personalization.copyWith(
+                  customResponses: customResponses,
+                );
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestDaysQuestion(Map<String, dynamic> config) {
+    final id = config['id'] as String;
+    final prompt = config['prompt'] as String;
+    final helperText = config['helper_text'] as String?;
+
+    // Get current values from customResponses
+    final restData = _personalization.customResponses?[id] as Map<String, dynamic>? ?? {};
+    final restCount = restData['count'] as int? ?? 0;
+    final restPeriod = restData['period'] as String? ?? 'per_week';
+
+    return _buildQuestionCard(
+      question: prompt,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (helperText != null) ...[
+            Text(
+              helperText,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Row(
+            children: [
+              // Number input
+              Expanded(
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  controller: TextEditingController(text: restCount > 0 ? restCount.toString() : ''),
+                  decoration: InputDecoration(
+                    hintText: '0',
+                    labelText: 'Rest days',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final count = int.tryParse(value) ?? 0;
+                    setState(() {
+                      final customResponses = Map<String, dynamic>.from(
+                        _personalization.customResponses ?? {},
+                      );
+                      customResponses[id] = {
+                        'count': count,
+                        'period': restPeriod,
+                      };
+                      _personalization = _personalization.copyWith(
+                        customResponses: customResponses,
+                      );
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Period dropdown
+              Flexible(
+                flex: 1,
+                child: DropdownButtonFormField<String>(
+                  value: restPeriod,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Period',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'per_week', child: Text('Per week', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'per_month', child: Text('Per month', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(value: 'total', child: Text('Total', overflow: TextOverflow.ellipsis)),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        final customResponses = Map<String, dynamic>.from(
+                          _personalization.customResponses ?? {},
+                        );
+                        customResponses[id] = {
+                          'count': restCount,
+                          'period': value,
+                        };
+                        _personalization = _personalization.copyWith(
+                          customResponses: customResponses,
+                        );
+                      });
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            restCount == 0
+              ? 'No rest days - going for an unbroken streak!'
+              : restPeriod == 'per_week'
+                ? '$restCount rest ${restCount == 1 ? "day" : "days"} per week'
+                : restPeriod == 'per_month'
+                  ? '$restCount rest ${restCount == 1 ? "day" : "days"} per month'
+                  : '$restCount rest ${restCount == 1 ? "day" : "days"} total in the streak',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateQuestion(Map<String, dynamic> config) {
+    final id = config['id'] as String;
+    final prompt = config['prompt'] as String;
+    final helperText = config['helper_text'] as String?;
+    final validation = config['validation'] as Map<String, dynamic>?;
+
+    final currentDate = _personalization.customResponses?[id] != null
+        ? DateTime.parse(_personalization.customResponses![id] as String)
+        : null;
+
+    return _buildQuestionCard(
+      question: prompt,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (helperText != null) ...[
+            Text(
+              helperText,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          InkWell(
+            onTap: () async {
+              final minDays = validation?['min_days_from_now'] as int? ?? 0;
+              final maxDays = validation?['max_days_from_now'] as int? ?? 365;
+
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: currentDate ?? DateTime.now().add(Duration(days: minDays)),
+                firstDate: DateTime.now().add(Duration(days: minDays)),
+                lastDate: DateTime.now().add(Duration(days: maxDays)),
+              );
+
+              if (picked != null) {
+                setState(() {
+                  final customResponses = Map<String, dynamic>.from(
+                    _personalization.customResponses ?? {},
+                  );
+                  customResponses[id] = picked.toIso8601String();
+                  _personalization = _personalization.copyWith(
+                    customResponses: customResponses,
+                  );
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    currentDate != null
+                        ? '${currentDate.day}/${currentDate.month}/${currentDate.year}'
+                        : 'Select date',
+                    style: AppTextStyles.bodyLarge,
+                  ),
+                  Icon(Icons.calendar_today, color: AppColors.primary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMinimumSessionQuestion() {
+    return _buildQuestionCard(
+      question: _questions[_currentQuestionIndex],
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

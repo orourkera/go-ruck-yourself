@@ -2,11 +2,21 @@
 
 ## Executive Summary
 
-Based on user behavior analysis, we've identified two critical metrics for user retention:
+Based on user behavior analysis, we've identified critical metrics for user retention:
+
+### The Two Key Numbers
 1. **Week 1 Activation**: Users need **4+ sessions in their first week** (71%+ retention rate)
 2. **Habit Formation**: Users who complete **7 total sessions** show 92.3% return rate (habit formed)
 
-Currently, only 30% of users achieve the Week 1 activation threshold, representing our biggest opportunity for improvement.
+### Critical Problem: 51% Never Start
+- **571 total users**: 291 (51%) never completed a single ruck session
+- **Session 1→2 conversion**: Only 52.1% return after first session
+- **Recent deterioration**: First-week retention has dropped 10% for recent cohorts
+
+### Current Performance
+- **All-time**: 30% of users achieve 4+ sessions in week 1
+- **Recent 2 months**: Only 23% achieve 4+ sessions in week 1 (getting worse)
+- **Activation rate declining**: Users with 1 session in week 1 now only have 31.5% retention (vs 42.4% historically)
 
 ---
 
@@ -363,6 +373,84 @@ Based on first week performance:
 
 ---
 
+## Recent Data Update (2-Month Comparison)
+
+### Engagement Cliff Analysis - Last 2 Months
+| Segment | Users | % of Total | Median Days Active |
+|---------|-------|------------|-------------------|
+| Never Started | 209 | 51% | N/A |
+| One and Done | 89 | 22% | 0 days |
+| Tried It (2-3) | 51 | 12% | 6 days |
+| Exploring (4-7) | 39 | 10% | 18 days |
+| Building Habit (8-15) | 13 | 3% | 40 days |
+| Habituated (16+) | 9 | 2% | 49 days |
+
+### First Week Behavior - Recent vs All-Time
+| Sessions Week 1 | All-Time Active % | Recent Active % | Change |
+|-----------------|-------------------|-----------------|---------|
+| 1 session | 42.4% | **31.5%** | 🔴 -10.9% |
+| 2 sessions | 61.5% | **55.2%** | 🔴 -6.3% |
+| 3 sessions | 50.0% | **36.4%** | 🔴 -13.6% |
+| 4 sessions | 71.4% | **71.4%** | ✅ Same |
+| 5+ sessions | 71.4%+ | **68.8%+** | 🔴 Slight decline |
+
+### Key Deterioration Metrics
+- **Never Started Rate**: Stable at ~51% (not improving)
+- **Session 1 Retention**: Dropped from 42.4% to 31.5% for users with only 1 session in week 1
+- **Week 1 Activation**: Dropped from 30% to 23% reaching 4+ sessions
+- **Power User Formation**: Only 5% of recent users reach habit formation (vs 6% all-time)
+
+---
+
+## Updated Recommendations Based on Recent Trends
+
+### URGENT Priority 1: Fix "Never Started" (51% of users)
+**This is your biggest opportunity - 209 recent users signed up but never rucked**
+- Audit signup → first session flow
+- Add mandatory "first ruck" during onboarding
+- Consider guided audio first session
+- Implement Day 0 activation push notification
+
+### URGENT Priority 2: Fix Session 1→2 Conversion
+**Recent data shows this is getting WORSE (31.5% retention vs 42.4% historical)**
+- Immediate post-session 1 celebration screen
+- Schedule Day 1 notification: "How are you feeling after yesterday's ruck?"
+- Day 2 aggressive re-engagement if no Session 2
+- Show immediate value (calories, distance, achievement)
+
+### Priority 3: Drive to 4 Sessions in Week 1
+**Only 23% of recent users achieve this (down from 30%)**
+- Update Quick Start to 4 sessions (not 3) ✅ IMPLEMENTED
+- Daily notifications for first 7 days
+- Progress bar showing X/4 sessions
+- Special achievement at 4 sessions
+
+### Priority 4: Bridge to Habit (Session 7)
+- Special program for users at sessions 4-6
+- "3 more to habit!" messaging
+- Unlock premium features at session 7
+
+---
+
+## Code Changes Implemented
+
+### 1. Quick Start Program Updated (2025-09-19)
+- Changed from 3 to 4 sessions in 7 days
+- Updated messaging to emphasize habit formation
+- File: `lib/features/coaching/presentation/widgets/new_user_coaching_sheet.dart`
+
+### 2. Coaching Card Visibility Fixed (2025-09-19)
+- Removed `const` to allow proper rebuilding
+- Added logging for debugging
+- Files: `lib/features/ruck_session/presentation/screens/home_screen.dart`
+
+### 3. AI Insights Enhanced (2025-09-19)
+- Shows detailed plan progress and adherence
+- Displays next workout from coaching plan
+- File: `lib/features/ruck_session/presentation/widgets/ai_insights_widget.dart`
+
+---
+
 *Analysis Date: 2025-09-19*
-*Total Users Analyzed: 280*
-*Key Finding: 7 sessions = habit formation, 4 first-week sessions = activation*
+*Total Users Analyzed: 571 (all-time), 410 (recent 2 months)*
+*Key Finding: Retention is deteriorating - urgent action needed on Session 1→2 conversion*

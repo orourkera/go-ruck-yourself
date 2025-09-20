@@ -92,10 +92,13 @@ class RetentionBackgroundJobs:
             logger.error(f"❌ Error scheduling delayed notification: {e}", exc_info=True)
             return False
     
-    def process_scheduled_notifications(self) -> bool:
+    def process_scheduled_notifications(self) -> int:
         """
         Process scheduled retention notifications that are due to be sent
         Should be called by a cron job or background task every 15 minutes
+
+        Returns:
+            int: Number of notifications processed (including skipped ones)
         """
         try:
             logger.info("🔄 Processing scheduled retention notifications")
@@ -109,7 +112,7 @@ class RetentionBackgroundJobs:
             
             if not response.data:
                 logger.info("📭 No scheduled retention notifications found")
-                return True
+                return 0
             
             processed_count = 0
             sent_count = 0
@@ -167,11 +170,11 @@ class RetentionBackgroundJobs:
                     continue
             
             logger.info(f"✅ Processed {processed_count} scheduled notifications, sent {sent_count}")
-            return True
+            return processed_count
             
         except Exception as e:
             logger.error(f"❌ Error processing scheduled notifications: {e}", exc_info=True)
-            return False
+            return 0
     
     def _send_scheduled_retention_notification(self, user_id: str, notification_type: str, context: Dict[str, Any]) -> bool:
         """

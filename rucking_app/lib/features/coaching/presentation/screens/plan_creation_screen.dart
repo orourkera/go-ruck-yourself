@@ -690,7 +690,8 @@ Keep it under 200 words, motivational, and specific to their answers.
         appBar: _currentStep != PlanCreationStep.greeting &&
                 _currentStep != PlanCreationStep.creating &&
                 _currentStep != PlanCreationStep.generatingSummary &&
-                _currentStep != PlanCreationStep.complete
+                _currentStep != PlanCreationStep.complete &&
+                _currentStep != PlanCreationStep.personalization // Hide AppBar during personalization
             ? AppBar(
                 title: const Text('AI Coaching Plan'),
                 backgroundColor: AppColors.primary,

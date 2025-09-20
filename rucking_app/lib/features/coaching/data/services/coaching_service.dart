@@ -49,20 +49,25 @@ class CoachingService {
 
   /// Get active coaching plan for the current user
   Future<Map<String, dynamic>?> getActiveCoachingPlan() async {
+    print('🔍🔍🔍 [COACHING_SERVICE] Fetching active coaching plan...');
     try {
       final responseData = await _apiClient.get('/user-coaching-plans');
+      print('🔍🔍🔍 [COACHING_SERVICE] Raw API response: $responseData');
       AppLogger.info('[COACHING_SERVICE] API response: $responseData');
 
       // API returns {"active_plan": null} or {"active_plan": {...}}
       if (responseData != null && responseData is Map<String, dynamic>) {
         final activePlan = responseData['active_plan'];
+        print('🔍🔍🔍 [COACHING_SERVICE] Extracted active_plan: ${activePlan == null ? "NULL" : activePlan.toString()}');
         AppLogger.info('[COACHING_SERVICE] Active plan extracted: ${activePlan != null ? "EXISTS" : "NULL"}');
         return activePlan as Map<String, dynamic>?;
       }
 
+      print('🔍🔍🔍 [COACHING_SERVICE] Invalid response format or null response');
       AppLogger.info('[COACHING_SERVICE] Invalid response format, returning null');
       return null;
     } catch (e) {
+      print('🔍🔍🔍 [COACHING_SERVICE] ERROR: $e');
       AppLogger.error('[COACHING_SERVICE] Error fetching plan: $e');
       throw Exception('Failed to fetch active coaching plan: $e');
     }

@@ -959,6 +959,11 @@ api.add_resource(UserCoachingPlansResource, '/api/user-coaching-plans', '/api/us
 api.add_resource(UserCoachingPlanProgressResource, '/api/user-coaching-plan-progress', '/api/user-coaching-plans/<string:plan_id>/progress')
 api.add_resource(PlanSessionTrackingResource, '/api/plan-session-tracking')
 
+# Coaching Plan Templates Endpoints
+from .api.coaching_plan_templates import CoachingPlanTemplateResource, CoachingPlanTemplatesResource
+api.add_resource(CoachingPlanTemplatesResource, '/api/coaching-plan-templates')
+api.add_resource(CoachingPlanTemplateResource, '/api/coaching-plan-templates/<string:plan_id>')
+
 # Event Deeplink Endpoints
 from .api.event_deeplinks import EventDeeplinkResource, WellKnownResource, ClubDeeplinkResource
 api.add_resource(ClubDeeplinkResource, '/clubs/<string:club_id>')

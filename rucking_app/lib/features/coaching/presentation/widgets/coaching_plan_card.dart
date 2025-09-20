@@ -23,55 +23,83 @@ class _CoachingPlanCardState extends State<CoachingPlanCard> {
   @override
   void initState() {
     super.initState();
+    print('🔍🔍🔍 [COACHING_CARD] initState called - starting load');
     _loadPlanData();
   }
 
   Future<void> _loadPlanData() async {
+    print('🔍🔍🔍 [COACHING_CARD] Starting to load plan data...');
     try {
-      final plan = await _coachingService.getActiveCoachingPlan();
+      // Add timeout to prevent hanging
+      final plan = await _coachingService.getActiveCoachingPlan()
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+            print('🔍🔍🔍 [COACHING_CARD] API call timed out after 10 seconds');
+            return null;
+          });
+
+      print('🔍🔍🔍 [COACHING_CARD] API Response: ${plan == null ? "NULL (NO PLAN)" : "HAS PLAN"}');
+      if (plan != null) {
+        print('🔍🔍🔍 [COACHING_CARD] Plan details: ${plan.keys.toList()}');
+        print('🔍🔍🔍 [COACHING_CARD] Plan name: ${plan['plan_name']}');
+      }
       AppLogger.info('[COACHING_CARD] Loaded plan data: ${plan != null ? "HAS PLAN" : "NO PLAN"}');
 
       Map<String, dynamic>? progress;
       if (plan != null) {
         try {
-          progress = await _coachingService.getCoachingPlanProgress();
+          progress = await _coachingService.getCoachingPlanProgress()
+              .timeout(const Duration(seconds: 5));
         } catch (e) {
+          print('🔍🔍🔍 [COACHING_CARD] Failed to load progress (non-fatal): $e');
           AppLogger.error('Failed to load progress: $e');
         }
       }
 
       if (mounted) {
+        print('🔍🔍🔍 [COACHING_CARD] Setting state - isLoading=false, planData=${plan == null ? "NULL" : "EXISTS"}');
         setState(() {
           _planData = plan;
           _progressData = progress;
           _isLoading = false;
         });
+        print('🔍🔍🔍 [COACHING_CARD] State updated - planData is now: ${_planData == null ? "NULL" : "EXISTS"}');
+      } else {
+        print('🔍🔍🔍 [COACHING_CARD] Widget not mounted, skipping setState');
       }
     } catch (e) {
+      print('🔍🔍🔍 [COACHING_CARD] ERROR loading plan: $e');
+      print('🔍🔍🔍 [COACHING_CARD] Error type: ${e.runtimeType}');
       AppLogger.error('Failed to load coaching plan for home screen: $e');
       if (mounted) {
+        print('🔍🔍🔍 [COACHING_CARD] Setting isLoading=false due to error');
         setState(() {
+          _planData = null;  // Explicitly set to null to show the "Start Journey" card
           _isLoading = false;
         });
       }
     }
+    print('🔍🔍🔍 [COACHING_CARD] _loadPlanData completed');
   }
 
   @override
   Widget build(BuildContext context) {
+    print('🔍🔍🔍 [COACHING_CARD BUILD] isLoading: $_isLoading, planData: ${_planData == null ? "NULL" : "EXISTS"}');
     AppLogger.info('[COACHING_CARD] Building widget - isLoading: $_isLoading, planData: ${_planData != null ? "EXISTS" : "NULL"}');
 
     if (_isLoading) {
+      print('🔍🔍🔍 [COACHING_CARD BUILD] Still loading - hiding widget');
       return const SizedBox.shrink();
     }
 
     // ONLY show the "Start Your Coaching Journey" card if user has NO plan
     if (_planData == null) {
+      print('🔍🔍🔍 [COACHING_CARD BUILD] User has NO PLAN - SHOWING coaching journey card!');
       AppLogger.info('[COACHING_CARD] Showing NO PLAN card');
       return _buildNoPlanCard();
     }
 
     // User HAS a plan - don't show anything on homepage
+    print('🔍🔍🔍 [COACHING_CARD BUILD] User HAS PLAN - hiding card completely');
     AppLogger.info('[COACHING_CARD] User has plan - hiding card');
     return const SizedBox.shrink();
   }

@@ -543,10 +543,101 @@ def personalize_plan(base_plan_id: str, personalization: Dict[str, Any], supabas
                 # Emphasize cardio component
                 personalized_structure['sessions_per_week']['unloaded_cardio'] = 3
                 adaptations.append("Enhanced cardio focus for weight loss goals")
-        
+
         elif any(word in success_lower for word in ['time', 'pace', 'speed', 'faster']):
             # Performance-oriented modifications
             adaptations.append("Performance-focused pacing and tempo work emphasized")
+
+    # 6. Process custom question responses from plan-specific questions
+    custom_responses = personalization.get('customResponses', {})
+    if custom_responses:
+        # Load Capacity Builder specific
+        if base_plan_id == 'load-capacity':
+            target_load_kg = custom_responses.get('targetLoadKg')
+            current_max_load_kg = custom_responses.get('currentMaxLoadKg')
+            injury_concerns = custom_responses.get('injuryConcerns', [])
+
+            if target_load_kg and current_max_load_kg:
+                load_gap = target_load_kg - current_max_load_kg
+                weeks_needed = int(load_gap / 2.5) + 4  # ~2.5kg per fortnight + buffer
+                personalized_structure['target_load'] = f"{target_load_kg}kg target in ~{weeks_needed} weeks"
+                adaptations.append(f"Progressing from {current_max_load_kg}kg to {target_load_kg}kg goal")
+
+            if injury_concerns:
+                if 'Back' in injury_concerns:
+                    adaptations.append("Core strengthening and posture focus for back protection")
+                if 'Knees' in injury_concerns:
+                    adaptations.append("Emphasis on flat terrain initially with gradual hill introduction")
+
+        # Fat Loss specific
+        elif base_plan_id == 'fat-loss':
+            weight_loss_target = custom_responses.get('weightLossTargetKg')
+            activity_level = custom_responses.get('currentActivityLevel')
+
+            if weight_loss_target:
+                weekly_target = weight_loss_target / 12  # 12-week plan
+                personalized_structure['calorie_deficit_target'] = f"{weekly_target:.1f}kg/week deficit"
+                adaptations.append(f"Calibrated for {weight_loss_target}kg loss over 12 weeks")
+
+            if activity_level:
+                if activity_level in ['sedentary', 'light']:
+                    personalized_structure['starting_volume'] = 'Conservative 90-minute weekly start'
+                    adaptations.append("Gradual volume build for sustainable habit formation")
+
+        # Event Prep specific
+        elif base_plan_id == 'event-prep':
+            event_date = custom_responses.get('eventDate')
+            event_distance = custom_responses.get('eventDistanceKm')
+            event_load = custom_responses.get('eventLoadKg')
+
+            if event_date:
+                from datetime import datetime
+                event_dt = datetime.fromisoformat(event_date.replace('Z', '+00:00'))
+                days_until = (event_dt - datetime.now()).days
+                personalized_structure['taper_week'] = max(1, (days_until // 7) - 1)
+                adaptations.append(f"Taper scheduled for week {personalized_structure['taper_week']}")
+
+            if event_distance:
+                personalized_structure['event_distance'] = f"{event_distance}km"
+                if event_distance > 20:
+                    adaptations.append("Extended long ruck progression for ultra-distance preparation")
+
+            if event_load:
+                personalized_structure['event_load'] = f"{event_load}kg required"
+                adaptations.append(f"Progressive loading to reach {event_load}kg event weight")
+
+        # Get Faster specific
+        elif base_plan_id == 'get-faster':
+            current_pace = custom_responses.get('currentPaceMinPerKm')
+            target_pace = custom_responses.get('targetPaceMinPerKm')
+            speed_experience = custom_responses.get('speedWorkExperience')
+
+            if current_pace and target_pace:
+                pace_improvement = current_pace - target_pace
+                personalized_structure['pace_targets'] = {
+                    'current': f"{current_pace} min/km",
+                    'target': f"{target_pace} min/km",
+                    'improvement': f"{pace_improvement} min/km"
+                }
+                adaptations.append(f"Targeting {pace_improvement} min/km pace improvement")
+
+            if speed_experience == 'none':
+                personalized_structure['interval_progression'] = 'Conservative with education focus'
+                adaptations.append("Gradual introduction to interval training with form emphasis")
+
+        # Age Strong specific
+        elif base_plan_id == 'age-strong':
+            primary_goals = custom_responses.get('primaryGoals', [])
+            mobility_concerns = custom_responses.get('mobilityConcerns', [])
+
+            if 'Better posture' in primary_goals:
+                adaptations.append("Core and upper back strengthening for posture improvement")
+            if 'Improved balance' in primary_goals:
+                adaptations.append("Single-leg and stability work integrated throughout")
+
+            if 'Stairs difficult' in mobility_concerns:
+                personalized_structure['progression'] = 'Flat terrain focus with gradual incline introduction'
+                adaptations.append("Building strength for stair climbing confidence")
     
     # 6. Preferred days scheduling
     training_schedule = []

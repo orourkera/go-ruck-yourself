@@ -11,6 +11,8 @@ class PlanPersonalization {
   final int? streakTimeframeDays;
   final String? equipmentType;
   final double? equipmentWeight;
+  // Custom fields from plan-specific questions
+  final Map<String, dynamic>? customResponses;
 
   const PlanPersonalization({
     this.why,
@@ -25,6 +27,7 @@ class PlanPersonalization {
     this.streakTimeframeDays,
     this.equipmentType,
     this.equipmentWeight,
+    this.customResponses,
   });
 
   PlanPersonalization copyWith({
@@ -40,6 +43,7 @@ class PlanPersonalization {
     int? streakTimeframeDays,
     String? equipmentType,
     double? equipmentWeight,
+    Map<String, dynamic>? customResponses,
   }) {
     return PlanPersonalization(
       why: why ?? this.why,
@@ -55,6 +59,7 @@ class PlanPersonalization {
       streakTimeframeDays: streakTimeframeDays ?? this.streakTimeframeDays,
       equipmentType: equipmentType ?? this.equipmentType,
       equipmentWeight: equipmentWeight ?? this.equipmentWeight,
+      customResponses: customResponses ?? this.customResponses,
     );
   }
 
@@ -72,6 +77,7 @@ class PlanPersonalization {
       'streakTimeframeDays': streakTimeframeDays,
       'equipmentType': equipmentType,
       'equipmentWeight': equipmentWeight,
+      'customResponses': customResponses,
     };
   }
 
@@ -89,6 +95,7 @@ class PlanPersonalization {
       streakTimeframeDays: json['streakTimeframeDays'] as int?,
       equipmentType: json['equipmentType'] as String?,
       equipmentWeight: (json['equipmentWeight'] as num?)?.toDouble(),
+      customResponses: json['customResponses'] as Map<String, dynamic>?,
     );
   }
 
