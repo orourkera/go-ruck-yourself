@@ -751,14 +751,14 @@ class CoachingPlansResource(Resource):
                 return error_response(f"Error personalizing plan: {str(e)}", 500)
             
             # Check if user already has an active plan of this type
-            existing_response = supabase.table("coaching_plans").select("id").eq(
+            existing_response = supabase.table("user_coaching_plans").select("id").eq(
                 "user_id", g.user_id
-            ).eq("base_plan_id", base_plan_id).eq("status", "active").execute()
-            
+            ).eq("coaching_plan_id", base_plan_id).eq("current_status", "active").execute()
+
             if existing_response.data:
                 # Archive the existing plan
-                supabase.table("coaching_plans").update({
-                    "status": "archived"
+                supabase.table("user_coaching_plans").update({
+                    "current_status": "archived"
                 }).eq("id", existing_response.data[0]["id"]).execute()
             
             # Create new coaching plan
@@ -860,7 +860,7 @@ class CoachingPlanResource(Resource):
                 return error_response("Unauthorized", 401)
             
             supabase = get_supabase_client()
-            response = supabase.table("coaching_plans").select("*").eq("id", plan_id).eq("user_id", g.user_id).execute()
+            response = supabase.table("user_coaching_plans").select("*").eq("id", plan_id).eq("user_id", g.user_id).execute()
             
             if not response.data:
                 return error_response("Coaching plan not found", 404)
@@ -901,7 +901,7 @@ class CoachingPlanResource(Resource):
             if not update_data:
                 return error_response("No valid fields to update", 400)
             
-            response = supabase.table("coaching_plans").update(update_data).eq("id", plan_id).eq("user_id", g.user_id).execute()
+            response = supabase.table("user_coaching_plans").update(update_data).eq("id", plan_id).eq("user_id", g.user_id).execute()
             
             if not response.data:
                 return error_response("Coaching plan not found", 404)

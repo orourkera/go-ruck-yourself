@@ -360,109 +360,124 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
     final username =
         authState is Authenticated ? authState.user.username : 'Rucker';
 
-    // Get the actual plan structure from the database
-    final sciencePlan = ScienceBasedPlan.getPlanById(_selectedPlanType!.id);
-    final baseStructure = sciencePlan?.baseStructure ?? {};
-    final progressionRules = sciencePlan?.progressionRules ?? {};
+    // Special handling for Daily Discipline
+    if (_selectedPlanType!.id == 'daily-discipline') {
+      await _generateDailyDisciplinePreview(username);
+      return;
+    }
 
-    // Convert baseStructure to readable format for the prompt
-    final structureDetails = baseStructure.entries
-        .map((e) => '${e.key}: ${e.value}')
-        .join('\n');
+    // Get custom responses if available
+    final customResponses = _personalization!.customResponses ?? {};
+
+    // Build personalized prompt based on plan type
+    String planSpecificDetails = '';
+
+    switch (_selectedPlanType!.id) {
+      case 'load-capacity':
+        final targetLoad = customResponses['target_load'] ?? 20;
+        final currentLoad = customResponses['current_max_load'] ?? 10;
+        final injuryConcerns = customResponses['injury_concerns'] ?? [];
+        planSpecificDetails = '''
+- Target Load: ${targetLoad}kg (working up from ${currentLoad}kg)
+- Injury Concerns: ${injuryConcerns.isNotEmpty ? injuryConcerns.join(', ') : 'None'}
+- Building from ${currentLoad}kg to ${targetLoad}kg safely''';
+        break;
+
+      case 'fat-loss':
+        final weightLossTarget = customResponses['weight_loss_target'] ?? 5;
+        final currentActivity = customResponses['current_activity'] ?? 'moderate';
+        final complementary = customResponses['complementary_activities'] ?? [];
+        planSpecificDetails = '''
+- Weight Loss Goal: ${weightLossTarget}kg over 12 weeks
+- Current Activity Level: $currentActivity
+- Complementary Activities: ${complementary.isNotEmpty ? complementary.join(', ') : 'Rucking only'}''';
+        break;
+
+      case 'get-faster':
+        final currentPace = customResponses['current_pace'] ?? '8:00';
+        final targetPace = customResponses['target_pace'] ?? '7:00';
+        final speedExperience = customResponses['speed_work_experience'] ?? 'some';
+        planSpecificDetails = '''
+- Current Pace: $currentPace min/km
+- Target Pace: $targetPace min/km
+- Speed Work Experience: $speedExperience''';
+        break;
+
+      case 'event-prep':
+        final eventDate = customResponses['event_date'];
+        final eventDistance = customResponses['event_distance'] ?? 19.3;
+        final eventLoad = customResponses['event_load'] ?? 20;
+        final timeGoal = customResponses['time_goal'] ?? 'Finish strong';
+        planSpecificDetails = '''
+- Event Date: ${eventDate != null ? DateTime.parse(eventDate).toLocal().toString().split(' ')[0] : 'TBD'}
+- Event Distance: ${eventDistance}km
+- Event Load: ${eventLoad}kg
+- Time Goal: $timeGoal''';
+        break;
+
+      case 'age-strong':
+        final primaryGoals = customResponses['primary_goals'] ?? [];
+        final mobilityConcerns = customResponses['mobility_concerns'] ?? [];
+        final terrain = customResponses['preferred_terrain'] ?? 'flat';
+        planSpecificDetails = '''
+- Primary Goals: ${primaryGoals.isNotEmpty ? primaryGoals.join(', ') : 'Stay active'}
+- Mobility Concerns: ${mobilityConcerns.isNotEmpty ? mobilityConcerns.join(', ') : 'None'}
+- Preferred Terrain: $terrain''';
+        break;
+    }
 
     final prompt = '''
-Create a concise, personalized RUCKING training plan for ${username}'s ${_selectedPlanType!.name} goal using markdown formatting optimized for mobile.
+Create a PERSONALIZED ${_selectedPlanType!.name} rucking plan for $username based on their specific inputs.
 
-Goal: ${_selectedPlanType!.name} (${_selectedPlanType!.duration})
-Training: ${_personalization!.trainingDaysPerWeek} days/week on ${_personalization!.preferredDays?.join(', ')}
-Plan Type: ${_selectedPlanType!.id}
+USER'S PERSONALIZATION:
+- Why: ${_personalization!.why?.join(', ') ?? 'Personal growth'}
+- Success: ${_personalization!.successDefinition ?? 'Complete the program'}
+- Training Days: ${_personalization!.trainingDaysPerWeek} days/week on ${_personalization!.preferredDays?.join(', ') ?? 'flexible schedule'}
+- Challenges: ${_personalization!.challenges?.join(', ') ?? 'Consistency'}
+- Minimum Session: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK on recovery days)' : ''}
 
-BASE PLAN STRUCTURE FROM DATABASE:
-$structureDetails
+PLAN-SPECIFIC DETAILS:
+$planSpecificDetails
 
-USER PERSONALIZATION (CRITICAL - ADAPT THE BASE PLAN USING THESE):
-1. Why they're doing this: ${_personalization!.why?.join(', ')}
-2. Success definition: ${_personalization!.successDefinition}
-3. Available days: ${_personalization!.trainingDaysPerWeek} days/week on ${_personalization!.preferredDays?.join(', ')}
-4. Main challenges: ${_personalization!.challenges?.join(', ')}
-5. Minimum session time: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK)' : ''}${_getStreakTargetDescription()}
+Create a personalized plan that directly addresses THEIR inputs:
 
-IMPORTANT: Start with the base plan structure above, then ADAPT it based on their personalization:
-- Adjust volume/intensity based on their available training days
-- Modify workouts to address their specific challenges
-- Ensure sessions fit their time constraints
-- Align progression with their success definition
-
-Generate a PERSONALIZED RUCKING plan with these sections using BULLETS ONLY:
-
-## 🎯 MISSION
-• **Why**: ${_personalization!.why?.join(', ')}
-• **Win**: ${_personalization!.successDefinition}
+## 🎯 YOUR MISSION
+• **Goal**: ${_selectedPlanType!.name} specifically for YOUR situation
+• **Why**: ${_personalization!.why?.join(', ') ?? 'Personal growth'}
+• **Win**: ${_personalization!.successDefinition ?? 'Complete successfully'}
 • **Timeline**: ${_selectedPlanType!.duration}
 
-## 📅 WEEKLY RUCKING RHYTHM
-ADAPT the base plan to fit ${_personalization!.trainingDaysPerWeek} days on ${_personalization!.preferredDays?.join(', ')}.
-List ONLY their selected days with specific rucking workouts adapted from the base structure:
+## 📅 YOUR WEEKLY TRAINING
+Design a week that fits ${_personalization!.trainingDaysPerWeek} days on ${_personalization!.preferredDays?.join(', ') ?? 'your schedule'}:
+[Create specific workouts for THEIR available days, respecting their minimum session time of ${_personalization!.minimumSessionMinutes} minutes]
 
-[For each of their preferred days, create a specific ruck workout that:
-- Fits their available time (consider minimum session: ${_personalization!.minimumSessionMinutes} min)
-- Addresses their challenges: ${_personalization!.challenges?.join(', ')}
-- Progresses toward their goal: ${_personalization!.successDefinition}]
+## 🚧 MANAGING YOUR CHALLENGES
+${_personalization!.challenges?.map((challenge) => '''
+**$challenge Strategy**:
+• Prevention: [specific preventive measures]
+• During Session: [how to handle if it comes up]
+• Recovery: [post-session protocol]''').join('\n\n') ?? 'Create protocols for consistency and motivation'}
 
-## ⚠️ CHALLENGE PROTOCOLS
-For: ${_personalization!.challenges?.join(', ')}
-
-**Green**: [when to go normal]
-**Yellow**: [when to modify]
-**Red**: [when to rest]
-
-## 📈 RUCKING PROGRESSION PATH
+## 📈 YOUR PROGRESSION PATH
+Based on your goals and current fitness, here's your personalized progression:
 
 **Weeks 1-2: Foundation**
-• Focus: [Base aerobic capacity with light weight]
-• Weight: [Starting weight in lbs/kg]
-• Volume: [X miles/km per week]
-• Milestone: [Complete X continuous rucks]
+[Build base specific to their current level and goals]
 
 **Weeks 3-4: Building**
-• Focus: [Increase weight or distance]
-• Weight: [+5-10 lbs/2-5kg]
-• Volume: [+20% distance]
-• Milestone: [First long ruck of X miles/km]
+[Progressive overload tailored to their targets]
 
 **Weeks 5-6: Pushing**
-• Focus: [Speed work or hills]
-• Weight: [Target training weight]
-• Volume: [Peak weekly mileage]
-• Milestone: [Hit pace goal with weight]
+[Peak training adapted to their timeline]
 
-**Weeks 7-8: Peak**
-• Focus: [Event simulation or goal attempt]
-• Weight: [Goal weight]
-• Volume: [Taper if needed]
-• Milestone: [Achieve ${_personalization!.successDefinition}]
+**Final Weeks: Peak & Taper**
+[Final preparation for their specific goal: ${_personalization!.successDefinition}]
 
-## 🔧 MINIMUM RUCK DAYS
-When you only have ${_personalization!.minimumSessionMinutes} min:
-• Option A: [Quick weighted walk, X lbs for X min]
-• Option B: [Stair climbs with ruck, X rounds]${_getStreakTargetInstruction()}
+## 🔧 MINIMUM SESSION PROTOCOL
+When you only have ${_personalization!.minimumSessionMinutes} minutes:
+[Create 2-3 specific options they can do in their minimum time]
 
-## 💪 EXPECTATIONS
-
-**Week 1-2**: [what you'll feel]
-**Week 3-4**: [what changes]
-**Week 5-6**: [breakthrough point]
-**Final**: [victory state]
-
-Keep under 300 words. Use bullet points, bold text, and clear headers. Be specific with rucking weights, distances, paces.
-
-For ${_selectedPlanType!.id} plan specifically:
-- Fat Loss: Focus on longer duration, moderate weight, steady pace rucks
-- Performance: Focus on speed work, intervals, and heavy carries
-- Daily Discipline: Focus on consistency with manageable daily rucks
-- Base Building: Focus on progressive volume with moderate weights
-
-ALL sessions must be RUCKING (weighted backpack walking/hiking).
+Keep it concise, specific to THEIR inputs, and actionable. Focus on practical rucking workouts they can actually do.
 ''';
 
     setState(() {
@@ -474,7 +489,7 @@ ALL sessions must be RUCKING (weighted backpack walking/hiking).
       await _openAiService.stream(
         model: 'gpt-4.1',
         instructions:
-            'You are a RUCKING coach personalizing a plan for ${username}. CRITICAL: Take the base plan structure provided and ADAPT it based on their 6 personalization responses - their why, success metric, available days, challenges, and time constraints. ALL workouts must be rucking (weighted backpack walking). Use markdown bullets (•), bold text, ## headers. Specify exact ruck weights, distances, paces. Make it truly personalized, not generic.',
+            'You are a rucking coach creating a PERSONALIZED plan for $username. Take their specific inputs (days available, challenges, goals, custom answers) and create a plan that addresses THEIR situation. Do NOT show generic templates. Every recommendation should tie back to what THEY told you. Use markdown formatting with bullets (•), bold text, and ## headers. Be specific with weights, distances, and paces based on their current fitness and goals.',
         input: prompt,
         temperature: 0.7,
         maxOutputTokens: 650,
@@ -499,6 +514,125 @@ ALL sessions must be RUCKING (weighted backpack walking/hiking).
       setState(() {
         _planPreviewSummary =
             'I\'m so excited about your ${_selectedPlanType!.name} journey! This ${_selectedPlanType!.duration} plan is perfectly tailored to your goals and schedule. With ${_personalization!.trainingDaysPerWeek} training days per week, you\'re going to see incredible progress toward ${_personalization!.successDefinition}. Let\'s make this happen!';
+        _isGeneratingPreview = false;
+      });
+    }
+  }
+
+  Future<void> _generateDailyDisciplinePreview(String username) async {
+    // Get custom responses for Daily Discipline
+    final customResponses = _personalization!.customResponses ?? {};
+    final streakDays = customResponses['streak_days'] ?? 30;
+    final restData = customResponses['rest_days'] ?? {};
+    final restCount = restData['count'] ?? 0;
+    final restPeriod = restData['period'] ?? 'per_week';
+    final minSessionTime = customResponses['minimum_time'] ?? 20;
+
+    // Build rest days description
+    String restDescription = '';
+    if (restCount == 0) {
+      restDescription = 'Every single day - no rest days!';
+    } else if (restPeriod == 'per_week') {
+      restDescription = '$restCount rest ${restCount == 1 ? "day" : "days"} per week';
+    } else if (restPeriod == 'per_month') {
+      restDescription = '$restCount rest ${restCount == 1 ? "day" : "days"} per month';
+    } else {
+      restDescription = '$restCount rest ${restCount == 1 ? "day" : "days"} total';
+    }
+
+    final prompt = '''
+Create a PERSONALIZED $streakDays-day rucking plan for $username. DO NOT use generic templates or mention "8 weeks" - this is specifically a $streakDays-day streak.
+
+USER'S ACTUAL INPUTS (USE THESE EXACT VALUES):
+- Streak Duration: $streakDays days (NOT 8 weeks!)
+- Rest Plan: $restDescription
+- Why: ${_personalization!.why?.join(', ') ?? 'Personal growth'}
+- Success: ${_personalization!.successDefinition ?? 'Complete the streak'}
+- Challenges: ${_personalization!.challenges?.join(', ') ?? 'Consistency'}
+- Minimum Session: $minSessionTime minutes
+
+CRITICAL: Every number and detail must match their inputs above. Do not use generic timeframes.
+
+## 🎯 YOUR MISSION
+• **Goal**: Complete YOUR $streakDays-day streak
+• **Why**: ${_personalization!.why?.join(', ') ?? 'Build discipline'}
+• **Win**: ${_personalization!.successDefinition ?? 'Streak complete'}
+• **Timeline**: $streakDays days (${(streakDays / 7).round()} weeks)
+
+## 📅 YOUR DAILY RHYTHM
+Based on $restDescription, here's your sustainable pattern:
+${restCount == 0 ? '''
+• Every single day for $streakDays days straight
+• Vary intensity to prevent burnout
+• Minimum $minSessionTime minutes keeps streak alive''' : '''
+• Ruck days and rest days based on: $restDescription
+• Active days need minimum $minSessionTime minutes
+• Rest days can be complete rest or light movement'''}
+
+## 🏃 SESSION ROTATION
+Rotate these throughout your $streakDays days:
+• **Easy Recovery**: ${minSessionTime}-${minSessionTime + 10} min @ comfortable pace, light weight
+• **Steady State**: ${minSessionTime + 10}-${minSessionTime + 20} min @ moderate pace, moderate weight
+• **Push Session**: ${minSessionTime + 15}-${minSessionTime + 30} min @ challenging pace or weight
+${restCount > 0 ? "• **Rest/Recovery**: Complete rest or gentle walk (unweighted optional)" : ""}
+
+## 🚧 DEALING WITH ${(_personalization!.challenges?.first ?? 'CHALLENGES').toUpperCase()}
+${_personalization!.challenges?.map((challenge) => '''
+**$challenge Protocol**:
+• Green (all good): [specific advice]
+• Yellow (adjust): [modification strategy]
+• Red (at risk): [minimum viable session to keep streak alive]
+''').join('\n') ?? '''
+• Green: Keep going as planned
+• Yellow: Reduce intensity but maintain consistency
+• Red: Do minimum $minSessionTime minutes to keep streak alive
+'''}
+
+## 📈 STREAK MILESTONES
+• **Day 7**: First week done - momentum building
+• **Day 14**: Two weeks - habit forming
+• **Day 21**: Three weeks - identity shifting
+• **Day ${(streakDays * 0.5).round()}**: Halfway - unstoppable now
+• **Day ${streakDays - 1}**: Final day tomorrow - victory in sight
+• **Day $streakDays**: MISSION COMPLETE! 🎯
+
+Keep it concise, specific to their inputs, and motivating. Use bullet points and clear formatting.
+''';
+
+    setState(() {
+      _planPreviewSummary = '';
+      _isGeneratingPreview = true;
+    });
+
+    try {
+      await _openAiService.stream(
+        model: 'gpt-4.1',
+        instructions:
+            'You are creating a PERSONALIZED $streakDays-day rucking streak plan. Use ONLY the specific numbers provided - this is a $streakDays-day plan, NOT 8 weeks. Every detail must match their actual inputs. Do not use generic templates. Make it specific to their $streakDays-day goal with $restDescription.',
+        input: prompt,
+        temperature: 0.7,
+        maxOutputTokens: 650,
+        onDelta: (delta) {
+          if (mounted) {
+            setState(() {
+              _planPreviewSummary += delta;
+            });
+          }
+        },
+        onComplete: (fullText) {
+          if (mounted) {
+            setState(() {
+              _isGeneratingPreview = false;
+              _planPreviewSummary = fullText;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to generate Daily Discipline preview: $e');
+      setState(() {
+        _planPreviewSummary =
+            'Your $streakDays-day Daily Discipline streak is ready! With $restDescription and a minimum of $minSessionTime minutes on tough days, you\'re set up for success. This journey will ${_personalization!.why?.join(", ") ?? "build unshakeable discipline"} and help you ${_personalization!.successDefinition ?? "achieve your goals"}. Let\'s start strong!';
         _isGeneratingPreview = false;
       });
     }
