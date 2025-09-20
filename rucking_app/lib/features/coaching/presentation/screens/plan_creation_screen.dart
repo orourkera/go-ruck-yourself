@@ -445,7 +445,7 @@ Create a personalized plan that directly addresses THEIR inputs:
 • **Goal**: ${_selectedPlanType!.name} specifically for YOUR situation
 • **Why**: ${_personalization!.why?.join(', ') ?? 'Personal growth'}
 • **Win**: ${_personalization!.successDefinition ?? 'Complete successfully'}
-• **Timeline**: ${_selectedPlanType!.duration}
+• **Timeline**: ${_getDynamicDuration()}
 
 ## 📅 YOUR WEEKLY TRAINING
 Design a week that fits ${_personalization!.trainingDaysPerWeek} days on ${_personalization!.preferredDays?.join(', ') ?? 'your schedule'}:
@@ -513,7 +513,7 @@ Keep it concise, specific to THEIR inputs, and actionable. Focus on practical ru
       AppLogger.error('Failed to generate plan preview summary: $e');
       setState(() {
         _planPreviewSummary =
-            'I\'m so excited about your ${_selectedPlanType!.name} journey! This ${_selectedPlanType!.duration} plan is perfectly tailored to your goals and schedule. With ${_personalization!.trainingDaysPerWeek} training days per week, you\'re going to see incredible progress toward ${_personalization!.successDefinition}. Let\'s make this happen!';
+            'I\'m so excited about your ${_selectedPlanType!.name} journey! This ${_getDynamicDuration()} plan is perfectly tailored to your goals and schedule. With ${_personalization!.trainingDaysPerWeek} training days per week, you\'re going to see incredible progress toward ${_personalization!.successDefinition}. Let\'s make this happen!';
         _isGeneratingPreview = false;
       });
     }
@@ -654,7 +654,7 @@ Keep it concise, specific to their inputs, and motivating. Use bullet points and
 You are a fitness coach. Generate a motivational and detailed summary of this personalized rucking plan.
 
 Plan Type: ${_selectedPlanType!.name}
-Duration: ${_selectedPlanType!.duration}
+Duration: ${_getDynamicDuration()}
 Description: ${_selectedPlanType!.description}
 
 User's Personalization:
@@ -1366,7 +1366,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              _selectedPlanType!.duration,
+                              _getDynamicDuration(),
                               style: AppTextStyles.bodyMedium.copyWith(
                                 color: _selectedPersonality!.color,
                                 fontWeight: FontWeight.w600,
@@ -1849,6 +1849,22 @@ Keep it under 200 words, motivational, and specific to their answers.
       default:
         return 'Your commitment to $why shows through in every choice you made. This plan will help you get there step by step.';
     }
+  }
+
+  String _getDynamicDuration() {
+    // For Daily Discipline, use the actual streak days
+    if (_selectedPlanType?.id == 'daily-discipline' &&
+        _personalization?.customResponses != null) {
+      final streakDays = _personalization!.customResponses!['streak_days'];
+      if (streakDays != null && streakDays != 'custom') {
+        return '$streakDays days';
+      } else if (streakDays == 'custom' && _personalization!.customResponses!['custom_days'] != null) {
+        final customDays = _personalization!.customResponses!['custom_days'];
+        return '$customDays days';
+      }
+    }
+    // For other plans, use the default duration
+    return _selectedPlanType?.duration ?? '8 weeks';
   }
 
   String _getPersonalizedPlanSummary() {

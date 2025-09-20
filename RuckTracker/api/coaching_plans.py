@@ -757,8 +757,9 @@ class CoachingPlansResource(Resource):
             ).eq("coaching_plan_id", base_plan['id']).eq("current_status", "active").execute()
 
             if existing_response.data:
-                # Archive the existing plan
-                supabase.table("user_coaching_plans").update({
+                # Archive the existing plan using admin client
+                admin_supabase = get_supabase_admin_client()
+                admin_supabase.table("user_coaching_plans").update({
                     "current_status": "archived"
                 }).eq("id", existing_response.data[0]["id"]).execute()
             
@@ -790,7 +791,9 @@ class CoachingPlansResource(Resource):
                 }
             }
 
-            response = supabase.table("user_coaching_plans").insert(user_plan_data).execute()
+            # Use admin client to bypass RLS for insert
+            admin_supabase = get_supabase_admin_client()
+            response = admin_supabase.table("user_coaching_plans").insert(user_plan_data).execute()
 
             # Also save equipment preferences to user profile
             equipment_type = personalization.get('equipment_type')
@@ -802,7 +805,7 @@ class CoachingPlansResource(Resource):
                 if equipment_weight:
                     user_update['equipment_weight_kg'] = equipment_weight
 
-                supabase.table("users").update(user_update).eq("id", g.user_id).execute()
+                admin_supabase.table("users").update(user_update).eq("id", g.user_id).execute()
             
             if not response.data:
                 return error_response("Failed to create coaching plan", 500)
