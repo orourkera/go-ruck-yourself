@@ -813,17 +813,31 @@ class CoachingPlansResource(Resource):
             created_plan = response.data[0]
             
             # Clean response data to prevent JSON serialization errors
-            clean_plan = {}
-            for key, value in created_plan.items():
-                if hasattr(value, '__dict__') and hasattr(value, 'data'):
-                    # Skip Supabase Response objects
-                    continue
-                clean_plan[key] = value
+            def clean_data(obj):
+                """Recursively clean data to remove Supabase Response objects"""
+                if hasattr(obj, '__dict__') and hasattr(obj, 'data'):
+                    # This is a Supabase Response object, skip it
+                    return None
+                elif isinstance(obj, dict):
+                    cleaned = {}
+                    for k, v in obj.items():
+                        cleaned_value = clean_data(v)
+                        if cleaned_value is not None:
+                            cleaned[k] = cleaned_value
+                    return cleaned
+                elif isinstance(obj, list):
+                    return [clean_data(item) for item in obj if clean_data(item) is not None]
+                else:
+                    return obj
+            
+            clean_plan = clean_data(created_plan)
+            clean_adaptations = clean_data(personalized_plan['adaptations'])
+            clean_schedule = clean_data(personalized_plan['training_schedule'])
             
             return success_response({
                 "coaching_plan": clean_plan,
-                "personalized_adaptations": personalized_plan['adaptations'],
-                "training_schedule": personalized_plan['training_schedule']
+                "personalized_adaptations": clean_adaptations,
+                "training_schedule": clean_schedule
             })
             
         except Exception as e:
