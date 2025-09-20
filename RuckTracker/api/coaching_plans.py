@@ -16,10 +16,11 @@ def _get_coaching_plan_templates(supabase_client) -> Dict[str, Any]:
     """Fetch coaching plan templates from database"""
     try:
         response = supabase_client.table('coaching_plan_templates').select('*').eq('is_active', True).execute()
-        
+
         templates = {}
         for template in response.data or []:
             templates[template['plan_id']] = {
+                'id': template['id'],  # Include the integer ID for foreign key references
                 'name': template['name'],
                 'duration_weeks': template['duration_weeks'],
                 'base_structure': template['base_structure'],
@@ -753,7 +754,7 @@ class CoachingPlansResource(Resource):
             # Check if user already has an active plan of this type
             existing_response = supabase.table("user_coaching_plans").select("id").eq(
                 "user_id", g.user_id
-            ).eq("coaching_plan_id", base_plan_id).eq("current_status", "active").execute()
+            ).eq("coaching_plan_id", base_plan['id']).eq("current_status", "active").execute()
 
             if existing_response.data:
                 # Archive the existing plan
@@ -776,7 +777,7 @@ class CoachingPlansResource(Resource):
             # Insert into user_coaching_plans table (not coaching_plans!)
             user_plan_data = {
                 "user_id": g.user_id,
-                "coaching_plan_id": base_plan_id,  # This references the template ID
+                "coaching_plan_id": base_plan['id'],  # Use the integer ID from the template
                 "coaching_personality": coaching_personality,
                 "start_date": datetime.now().isoformat(),
                 "current_week": 1,
@@ -784,7 +785,8 @@ class CoachingPlansResource(Resource):
                 "plan_modifications": {
                     "personalization": personalization,
                     "plan_structure": personalized_plan['personalized_structure'],
-                    "adaptations": personalized_plan['adaptations']
+                    "adaptations": personalized_plan['adaptations'],
+                    "plan_type": base_plan_id  # Keep the string ID for reference
                 }
             }
 
