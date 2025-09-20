@@ -44,27 +44,27 @@ class _GoalsListScreenState extends State<GoalsListScreen> {
         label: const Text('Set a Personal Goal'),
       ),
       body: FutureBuilder<List<GoalWithProgress>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('Failed to load goals: ${snapshot.error}'),
-              ),
-            );
-          }
-          final items = snapshot.data ?? const [];
-          if (items.isEmpty) {
-            return const Center(child: Text('No goals yet'));
-          }
-          return ListView.separated(
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Failed to load goals: ${snapshot.error}'),
+                    ),
+                  );
+                }
+                final items = snapshot.data ?? const [];
+                if (items.isEmpty) {
+                  return const Center(child: Text('No goals yet'));
+                }
+                return ListView.separated(
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
               final item = items[index];
               final goal = item.goal;
               final progress = item.progress;

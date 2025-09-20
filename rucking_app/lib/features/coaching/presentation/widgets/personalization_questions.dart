@@ -5,15 +5,18 @@ import 'package:rucking_app/features/coaching/domain/models/coaching_plan_type.d
 import 'package:rucking_app/features/coaching/domain/models/plan_custom_questions.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PersonalizationQuestions extends StatefulWidget {
   final void Function(PlanPersonalization) onPersonalizationComplete;
   final CoachingPlanType? planType;
+  final Map<String, dynamic>? userInsights;
 
   const PersonalizationQuestions({
     super.key,
     required this.onPersonalizationComplete,
     this.planType,
+    this.userInsights,
   });
 
   @override
@@ -28,43 +31,168 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   // Provide sensible defaults so controls like sliders start in an enabled state
   PlanPersonalization _personalization =
       const PlanPersonalization(trainingDaysPerWeek: 4);
+  bool _useMetric = true;  // User's metric preference
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMetricPreference();
+    _initializeWithInsights();
+  }
+
+  void _initializeWithInsights() {
+    if (widget.userInsights != null) {
+      // Use user insights to set smart defaults
+      final insights = widget.userInsights!;
+
+      // Set training days per week based on weekly average
+      if (insights['weekly_avg'] != null) {
+        final weeklyAvg = insights['weekly_avg'] as double;
+        _personalization = _personalization.copyWith(
+          trainingDaysPerWeek: weeklyAvg.round().clamp(1, 7),
+        );
+      }
+
+      // Pre-populate custom responses based on user data
+      Map<String, dynamic> customResponses = {};
+
+      // For load capacity plan - set current max load
+      if (widget.planType?.id == 'load-capacity' && insights['ruck_weight'] != null) {
+        customResponses['current_max_load'] = insights['ruck_weight'];
+      }
+
+      // For get faster plan - set current pace
+      if (widget.planType?.id == 'get-faster' && insights['avg_pace'] != null) {
+        customResponses['current_pace'] = insights['avg_pace'];
+      }
+
+      // For event prep - suggest distance based on avg distance
+      if (widget.planType?.id == 'event-prep' && insights['avg_distance'] != null) {
+        final avgDistance = insights['avg_distance'] as double;
+        customResponses['event_distance'] = (avgDistance * 2).round(); // Suggest double their average
+      }
+
+      if (customResponses.isNotEmpty) {
+        _personalization = _personalization.copyWith(
+          customResponses: customResponses,
+        );
+      }
+    }
+  }
+
+  Future<void> _loadMetricPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final preferMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+    if (mounted) {
+      setState(() {
+        _useMetric = preferMetric;
+      });
+    }
+  }
 
   List<String> get _questions {
     final questions = <String>[];
+    final planId = widget.planType?.id;
 
-    // For Daily Discipline, start with custom questions
-    if (widget.planType?.id == 'daily-discipline') {
-      final customQuestions = PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
-      for (final question in customQuestions) {
-        questions.add(question.prompt);
-      }
-
-      // Then add relevant base questions (skip training days/week, preferred days, and equipment)
-      questions.addAll([
-        "Why is this streak important to you?",
-        "In 8–12 weeks, what would make you say this was a win?", // This will be dynamically updated in _buildSuccessQuestion
-        "What's your biggest challenge to hitting this goal?",
-      ]);
-    } else {
-      // For all other plans, standard order
-      questions.addAll([
-        "What's your why for this goal?",
-        "In 8–12 weeks, what would make you say this was a win?",
-        "How many days/week can you realistically train?",
-        "Which days usually work best?",
-        "What's your biggest challenge to hitting this goal?",
-        "What equipment do you have?",
-      ]);
-
-      // Add custom questions from code-based definitions
-      if (widget.planType != null) {
-        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
+    switch (planId) {
+      case 'daily-discipline':
+        // Custom questions first for streak
+        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
         for (final question in customQuestions) {
           questions.add(question.prompt);
         }
-      }
+        // Then relevant base questions (no training days/preferred days/equipment)
+        questions.addAll([
+          "Why is this streak important to you?",
+          "In 8–12 weeks, what would make you say this was a win?",
+          "What's your biggest challenge to hitting this goal?",
+        ]);
+        break;
 
-      questions.add("On tough days, what's your minimum viable session?");
+      case 'fat-loss':
+        // Weight loss target first
+        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        if (customQuestions.isNotEmpty) {
+          questions.add(customQuestions[0].prompt); // Weight loss target
+        }
+        // Base questions
+        questions.addAll([
+          "What's your why for this goal?",
+          "In 8–12 weeks, what would make you say this was a win?",
+          "How many days/week can you realistically train?",
+          "Which days usually work best?",
+          "What's your biggest challenge to hitting this goal?",
+          "What equipment do you have?",
+        ]);
+        // Remaining custom questions
+        for (int i = 1; i < customQuestions.length; i++) {
+          questions.add(customQuestions[i].prompt);
+        }
+        questions.add("On tough days, what's your minimum viable session?");
+        break;
+
+      case 'load-capacity':
+        // Target load first
+        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        if (customQuestions.isNotEmpty) {
+          questions.add(customQuestions[0].prompt); // Target load
+        }
+        // Base questions
+        questions.addAll([
+          "What's your why for this goal?",
+          "In 8–12 weeks, what would make you say this was a win?",
+          "How many days/week can you realistically train?",
+          "Which days usually work best?",
+          "What's your biggest challenge to hitting this goal?",
+          "What equipment do you have?",
+        ]);
+        // Remaining custom questions
+        for (int i = 1; i < customQuestions.length; i++) {
+          questions.add(customQuestions[i].prompt);
+        }
+        questions.add("On tough days, what's your minimum viable session?");
+        break;
+
+      case 'event-prep':
+        // Event date first
+        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        if (customQuestions.isNotEmpty) {
+          questions.add(customQuestions[0].prompt); // Event date
+        }
+        // Base questions
+        questions.addAll([
+          "What's your why for this goal?",
+          "In 8–12 weeks, what would make you say this was a win?",
+          "How many days/week can you realistically train?",
+          "Which days usually work best?",
+          "What's your biggest challenge to hitting this goal?",
+          "What equipment do you have?",
+        ]);
+        // Remaining custom questions
+        for (int i = 1; i < customQuestions.length; i++) {
+          questions.add(customQuestions[i].prompt);
+        }
+        questions.add("On tough days, what's your minimum viable session?");
+        break;
+
+      default:
+        // Standard order for other plans
+        questions.addAll([
+          "What's your why for this goal?",
+          "In 8–12 weeks, what would make you say this was a win?",
+          "How many days/week can you realistically train?",
+          "Which days usually work best?",
+          "What's your biggest challenge to hitting this goal?",
+          "What equipment do you have?",
+        ]);
+        // Add custom questions
+        if (widget.planType != null) {
+          final customQuestions = PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
+          for (final question in customQuestions) {
+            questions.add(question.prompt);
+          }
+        }
+        questions.add("On tough days, what's your minimum viable session?");
     }
 
     return questions;
@@ -142,90 +270,212 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   List<Widget> _buildQuestionPages() {
     final pages = <Widget>[];
+    final planId = widget.planType?.id;
 
-    // For Daily Discipline, start with custom questions first
-    if (widget.planType?.id == 'daily-discipline') {
-      final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
-      for (final questionConfig in customQuestionMaps) {
-        pages.add(_buildCustomQuestion(questionConfig));
-      }
-
-      // Then add relevant base questions (no preferred days for streak)
-      pages.addAll([
-        _buildWhyQuestion(),
-        _buildSuccessQuestion(),
-        _buildChallengesQuestion(),
-      ]);
-    } else {
-      // For all other plans, use standard order
-      pages.addAll([
-        _buildWhyQuestion(),
-        _buildSuccessQuestion(),
-        _buildTrainingDaysQuestion(),
-        _buildPreferredDaysQuestion(),
-        _buildChallengesQuestion(),
-        _buildEquipmentQuestion(),
-      ]);
-
-      // Add custom questions after base questions
-      if (widget.planType != null) {
-        final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
+    switch (planId) {
+      case 'daily-discipline':
+        // Custom questions first
+        final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(planId!);
         for (final questionConfig in customQuestionMaps) {
           pages.add(_buildCustomQuestion(questionConfig));
         }
-      }
+        // Then relevant base questions (no preferred days for streak)
+        pages.addAll([
+          _buildWhyQuestion(),
+          _buildSuccessQuestion(),
+          _buildChallengesQuestion(),
+        ]);
+        break;
 
-      pages.add(_buildMinimumSessionQuestion());
+      case 'fat-loss':
+      case 'load-capacity':
+      case 'event-prep':
+        // First custom question comes first (weight target/load target/event date)
+        final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(planId!);
+        if (customQuestionMaps.isNotEmpty) {
+          pages.add(_buildCustomQuestion(customQuestionMaps[0]));
+        }
+        // Then base questions
+        pages.addAll([
+          _buildWhyQuestion(),
+          _buildSuccessQuestion(),
+          _buildTrainingDaysQuestion(),
+          _buildPreferredDaysQuestion(),
+          _buildChallengesQuestion(),
+          _buildEquipmentQuestion(),
+        ]);
+        // Then remaining custom questions
+        for (int i = 1; i < customQuestionMaps.length; i++) {
+          pages.add(_buildCustomQuestion(customQuestionMaps[i]));
+        }
+        pages.add(_buildMinimumSessionQuestion());
+        break;
+
+      default:
+        // Standard order for other plans
+        pages.addAll([
+          _buildWhyQuestion(),
+          _buildSuccessQuestion(),
+          _buildTrainingDaysQuestion(),
+          _buildPreferredDaysQuestion(),
+          _buildChallengesQuestion(),
+          _buildEquipmentQuestion(),
+        ]);
+        // Add custom questions after base questions
+        if (widget.planType != null) {
+          final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
+          for (final questionConfig in customQuestionMaps) {
+            pages.add(_buildCustomQuestion(questionConfig));
+          }
+        }
+        pages.add(_buildMinimumSessionQuestion());
     }
 
     return pages;
   }
 
   bool _canProceed() {
-    final isDailyDiscipline = widget.planType?.id == 'daily-discipline';
+    final planId = widget.planType?.id;
 
-    if (isDailyDiscipline) {
-      // For Daily Discipline, custom questions come first (0-2), then base questions (3-5)
-      switch (_currentQuestionIndex) {
-        case 0: // How many days to ruck?
-          return _personalization.customResponses != null &&
-              _personalization.customResponses!['streak_days'] != null;
-        case 1: // Rest days (optional)
-          return true; // Optional question
-        case 2: // Minimum session length
-          return true; // Has default value
-        case 3: // Why question
-          return _personalization.why != null && _personalization.why!.isNotEmpty;
-        case 4: // Success definition (optional)
-          return true; // Optional question
-        case 5: // Challenges
-          return _personalization.challenges != null &&
-              _personalization.challenges!.isNotEmpty;
-        default:
-          return false;
-      }
-    } else {
-      // For other plans, base questions first, then custom
-      switch (_currentQuestionIndex) {
-        case 0: // Why
-          return _personalization.why != null && _personalization.why!.isNotEmpty;
-        case 1: // Success
-          return _personalization.successDefinition != null &&
-              _personalization.successDefinition!.isNotEmpty;
-        case 2: // Training days
-          return _personalization.trainingDaysPerWeek != null;
-        case 3: // Preferred days
-          return _personalization.preferredDays != null &&
-              _personalization.preferredDays!.isNotEmpty;
-        case 4: // Challenges
-          return _personalization.challenges != null &&
-              _personalization.challenges!.isNotEmpty;
-        case 5: // Equipment
-          return true; // Has default
-        default:
-          // Custom questions and minimum session - allow proceed
-          return true;
-      }
+    switch (planId) {
+      case 'daily-discipline':
+        // Custom questions first (0-2), then base questions (3-5)
+        switch (_currentQuestionIndex) {
+          case 0: // How many days to ruck?
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['streak_days'] != null;
+          case 1: // Rest days (optional)
+            return true;
+          case 2: // Minimum session length
+            return true;
+          case 3: // Why question
+            return _personalization.why != null && _personalization.why!.isNotEmpty;
+          case 4: // Success definition (optional)
+            return true;
+          case 5: // Challenges
+            return _personalization.challenges != null &&
+                _personalization.challenges!.isNotEmpty;
+          default:
+            return false;
+        }
+
+      case 'fat-loss':
+        // Weight loss target first, then base, then other custom
+        switch (_currentQuestionIndex) {
+          case 0: // Weight loss target
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['weight_loss_target'] != null;
+          case 1: // Why
+            return _personalization.why != null && _personalization.why!.isNotEmpty;
+          case 2: // Success (optional)
+            return true;
+          case 3: // Training days
+            return _personalization.trainingDaysPerWeek != null;
+          case 4: // Preferred days
+            return _personalization.preferredDays != null &&
+                _personalization.preferredDays!.isNotEmpty;
+          case 5: // Challenges
+            return _personalization.challenges != null &&
+                _personalization.challenges!.isNotEmpty;
+          case 6: // Equipment
+            return true;
+          case 7: // Current activity level
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['current_activity'] != null;
+          case 8: // Complementary activities (optional)
+            return true;
+          case 9: // Minimum session
+            return _personalization.minimumSessionMinutes != null;
+          default:
+            return true;
+        }
+
+      case 'load-capacity':
+        // Target load first, then base, then other custom
+        switch (_currentQuestionIndex) {
+          case 0: // Target load
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['target_load'] != null;
+          case 1: // Why
+            return _personalization.why != null && _personalization.why!.isNotEmpty;
+          case 2: // Success (optional)
+            return true;
+          case 3: // Training days
+            return _personalization.trainingDaysPerWeek != null;
+          case 4: // Preferred days
+            return _personalization.preferredDays != null &&
+                _personalization.preferredDays!.isNotEmpty;
+          case 5: // Challenges
+            return _personalization.challenges != null &&
+                _personalization.challenges!.isNotEmpty;
+          case 6: // Equipment
+            return true;
+          case 7: // Current max load
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['current_max_load'] != null;
+          case 8: // Injury concerns (optional)
+            return true;
+          case 9: // Minimum session
+            return _personalization.minimumSessionMinutes != null;
+          default:
+            return true;
+        }
+
+      case 'event-prep':
+        // Event date first, then base, then other custom
+        switch (_currentQuestionIndex) {
+          case 0: // Event date
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['event_date'] != null;
+          case 1: // Why
+            return _personalization.why != null && _personalization.why!.isNotEmpty;
+          case 2: // Success (optional)
+            return true;
+          case 3: // Training days
+            return _personalization.trainingDaysPerWeek != null;
+          case 4: // Preferred days
+            return _personalization.preferredDays != null &&
+                _personalization.preferredDays!.isNotEmpty;
+          case 5: // Challenges
+            return _personalization.challenges != null &&
+                _personalization.challenges!.isNotEmpty;
+          case 6: // Equipment
+            return true;
+          case 7: // Event distance
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['event_distance'] != null;
+          case 8: // Event load
+            return _personalization.customResponses != null &&
+                _personalization.customResponses!['event_load'] != null;
+          case 9: // Time goal (optional)
+            return true;
+          case 10: // Minimum session
+            return _personalization.minimumSessionMinutes != null;
+          default:
+            return true;
+        }
+
+      default:
+        // Standard order for other plans
+        switch (_currentQuestionIndex) {
+          case 0: // Why
+            return _personalization.why != null && _personalization.why!.isNotEmpty;
+          case 1: // Success (optional)
+            return true;
+          case 2: // Training days
+            return _personalization.trainingDaysPerWeek != null;
+          case 3: // Preferred days
+            return _personalization.preferredDays != null &&
+                _personalization.preferredDays!.isNotEmpty;
+          case 4: // Challenges
+            return _personalization.challenges != null &&
+                _personalization.challenges!.isNotEmpty;
+          case 5: // Equipment
+            return true;
+          default:
+            // Custom questions and minimum session - allow proceed
+            return true;
+        }
     }
   }
 
@@ -1064,15 +1314,34 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   Widget _buildSliderQuestion(Map<String, dynamic> config) {
     final id = config['id'] as String;
     final prompt = config['prompt'] as String;
-    final min = (config['min'] as num).toDouble();
-    final max = (config['max'] as num).toDouble();
-    final step = (config['step'] as num?)?.toDouble() ?? 1.0;
-    final unit = config['unit'] as String?;
-    final defaultValue = (config['default'] as num?)?.toDouble() ?? min;
+    var min = (config['min'] as num).toDouble();
+    var max = (config['max'] as num).toDouble();
+    var step = (config['step'] as num?)?.toDouble() ?? 1.0;
+    var unit = config['unit'] as String?;
+    var defaultValue = (config['default'] as num?)?.toDouble() ?? min;
     final helperText = config['helper_text'] as String?;
 
+    // For weight-related questions, check user's metric preference
+    if (id == 'weight_loss_target' && unit == 'kg' && !_useMetric) {
+      // Convert kg to lbs (1 kg = 2.20462 lbs)
+      min = min * 2.20462;
+      max = max * 2.20462;
+      step = 1.0; // Use 1 lb steps for cleaner UX
+      defaultValue = defaultValue * 2.20462;
+      unit = 'lbs';
+    }
+
     // Get current value from customResponses
-    final currentValue = (_personalization.customResponses?[id] as num?)?.toDouble() ?? defaultValue;
+    var currentValue = (_personalization.customResponses?[id] as num?)?.toDouble() ?? defaultValue;
+
+    // If we have a stored value in kg but showing in lbs, convert it
+    if (id == 'weight_loss_target' && !_useMetric && unit == 'lbs') {
+      final storedValue = _personalization.customResponses?[id];
+      if (storedValue != null) {
+        // Stored value is in kg, convert to lbs for display
+        currentValue = (storedValue as num).toDouble() * 2.20462;
+      }
+    }
 
     return _buildQuestionCard(
       question: prompt,
@@ -1108,7 +1377,13 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                 final customResponses = Map<String, dynamic>.from(
                   _personalization.customResponses ?? {},
                 );
-                customResponses[id] = value;
+                // For weight loss target, always store in kg regardless of display unit
+                if (id == 'weight_loss_target' && !_useMetric) {
+                  // Convert lbs back to kg for storage
+                  customResponses[id] = value / 2.20462;
+                } else {
+                  customResponses[id] = value;
+                }
                 _personalization = _personalization.copyWith(
                   customResponses: customResponses,
                 );

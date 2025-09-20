@@ -66,7 +66,7 @@ import 'package:rucking_app/features/profile/presentation/screens/public_profile
 import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/features/profile/presentation/screens/followers_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/advanced_calorie_settings_screen.dart';
-import 'package:rucking_app/features/goals/presentation/screens/goals_list_screen.dart';
+import 'package:rucking_app/features/coaching/presentation/screens/plan_creation_screen.dart';
 import 'package:rucking_app/features/goals/presentation/screens/goal_detail_screen.dart';
 import 'package:rucking_app/features/gear/presentation/screens/gear_home_screen.dart';
 import 'package:rucking_app/features/gear/presentation/screens/gear_detail_screen.dart';
@@ -562,7 +562,7 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
                             builder: (_) => const HomeScreen());
                       case '/goals':
                         return MaterialPageRoute(
-                            builder: (_) => const GoalsListScreen());
+                            builder: (_) => const PlanCreationScreen());
                       case '/login':
                         return MaterialPageRoute(builder: (_) => LoginScreen());
                       case '/auth_callback':

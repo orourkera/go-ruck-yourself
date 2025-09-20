@@ -1,10 +1,10 @@
-from flask import request, g, jsonify
+from flask import request, g
 from flask_restful import Resource
 import logging
 from typing import Dict, Any, Optional
 
 from ..supabase_client import get_supabase_client
-from ..utils.response_helper import success_response, error_response
+from ..utils.api_response import success_response, error_response
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class CoachingPlanTemplateResource(Resource):
             response = supabase.table('coaching_plan_templates').select('*').eq('plan_id', plan_id).eq('is_active', True).single().execute()
 
             if not response.data:
-                return error_response(f'Plan template {plan_id} not found', 404)
+                return error_response(f'Plan template {plan_id} not found', status_code=404)
 
             template = response.data
 
@@ -41,7 +41,7 @@ class CoachingPlanTemplateResource(Resource):
 
         except Exception as e:
             logger.error(f"Failed to fetch plan template {plan_id}: {e}")
-            return error_response(f'Failed to fetch plan template: {str(e)}', 500)
+            return error_response(f'Failed to fetch plan template: {str(e)}', status_code=500)
 
 class CoachingPlanTemplatesResource(Resource):
     """Get all active coaching plan templates"""
@@ -74,4 +74,4 @@ class CoachingPlanTemplatesResource(Resource):
 
         except Exception as e:
             logger.error(f"Failed to fetch plan templates: {e}")
-            return error_response(f'Failed to fetch plan templates: {str(e)}', 500)
+            return error_response(f'Failed to fetch plan templates: {str(e)}', status_code=500)

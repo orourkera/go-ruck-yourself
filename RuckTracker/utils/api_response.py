@@ -33,6 +33,11 @@ def success_response(data=None, message=None, status_code=200):
 
 
 def error_response(message, details=None, status_code=400):
+    # Allow legacy usage where status_code was passed as second positional argument
+    if isinstance(details, int) and status_code == 400:
+        status_code = details
+        details = None
+
     response_body = {
         "success": False,
         "error": message

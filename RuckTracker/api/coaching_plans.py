@@ -1,4 +1,4 @@
-from flask import request, g, jsonify
+from flask import request, g
 from flask_restful import Resource
 import logging
 from typing import Dict, List, Any, Optional
@@ -8,7 +8,7 @@ import uuid
 import json
 
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
-from ..utils.response_helper import success_response, error_response
+from ..utils.api_response import success_response, error_response
 
 logger = logging.getLogger(__name__)
 
@@ -699,7 +699,7 @@ class CoachingPlanTemplatesResource(Resource):
             
         except Exception as e:
             logger.error(f"Error fetching coaching plan templates: {str(e)}")
-            return error_response(f"Error fetching coaching plan templates: {str(e)}", 500)
+            return error_response(f"Error fetching coaching plan templates: {str(e)}", status_code=500)
 
 class CoachingPlansResource(Resource):
     """Resource for managing coaching plans"""
@@ -708,17 +708,17 @@ class CoachingPlansResource(Resource):
         """Create a new personalized coaching plan for the user"""
         try:
             if not hasattr(g, 'user_id') or not g.user_id:
-                return error_response("Unauthorized", 401)
+                return error_response("Unauthorized", status_code=401)
             
             data = request.get_json()
             if not data:
-                return error_response("Request body required", 400)
+                return error_response("Request body required", status_code=400)
             
             # Validate required fields
             required_fields = ['base_plan_id', 'coaching_personality', 'personalization']
             for field in required_fields:
                 if field not in data:
-                    return error_response(f"Missing required field: {field}", 400)
+                    return error_response(f"Missing required field: {field}", status_code=400)
             
             base_plan_id = data['base_plan_id']
             coaching_personality = data['coaching_personality']
@@ -733,14 +733,14 @@ class CoachingPlansResource(Resource):
             ).eq('current_status', 'active').limit(1).execute()
 
             if existing_plan.data:
-                return error_response("User already has an active coaching plan", 409)
+                return error_response("User already has an active coaching plan", status_code=409)
 
             # Get coaching plan templates from database
             templates = _get_coaching_plan_templates(supabase)
             
             # Validate base plan exists
             if base_plan_id not in templates:
-                return error_response(f"Invalid base plan ID: {base_plan_id}", 400)
+                return error_response(f"Invalid base plan ID: {base_plan_id}", status_code=400)
             
             base_plan = templates[base_plan_id]
             
@@ -749,7 +749,7 @@ class CoachingPlansResource(Resource):
                 personalized_plan = personalize_plan(base_plan_id, personalization, supabase, g.user_id)
             except Exception as e:
                 logger.error(f"Error in personalize_plan: {e}")
-                return error_response(f"Error personalizing plan: {str(e)}", 500)
+                return error_response(f"Error personalizing plan: {str(e)}", status_code=500)
             
             # Check if user already has any active plan (regardless of type)
             admin_supabase = get_supabase_admin_client()
@@ -810,7 +810,7 @@ class CoachingPlansResource(Resource):
                 admin_supabase.table("users").update(user_update).eq("id", g.user_id).execute()
             
             if not response.data:
-                return error_response("Failed to create coaching plan", 500)
+                return error_response("Failed to create coaching plan", status_code=500)
             
             created_plan = response.data[0]
             
@@ -848,13 +848,13 @@ class CoachingPlansResource(Resource):
             error_msg = str(e)
             if hasattr(e, 'details') and isinstance(e.details, dict):
                 error_msg = e.details.get('message', str(e))
-            return error_response(f"Error creating coaching plan: {error_msg}", 500)
+            return error_response(f"Error creating coaching plan: {error_msg}", status_code=500)
     
     def get(self):
         """Get all coaching plans for the current user"""
         try:
             if not hasattr(g, 'user_id') or not g.user_id:
-                return error_response("Unauthorized", 401)
+                return error_response("Unauthorized", status_code=401)
             
             status = request.args.get('status')
             
@@ -873,7 +873,7 @@ class CoachingPlansResource(Resource):
             
         except Exception as e:
             logger.error(f"Error fetching coaching plans: {str(e)}")
-            return error_response(f"Error fetching coaching plans: {str(e)}", 500)
+            return error_response(f"Error fetching coaching plans: {str(e)}", status_code=500)
 
 class CoachingPlanResource(Resource):
     """Resource for managing individual coaching plans"""
@@ -882,13 +882,13 @@ class CoachingPlanResource(Resource):
         """Get a specific coaching plan"""
         try:
             if not hasattr(g, 'user_id') or not g.user_id:
-                return error_response("Unauthorized", 401)
+                return error_response("Unauthorized", status_code=401)
             
             supabase = get_supabase_client()
             response = supabase.table("user_coaching_plans").select("*").eq("id", plan_id).eq("user_id", g.user_id).execute()
             
             if not response.data:
-                return error_response("Coaching plan not found", 404)
+                return error_response("Coaching plan not found", status_code=404)
             
             return success_response({
                 "coaching_plan": response.data[0]
@@ -896,17 +896,17 @@ class CoachingPlanResource(Resource):
             
         except Exception as e:
             logger.error(f"Error fetching coaching plan: {str(e)}")
-            return error_response(f"Error fetching coaching plan: {str(e)}", 500)
+            return error_response(f"Error fetching coaching plan: {str(e)}", status_code=500)
     
     def patch(self, plan_id):
         """Update a coaching plan (e.g., status)"""
         try:
             if not hasattr(g, 'user_id') or not g.user_id:
-                return error_response("Unauthorized", 401)
+                return error_response("Unauthorized", status_code=401)
             
             data = request.get_json()
             if not data:
-                return error_response("Request body required", 400)
+                return error_response("Request body required", status_code=400)
             
             supabase = get_supabase_client()
             
@@ -916,7 +916,7 @@ class CoachingPlanResource(Resource):
             if 'status' in data:
                 valid_statuses = ['active', 'paused', 'completed', 'archived']
                 if data['status'] not in valid_statuses:
-                    return error_response(f"Invalid status. Must be one of: {valid_statuses}", 400)
+                    return error_response(f"Invalid status. Must be one of: {valid_statuses}", status_code=400)
                 
                 update_data['status'] = data['status']
                 
@@ -924,12 +924,12 @@ class CoachingPlanResource(Resource):
                     update_data['completed_at'] = datetime.utcnow().isoformat()
             
             if not update_data:
-                return error_response("No valid fields to update", 400)
+                return error_response("No valid fields to update", status_code=400)
             
             response = supabase.table("user_coaching_plans").update(update_data).eq("id", plan_id).eq("user_id", g.user_id).execute()
             
             if not response.data:
-                return error_response("Coaching plan not found", 404)
+                return error_response("Coaching plan not found", status_code=404)
             
             return success_response({
                 "message": "Coaching plan updated successfully",
@@ -938,7 +938,7 @@ class CoachingPlanResource(Resource):
             
         except Exception as e:
             logger.error(f"Error updating coaching plan: {str(e)}")
-            return error_response(f"Error updating coaching plan: {str(e)}", 500)
+            return error_response(f"Error updating coaching plan: {str(e)}", status_code=500)
 
 
 # Register API resources

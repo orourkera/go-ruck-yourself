@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -18,6 +19,7 @@ import 'package:rucking_app/features/coaching/domain/models/science_based_plan.d
 import 'package:rucking_app/features/coaching/presentation/widgets/personalization_questions.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 import 'package:rucking_app/features/coaching/presentation/screens/coaching_plan_details_screen.dart';
+import 'package:rucking_app/features/coaching/presentation/widgets/rucker_rating_widget.dart';
 
 enum PlanCreationStep {
   greeting,
@@ -54,6 +56,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   CoachingPersonality? _hoveredPersonality;
   PlanPersonalization? _personalization;
   String _generatedSummary = '';
+  Map<String, dynamic>? _userInsights;
 
   late OpenAIResponsesService _openAiService;
   late CoachingService _coachingService;
@@ -384,13 +387,49 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
         break;
 
       case 'fat-loss':
-        final weightLossTarget = customResponses['weight_loss_target'] ?? 5;
+        // Weight loss target is always stored in kg internally
+        final weightLossTargetKg = customResponses['weight_loss_target'] ?? 5;
         final currentActivity = customResponses['current_activity'] ?? 'moderate';
         final complementary = customResponses['complementary_activities'] ?? [];
+
+        // Get user's metric preference for display
+        final prefs = await SharedPreferences.getInstance();
+        final useMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+        final weightLossTarget = useMetric ? weightLossTargetKg : weightLossTargetKg * 2.20462;
+        final weightUnit = useMetric ? 'kg' : 'lbs';
+
+        // Calculate calorie requirements (using kg for calculation)
+        // 1kg fat loss = ~7,700 calories deficit
+        final totalCaloriesNeeded = (weightLossTargetKg * 7700).round();
+        final weeklyCaloriesNeeded = (totalCaloriesNeeded / 12).round();
+        final dailyDeficitNeeded = (weeklyCaloriesNeeded / 7).round();
+
+        // Estimate calories from rucking (based on 4 sessions/week avg)
+        final sessionsPerWeek = _personalization!.trainingDaysPerWeek ?? 4;
+        // Rough estimate: 400-500 calories per 45-min ruck session
+        final weeklyRuckCalories = sessionsPerWeek * 450;
+        final remainingWeeklyDeficit = weeklyCaloriesNeeded - weeklyRuckCalories;
+        final remainingDailyDeficit = (remainingWeeklyDeficit / 7).round();
+
         planSpecificDetails = '''
-- Weight Loss Goal: ${weightLossTarget}kg over 12 weeks
+- Weight Loss Goal: ${weightLossTarget.toStringAsFixed(1)}$weightUnit over 12 weeks
 - Current Activity Level: $currentActivity
-- Complementary Activities: ${complementary.isNotEmpty ? complementary.join(', ') : 'Rucking only'}''';
+- Complementary Activities: ${complementary.isNotEmpty ? complementary.join(', ') : 'Rucking only'}
+
+📊 CALORIE MATH:
+- Total deficit needed: ${totalCaloriesNeeded.toStringAsFixed(0)} calories
+- Weekly deficit target: ${weeklyCaloriesNeeded.toStringAsFixed(0)} calories
+- Daily deficit target: ${dailyDeficitNeeded.toStringAsFixed(0)} calories
+
+🔥 YOUR BURN PLAN:
+- Rucking ($sessionsPerWeek sessions/week): ~${weeklyRuckCalories} cal/week
+- From diet/other activity: ~${remainingWeeklyDeficit > 0 ? remainingWeeklyDeficit : 0} cal/week
+- Daily nutrition deficit needed: ~${remainingDailyDeficit > 0 ? remainingDailyDeficit : 0} calories
+
+💡 REALITY CHECK:
+${remainingDailyDeficit > 500 ? "This is aggressive - consider a longer timeline or adding more activity" :
+  remainingDailyDeficit > 300 ? "This is achievable with moderate dietary changes" :
+  "Your activity level makes this very achievable!"}''';
         break;
 
       case 'get-faster':
@@ -426,6 +465,26 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
         break;
     }
 
+    // Add user insights context if available
+    String userInsightsContext = '';
+    if (_userInsights != null) {
+      final experienceLevel = _userInsights!['experience_level'] ?? 'Unknown';
+      final avgDistance = _userInsights!['avg_distance'] ?? 0.0;
+      final avgPace = _userInsights!['avg_pace'] ?? 0.0;
+      final weeklyAvg = _userInsights!['weekly_avg'] ?? 0.0;
+      final ruckWeight = _userInsights!['ruck_weight'];
+
+      userInsightsContext = '''
+
+USER'S CURRENT FITNESS PROFILE:
+- Experience Level: $experienceLevel
+- Current Weekly Frequency: ${weeklyAvg.toStringAsFixed(1)} sessions/week
+- Average Distance: ${avgDistance.toStringAsFixed(1)} km per session
+- Average Pace: ${avgPace > 0 ? '${avgPace.toStringAsFixed(1)} min/km' : 'N/A'}
+- Typical Ruck Weight: ${ruckWeight != null ? '${ruckWeight.toStringAsFixed(0)} kg' : 'N/A'}
+''';
+    }
+
     final prompt = '''
 Create a PERSONALIZED ${_selectedPlanType!.name} rucking plan for $username based on their specific inputs.
 
@@ -435,7 +494,7 @@ USER'S PERSONALIZATION:
 - Training Days: ${_personalization!.trainingDaysPerWeek} days/week on ${_personalization!.preferredDays?.join(', ') ?? 'flexible schedule'}
 - Challenges: ${_personalization!.challenges?.join(', ') ?? 'Consistency'}
 - Minimum Session: ${_personalization!.minimumSessionMinutes} minutes${(_personalization!.unloadedOk ?? false) ? ' (unloaded OK on recovery days)' : ''}
-
+$userInsightsContext
 PLAN-SPECIFIC DETAILS:
 $planSpecificDetails
 
@@ -446,6 +505,7 @@ Create a personalized plan that directly addresses THEIR inputs:
 • **Why**: ${_personalization!.why?.join(', ') ?? 'Personal growth'}
 • **Win**: ${_personalization!.successDefinition ?? 'Complete successfully'}
 • **Timeline**: ${_getDynamicDuration()}
+${_selectedPlanType!.id == 'fat-loss' ? '\n## 🔥 CALORIE BURN STRATEGY\n[Include the calorie calculations and what else they need to do beyond rucking to hit their deficit goals]' : ''}
 
 ## 📅 YOUR WEEKLY TRAINING
 Design a week that fits ${_personalization!.trainingDaysPerWeek} days on ${_personalization!.preferredDays?.join(', ') ?? 'your schedule'}:
@@ -540,13 +600,31 @@ Keep it concise, specific to THEIR inputs, and actionable. Focus on practical ru
       restDescription = '$restCount rest ${restCount == 1 ? "day" : "days"} total';
     }
 
+    // Add user insights context if available
+    String userInsightsContext = '';
+    if (_userInsights != null) {
+      final experienceLevel = _userInsights!['experience_level'] ?? 'Unknown';
+      final avgDistance = _userInsights!['avg_distance'] ?? 0.0;
+      final weeklyAvg = _userInsights!['weekly_avg'] ?? 0.0;
+      final ruckWeight = _userInsights!['ruck_weight'];
+
+      userInsightsContext = '''
+
+USER'S CURRENT FITNESS PROFILE:
+- Experience Level: $experienceLevel
+- Current Weekly Frequency: ${weeklyAvg.toStringAsFixed(1)} sessions/week
+- Average Distance: ${avgDistance.toStringAsFixed(1)} km per session
+- Typical Ruck Weight: ${ruckWeight != null ? '${ruckWeight.toStringAsFixed(0)} kg' : 'N/A'}
+''';
+    }
+
     final prompt = '''
 Create a PERSONALIZED $streakDays-day rucking plan for $username. DO NOT use generic templates or mention "8 weeks" - this is specifically a $streakDays-day streak.
 
 USER'S ACTUAL INPUTS (USE THESE EXACT VALUES):
 - Streak Duration: $streakDays days (NOT 8 weeks!)
 - Rest Plan: $restDescription
-- Why: ${_personalization!.why?.join(', ') ?? 'Personal growth'}
+- Why: ${_personalization!.why?.join(', ') ?? 'Personal growth'}$userInsightsContext
 - Success: ${_personalization!.successDefinition ?? 'Complete the streak'}
 - Challenges: ${_personalization!.challenges?.join(', ') ?? 'Consistency'}
 - Minimum Session: $minSessionTime minutes
@@ -929,9 +1007,16 @@ Keep it under 200 words, motivational, and specific to their answers.
               ),
             ),
 
+            // Rucker Rating Widget - show after greeting
+            if (_showGoalPills) ...[
+              const SizedBox(height: 24),
+              const RuckerRatingWidget(),
+              const SizedBox(height: 24),
+            ],
+
             // Goal selection pills (shown after streaming completes)
             if (_showGoalPills) ...[
-              const SizedBox(height: 32),
+              const SizedBox(height: 8),
               AnimatedOpacity(
                 opacity: _showGoalPills ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 600),
@@ -1007,6 +1092,7 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   Widget _buildGoalSelectionStep() {
+    print('🎯🎯🎯 [GOAL_SELECTION] Building goal selection step');
     return AnimatedOpacity(
       opacity: _currentStep == PlanCreationStep.goalSelection ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 600),
@@ -1047,6 +1133,16 @@ Keep it under 200 words, motivational, and specific to their answers.
               ),
             ),
 
+            // Rucker Rating Widget
+            RuckerRatingWidget(
+              onInsightsLoaded: (insights) {
+                setState(() {
+                  _userInsights = insights;
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+
             // Plan type cards
             Expanded(
               child: ListView.builder(
@@ -1073,6 +1169,7 @@ Keep it under 200 words, motivational, and specific to their answers.
     return PersonalizationQuestions(
       onPersonalizationComplete: _onPersonalizationComplete,
       planType: _selectedPlanType,
+      userInsights: _userInsights,
     );
   }
 
