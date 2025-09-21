@@ -584,13 +584,24 @@ class SessionLifecycleManager implements SessionManager {
     _ticker = null;
   }
 
+  static int _tickCount = 0;
+
   Future<void> _onTick(manager_events.Tick event) async {
+    _tickCount++;
+    if (_tickCount % 5 == 0) {
+      print('[FUCK_TIMER] _onTick called $_tickCount times');
+    }
+
     if (_currentState.isActive &&
         _sessionStartTime != null &&
         _currentState.pausedAt == null) {
       // Only update duration when NOT paused (pausedAt is null)
       final newDuration = DateTime.now().difference(_sessionStartTime!);
       _updateState(_currentState.copyWith(duration: newDuration));
+
+      if (_tickCount % 5 == 0) {
+        print('[FUCK_TIMER] Duration updated to ${newDuration.inSeconds} seconds');
+      }
     }
     // When paused (pausedAt is not null), duration should remain frozen - no updates
   }
@@ -1266,6 +1277,8 @@ class SessionLifecycleManager implements SessionManager {
     _timerCoordinator.stopTimerSystem();
   }
 
+  int _mainTickCount = 0;
+
   /// Main tick callback - called every second
   void _onMainTick() {
     if (!_currentState.isActive) return;
@@ -1277,6 +1290,7 @@ class SessionLifecycleManager implements SessionManager {
       return;
     }
 
+    _mainTickCount++;
     final now = DateTime.now();
     final newDuration = _sessionStartTime != null
         ? now.difference(_sessionStartTime!)
@@ -1285,6 +1299,11 @@ class SessionLifecycleManager implements SessionManager {
     _updateState(_currentState.copyWith(
       duration: newDuration,
     ));
+
+    // Log to verify timer is actually ticking
+    if (_mainTickCount % 5 == 0) {
+      AppLogger.info('[LIFECYCLE] Timer tick #$_mainTickCount: ${newDuration.inSeconds}s');
+    }
   }
 
   /// Watchdog tick callback - called every 30 seconds

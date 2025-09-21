@@ -619,14 +619,25 @@ class _ElapsedTimeDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocSelector<ActiveSessionBloc, ActiveSessionState, int>(
-      selector: (state) {
-        if (state is ActiveSessionRunning) {
-          return state.elapsedSeconds;
+    // Use BlocBuilder instead of BlocSelector to ensure we get all state changes
+    return BlocBuilder<ActiveSessionBloc, ActiveSessionState>(
+      // Force rebuild on ANY state change where elapsed seconds might have changed
+      buildWhen: (previous, current) {
+        // Always rebuild if the elapsed seconds changed
+        if (previous is ActiveSessionRunning && current is ActiveSessionRunning) {
+          return previous.elapsedSeconds != current.elapsedSeconds;
         }
-        return 0;
+        // Also rebuild when transitioning between states
+        return previous.runtimeType != current.runtimeType;
       },
-      builder: (context, elapsedSeconds) {
+      builder: (context, state) {
+        int elapsedSeconds = 0;
+        if (state is ActiveSessionRunning) {
+          elapsedSeconds = state.elapsedSeconds;
+          // DEBUG: Log every build with elapsed seconds
+          print('[UI_TIMER_DEBUG] Widget rebuilding with elapsedSeconds=$elapsedSeconds');
+        }
+
         final formattedTime =
             _formatDuration(Duration(seconds: elapsedSeconds), isCardLayout);
         if (!isCardLayout) {

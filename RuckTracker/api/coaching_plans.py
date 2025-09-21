@@ -9,6 +9,7 @@ from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..utils.api_response import success_response, error_response
 from .user_coaching_plans import _generate_plan_sessions
 from RuckTracker.services.plan_notification_service import plan_notification_service
+from RuckTracker.services.plan_audit_service import plan_audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -846,6 +847,13 @@ class CoachingPlansResource(Resource):
                 plan_notification_service.seed_plan_schedule(g.user_id, created_plan['id'])
             except Exception as notif_err:
                 logger.error(f"Failed to seed plan notifications for plan {created_plan['id']}: {notif_err}")
+
+            # Run plan audit to verify structure and guardrails, and notify admins
+            try:
+                audit_result = plan_audit_service.audit_and_correct_plan(g.user_id, created_plan['id'])
+                logger.info(f"Plan audit completed for plan {created_plan['id']}: {audit_result.get('status')}")
+            except Exception as audit_err:
+                logger.error(f"Failed to audit coaching plan {created_plan['id']}: {audit_err}")
 
             # Clean response data to prevent JSON serialization errors
             def clean_data(obj):

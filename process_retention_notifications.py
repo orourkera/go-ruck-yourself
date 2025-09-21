@@ -39,10 +39,12 @@ def main():
         # Import and initialize the background job service
         from RuckTracker.services.retention_background_jobs import retention_background_jobs
         from RuckTracker.services.plan_notification_service import plan_notification_service
+        from RuckTracker.services.plan_audit_service import plan_audit_service
 
         # Process all due notifications
         processed_count = retention_background_jobs.process_scheduled_notifications()
         plan_processed = plan_notification_service.process_scheduled_notifications()
+        audits_processed = plan_audit_service.process_pending_reviews(limit=25)
 
         if processed_count > 0:
             logger.info(f"✅ Successfully processed {processed_count} retention notifications")
@@ -53,6 +55,11 @@ def main():
             logger.info(f"✅ Processed {plan_processed} coaching plan notifications")
         else:
             logger.info("ℹ️ No coaching plan notifications were due")
+        
+        if audits_processed > 0:
+            logger.info(f"✅ Processed {audits_processed} pending plan audits")
+        else:
+            logger.info("ℹ️ No plan audits were pending")
             
     except Exception as e:
         logger.error(f"❌ Error processing retention notifications: {e}")

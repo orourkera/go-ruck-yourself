@@ -17,6 +17,7 @@ import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
 import 'package:rucking_app/core/services/weather_service.dart';
 import 'package:rucking_app/features/ruck_session/data/repositories/session_repository.dart';
+import 'package:rucking_app/core/models/location_point.dart';
 
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
@@ -433,11 +434,18 @@ class ActiveSessionCoordinator
     return null;
   }
 
+  int _aggregateCallCount = 0;
+
   /// Aggregate state from all managers and emit combined state
   void _aggregateAndEmitState() {
     final lifecycleState = _lifecycleManager.currentState;
     final locationState = _locationManager.currentState;
     final heartRateState = _heartRateManager.currentState;
+
+    _aggregateCallCount++;
+    if (_aggregateCallCount % 5 == 0) {
+      AppLogger.info('[COORDINATOR] _aggregateAndEmitState #$_aggregateCallCount, elapsed=${lifecycleState.duration.inSeconds}s');
+    }
 
     AppLogger.info(
         '[COORDINATOR] Aggregating state: lifecycle(isActive=${lifecycleState.isActive}, sessionId=${lifecycleState.sessionId}, error=${lifecycleState.errorMessage})');
@@ -543,7 +551,7 @@ class ActiveSessionCoordinator
         averagePace:
             finalDistance > 0 ? duration.inSeconds / finalDistance : null,
         route: route,
-        heartRateSamples: _heartRateManager.heartRateSampleObjects,
+        heartRateSamples: List.from(_heartRateManager.heartRateSampleObjects),
         averageHeartRate:
             _heartRateManager.currentState.averageHeartRate?.toInt(),
         minHeartRate: _heartRateManager.currentState.minHeartRate,
@@ -602,7 +610,8 @@ class ActiveSessionCoordinator
     } else if (lifecycleState.sessionId != null && lifecycleState.isActive) {
       AppLogger.info('[COORDINATOR] Path: Running state (active, has session)');
       // Aggregate states from all managers into ActiveSessionRunning
-      final locationPoints = _locationManager.locationPoints;
+      // CRITICAL: Create a NEW list to ensure Equatable detects state changes
+      final locationPoints = List<LocationPoint>.from(_locationManager.locationPoints);
       // Diagnostics: capture previous distance if we were already running
       double? prevDistance;
       if (_currentAggregatedState is ActiveSessionRunning) {
@@ -634,12 +643,16 @@ class ActiveSessionCoordinator
             '[COORDINATOR] Sending elevation to UI: gain=${locationState.elevationGain.toStringAsFixed(1)}m, loss=${locationState.elevationLoss.toStringAsFixed(1)}m');
       }
 
+      // DEBUG: Log every single time we create a new running state
+      final newElapsedSeconds = lifecycleState.duration.inSeconds;
+      AppLogger.info('[TIMER_DEBUG] Creating NEW ActiveSessionRunning with elapsedSeconds=$newElapsedSeconds');
+
       _currentAggregatedState = ActiveSessionRunning(
         sessionId: lifecycleState.sessionId!,
         userWeightKg: lifecycleState.userWeightKg,
         ruckWeightKg: lifecycleState.ruckWeightKg,
         locationPoints: locationPoints,
-        elapsedSeconds: lifecycleState.duration.inSeconds,
+        elapsedSeconds: newElapsedSeconds,
         distanceKm: locationState.totalDistance,
         elevationGain: locationState.elevationGain,
         elevationLoss: locationState.elevationLoss,
@@ -653,7 +666,7 @@ class ActiveSessionCoordinator
         latestHeartRate: heartRateState.currentHeartRate,
         minHeartRate: heartRateState.minHeartRate,
         maxHeartRate: heartRateState.maxHeartRate,
-        heartRateSamples: _heartRateManager.heartRateSampleObjects,
+        heartRateSamples: List.from(_heartRateManager.heartRateSampleObjects),
         isGpsReady: _locationManager.isGpsReady,
         plannedRoute: null, // TODO: Get planned route from correct source
         plannedRouteDistance: null,
@@ -1266,6 +1279,13 @@ class ActiveSessionCoordinator
       final prev = _lastEmittedDistanceKm;
       final delta = prev != null ? (rs.distanceKm - prev) : null;
       _emitSeq += 1;
+
+      // Log every 5th update to verify timer is working
+      if (_emitSeq % 5 == 0) {
+        AppLogger.info(
+            '[TIMER_DEBUG] EMITTING STATE #$_emitSeq: elapsed=${rs.elapsedSeconds}s');
+      }
+
       AppLogger.info(
           '[COORDINATOR][EMIT] seq=$_emitSeq distance=${rs.distanceKm.toStringAsFixed(3)} km${delta != null ? ' (Δ=' + delta.toStringAsFixed(3) + ' km)' : ''}, elapsed=${rs.elapsedSeconds}s, paused=${rs.isPaused}, dt=${dtMs != null ? dtMs.toString() + 'ms' : 'n/a'}');
       _lastEmittedDistanceKm = rs.distanceKm;
