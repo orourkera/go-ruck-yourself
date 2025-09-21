@@ -1,5 +1,6 @@
 -- Update RPC to include ruck_weight_kg and ensure proper fields in JSON response
--- Filter out rucks with insufficient GPS data (< 3 route points after clipping)
+-- Added explicit 'created_at_desc' case for recent sorting
+-- Proximity sorting is now handled client-side in the Flutter app
 -- Safe to re-run: uses CREATE OR REPLACE FUNCTION
 
 -- RPC function to get public ruck sessions with optimized route data
@@ -54,20 +55,9 @@ BEGIN
     -- Determine order clause based on sort_by parameter
     CASE p_sort_by
         WHEN 'proximity_asc' THEN
-            -- Proximity sorting requires location data - return empty result if not provided
-            IF p_latitude IS NULL OR p_longitude IS NULL THEN
-                RETURN json_build_object(
-                    'ruck_sessions', '[]'::json,
-                    'meta', json_build_object(
-                        'count', 0,
-                        'per_page', p_per_page,
-                        'page', p_page,
-                        'sort_by', p_sort_by,
-                        'error', 'Location data required for proximity sorting'
-                    )
-                );
-            END IF;
-            -- Add location-based distance calculation here in future
+            -- Proximity sorting requires client-side calculation with user's location
+            -- Backend cannot precompute proximity without knowing user's location
+            -- Return sessions sorted by recent, frontend will handle proximity sorting
             order_clause := 'ORDER BY completed_at DESC';
         WHEN 'created_at_desc' THEN
             order_clause := 'ORDER BY completed_at DESC';

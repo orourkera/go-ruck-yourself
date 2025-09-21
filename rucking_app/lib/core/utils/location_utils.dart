@@ -139,9 +139,10 @@ class LocationUtils {
         locationParts.add(state);
       }
 
-      // Add country if we don't have enough info
-      if (locationParts.length < 2 && country != null && country.isNotEmpty) {
-        return country;
+      // Don't add country if it's the only thing we have (too broad)
+      // But if we have other details, country can be added as needed
+      if (locationParts.isEmpty && country != null && country.isNotEmpty) {
+        return "Unknown Location";
       }
 
       return locationParts.isEmpty
