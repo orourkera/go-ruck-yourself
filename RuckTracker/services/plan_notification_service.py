@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, time
 from statistics import median, pstdev
 from typing import Any, Dict, List, Optional, Tuple
 
-from dateutil import parser, tz
+from dateutil import parser
+from datetime import timezone
 
 from .notification_manager import notification_manager
 from ..supabase_client import get_supabase_admin_client
@@ -86,9 +87,9 @@ class PlanCadenceAnalyzer:
 
     def _recompute_snapshot(self, user_id: str, plan_id: int, timezone_name: str) -> PlanBehaviorSnapshot:
         session_timezone = session.get('scheduled_timezone') if session else None
-        tzinfo = tz.gettz(session_timezone) if session_timezone else None
+        tzinfo = timezone.utc(session_timezone) if session_timezone else None
         if not tzinfo:
-            tzinfo = tz.gettz(timezone_name) or tz.UTC
+            tzinfo = timezone.utc(timezone_name) or timezone.utc
         samples = self._collect_samples(user_id, plan_id)
 
         if not samples:
@@ -494,9 +495,9 @@ class PlanNotificationService:
             return
 
         session_timezone = session.get('scheduled_timezone') if session else None
-        tzinfo = tz.gettz(session_timezone) if session_timezone else None
+        tzinfo = timezone.utc(session_timezone) if session_timezone else None
         if not tzinfo:
-            tzinfo = tz.gettz(timezone_name) or tz.UTC
+            tzinfo = timezone.utc(timezone_name) or timezone.utc
         start_time = self._resolve_session_start_time(session, behavior, prefs)
         session_start_dt = datetime.combine(
             datetime.fromisoformat(scheduled_date).date(),
@@ -514,9 +515,9 @@ class PlanNotificationService:
                 plan_id=plan_id,
                 session_id=session_id,
                 notification_type='plan_evening_brief',
-                scheduled_at=evening_dt.astimezone(tz.UTC)
+                scheduled_at=evening_dt.astimezone(timezone.utc)
             )
-            self._update_session_next_notification(session_id, evening_dt.astimezone(tz.UTC))
+            self._update_session_next_notification(session_id, evening_dt.astimezone(timezone.utc))
 
         if morning_dt > now:
             self._upsert_audit_entry(
@@ -524,7 +525,7 @@ class PlanNotificationService:
                 plan_id=plan_id,
                 session_id=session_id,
                 notification_type='plan_morning_hype',
-                scheduled_at=morning_dt.astimezone(tz.UTC)
+                scheduled_at=morning_dt.astimezone(timezone.utc)
             )
 
         missed_dt = session_start_dt + timedelta(minutes=MISSED_FOLLOWUP_GRACE_MINUTES)
@@ -533,7 +534,7 @@ class PlanNotificationService:
             plan_id=plan_id,
             session_id=session_id,
             notification_type='plan_missed_followup',
-            scheduled_at=missed_dt.astimezone(tz.UTC)
+            scheduled_at=missed_dt.astimezone(timezone.utc)
         )
 
     def _resolve_session_start_time(self,
@@ -702,7 +703,7 @@ class PlanNotificationService:
         weekday = datetime.utcnow().strftime('%A')
         summary_needed = prefs.get('weekly_digest_day')
         if summary_needed and weekday == summary_needed:
-            tzinfo = tz.gettz(timezone_name) or tz.UTC
+            tzinfo = timezone.utc(timezone_name) or timezone.utc
             now_local = datetime.now(tzinfo)
             digest_local = now_local.replace(hour=19, minute=0, second=0, microsecond=0)
             if digest_local <= now_local:
@@ -712,7 +713,7 @@ class PlanNotificationService:
                 plan_id=plan_id,
                 session_id=None,
                 notification_type='plan_weekly_digest',
-                scheduled_at=digest_local.astimezone(tz.UTC)
+                scheduled_at=digest_local.astimezone(timezone.utc)
             )
 
     def _build_session_context(self,
@@ -933,7 +934,7 @@ class PlanNotificationService:
                     session_datetime = datetime.fromisoformat(datetime_str)
 
                     # Apply timezone
-                    tz_obj = tz.gettz(timezone_name)
+                    tz_obj = timezone.utc(timezone_name)
                     if tz_obj:
                         session_datetime = session_datetime.replace(tzinfo=tz_obj)
                 except Exception as e:
@@ -952,7 +953,7 @@ class PlanNotificationService:
                     datetime_str = f"{date_str} {time_str}"
                     session_datetime = datetime.fromisoformat(datetime_str)
 
-                    tz_obj = tz.gettz(timezone_name)
+                    tz_obj = timezone.utc(timezone_name)
                     if tz_obj:
                         session_datetime = session_datetime.replace(tzinfo=tz_obj)
                 except Exception as e:
