@@ -375,13 +375,20 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
               buildWhen: (previous, current) {
                 // Always rebuild if the type of state changes (e.g., Loading -> Running)
                 if (previous.runtimeType != current.runtimeType) {
+                  print('[BUILD_WHEN_DEBUG] State type changed: ${previous.runtimeType} -> ${current.runtimeType}');
                   return true;
                 }
                 // If both are ActiveSessionRunning, check for specific significant changes
                 if (previous is ActiveSessionRunning &&
                     current is ActiveSessionRunning) {
+                  // Check if elapsedSeconds changed
+                  final elapsedChanged = previous.elapsedSeconds != current.elapsedSeconds;
+                  if (elapsedChanged) {
+                    print('[BUILD_WHEN_DEBUG] elapsedSeconds changed: ${previous.elapsedSeconds} -> ${current.elapsedSeconds}');
+                  }
+
                   // While finishing, ignore isPaused toggles to avoid transient pause UI rebuilds
-                  return (previous.isPaused != current.isPaused) ||
+                  final shouldRebuild = (previous.isPaused != current.isPaused) ||
                       !listEquals(
                           previous.locationPoints,
                           current
@@ -392,9 +399,14 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       previous.elevationGain != current.elevationGain ||
                       previous.elevationLoss != current.elevationLoss ||
                       previous.steps != current.steps ||
-                      previous.elapsedSeconds != current.elapsedSeconds || // Add elapsed time check
+                      elapsedChanged || // Use the variable we just checked
                       previous.sessionId !=
                           current.sessionId; // Important for initial load
+
+                  if (shouldRebuild) {
+                    print('[BUILD_WHEN_DEBUG] Rebuilding UI due to state change');
+                  }
+                  return shouldRebuild;
                 }
                 // For other state types or transitions, allow rebuild
                 return true;

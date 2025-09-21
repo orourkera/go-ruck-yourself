@@ -348,6 +348,15 @@ if database_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Recommended to disable
 
+# Conservative engine options to avoid exhausting Postgres connections
+# Especially important on dynos with multiple workers/threads
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,     # Proactively validate connections before use
+    'pool_recycle': 300,       # Recycle connections every 5 minutes
+    'pool_size': 2,            # Small fixed pool per process
+    'max_overflow': 0,         # Do not exceed pool_size
+}
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.json_encoder = CustomJSONEncoder  # Use custom JSON encoder
 

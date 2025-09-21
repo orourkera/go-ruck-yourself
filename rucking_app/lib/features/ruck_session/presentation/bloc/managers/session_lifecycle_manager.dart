@@ -1296,6 +1296,11 @@ class SessionLifecycleManager implements SessionManager {
         ? now.difference(_sessionStartTime!)
         : Duration.zero;
 
+    // Log every tick to debug timing issues
+    if (_mainTickCount % 5 == 0) {
+      print('[TIMER_DEBUG] _onMainTick #$_mainTickCount: duration=${newDuration.inSeconds}s, sessionStart=${_sessionStartTime}');
+    }
+
     _updateState(_currentState.copyWith(
       duration: newDuration,
     ));

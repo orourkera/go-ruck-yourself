@@ -645,6 +645,7 @@ class ActiveSessionCoordinator
 
       // DEBUG: Log every single time we create a new running state
       final newElapsedSeconds = lifecycleState.duration.inSeconds;
+      print('[TIMER_DEBUG] Creating NEW ActiveSessionRunning with elapsedSeconds=$newElapsedSeconds');
       AppLogger.info('[TIMER_DEBUG] Creating NEW ActiveSessionRunning with elapsedSeconds=$newElapsedSeconds');
 
       _currentAggregatedState = ActiveSessionRunning(
@@ -1295,6 +1296,11 @@ class ActiveSessionCoordinator
           '[COORDINATOR][EMIT] seq=${_emitSeq + 1} state=${_currentAggregatedState.runtimeType}');
       _emitSeq += 1;
       _lastEmitAt = DateTime.now();
+    }
+    print('[STATE_EMIT_DEBUG] Emitting state: ${_currentAggregatedState.runtimeType}');
+    if (_currentAggregatedState is ActiveSessionRunning) {
+      final runningState = _currentAggregatedState as ActiveSessionRunning;
+      print('[STATE_EMIT_DEBUG] elapsedSeconds: ${runningState.elapsedSeconds}');
     }
     emit(_currentAggregatedState);
   }
