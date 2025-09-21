@@ -181,8 +181,8 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
             // Filter chips for sorting
             BlocBuilder<RuckBuddiesBloc, RuckBuddiesState>(
               builder: (context, state) {
-                // Default filter is 'closest'
-                String currentFilter = 'closest';
+                // Default filter is 'recent'
+                String currentFilter = 'recent';
 
                 // Extract current filter from state if available
                 if (state is RuckBuddiesLoaded) {

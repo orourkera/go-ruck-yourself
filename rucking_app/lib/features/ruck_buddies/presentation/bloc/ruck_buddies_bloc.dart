@@ -49,10 +49,10 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         lon = position.longitude;
       } catch (e) {
         debugPrint(
-            ' [RuckBuddiesBloc] Failed to get current location: $e. Proceeding without it.');
-        // Optionally, change filter if location is essential for 'closest'
-        // filterToUse = 'most_recent'; // Example fallback, if desired
-        // emit(RuckBuddiesError('Could not get location for "closest" rucks. Showing most recent instead.'));
+            ' [RuckBuddiesBloc] Failed to get current location: $e. Cannot use closest filter.');
+        // Location is required for 'closest' filter - show error
+        emit(RuckBuddiesError(message: 'Location access is required for "Closest" filter. Please enable location services and try again.'));
+        return;
       }
     }
 
@@ -229,7 +229,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     debugPrint('[BLOC] Refresh triggered - clearing caches');
     RuckBuddiesRepositoryImpl.clearRuckBuddiesCache();
 
-    String currentFilter = 'closest';
+    String currentFilter = 'recent';
     double? currentLat;
     double? currentLon;
 
@@ -238,6 +238,13 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       currentFilter = loadedState.filter;
       currentLat = loadedState.latitude;
       currentLon = loadedState.longitude;
+    }
+
+    // If user was on 'closest' filter but no location data, cannot refresh
+    if (currentFilter == 'closest' && (currentLat == null || currentLon == null)) {
+      debugPrint('[BLOC] Refresh: Cannot refresh closest filter without location data');
+      emit(RuckBuddiesError(message: 'Location access is required for "Closest" filter. Please select a different filter or enable location services.'));
+      return;
     }
 
     add(FetchRuckBuddiesEvent(

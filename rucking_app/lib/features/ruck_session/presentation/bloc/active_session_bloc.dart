@@ -1418,12 +1418,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   ) async {
     AppLogger.debug('Requesting session recovery through coordinator');
 
-    // Delegate to coordinator if it exists
-    if (_coordinator != null) {
-      _coordinator!.add(event);
-    } else {
-      AppLogger.warning('No coordinator available for session recovery');
+    // Create coordinator if it doesn't exist
+    if (_coordinator == null) {
+      AppLogger.info('Creating coordinator for session recovery');
+      _coordinator = _createCoordinator();
+      _setupCoordinatorSubscription();
     }
+
+    // Delegate to coordinator
+    _coordinator!.add(event);
   }
 
   Future<void> _onSessionReset(

@@ -15,7 +15,7 @@ class FetchRuckBuddiesEvent extends RuckBuddiesEvent {
 
   const FetchRuckBuddiesEvent({
     this.limit = 20,
-    this.filter = 'closest',
+    this.filter = 'recent',
     this.latitude,
     this.longitude,
   });
