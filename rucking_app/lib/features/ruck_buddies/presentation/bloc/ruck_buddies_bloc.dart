@@ -235,19 +235,23 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
 
   /// Sort ruck buddies by proximity to user's location
   List<RuckBuddy> _sortByProximity(List<RuckBuddy> rucks, double userLat, double userLon) {
-    debugPrint('[BLOC] Sorting ${rucks.length} rucks by proximity to ($userLat, $userLon)');
+    debugPrint('[PROXIMITY] Sorting ${rucks.length} rucks by proximity to user location ($userLat, $userLon)');
 
     // Calculate distance for each ruck and sort by proximity
     final sortedRucks = rucks.map((ruck) {
-      // Use the first route point to calculate distance (or center if no points)
       double distance = double.infinity;
 
       if (ruck.locationPoints != null && ruck.locationPoints!.isNotEmpty) {
-        // Calculate distance to the route center for better proximity representation
+        // Parse route points with accuracy filtering
         final routePoints = _parseRoutePoints(ruck.locationPoints!);
         if (routePoints.isNotEmpty) {
-          distance = _calculateDistanceToRoute(userLat, userLon, routePoints);
+          // Calculate distance to the starting point of the route
+          distance = _calculateDistanceToRoute(userLat, userLon, routePoints, ruck.id, ruck.user.username);
+        } else {
+          debugPrint('[PROXIMITY] No valid GPS points (all filtered by accuracy) for ruck ${ruck.id} (${ruck.user.username})');
         }
+      } else {
+        debugPrint('[PROXIMITY] No location points available for ruck ${ruck.id} (${ruck.user.username})');
       }
 
       return {'ruck': ruck, 'distance': distance};
@@ -256,9 +260,25 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     // Sort by distance (closest first)
     sortedRucks.sort((a, b) => (a['distance'] as double).compareTo(b['distance'] as double));
 
-    debugPrint('[BLOC] Proximity sorting complete - closest distance: ${sortedRucks.first['distance']}, farthest: ${sortedRucks.last['distance']}');
+    // Filter out rucks with no valid location (infinite distance)
+    final validRucks = sortedRucks.where((item) =>
+      (item['distance'] as double) != double.infinity
+    ).toList();
 
-    return sortedRucks.map((item) => item['ruck'] as RuckBuddy).toList();
+    final invalidRucks = sortedRucks.where((item) =>
+      (item['distance'] as double) == double.infinity
+    ).toList();
+
+    debugPrint('[PROXIMITY] Sorting complete:');
+    debugPrint('[PROXIMITY]   - Valid rucks with location: ${validRucks.length}');
+    debugPrint('[PROXIMITY]   - Invalid rucks (no location): ${invalidRucks.length}');
+    if (validRucks.isNotEmpty) {
+      debugPrint('[PROXIMITY]   - Closest: ${validRucks.first['distance']} km');
+      debugPrint('[PROXIMITY]   - Farthest: ${validRucks.last['distance']} km');
+    }
+
+    // Return valid rucks first, then invalid ones at the end
+    return [...validRucks, ...invalidRucks].map((item) => item['ruck'] as RuckBuddy).toList();
   }
 
   /// Calculate Haversine distance between two points in kilometers
@@ -296,37 +316,56 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
   }
 
   /// Parse route points from various formats into LatLng objects
+  /// Filters out points with poor GPS accuracy (> 50m)
   List<LatLng> _parseRoutePoints(List<dynamic> rawRoute) {
     final points = <LatLng>[];
+    const double maxAcceptableAccuracy = 50.0; // meters
 
     for (final p in rawRoute) {
       double? lat;
       double? lng;
+      double? accuracy;
 
       if (p is Map) {
         lat = _parseCoordinate(p, 'latitude') ?? _parseCoordinate(p, 'lat');
         lng = _parseCoordinate(p, 'longitude') ?? _parseCoordinate(p, 'lng') ?? _parseCoordinate(p, 'lon');
+
+        // Check for accuracy data in various formats
+        accuracy = _parseNum(p['accuracy']) ??
+                  _parseNum(p['accuracy_meters']) ??
+                  _parseNum(p['horizontal_accuracy_m']);
       } else if (p is List && p.length >= 2) {
         lat = _parseNum(p[0]);
         lng = _parseNum(p[1]);
+        // For list format, we can't determine accuracy, so we'll include it
+        accuracy = null;
       }
 
+      // Only add points with good accuracy (or unknown accuracy for backwards compatibility)
       if (lat != null && lng != null) {
-        points.add(LatLng(lat, lng));
+        if (accuracy == null || accuracy <= maxAcceptableAccuracy) {
+          points.add(LatLng(lat, lng));
+        }
       }
     }
 
     return points;
   }
 
-  /// Calculate distance to the center of a route
-  double _calculateDistanceToRoute(double userLat, double userLon, List<LatLng> routePoints) {
+  /// Calculate distance to the starting point of a route
+  /// Uses the first valid GPS point (with good accuracy) as the starting location
+  double _calculateDistanceToRoute(double userLat, double userLon, List<LatLng> routePoints, String ruckId, String username) {
     if (routePoints.isEmpty) return double.infinity;
 
-    // For simplicity, calculate distance to the first point
-    // In a more advanced implementation, we could calculate distance to the closest point on the route
+    // Calculate distance to the first point (starting location)
+    // This is the most relevant for users looking for nearby starting points
     final firstPoint = routePoints.first;
-    return _calculateDistance(userLat, userLon, firstPoint.latitude, firstPoint.longitude);
+    final distance = _calculateDistance(userLat, userLon, firstPoint.latitude, firstPoint.longitude);
+
+    // Log for debugging
+    debugPrint('[PROXIMITY] Distance from user to ruck $ruckId ($username): ${distance.toStringAsFixed(2)} km');
+
+    return distance;
   }
 
   Future<void> _onRefreshRuckBuddies(

@@ -9,10 +9,10 @@ class LocationUtils {
 
   /// Get a readable location name from coordinates
   /// Returns the location in format of "[Park/Monument] [City], [State]"
-  /// If unable to determine location, returns "Unknown Location"
+  /// If unable to determine location, returns empty string
   static Future<String> getLocationName(List<dynamic>? locationPoints) async {
     if (locationPoints == null || locationPoints.isEmpty) {
-      return "Unknown Location";
+      return "";
     }
 
     try {
@@ -34,13 +34,13 @@ class LocationUtils {
       }
 
       if (lat == null || lng == null) {
-        return "Unknown Location";
+        return "";
       }
 
       return await getLocationNameFromLatLng(LatLng(lat, lng));
     } catch (e) {
       print('Error getting location name: $e');
-      return "Unknown Location";
+      return "";
     }
   }
 
@@ -77,7 +77,7 @@ class LocationUtils {
       print('Error in reverse geocoding: $e');
     }
 
-    return "Unknown Location";
+    return "";
   }
 
   /// Helper to format location data prioritizing parks/monuments, then city, state
@@ -139,18 +139,17 @@ class LocationUtils {
         locationParts.add(state);
       }
 
-      // Don't add country if it's the only thing we have (too broad)
-      // But if we have other details, country can be added as needed
+      // If we only have country, show it - better than nothing
       if (locationParts.isEmpty && country != null && country.isNotEmpty) {
-        return "Unknown Location";
+        return country;
       }
 
       return locationParts.isEmpty
-          ? "Unknown Location"
+          ? ""
           : locationParts.join(" • ");
     } catch (e) {
       print('Error formatting location: $e');
-      return "Unknown Location";
+      return "";
     }
   }
 
