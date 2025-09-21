@@ -509,13 +509,8 @@ class SessionLifecycleManager implements SessionManager {
     AppLogger.info('[LIFECYCLE] Timer cancelled for pause');
 
     // CRITICAL: Pause TimerCoordinator to stop duration increment
-    try {
-      final timerCoordinator = GetIt.instance<TimerCoordinator>();
-      timerCoordinator.pauseTimerSystem();
-      AppLogger.info('[LIFECYCLE] TimerCoordinator paused successfully');
-    } catch (e) {
-      AppLogger.error('[LIFECYCLE] Failed to pause TimerCoordinator: $e');
-    }
+    _timerCoordinator.pauseTimerSystem();
+    AppLogger.info('[LIFECYCLE] TimerCoordinator paused successfully');
 
     // Update watch (the watch service will handle avoiding duplicate calls)
     await _watchService.pauseSessionOnWatch();
@@ -562,13 +557,8 @@ class SessionLifecycleManager implements SessionManager {
     AppLogger.info('[LIFECYCLE] Timer restarted for resume');
 
     // CRITICAL: Resume TimerCoordinator to restart duration increment
-    try {
-      final timerCoordinator = GetIt.instance<TimerCoordinator>();
-      timerCoordinator.resumeTimerSystem();
-      AppLogger.info('[LIFECYCLE] TimerCoordinator resumed successfully');
-    } catch (e) {
-      AppLogger.error('[LIFECYCLE] Failed to resume TimerCoordinator: $e');
-    }
+    _timerCoordinator.resumeTimerSystem();
+    AppLogger.info('[LIFECYCLE] TimerCoordinator resumed successfully');
 
     // Update watch
     await _watchService.resumeSessionOnWatch();

@@ -1856,8 +1856,11 @@ class RuckSessionCompleteResource(Resource):
                     # First week sprint complete (if within first week)
                     user_created_resp = supabase.table('users').select('created_at').eq('id', user_id).single().execute()
                     if user_created_resp.data:
-                        from dateutil import parser
+                        from dateutil import parser, tz
                         user_created_at = parser.parse(user_created_resp.data['created_at'])
+                        # Ensure user_created_at is timezone-aware
+                        if user_created_at.tzinfo is None:
+                            user_created_at = user_created_at.replace(tzinfo=tz.tzutc())
                         days_since_signup = (datetime.now(tz.tzutc()) - user_created_at).days
                         
                         if days_since_signup <= 7:

@@ -501,7 +501,8 @@ def _record_session_against_plan(user_id: str, session_id: int, user_jwt: Option
             'id, start_date, current_week'
         ).eq('user_id', user_id).eq('current_status', 'active').maybe_single().execute()
 
-        if not plan_resp.data:
+        # Handle case where plan_resp is None or has no data
+        if not plan_resp or not plan_resp.data:
             return {'status': 'no_active_plan'}
 
         plan_data = plan_resp.data
@@ -515,7 +516,8 @@ def _record_session_against_plan(user_id: str, session_id: int, user_jwt: Option
         ).eq('user_coaching_plan_id', plan_id).eq('completion_status', 'planned') \
          .lte('planned_week', current_week).order('planned_week').order('id').limit(1).execute()
 
-        if not plan_session_resp.data:
+        # Handle case where plan_session_resp is None or has no data
+        if not plan_session_resp or not plan_session_resp.data:
             return {'status': 'no_matching_session', 'plan_id': plan_id}
 
         plan_session = plan_session_resp.data[0]
