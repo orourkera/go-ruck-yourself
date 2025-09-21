@@ -1637,6 +1637,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     _CoordinatorStateForwarded event,
     Emitter<ActiveSessionState> emit,
   ) {
+    // Debug timer updates
+    if (event.state is ActiveSessionRunning) {
+      final running = event.state as ActiveSessionRunning;
+      print('[TIMER_FIX] Emitting state with elapsedSeconds: ${running.elapsedSeconds}');
+    }
     // Safely emit the coordinator state within an event handler context
     emit(event.state);
   }

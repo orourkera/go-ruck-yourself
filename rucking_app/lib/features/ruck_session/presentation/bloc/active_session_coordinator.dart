@@ -219,7 +219,8 @@ class ActiveSessionCoordinator
     _managerSubscriptions.add(
       _lifecycleManager.stateStream.listen((state) {
         AppLogger.debug(
-            '[COORDINATOR] Lifecycle state updated: ${state.isActive}');
+            '[COORDINATOR] Lifecycle state updated: isActive=${state.isActive}, duration=${state.duration.inSeconds}s');
+        print('[TIMER_FIX] Lifecycle state changed - duration: ${state.duration.inSeconds}s');
         _aggregateAndEmitState();
       }),
     );
@@ -443,6 +444,7 @@ class ActiveSessionCoordinator
     final heartRateState = _heartRateManager.currentState;
 
     _aggregateCallCount++;
+    print('[TIMER_FIX] _aggregateAndEmitState #$_aggregateCallCount, elapsed=${lifecycleState.duration.inSeconds}s');
     if (_aggregateCallCount % 5 == 0) {
       AppLogger.info('[COORDINATOR] _aggregateAndEmitState #$_aggregateCallCount, elapsed=${lifecycleState.duration.inSeconds}s');
     }
