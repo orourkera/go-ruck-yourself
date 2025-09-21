@@ -955,9 +955,11 @@ api.add_resource(GoalNotificationSendResource, '/api/goals/<string:goal_id>/noti
 
 # User Coaching Plans Endpoints
 from .api.user_coaching_plans import UserCoachingPlansResource, UserCoachingPlanProgressResource, PlanSessionTrackingResource
+from .api.notification_intervention import CoachingNotificationInterventionResource
 api.add_resource(UserCoachingPlansResource, '/api/user-coaching-plans', '/api/user-coaching-plans/active')
 api.add_resource(UserCoachingPlanProgressResource, '/api/user-coaching-plan-progress', '/api/user-coaching-plans/<string:plan_id>/progress')
 api.add_resource(PlanSessionTrackingResource, '/api/plan-session-tracking')
+api.add_resource(CoachingNotificationInterventionResource, '/api/coaching-notification-intervention')
 
 # Coaching Plan Templates Endpoints
 from .api.coaching_plan_templates import CoachingPlanTemplateResource, CoachingPlanTemplatesResource

@@ -31,6 +31,7 @@ import 'package:rucking_app/core/services/android_optimization_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 import 'package:rucking_app/core/utils/error_handler.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
@@ -285,7 +286,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
 
             // Try to restart coordinator if it's completely failed
             if (_coordinator?.isClosed == true) {
-              AppLogger.info('[COORDINATOR] Restarting coordinator due to critical failure');
+              AppLogger.info(
+                  '[COORDINATOR] Restarting coordinator due to critical failure');
               _restartCoordinator();
             }
           }
@@ -348,7 +350,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // If we have a running session, forward the current state to restart tracking
       if (state is ActiveSessionRunning) {
         final runningState = state as ActiveSessionRunning;
-        AppLogger.info('[COORDINATOR] Re-initializing session tracking after restart');
+        AppLogger.info(
+            '[COORDINATOR] Re-initializing session tracking after restart');
 
         // Forward session start event to reactivate tracking
         _coordinator!.add(SessionStarted(
@@ -391,11 +394,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         coordinatorState is ActiveSessionRunning &&
         _aiCheerleaderPersonality != null &&
         _currentUser != null) {
-
       // Throttle AI cheerleader checks to prevent blocking distance tracking
       final now = DateTime.now();
       if (_lastAICheerleaderCheck != null &&
-          now.difference(_lastAICheerleaderCheck!).inSeconds < _aiCheerleaderMinInterval.inSeconds) {
+          now.difference(_lastAICheerleaderCheck!).inSeconds <
+              _aiCheerleaderMinInterval.inSeconds) {
         // Skip this check - too soon since last check
         return;
       }
@@ -609,12 +612,26 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // 2. Fetch coaching plan data for AI context
       Map<String, dynamic>? coachingPlan;
       try {
-        final coachingResponse = await _apiClient.get('/user-coaching-plans');
-        if (coachingResponse != null &&
-            coachingResponse is Map<String, dynamic>) {
-          coachingPlan = coachingResponse;
+        final coachingService = GetIt.instance<CoachingService>();
+        final plan = await coachingService.getActiveCoachingPlan();
+        final progressResponse =
+            await coachingService.getCoachingPlanProgress();
+        final progress = progressResponse['progress'] is Map
+            ? Map<String, dynamic>.from(progressResponse['progress'])
+            : null;
+        final nextSession = progressResponse['next_session'] is Map
+            ? Map<String, dynamic>.from(progressResponse['next_session'])
+            : null;
+
+        coachingPlan = coachingService.buildAIPlanContext(
+          plan: plan,
+          progress: progress,
+          nextSession: nextSession,
+        );
+
+        if (coachingPlan != null) {
           AppLogger.info(
-              '[AI_CHEERLEADER_DEBUG] Fetched coaching plan data: ${coachingPlan?['plan_name']}');
+              '[AI_CHEERLEADER_DEBUG] Fetched coaching plan data: ${coachingPlan['plan_name']}');
         }
       } catch (e) {
         AppLogger.info('[AI_CHEERLEADER_DEBUG] No coaching plan available: $e');
@@ -1376,7 +1393,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final failureState = state as ActiveSessionFailure;
 
       // Try to recover to running state if we have session data
-      AppLogger.info('[SESSION_RECOVERY] Attempting to restore session from failure state');
+      AppLogger.info(
+          '[SESSION_RECOVERY] Attempting to restore session from failure state');
 
       // First, check for crashed session recovery
       add(const CheckForCrashedSession());

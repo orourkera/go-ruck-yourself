@@ -525,7 +525,8 @@ Focus on factual metrics, notable achievements, and one meaningful insight. Keep
       sb.writeln('  "has_hr_zones": true,');
     sb.writeln('}');
 
-    // Add coaching plan context to session summary
+    coachingPlan = _normalizeCoachingPlanForAI(coachingPlan);
+
     final coachingContext = coachingPlan != null && coachingPlan.isNotEmpty
         ? '''
 Coaching Plan Context:
@@ -533,7 +534,7 @@ Coaching Plan Context:
 - Plan Goal: ${coachingPlan['goal'] ?? 'fitness improvement'}
 - Current Phase: ${coachingPlan['current_phase']} phase
 - Plan Progress: ${coachingPlan['adherence_percentage'] ?? 0}% adherence
-- Status: ${(coachingPlan['adherence_percentage'] ?? 0) >= 70 ? 'ON TRACK' : 'BEHIND SCHEDULE'}
+- Status: ${(coachingPlan['is_on_track'] == true) ? 'ON TRACK' : 'BEHIND SCHEDULE'}
 
 IMPORTANT: Reference the coaching plan context in your summary. If user is on track, acknowledge their plan adherence. If behind, encourage them to get back on track.
 When the plan includes scientific sources, occasionally cite them to build trust (e.g., "Your plan follows Daniels' Running Formula principles for aerobic development").'''
@@ -612,28 +613,35 @@ Reference historical trends and achievements when relevant.''';
         : null;
     final location = environmentData?['location'] as Map<String, dynamic>?;
     final currentCity = location?['city'] as String?;
-    final hasRecentLocationMention = _hasRecentLocationMention(history, currentCity);
+    final hasRecentLocationMention =
+        _hasRecentLocationMention(history, currentCity);
 
     String avoidBlock = '';
     if (avoidLines.isNotEmpty || hasRecentLocationMention) {
       avoidBlock = '\n\nVariety Guidelines:';
 
       if (avoidLines.isNotEmpty) {
-        avoidBlock += '\nAvoid repeating these exact phrases from recent responses:\n- ' +
-            avoidLines.join('\n- ');
+        avoidBlock +=
+            '\nAvoid repeating these exact phrases from recent responses:\n- ' +
+                avoidLines.join('\n- ');
       }
 
       if (hasRecentLocationMention) {
-        avoidBlock += '\nIMPORTANT: Location/city was mentioned recently - do NOT mention location, city, area, or place names in this response.';
+        avoidBlock +=
+            '\nIMPORTANT: Location/city was mentioned recently - do NOT mention location, city, area, or place names in this response.';
       }
 
-      avoidBlock += '\n\nFor variety, try referencing different aspects of their performance each time.\n';
+      avoidBlock +=
+          '\n\nFor variety, try referencing different aspects of their performance each time.\n';
     }
 
     // Add coaching plan guidance to the prompt ONLY if we have actual coaching plan data
-    final coachingPlan = (history is Map && history['coachingPlan'] is Map)
-        ? history['coachingPlan'] as Map<String, dynamic>?
-        : null;
+    Map<String, dynamic>? coachingPlan =
+        (history is Map && history['coachingPlan'] is Map)
+            ? history['coachingPlan'] as Map<String, dynamic>?
+            : null;
+    coachingPlan = _normalizeCoachingPlanForAI(coachingPlan);
+
     final coachingGuidance = coachingPlan != null && coachingPlan.isNotEmpty
         ? '''
 
@@ -667,6 +675,47 @@ ${coachingPlan != null ? '''- PRIORITIZE coaching plan context - reference their
 - If sources are available in the plan, occasionally cite them naturally (e.g., "Following Maffetone Method for your base building")''' : ''}
 
 Respond with your motivational message:''';
+  }
+
+  Map<String, dynamic>? _normalizeCoachingPlanForAI(
+      Map<String, dynamic>? plan) {
+    if (plan == null || plan.isEmpty) return null;
+
+    final normalized = Map<String, dynamic>.from(plan);
+
+    final planName =
+        normalized['plan_name'] ?? normalized['name'] ?? 'Training Plan';
+    normalized['plan_name'] = planName;
+    normalized['name'] = planName;
+
+    final currentWeek =
+        normalized['current_week'] ?? normalized['weekNumber'] ?? 1;
+    final durationWeeks =
+        normalized['duration_weeks'] ?? normalized['duration'] ?? 0;
+    normalized['current_week'] = currentWeek;
+    normalized['weekNumber'] = currentWeek;
+    normalized['duration_weeks'] = durationWeeks;
+    normalized['duration'] = durationWeeks;
+
+    final adherence =
+        (normalized['adherence_percentage'] as num?)?.toDouble() ??
+            (normalized['adherence'] as num?)?.toDouble() ??
+            0.0;
+    normalized['adherence_percentage'] = adherence;
+    normalized['adherence'] = adherence;
+
+    final isOnTrack = normalized['is_on_track'] == true ||
+        normalized['isOnTrack'] == true ||
+        (adherence >= 70);
+    normalized['is_on_track'] = isOnTrack;
+    normalized['isOnTrack'] = isOnTrack;
+
+    if (normalized['nextSession'] == null &&
+        normalized['next_session'] != null) {
+      normalized['nextSession'] = normalized['next_session'];
+    }
+
+    return normalized;
   }
 
   String _buildBaseContext(
@@ -762,9 +811,12 @@ Respond with your motivational message:''';
             locationMap['locality']) as String?;
 
         // Check if we should include location based on recent mentions
-        if (cityName != null && cityName.isNotEmpty && cityName != 'Unknown Location') {
+        if (cityName != null &&
+            cityName.isNotEmpty &&
+            cityName != 'Unknown Location') {
           shouldIncludeLocation = !_hasRecentLocationMention(history, cityName);
-          AppLogger.info('[LOCATION_CONTEXT] City: $cityName, Include: $shouldIncludeLocation');
+          AppLogger.info(
+              '[LOCATION_CONTEXT] City: $cityName, Include: $shouldIncludeLocation');
         }
 
         if (shouldIncludeLocation) {
@@ -783,7 +835,9 @@ Respond with your motivational message:''';
             weatherCondition = weatherCondition ??
                 (weatherMap['condition'] ?? weatherMap['summary']) as String?;
             tempF = tempF ??
-                (weatherMap['tempF'] is num ? weatherMap['tempF'] as num : null);
+                (weatherMap['tempF'] is num
+                    ? weatherMap['tempF'] as num
+                    : null);
             final tempCAlt =
                 weatherMap['tempC'] is num ? weatherMap['tempC'] as num : null;
             if (preferMetric && tempF == null && tempCAlt != null) {
@@ -1230,7 +1284,8 @@ Respond with your motivational message:''';
   }
 
   /// Check if recent responses mention location/city to avoid repetition
-  bool _hasRecentLocationMention(Map<dynamic, dynamic> history, String? currentCity) {
+  bool _hasRecentLocationMention(
+      Map<dynamic, dynamic> history, String? currentCity) {
     if (currentCity == null || currentCity.isEmpty) return false;
 
     final items = (history['ai_cheerleader_history'] as List?) ?? const [];
@@ -1249,7 +1304,8 @@ Respond with your motivational message:''';
             response.contains('area') ||
             response.contains('neighborhood') ||
             response.contains('place')) {
-          AppLogger.info('[LOCATION_REPEAT] Found recent location mention in: ${response.substring(0, math.min(50, response.length))}...');
+          AppLogger.info(
+              '[LOCATION_REPEAT] Found recent location mention in: ${response.substring(0, math.min(50, response.length))}...');
           return true;
         }
       }
@@ -1262,9 +1318,11 @@ Respond with your motivational message:''';
 
       // Check for location marker
       if (response.startsWith('LOCATION_MENTIONED:')) {
-        final markerCity = response.substring('LOCATION_MENTIONED:'.length).toLowerCase();
+        final markerCity =
+            response.substring('LOCATION_MENTIONED:'.length).toLowerCase();
         if (markerCity == cityLower) {
-          AppLogger.info('[LOCATION_REPEAT] Found location marker in local cache for: $cityLower');
+          AppLogger.info(
+              '[LOCATION_REPEAT] Found location marker in local cache for: $cityLower');
           return true;
         }
       }
@@ -1276,7 +1334,8 @@ Respond with your motivational message:''';
           responseLower.contains('area') ||
           responseLower.contains('neighborhood') ||
           responseLower.contains('place')) {
-        AppLogger.info('[LOCATION_REPEAT] Found recent location mention in local cache: ${response.substring(0, math.min(50, response.length))}...');
+        AppLogger.info(
+            '[LOCATION_REPEAT] Found recent location mention in local cache: ${response.substring(0, math.min(50, response.length))}...');
         return true;
       }
     }
@@ -1285,7 +1344,8 @@ Respond with your motivational message:''';
   }
 
   /// Check if the AI response mentions location and record it for future avoidance
-  void _recordLocationMentionIfPresent(String message, Map<String, dynamic> context) {
+  void _recordLocationMentionIfPresent(
+      String message, Map<String, dynamic> context) {
     final messageLower = message.toLowerCase();
     final environment = context['environment'] as Map<String, dynamic>?;
     final location = environment?['location'] as Map<String, dynamic>?;
@@ -1301,7 +1361,8 @@ Respond with your motivational message:''';
 
     if (hasLocationMention && cityName != null) {
       // Record the location mention for future avoidance
-      AppLogger.info('[LOCATION_TRACKING] Location mention detected in AI response: $cityName');
+      AppLogger.info(
+          '[LOCATION_TRACKING] Location mention detected in AI response: $cityName');
 
       // Add a special marker to local cache to indicate location was mentioned
       final locationMarker = "LOCATION_MENTIONED:$cityName";

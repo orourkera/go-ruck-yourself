@@ -22,7 +22,6 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/error_messages.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/session_complete_screen.dart';
@@ -31,6 +30,7 @@ import 'package:latlong2/latlong.dart' as latlong;
 import '../widgets/active_session_dialog.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/plan_session_recommendations.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/ai_coaching_session_widget.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 
 /// Screen for creating a new ruck session
 class CreateSessionScreen extends StatefulWidget {
@@ -205,27 +205,51 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   /// Load coaching plan data for session recommendations
   Future<void> _loadCoachingPlanData() async {
     try {
-      final apiClient = GetIt.instance<ApiClient>();
+      final coachingService = GetIt.instance<CoachingService>();
 
-      // Fetch active coaching plan
-      final planResponse = await apiClient.get('/user-coaching-plans/active');
-      if (planResponse.isNotEmpty) {
-        _coachingPlan = planResponse;
+      final plan = await coachingService.getActiveCoachingPlan();
 
-        // Fetch coaching plan progress
-        final progressResponse = await apiClient
-            .get('/user-coaching-plans/${_coachingPlan!['id']}/progress');
-        if (progressResponse != null) {
-          _coachingProgress = progressResponse;
-          if (progressResponse['nextSession'] != null) {
-            _nextSession = progressResponse['nextSession'];
-          }
+      // Explicitly check for null or empty plan
+      if (plan != null && plan.isNotEmpty) {
+        _coachingPlan = Map<String, dynamic>.from(plan);
+
+        final progressResponse =
+            await coachingService.getCoachingPlanProgress();
+        final progress = progressResponse['progress'] is Map
+            ? Map<String, dynamic>.from(progressResponse['progress'])
+            : null;
+        final nextSession = progressResponse['next_session'] is Map
+            ? Map<String, dynamic>.from(progressResponse['next_session'])
+            : null;
+
+        _coachingProgress = progress;
+
+        if (nextSession != null) {
+          _nextSession = nextSession;
         }
+
+        if (_coachingProgress != null) {
+          _coachingPlan!['progress'] = _coachingProgress;
+          _coachingPlan!['adherence_percentage'] ??=
+              _coachingProgress!['adherence_percentage'];
+          _coachingPlan!['is_on_track'] ??= _coachingProgress!['is_on_track'];
+        }
+        if (_nextSession != null) {
+          _coachingPlan!['next_session'] = _nextSession;
+        }
+      } else {
+        // Ensure coaching plan is null when no plan exists
+        _coachingPlan = null;
+        _nextSession = null;
+        _coachingProgress = null;
       }
     } catch (e) {
       AppLogger.info(
           '[CREATE_SESSION] No active coaching plan or error loading: $e');
-      // Silently continue - coaching plan recommendations are optional
+      // Ensure coaching plan is null on error
+      _coachingPlan = null;
+      _nextSession = null;
+      _coachingProgress = null;
     }
   }
 

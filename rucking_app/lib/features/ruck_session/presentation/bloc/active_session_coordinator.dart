@@ -36,6 +36,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_zone_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 
 /// Main coordinator that orchestrates all session managers
 class ActiveSessionCoordinator
@@ -1171,19 +1172,20 @@ class ActiveSessionCoordinator
     UploadSessionPhotosRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.info('[COORDINATOR] Uploading ${event.photos.length} photos for session ${event.sessionId}');
+    AppLogger.info(
+        '[COORDINATOR] Uploading ${event.photos.length} photos for session ${event.sessionId}');
 
     try {
       // Upload photos directly via session repository
       final sessionRepository = GetIt.I<SessionRepository>();
-      await sessionRepository.uploadSessionPhotos(event.sessionId, event.photos);
+      await sessionRepository.uploadSessionPhotos(
+          event.sessionId, event.photos);
 
       AppLogger.info('[COORDINATOR] Photos uploaded successfully');
 
       // Refresh session photos
       final activeSessionBloc = GetIt.I<ActiveSessionBloc>();
       activeSessionBloc.add(FetchSessionPhotosRequested(event.sessionId));
-
     } catch (e) {
       AppLogger.error('[COORDINATOR] Failed to upload photos: $e');
     }
@@ -1576,10 +1578,24 @@ class ActiveSessionCoordinator
       // Fetch coaching plan data for session summary context
       Map<String, dynamic>? coachingPlan;
       try {
-        final coachingResponse = await _apiClient.get('/user-coaching-plans');
-        if (coachingResponse != null &&
-            coachingResponse is Map<String, dynamic>) {
-          coachingPlan = coachingResponse;
+        final coachingService = GetIt.instance<CoachingService>();
+        final plan = await coachingService.getActiveCoachingPlan();
+        final progressResponse =
+            await coachingService.getCoachingPlanProgress();
+        final progress = progressResponse['progress'] is Map
+            ? Map<String, dynamic>.from(progressResponse['progress'])
+            : null;
+        final nextSession = progressResponse['next_session'] is Map
+            ? Map<String, dynamic>.from(progressResponse['next_session'])
+            : null;
+
+        coachingPlan = coachingService.buildAIPlanContext(
+          plan: plan,
+          progress: progress,
+          nextSession: nextSession,
+        );
+
+        if (coachingPlan != null) {
           AppLogger.info(
               '[COORDINATOR] Fetched coaching plan for summary: ${coachingPlan['plan_name']}');
         }

@@ -602,19 +602,150 @@ Return JSON format: {"title": "...", "body": "..."}"""
         except Exception as e:
             logger.error(f"OpenAI API call failed: {e}")
             return None
-    
+
+    def generate_ai_plan_notification(self, user_id: str, notification_type: str, tone: str, context: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """Generate plan notification content via OpenAI, respecting coaching tone"""
+        try:
+            import openai
+            import os
+            import json
+
+            openai_api_key = os.getenv('OPENAI_API_KEY')
+            if not openai_api_key:
+                logger.warning("OpenAI API key not configured; falling back to templates")
+                return None
+
+            client = openai.OpenAI(api_key=openai_api_key)
+
+            tone_descriptors = {
+                'drill_sergeant': 'authoritative, disciplined, direct, high-accountability',
+                'supportive_friend': 'warm, encouraging, conversational, empathetic',
+                'data_nerd': 'analytical, precise, metrics-driven yet motivating',
+                'minimalist': 'succinct, calm, no fluff, still supportive'
+            }
+
+            notification_prompts = {
+                'plan_evening_brief': {
+                    'goal': 'Send an evening-before reminder encouraging preparation, rest, and anticipation of the next ruck session.',
+                    'constraints': 'Mention start time or window, nod to weather if provided, keep under 120 characters for body and 50 for title.'
+                },
+                'plan_morning_hype': {
+                    'goal': 'Deliver a short, energetic push notification about one hour before the planned ruck.',
+                    'constraints': 'Highlight session focus or intent, remind about load or pacing if supplied, keep tone uplifting and concise.'
+                },
+                'plan_missed_followup': {
+                    'goal': 'Encourage the athlete after a missed session with an actionable recovery plan.',
+                    'constraints': 'Acknowledge miss without shame, provide a concrete next step or makeup option, keep message positive.'
+                },
+                'plan_completion_celebration': {
+                    'goal': 'Celebrate a completed session with positive reinforcement tied to their plan metrics.',
+                    'constraints': 'Reference distance, load, or adherence if available, point to next action or recovery tip, remain under push notification length limits.'
+                },
+                'plan_weekly_digest': {
+                    'goal': 'Summarize weekly progress, reinforce adherence, and preview next focus area.',
+                    'constraints': 'Include sessions completed vs planned, adherence percentage, upcoming focus or milestone, motivating close.'
+                }
+            }
+
+            prompt_config = notification_prompts.get(notification_type)
+            if not prompt_config:
+                logger.debug(f"No AI prompt template for {notification_type}")
+                return None
+
+            tone_style = tone_descriptors.get(tone, tone_descriptors['supportive_friend'])
+
+            system_prompt = (
+                "You are an elite rucking coach crafting world-class push notifications. "
+                f"Voice style: {tone_style}. "
+                f"Objective: {prompt_config['goal']} "
+                f"Constraints: {prompt_config['constraints']} "
+                "Output must be valid JSON with 'title' (<=50 chars) and 'body' (<=120 chars)."
+            )
+
+            lines = [
+                f"Notification type: {notification_type}",
+                f"User ID: {user_id}",
+                f"Plan: {context.get('plan_name', 'Coaching plan')}"
+            ]
+
+            if context.get('session_focus'):
+                lines.append(f"Session focus: {context['session_focus']}")
+            if context.get('scheduled_date_label'):
+                lines.append(f"Scheduled day: {context['scheduled_date_label']}")
+            if context.get('start_time_label'):
+                lines.append(f"Start time: {context['start_time_label']} {context.get('timezone', 'UTC')}")
+            if context.get('prime_window_label'):
+                lines.append(f"Prime window: {context['prime_window_label']}")
+            if context.get('weather_summary'):
+                lines.append(f"Weather: {context['weather_summary']}")
+            if context.get('distance_label'):
+                lines.append(f"Distance: {context['distance_label']}")
+            if context.get('load_label'):
+                lines.append(f"Load: {context['load_label']}")
+            if context.get('adherence_percent') is not None:
+                lines.append(f"Adherence: {context['adherence_percent']}%")
+            if context.get('completed_sessions') is not None and context.get('planned_sessions') is not None:
+                lines.append(
+                    f"Weekly sessions: {context['completed_sessions']}/{context['planned_sessions']}"
+                )
+            if context.get('upcoming_focus'):
+                lines.append(f"Upcoming focus: {context['upcoming_focus']}")
+            if context.get('makeup_tip'):
+                lines.append(f"Makeup guidance: {context['makeup_tip']}")
+            if context.get('next_tip'):
+                lines.append(f"Next tip: {context['next_tip']}")
+            if context.get('behavior_confidence') is not None:
+                lines.append(f"Cadence confidence: {context['behavior_confidence']}")
+
+            user_prompt = "\n".join(lines)
+
+            response = client.chat.completions.create(
+                model=os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-3.5-turbo'),
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+
+            content = response.choices[0].message.content.strip()
+            parsed_content = json.loads(content)
+            if 'title' in parsed_content and 'body' in parsed_content:
+                return parsed_content
+            logger.error(f"AI plan notification response missing title/body: {content}")
+            return None
+
+        except Exception as exc:
+            logger.error(f"Failed to generate AI plan notification: {exc}")
+            return None
+
     def _get_user_coaching_profile(self, user_id: str) -> Dict[str, Any]:
         """Get user's coaching profile preferences"""
         try:
             from ..supabase_client import get_supabase_admin_client
             admin_client = get_supabase_admin_client()
             
-            response = admin_client.table('user_profiles').select(
-                'coaching_tone, coaching_style'
-            ).eq('user_id', user_id).execute()
-            
-            if response.data:
+            response = None
+            try:
+                response = admin_client.table('user_profiles').select(
+                    'coaching_tone, coaching_style'
+                ).eq('user_id', user_id).execute()
+            except Exception as missing_profiles_err:
+                logger.debug(f"user_profiles table not available: {missing_profiles_err}")
+
+            if response and response.data:
                 return response.data[0]
+
+            # Fallback to core users table if profile record not available
+            try:
+                users_resp = admin_client.table('users').select(
+                    'coaching_tone, coaching_style'
+                ).eq('id', user_id).execute()
+                if users_resp.data:
+                    return users_resp.data[0]
+            except Exception as users_err:
+                logger.debug(f"Fallback to users table failed: {users_err}")
             
             return {'coaching_tone': None, 'coaching_style': 'balanced'}
             

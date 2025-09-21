@@ -8,6 +8,8 @@ import 'package:rucking_app/features/coaching/domain/services/streak_protection_
 import 'package:rucking_app/features/coaching/domain/services/coaching_message_generator.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:get_it/get_it.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 
 /// Service responsible for scheduling and managing AI coaching notifications
 class CoachingNotificationService {
@@ -103,11 +105,53 @@ class CoachingNotificationService {
       await cancelAllNotifications();
 
       // Get coaching plan data
-      final coachingPlan = await _getCoachingPlan();
+      final coachingService = GetIt.instance<CoachingService>();
+      final coachingPlan = await coachingService.getActiveCoachingPlan();
       if (coachingPlan == null) {
         AppLogger.warning(
             'No coaching plan found, skipping notification scheduling');
         return;
+      }
+
+      Map<String, dynamic>? progress;
+      Map<String, dynamic>? nextSession;
+      Map<String, dynamic>? weeklySchedule;
+      try {
+        final progressResponse =
+            await coachingService.getCoachingPlanProgress();
+        progress = progressResponse['progress'] is Map
+            ? Map<String, dynamic>.from(progressResponse['progress'])
+            : null;
+        if (progressResponse['next_session'] is Map) {
+          nextSession =
+              Map<String, dynamic>.from(progressResponse['next_session']);
+        }
+        if (progressResponse['weekly_schedule'] is Map) {
+          weeklySchedule =
+              Map<String, dynamic>.from(progressResponse['weekly_schedule']);
+        }
+      } catch (e) {
+        AppLogger.error('Error fetching coaching plan progress: $e');
+      }
+
+      if (nextSession != null) {
+        coachingPlan['next_session'] = nextSession;
+      }
+      if (progress != null) {
+        coachingPlan['progress'] = progress;
+        coachingPlan['adherence_percentage'] ??=
+            progress['adherence_percentage'];
+        coachingPlan['is_on_track'] ??= progress['is_on_track'];
+        coachingPlan['adherence_score'] ??= progress['adherence_percentage'];
+      }
+      if (weeklySchedule != null && weeklySchedule['sessions'] is List) {
+        final sessionsList = (weeklySchedule['sessions'] as List)
+            .whereType<Map>()
+            .map((s) => Map<String, dynamic>.from(s))
+            .toList();
+        if (sessionsList.isNotEmpty) {
+          coachingPlan['next_sessions'] = sessionsList;
+        }
       }
 
       // Schedule different types of notifications
@@ -632,16 +676,6 @@ class CoachingNotificationService {
   }
 
   /// Get coaching plan from API
-  Future<Map<String, dynamic>?> _getCoachingPlan() async {
-    try {
-      final response = await _apiClient.get('/user/coaching-plan');
-      return response.data as Map<String, dynamic>?;
-    } catch (e) {
-      AppLogger.error('Error fetching coaching plan: $e');
-      return null;
-    }
-  }
-
   /// Handle background notification checks (called by system when notifications trigger)
   Future<void> handleBackgroundCheck(
       String notificationType, Map<String, dynamic>? payload) async {

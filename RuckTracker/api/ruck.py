@@ -15,6 +15,7 @@ from .goals import _compute_window_bounds, _km_to_mi
 from ..utils.auth_helper import get_current_user_id
 from ..utils.api_response import check_auth_and_respond
 from ..services.push_notification_service import PushNotificationService, get_user_device_tokens
+from .user_coaching_plans import _record_session_against_plan
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -2007,6 +2008,18 @@ class RuckSessionCompleteResource(Resource):
             except Exception as splits_fetch_error:
                 logger.error(f"Error fetching splits for completed session {ruck_id}: {splits_fetch_error}")
                 completed_session['splits'] = []  # Ensure splits field exists even if fetch fails
+            
+            try:
+                plan_tracking_result = _record_session_against_plan(
+                    user_id=user_id,
+                    session_id=ruck_id,
+                    user_jwt=getattr(g, 'access_token', None)
+                )
+
+                if plan_tracking_result.get('status') in ('tracked', 'no_matching_session', 'no_active_plan', 'error'):
+                    completed_session['plan_tracking'] = plan_tracking_result
+            except Exception as plan_track_err:
+                logger.error(f"Failed to record session {ruck_id} against coaching plan: {plan_track_err}")
             
             return completed_session, 200
         except Exception as e:

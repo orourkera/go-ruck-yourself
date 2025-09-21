@@ -9,6 +9,7 @@ import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/models/weather.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 
 /// Service that analyzes user patterns and generates AI-powered insights for the homepage
 class AIInsightsService {
@@ -38,16 +39,57 @@ class AIInsightsService {
       final timeOfDay = _getTimeOfDay(now);
       final dayOfWeek = DateFormat('EEEE').format(now);
 
-      // Fetch user insights and coaching plan data in parallel
+      // Fetch user insights and coaching plan data
+      final coachingService = getIt<CoachingService>();
+
+      // First fetch insights and check for active plan
       final futures = await Future.wait([
         _fetchUserInsights(),
-        _fetchCoachingPlanData(),
-        _fetchCoachingPlanProgress(),
+        coachingService.getActiveCoachingPlan(),
       ]);
 
-      var insights = futures[0];
-      final coachingPlan = futures[1];
-      final coachingProgress = futures[2];
+      var insights = futures[0] as Map<String, dynamic>;
+      Map<String, dynamic>? coachingPlan = futures[1] as Map<String, dynamic>?;
+
+      Map<String, dynamic>? coachingProgress;
+      Map<String, dynamic>? nextSession;
+
+      // Only fetch progress if there's an active plan
+      if (coachingPlan != null && coachingPlan.isNotEmpty) {
+        try {
+          final coachingProgressWrapper = await coachingService.getCoachingPlanProgress();
+
+          coachingProgress = coachingProgressWrapper['progress'] is Map
+              ? Map<String, dynamic>.from(
+                  coachingProgressWrapper['progress'] as Map)
+              : null;
+
+          nextSession = coachingProgressWrapper['next_session'] is Map
+              ? Map<String, dynamic>.from(
+                  coachingProgressWrapper['next_session'] as Map)
+              : null;
+        } catch (e) {
+          AppLogger.debug('[AI_INSIGHTS] Could not fetch coaching progress: $e');
+          // Continue without progress data
+        }
+      }
+
+      if (coachingPlan != null && nextSession != null) {
+        coachingPlan = {
+          ...coachingPlan,
+          'next_session': nextSession,
+        };
+      }
+
+      final aiPlanContext = coachingService.buildAIPlanContext(
+        plan: coachingPlan,
+        progress: coachingProgress,
+        nextSession: nextSession,
+      );
+
+      if (aiPlanContext != null) {
+        coachingPlan = aiPlanContext;
+      }
 
       if (insights.isEmpty) {
         await Future.delayed(const Duration(milliseconds: 400));
@@ -186,30 +228,6 @@ class AIInsightsService {
   }
 
   /// Fetch user's active coaching plan data
-  Future<Map<String, dynamic>> _fetchCoachingPlanData() async {
-    try {
-      AppLogger.info('[AI_INSIGHTS] Fetching coaching plan data');
-      final response = await _apiClient.get(ApiEndpoints.userCoachingPlans);
-      return Map<String, dynamic>.from(response ?? {});
-    } catch (e) {
-      AppLogger.info(
-          '[AI_INSIGHTS] No active coaching plan or error fetching: $e');
-      return {};
-    }
-  }
-
-  /// Fetch detailed coaching plan progress
-  Future<Map<String, dynamic>> _fetchCoachingPlanProgress() async {
-    try {
-      final response =
-          await _apiClient.get(ApiEndpoints.userCoachingPlanProgress);
-      return Map<String, dynamic>.from(response ?? {});
-    } catch (e) {
-      AppLogger.info('[AI_INSIGHTS] No coaching plan progress available: $e');
-      return {};
-    }
-  }
-
   Map<String, dynamic> _buildInsightContext({
     required Map<String, dynamic> userInsights,
     required bool preferMetric,
@@ -298,28 +316,59 @@ class AIInsightsService {
     context['sessionsTo100'] = (100 - totalSessions).clamp(0, 100);
 
     // Add coaching plan context if available
+    final adherenceValue =
+        (coachingProgress?['adherence_percentage'] as num?)?.toDouble() ??
+            (coachingPlan?['adherence_percentage'] as num?)?.toDouble() ??
+            0.0;
+
     if (coachingPlan != null && coachingPlan.isNotEmpty) {
       context['hasCoachingPlan'] = true;
       context['coachingPlan'] = {
-        'name': coachingPlan['plan_name'] ?? 'Training Plan',
-        'duration': coachingPlan['duration_weeks'] ?? 0,
-        'difficulty': coachingPlan['difficulty_level'] ?? 'beginner',
+        'name': coachingPlan['plan_name'] ??
+            coachingPlan['name'] ??
+            'Training Plan',
+        'plan_name': coachingPlan['plan_name'] ??
+            coachingPlan['name'] ??
+            'Training Plan',
+        'duration':
+            coachingPlan['duration_weeks'] ?? coachingPlan['duration'] ?? 0,
         'goal': coachingPlan['goal'] ?? '',
-        'phase': coachingPlan['current_phase'] ?? 'preparation',
+        'phase': coachingPlan['current_phase'] ??
+            coachingPlan['phase'] ??
+            'Training',
         'weekNumber': coachingPlan['current_week'] ?? 1,
+        'adherence': adherenceValue,
+        'isOnTrack': coachingPlan['is_on_track'] ??
+            coachingPlan['isOnTrack'] ??
+            (adherenceValue >= 70),
+        'nextSession': coachingPlan['next_session'],
+        'sources': coachingPlan['sources'],
+        'hydration_fueling': coachingPlan['hydration_fueling'],
       };
     } else {
       context['hasCoachingPlan'] = false;
     }
 
+    if (coachingPlan != null &&
+        coachingPlan.isNotEmpty &&
+        context['coachingPlan'] is Map<String, dynamic>) {
+      final planMap = context['coachingPlan'] as Map<String, dynamic>;
+      if (planMap['nextSession'] == null &&
+          coachingProgress != null &&
+          coachingProgress['next_session'] != null) {
+        planMap['nextSession'] = coachingProgress['next_session'];
+      }
+    }
+
     // Add coaching progress context if available
     if (coachingProgress != null && coachingProgress.isNotEmpty) {
       context['coachingProgress'] = {
-        'adherence': coachingProgress['adherence_percentage'] ?? 0,
+        'adherence': adherenceValue,
         'completedSessions': coachingProgress['completed_sessions'] ?? 0,
         'totalSessions': coachingProgress['total_sessions'] ?? 0,
         'nextSession': coachingProgress['next_session'],
-        'isOnTrack': (coachingProgress['adherence_percentage'] ?? 0) >= 70,
+        'isOnTrack':
+            (coachingProgress['is_on_track'] == true) || (adherenceValue >= 70),
         'daysInPlan': coachingProgress['days_in_plan'] ?? 0,
         'recommendations': coachingProgress['recommendations'] ?? [],
       };

@@ -107,20 +107,36 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     try {
       // Get progress data for adherence stats
       Map<String, dynamic>? progressData;
+      Map<String, dynamic>? nextSession;
       try {
         final coachingService = GetIt.instance<CoachingService>();
-        progressData = await coachingService.getCoachingPlanProgress();
+        final progressResponse =
+            await coachingService.getCoachingPlanProgress();
+
+        progressData = progressResponse['progress'] is Map
+            ? Map<String, dynamic>.from(progressResponse['progress'])
+            : null;
+
+        if (progressResponse['next_session'] is Map) {
+          nextSession = Map<String, dynamic>.from(
+              progressResponse['next_session'] as Map);
+        }
+
+        if (nextSession != null) {
+          plan['next_session'] = nextSession;
+        }
       } catch (e) {
         AppLogger.error('[AI_INSIGHTS_WIDGET] Failed to fetch progress: $e');
       }
 
-      // Extract next session from plan data or progress data
-      final nextSession = progressData?['next_session'] ??
-                         plan['next_session'] ??
-                         plan['recent_sessions']?.firstWhere(
-                           (s) => s['completion_status'] == 'planned',
-                           orElse: () => null,
-                         );
+      nextSession ??= plan['next_session'] is Map
+          ? Map<String, dynamic>.from(plan['next_session'])
+          : null;
+
+      nextSession ??= plan['recent_sessions']?.firstWhere(
+        (s) => s['completion_status'] == 'planned',
+        orElse: () => null,
+      );
 
       String insight = "";
       String recommendation = "Loading next workout...";
@@ -132,10 +148,16 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       final planName = plan['plan_name'] ?? 'Training Plan';
 
       // Get adherence data
-      final adherence = progressData?['adherence_percentage'] ?? 0;
-      final completedSessions = progressData?['completed_sessions'] ?? 0;
-      final totalSessions = progressData?['total_sessions'] ?? 0;
-      final weeklyStreak = progressData?['weekly_streak'] ?? 0;
+      final adherence = (progressData?['adherence_percentage'] as num? ??
+              plan['adherence_percentage'] as num? ??
+              0)
+          .toDouble();
+      final completedSessions =
+          (progressData?['completed_sessions'] as num?)?.toInt() ?? 0;
+      final totalSessions =
+          (progressData?['total_sessions'] as num?)?.toInt() ?? 0;
+      final weeklyStreak =
+          (progressData?['weekly_streak'] as num?)?.toInt() ?? 0;
 
       // Build progress narrative
       String progressStatus = "";
@@ -161,19 +183,22 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
         // Get detailed session info from the recommendation object
         final sessionRecommendation = nextSession['recommendation'] ?? {};
         final sessionType = nextSession['session_type'] ??
-                          nextSession['planned_session_type'] ??
-                          nextSession['type'] ??
-                          'training';
+            nextSession['planned_session_type'] ??
+            nextSession['type'] ??
+            'training';
 
         // Format the session type nicely
         String sessionTitle = _formatSessionType(sessionType);
 
         // Extract details from recommendation
         final duration = sessionRecommendation['duration'] ??
-                        (nextSession['duration_minutes'] != null ? "${nextSession['duration_minutes']} min" : null);
+            (nextSession['duration_minutes'] != null
+                ? "${nextSession['duration_minutes']} min"
+                : null);
         final intensity = sessionRecommendation['intensity'];
         final load = sessionRecommendation['load'];
-        final description = sessionRecommendation['description'] ?? sessionTitle;
+        final description =
+            sessionRecommendation['description'] ?? sessionTitle;
 
         // Build detailed recommendation
         recommendation = "Today: $description";
@@ -188,7 +213,9 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
         }
 
         // Add motivational text based on personality
-        final personality = plan['coaching_personality'] ?? plan['personality'] ?? 'Supportive Friend';
+        final personality = plan['coaching_personality'] ??
+            plan['personality'] ??
+            'Supportive Friend';
         motivation = _getPersonalityMotivation(personality, sessionType);
 
         // Add context based on performance
@@ -200,11 +227,14 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       } else {
         // Check if it's a rest day or plan complete
         if (currentWeek >= totalWeeks) {
-          recommendation = "Plan complete! Time to celebrate your achievement 🎉";
-          motivation = "You've completed your ${totalWeeks}-week plan. Incredible work!";
+          recommendation =
+              "Plan complete! Time to celebrate your achievement 🎉";
+          motivation =
+              "You've completed your ${totalWeeks}-week plan. Incredible work!";
         } else {
           recommendation = "Rest day - recovery is part of the journey";
-          motivation = "Use today to stretch, hydrate, and prepare for your next session";
+          motivation =
+              "Use today to stretch, hydrate, and prepare for your next session";
         }
       }
 
@@ -251,28 +281,38 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
 
   String _getPersonalityMotivation(String personality, String sessionType) {
     final isHard = sessionType.contains('interval') ||
-                   sessionType.contains('tempo') ||
-                   sessionType.contains('hill');
+        sessionType.contains('tempo') ||
+        sessionType.contains('hill');
 
     switch (personality.toLowerCase()) {
       case 'drill_sergeant':
       case 'drill sergeant':
-        return isHard ? "No excuses! Time to push your limits!" : "Stay disciplined, soldier!";
+        return isHard
+            ? "No excuses! Time to push your limits!"
+            : "Stay disciplined, soldier!";
       case 'supportive_friend':
       case 'supportive friend':
-        return isHard ? "You've got this! I believe in you!" : "Great job staying consistent!";
+        return isHard
+            ? "You've got this! I believe in you!"
+            : "Great job staying consistent!";
       case 'southern_redneck':
       case 'southern redneck':
         return isHard ? "Time to get after it, partner!" : "Keep on truckin'!";
       case 'yoga_instructor':
       case 'yoga instructor':
-        return isHard ? "Embrace the challenge with mindfulness" : "Focus on your breath and form";
+        return isHard
+            ? "Embrace the challenge with mindfulness"
+            : "Focus on your breath and form";
       case 'british_butler':
       case 'british butler':
-        return isHard ? "A splendid opportunity to excel, sir" : "Steady progress, as always";
+        return isHard
+            ? "A splendid opportunity to excel, sir"
+            : "Steady progress, as always";
       case 'cowboy':
       case 'cowboy/cowgirl':
-        return isHard ? "Saddle up for a tough ride!" : "Keep movin' down the trail";
+        return isHard
+            ? "Saddle up for a tough ride!"
+            : "Keep movin' down the trail";
       case 'nature_lover':
       case 'nature lover':
         return isHard ? "Channel the mountain's strength" : "Enjoy the journey";

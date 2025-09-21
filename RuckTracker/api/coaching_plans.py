@@ -8,6 +8,7 @@ import json
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..utils.api_response import success_response, error_response
 from .user_coaching_plans import _generate_plan_sessions
+from RuckTracker.services.plan_notification_service import plan_notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -814,10 +815,16 @@ class CoachingPlansResource(Resource):
                 "user_id": g.user_id,
                 "coaching_tone": coaching_personality
             }
-            admin_supabase.table("user_profiles").upsert(
-                profile_payload,
-                on_conflict='user_id'
-            ).execute()
+            try:
+                admin_supabase.table("user_profiles").upsert(
+                    profile_payload,
+                    on_conflict='user_id'
+                ).execute()
+            except Exception as profile_err:
+                logger.info(f"user_profiles upsert failed, falling back to users table: {profile_err}")
+                admin_supabase.table("users").update({
+                    "coaching_tone": coaching_personality
+                }).eq("id", g.user_id).execute()
             
             if not response.data:
                 return error_response("Failed to create coaching plan", status_code=500)
@@ -825,10 +832,21 @@ class CoachingPlansResource(Resource):
             created_plan = response.data[0]
             
             try:
-                _generate_plan_sessions(created_plan['id'], base_plan, plan_start_date)
+                plan_session_metadata = {
+                    "plan_structure": personalized_plan['personalized_structure'],
+                    "weekly_template": personalized_plan.get('weekly_template'),
+                    "training_schedule": personalized_plan.get('training_schedule'),
+                    "duration_weeks": base_plan.get('duration_weeks')
+                }
+                _generate_plan_sessions(created_plan['id'], plan_session_metadata, plan_start_date)
             except Exception as session_error:
                 logger.error(f"Failed to seed plan sessions for plan {created_plan['id']}: {session_error}")
-            
+
+            try:
+                plan_notification_service.seed_plan_schedule(g.user_id, created_plan['id'])
+            except Exception as notif_err:
+                logger.error(f"Failed to seed plan notifications for plan {created_plan['id']}: {notif_err}")
+
             # Clean response data to prevent JSON serialization errors
             def clean_data(obj):
                 """Recursively clean data to remove Supabase Response objects"""

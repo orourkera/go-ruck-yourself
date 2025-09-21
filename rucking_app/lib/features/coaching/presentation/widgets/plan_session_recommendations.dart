@@ -33,10 +33,14 @@ class PlanSessionRecommendations extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final planName = coachingPlan!['name'] as String? ?? 'Your Plan';
+    final planName = (coachingPlan!['plan_name'] as String?) ??
+        (coachingPlan!['name'] as String?) ??
+        'Your Plan';
     final weekNumber = coachingPlan!['current_week'] as int? ?? 1;
     final totalWeeks = coachingPlan!['duration_weeks'] as int? ?? 8;
-    final phase = coachingPlan!['phase'] as String? ?? 'Base Building';
+    final phase = (coachingPlan!['phase'] as String?) ??
+        (coachingPlan!['current_phase'] as String?) ??
+        'Base Building';
 
     final sessionType = nextSession!['type'] as String? ?? 'Base Ruck';
     final distanceKm = nextSession!['distance_km'] as double?;

@@ -28,7 +28,8 @@ class AICoachingSessionWidget extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<AICoachingSessionWidget> createState() => _AICoachingSessionWidgetState();
+  State<AICoachingSessionWidget> createState() =>
+      _AICoachingSessionWidgetState();
 }
 
 class _AICoachingSessionWidgetState extends State<AICoachingSessionWidget> {
@@ -54,16 +55,23 @@ class _AICoachingSessionWidgetState extends State<AICoachingSessionWidget> {
 
     try {
       final authState = context.read<AuthBloc>().state;
-      final username = authState is Authenticated ? authState.user.username : 'Rucker';
+      final username =
+          authState is Authenticated ? authState.user.username : 'Rucker';
 
       // Build context for AI
-      final planName = widget.coachingPlan!['plan_name'] ?? 'Training Plan';
+      final planName = widget.coachingPlan!['plan_name'] ??
+          widget.coachingPlan!['name'] ??
+          'Training Plan';
       final weekNumber = widget.coachingPlan!['current_week'] ?? 1;
       final totalWeeks = widget.coachingPlan!['duration_weeks'] ?? 8;
-      final phase = widget.coachingPlan!['current_phase'] ?? 'Base Building';
+      final phase = widget.coachingPlan!['current_phase'] ??
+          widget.coachingPlan!['phase'] ??
+          'Base Building';
 
       // Progress data
-      final adherence = widget.progress?['adherence_percentage'] ?? 0;
+      final adherence = widget.progress?['adherence_percentage'] ??
+          widget.coachingPlan?['adherence_percentage'] ??
+          0;
       final completedSessions = widget.progress?['completed_sessions'] ?? 0;
       final totalSessions = widget.progress?['total_sessions'] ?? 0;
       final isOnTrack = adherence >= 70;
@@ -89,9 +97,8 @@ class _AICoachingSessionWidgetState extends State<AICoachingSessionWidget> {
 
       String weightStr = '';
       if (weightKg != null) {
-        final weight = widget.preferMetric
-            ? weightKg
-            : weightKg * AppConfig.kgToLbs;
+        final weight =
+            widget.preferMetric ? weightKg : weightKg * AppConfig.kgToLbs;
         weightStr = '${weight.toStringAsFixed(0)} $weightUnit';
       }
 
@@ -99,7 +106,8 @@ class _AICoachingSessionWidgetState extends State<AICoachingSessionWidget> {
 
       // Get plan sources if available
       final sources = widget.coachingPlan?['sources'] as List? ?? [];
-      final hydrationFueling = widget.coachingPlan?['hydration_fueling'] as Map? ?? {};
+      final hydrationFueling =
+          widget.coachingPlan?['hydration_fueling'] as Map? ?? {};
       final volumeCap = widget.coachingPlan?['weekly_volume_cap'] as num?;
 
       final prompt = '''
@@ -149,7 +157,8 @@ Match the "$personality" coaching style exactly. Keep it concise and focused on 
 
       if (mounted) {
         setState(() {
-          _aiMessage = response ?? 'Unable to generate coaching advice at this time.';
+          _aiMessage =
+              response ?? 'Unable to generate coaching advice at this time.';
           _isLoading = false;
         });
       }
@@ -354,7 +363,8 @@ Match the "$personality" coaching style exactly. Keep it concise and focused on 
               Text(
                 '${adherence}% adherence',
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: adherence >= 70 ? AppColors.success : AppColors.warning,
+                  color:
+                      adherence >= 70 ? AppColors.success : AppColors.warning,
                   fontWeight: FontWeight.bold,
                 ),
               ),

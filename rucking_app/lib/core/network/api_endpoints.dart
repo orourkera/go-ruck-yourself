@@ -66,6 +66,7 @@ class ApiEndpoints {
 
   // Coaching Plans
   static const String userCoachingPlans = '$baseApi/user-coaching-plans';
+  static const String userCoachingPlansActive = '$userCoachingPlans/active';
   static const String userCoachingPlanProgress =
       '$baseApi/user-coaching-plan-progress';
 

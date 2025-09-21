@@ -4,12 +4,15 @@ Handles plan instantiation, progress tracking, and plan management
 """
 
 import logging
+import json
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
 from flask import request, g
 from flask_restful import Resource
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..utils.auth_helper import get_current_user_id
 from ..utils.api_response import check_auth_and_respond
+from RuckTracker.services.plan_notification_service import plan_notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +112,64 @@ class UserCoachingPlansResource(Resource):
     def post(self):
         """DEPRECATED - Use /api/coaching-plans POST instead for personalized plan creation"""
         return {"error": "This endpoint is deprecated. Use POST /api/coaching-plans for creating personalized coaching plans"}, 410
+
+    def delete(self):
+        """Delete/cancel user's active coaching plan"""
+        try:
+            user_id = get_current_user_id()
+            auth_response = check_auth_and_respond(user_id)
+            if auth_response:
+                return auth_response
+
+            # Find active plan
+            client = get_supabase_client()
+            plan_resp = client.table('user_coaching_plans').select('id').eq(
+                'user_id', user_id
+            ).eq('current_status', 'active').limit(1).execute()
+
+            if not plan_resp.data:
+                return {"error": "No active coaching plan found"}, 404
+
+            plan_id = plan_resp.data[0]['id']
+
+            # Use admin client for both operations
+            admin_client = get_supabase_admin_client()
+
+            # Delete or update associated plan sessions
+            # Option 1: Delete only future/planned sessions, keep completed ones for history
+            try:
+                # Delete only planned sessions (not completed ones)
+                sessions_resp = admin_client.table('plan_sessions').delete().eq(
+                    'user_coaching_plan_id', plan_id
+                ).eq('completion_status', 'planned').execute()
+
+                logger.info(f"Deleted {len(sessions_resp.data)} planned sessions for plan {plan_id}")
+
+                # Update completed sessions to mark them as from a cancelled plan (optional)
+                # This preserves history while indicating the plan was cancelled
+                admin_client.table('plan_sessions').update({
+                    'plan_cancelled': True
+                }).eq('user_coaching_plan_id', plan_id).neq('completion_status', 'planned').execute()
+
+            except Exception as session_error:
+                logger.warning(f"Error handling plan sessions during deletion: {session_error}")
+                # Continue with plan deletion even if session cleanup fails
+
+            # Update plan status to cancelled
+            update_resp = admin_client.table('user_coaching_plans').update({
+                'current_status': 'cancelled',
+                'cancelled_date': datetime.now().isoformat()
+            }).eq('id', plan_id).execute()
+
+            if update_resp.data:
+                logger.info(f"Cancelled coaching plan {plan_id} for user {user_id}")
+                return {"message": "Coaching plan cancelled successfully"}, 200
+            else:
+                return {"error": "Failed to cancel coaching plan"}, 500
+
+        except Exception as e:
+            logger.error(f"DELETE /user-coaching-plans failed: {e}")
+            return {"error": "Failed to cancel coaching plan"}, 500
 
     def post_deprecated(self):
         """[DEPRECATED] Create new coaching plan from template - kept for reference only"""
@@ -266,53 +327,37 @@ class PlanSessionTrackingResource(Resource):
             session_id = body.get('session_id')
             if not session_id:
                 return {"error": "session_id required"}, 400
+
+            try:
+                session_id = int(session_id)
+            except (TypeError, ValueError):
+                return {"error": "session_id must be an integer"}, 400
                 
-            # Get user's active plan
-            client = get_supabase_client()
-            plan_resp = client.table('user_coaching_plans').select('id').eq(
-                'user_id', user_id
-            ).eq('current_status', 'active').maybe_single().execute()
-            
-            if not plan_resp.data:
+            tracking_result = _record_session_against_plan(
+                user_id=user_id,
+                session_id=session_id,
+                user_jwt=getattr(g, 'access_token', None)
+            )
+
+            status = tracking_result.get('status')
+
+            if status == 'tracked':
+                return {
+                    "message": "Session tracked against plan",
+                    "adherence_score": tracking_result.get('adherence_score'),
+                    "plan_session": tracking_result.get('plan_session')
+                }, 200
+
+            if status == 'no_active_plan':
                 return {"error": "No active coaching plan found"}, 404
-                
-            plan_id = plan_resp.data['id']
-            
-            # Find the plan session to mark as completed
-            current_week = _calculate_weeks_elapsed_from_plan(plan_resp.data)
-            
-            # Get next uncompleted session in current or previous week
-            plan_session_resp = client.table('plan_sessions').select('id, planned_week, planned_session_type').eq(
-                'user_coaching_plan_id', plan_id
-            ).eq('completion_status', 'planned').lte('planned_week', current_week).order('planned_week').limit(1).execute()
-            
-            if not plan_session_resp.data:
-                # No more planned sessions, create ad-hoc tracking
-                logger.info(f"No planned session found, creating ad-hoc session tracking for session {session_id}")
+
+            if status == 'no_matching_session':
                 return {"message": "Session completed outside of plan"}, 200
-                
-            plan_session = plan_session_resp.data[0]
-            
-            # Calculate adherence score based on session performance
-            adherence_score = _calculate_session_adherence(session_id, plan_session['planned_session_type'])
-            
-            # Update plan session
-            update_data = {
-                'session_id': session_id,
-                'completion_status': 'completed',
-                'completed_date': datetime.now().date().isoformat(),
-                'plan_adherence_score': adherence_score
-            }
-            
-            client.table('plan_sessions').update(update_data).eq('id', plan_session['id']).execute()
-            
-            # Update user plan current week if necessary
-            if plan_session['planned_week'] > current_week:
-                client.table('user_coaching_plans').update({
-                    'current_week': plan_session['planned_week']
-                }).eq('id', plan_id).execute()
-            
-            return {"message": "Session tracked against plan", "adherence_score": adherence_score}, 200
+
+            if status == 'error':
+                return {"error": "Failed to track session against plan"}, 500
+
+            return {"message": "No plan update required", "status": status}, 200
             
         except Exception as e:
             logger.error(f"POST /plan-session-tracking failed: {e}")
@@ -357,45 +402,199 @@ def _calculate_adherence_stats(sessions):
     }
 
 
-def _generate_plan_sessions(user_plan_id, template, start_date):
-    """Generate plan sessions based on template structure"""
+def _generate_plan_sessions(user_plan_id, plan_metadata, start_date):
+    """Generate plan sessions based on personalized plan metadata."""
     try:
         client = get_supabase_admin_client()  # Use admin client to bypass RLS
-        plan_structure = template['base_structure']  # Fixed field name
-        duration_weeks = template['duration_weeks']
-        
+        plan_structure = plan_metadata.get('plan_structure')
+        if isinstance(plan_structure, str):
+            try:
+                plan_structure = json.loads(plan_structure)
+            except json.JSONDecodeError:
+                plan_structure = None
+
+        if not plan_structure and 'base_structure' in plan_metadata:
+            plan_structure = plan_metadata['base_structure']
+            if isinstance(plan_structure, str):
+                try:
+                    plan_structure = json.loads(plan_structure)
+                except json.JSONDecodeError:
+                    plan_structure = None
+
+        if not isinstance(plan_structure, dict):
+            plan_structure = {}
+
+        weekly_template = plan_structure.get('weekly_template')
+        if not weekly_template:
+            weekly_template = plan_metadata.get('weekly_template', [])
+
+        training_schedule = plan_metadata.get('training_schedule', [])
+
+        duration_weeks = plan_metadata.get('duration_weeks') or plan_structure.get('duration_weeks')
+        if not duration_weeks:
+            duration_weeks = plan_metadata.get('weeks')
+
+        if not duration_weeks:
+            logger.warning(f"Cannot generate sessions for plan {user_plan_id}: duration_weeks missing")
+            return
+
         sessions_to_create = []
-        
+
+        def day_to_offset(day_name: str) -> int:
+            mapping = {
+                'monday': 0,
+                'tuesday': 1,
+                'wednesday': 2,
+                'thursday': 3,
+                'friday': 4,
+                'saturday': 5,
+                'sunday': 6
+            }
+            return mapping.get(day_name.lower(), 0)
+
+        def add_session(week_num: int, session_payload: Dict[str, Any]):
+            day_name = session_payload.get('day', 'monday')
+            session_type = session_payload.get('session_type', 'planned_session')
+            session_offset = day_to_offset(day_name)
+            week_start = start_date + timedelta(weeks=week_num - 1)
+            session_date = week_start + timedelta(days=session_offset)
+
+            sessions_to_create.append({
+                'user_coaching_plan_id': user_plan_id,
+                'planned_week': week_num,
+                'planned_session_type': session_type,
+                'scheduled_date': session_date.isoformat(),
+                'completion_status': 'planned'
+            })
+
         for week_num in range(1, duration_weeks + 1):
-            week_start = start_date + timedelta(weeks=week_num-1)
-            
-            # Get week structure from template (default to 3 sessions if not specified)
-            week_sessions = plan_structure.get(f'week_{week_num}', {
-                'sessions': ['base_aerobic', 'recovery', 'base_aerobic']
-            }).get('sessions', [])
-            
-            # Schedule sessions across the week (Mon, Wed, Fri pattern)
-            session_days = [0, 2, 4]  # Monday, Wednesday, Friday
-            
-            for i, session_type in enumerate(week_sessions[:3]):  # Max 3 sessions per week
-                if i < len(session_days):
-                    session_date = week_start + timedelta(days=session_days[i])
-                    
-                    sessions_to_create.append({
-                        'user_coaching_plan_id': user_plan_id,
-                        'planned_week': week_num,
-                        'planned_session_type': session_type,
-                        'scheduled_date': session_date.isoformat(),
-                        'completion_status': 'planned'
-                    })
-        
-        # Batch insert sessions
+            if weekly_template:
+                for session in weekly_template:
+                    add_session(week_num, session)
+            elif training_schedule:
+                for session in training_schedule:
+                    add_session(week_num, session)
+            else:
+                # Fallback: create a generic ruck session 3 times per week
+                default_sessions = [
+                    {'day': 'monday', 'session_type': 'planned_ruck'},
+                    {'day': 'wednesday', 'session_type': 'planned_ruck'},
+                    {'day': 'friday', 'session_type': 'planned_ruck'}
+                ]
+                for session in default_sessions:
+                    add_session(week_num, session)
+
         if sessions_to_create:
             client.table('plan_sessions').insert(sessions_to_create).execute()
             logger.info(f"Generated {len(sessions_to_create)} plan sessions for user plan {user_plan_id}")
-            
+
     except Exception as e:
         logger.error(f"Failed to generate plan sessions: {e}")
+
+
+def _record_session_against_plan(user_id: str, session_id: int, user_jwt: Optional[str] = None) -> Dict[str, Any]:
+    """Attach a completed ruck session to the user's active coaching plan if applicable."""
+    try:
+        client = get_supabase_client(user_jwt=user_jwt)
+
+        plan_resp = client.table('user_coaching_plans').select(
+            'id, start_date, current_week'
+        ).eq('user_id', user_id).eq('current_status', 'active').maybe_single().execute()
+
+        if not plan_resp.data:
+            return {'status': 'no_active_plan'}
+
+        plan_data = plan_resp.data
+        plan_id = plan_data['id']
+
+        # Determine which plan week we should be checking against
+        current_week = _calculate_weeks_elapsed_from_plan(plan_data)
+
+        plan_session_resp = client.table('plan_sessions').select(
+            'id, planned_week, planned_session_type, scheduled_date, scheduled_start_time, scheduled_timezone'
+        ).eq('user_coaching_plan_id', plan_id).eq('completion_status', 'planned') \
+         .lte('planned_week', current_week).order('planned_week').order('id').limit(1).execute()
+
+        if not plan_session_resp.data:
+            return {'status': 'no_matching_session', 'plan_id': plan_id}
+
+        plan_session = plan_session_resp.data[0]
+
+        adherence_score = _calculate_session_adherence(session_id, plan_session['planned_session_type'])
+
+        update_payload = {
+            'session_id': session_id,
+            'completion_status': 'completed',
+            'completed_date': datetime.utcnow().date().isoformat(),
+            'plan_adherence_score': adherence_score
+        }
+
+        client.table('plan_sessions').update(update_payload).eq('id', plan_session['id']).execute()
+
+        # Update the plan's current week if we've advanced beyond it
+        plan_current_week = plan_data.get('current_week') or 1
+        if plan_session['planned_week'] > plan_current_week:
+            client.table('user_coaching_plans').update({
+                'current_week': plan_session['planned_week']
+            }).eq('id', plan_id).execute()
+
+        tracked_session = {
+            **plan_session,
+            'session_id': session_id,
+            'completion_status': 'completed',
+            'completed_date': update_payload['completed_date'],
+            'plan_adherence_score': adherence_score
+        }
+
+        session_payload = {
+            'session_focus': plan_session.get('planned_session_type'),
+            'scheduled_date': plan_session.get('scheduled_date'),
+            'scheduled_start_time': plan_session.get('scheduled_start_time'),
+            'scheduled_timezone': plan_session.get('scheduled_timezone'),
+            'adherence_score': adherence_score
+        }
+
+        try:
+            session_details_resp = client.table('ruck_session').select(
+                'distance_km, duration_seconds, ruck_weight_kg, completed_at, avg_heart_rate'
+            ).eq('id', session_id).maybe_single().execute()
+
+            if session_details_resp.data:
+                details = session_details_resp.data
+                if details.get('distance_km') is not None:
+                    session_payload['distance_km'] = float(details['distance_km'])
+                if details.get('duration_seconds') is not None:
+                    session_payload['duration_minutes'] = int(details['duration_seconds'] // 60)
+                if details.get('ruck_weight_kg') is not None:
+                    session_payload['ruck_weight_kg'] = float(details['ruck_weight_kg'])
+                if details.get('completed_at'):
+                    session_payload['completed_at'] = details['completed_at']
+                if details.get('avg_heart_rate') is not None:
+                    session_payload['avg_heart_rate'] = details['avg_heart_rate']
+        except Exception as details_exc:
+            logger.warning(f"Unable to fetch session metrics for {session_id}: {details_exc}")
+
+        try:
+            plan_notification_service.handle_session_completed(
+                user_id=user_id,
+                plan_id=plan_id,
+                plan_session_id=plan_session['id'],
+                session_payload=session_payload
+            )
+        except Exception as notify_exc:
+            logger.error(f"Plan notification scheduling failed for session {session_id}: {notify_exc}")
+
+        return {
+            'status': 'tracked',
+            'plan_id': plan_id,
+            'plan_session_id': plan_session['id'],
+            'adherence_score': adherence_score,
+            'plan_session': tracked_session
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to record session {session_id} for user {user_id} against plan: {e}")
+        return {'status': 'error', 'error': str(e)}
 
 
 def _calculate_comprehensive_progress(plan, template, sessions):

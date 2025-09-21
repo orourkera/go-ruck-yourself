@@ -98,6 +98,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
       final coachingService = GetIt.instance<CoachingService>();
       final plan = await coachingService.getActiveCoachingPlan();
+
+      print('[PROFILE] Coaching plan check - plan: $plan');
+      print('[PROFILE] Has coaching plan: ${plan != null}');
+
       if (mounted) {
         setState(() {
           _hasCoachingPlan = plan != null;
@@ -106,6 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
+      print('[PROFILE] Error checking coaching plan: $e');
       // No plan or error - don't show the menu item
       if (mounted) {
         setState(() {
