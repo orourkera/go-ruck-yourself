@@ -400,45 +400,42 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           now.difference(_lastAICheerleaderCheck!).inSeconds <
               _aiCheerleaderMinInterval.inSeconds) {
         // Skip this check - too soon since last check
-        return;
+        // CRITICAL: Don't return here - still need to forward the state!
+        // Just skip the AI processing
+      } else if (_isProcessingAICheerleader) {
+        // Skip if already processing to prevent overlapping operations
+        // CRITICAL: Don't return here - still need to forward the state!
+      } else {
+        _lastAICheerleaderCheck = now;
+
+        AppLogger.info(
+            '[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
+
+        // Fire and forget with complete isolation
+        Future.microtask(() async {
+          _isProcessingAICheerleader = true;
+          try {
+            await _checkAICheerleaderTriggers(coordinatorState);
+          } catch (e, stack) {
+            AppLogger.error('[AI_CHEERLEADER] Isolated trigger check failed: $e');
+            AppLogger.error('[AI_CHEERLEADER] Stack: $stack');
+            // Log to Sentry but don't crash the session
+            await AppErrorHandler.handleError(
+              'ai_cheerleader_crash',
+              'AI Cheerleader crashed at milestone but session continues',
+              context: {
+                'distance_km': coordinatorState.distanceKm.toString(),
+                'elapsed_seconds': coordinatorState.elapsedSeconds.toString(),
+                'personality': _aiCheerleaderPersonality ?? 'unknown',
+                'error': e.toString(),
+              },
+              severity: ErrorSeverity.warning,
+            );
+          } finally {
+            _isProcessingAICheerleader = false;
+          }
+        });
       }
-
-      // Skip if already processing to prevent overlapping operations
-      if (_isProcessingAICheerleader) {
-        // AI processing debug logging removed for performance
-        // AppLogger.info('[AI_DEBUG] Skipping AI check - already processing previous trigger');
-        return;
-      }
-
-      _lastAICheerleaderCheck = now;
-
-      AppLogger.info(
-          '[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
-
-      // Fire and forget with complete isolation
-      Future.microtask(() async {
-        _isProcessingAICheerleader = true;
-        try {
-          await _checkAICheerleaderTriggers(coordinatorState);
-        } catch (e, stack) {
-          AppLogger.error('[AI_CHEERLEADER] Isolated trigger check failed: $e');
-          AppLogger.error('[AI_CHEERLEADER] Stack: $stack');
-          // Log to Sentry but don't crash the session
-          await AppErrorHandler.handleError(
-            'ai_cheerleader_crash',
-            'AI Cheerleader crashed at milestone but session continues',
-            context: {
-              'distance_km': coordinatorState.distanceKm.toString(),
-              'elapsed_seconds': coordinatorState.elapsedSeconds.toString(),
-              'personality': _aiCheerleaderPersonality ?? 'unknown',
-              'error': e.toString(),
-            },
-            severity: ErrorSeverity.warning,
-          );
-        } finally {
-          _isProcessingAICheerleader = false;
-        }
-      });
     } else {
       AppLogger.info(
           '[AI_DEBUG] AI triggers skipped - enabled: $_aiCheerleaderEnabled, running: ${coordinatorState is ActiveSessionRunning}, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');

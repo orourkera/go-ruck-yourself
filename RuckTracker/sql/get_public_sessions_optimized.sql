@@ -50,7 +50,11 @@ BEGIN
     -- Determine order clause based on sort_by parameter
     CASE p_sort_by
         WHEN 'proximity_asc' THEN
-            -- Proximity sorting not available without location data
+            -- Proximity sorting requires client-side calculation with user's location
+            -- Backend cannot precompute proximity without knowing user's location
+            -- Return sessions sorted by recent, frontend will handle proximity sorting
+            order_clause := 'ORDER BY completed_at DESC';
+        WHEN 'created_at_desc' THEN
             order_clause := 'ORDER BY completed_at DESC';
         WHEN 'calories_desc' THEN
             order_clause := 'ORDER BY calories_burned DESC NULLS LAST';
@@ -125,15 +129,36 @@ BEGIN
                 ELSE 12
             END,
             -- Max points based on distance
-            CASE 
+            CASE
                 WHEN session_record.distance_km IS NULL OR session_record.distance_km < 1 THEN 60
-                WHEN session_record.distance_km <= 3 THEN 100   
-                WHEN session_record.distance_km <= 5 THEN 150  
-                WHEN session_record.distance_km <= 10 THEN 250 
-                WHEN session_record.distance_km <= 15 THEN 350 
+                WHEN session_record.distance_km <= 3 THEN 100
+                WHEN session_record.distance_km <= 5 THEN 150
+                WHEN session_record.distance_km <= 10 THEN 250
+                WHEN session_record.distance_km <= 15 THEN 350
                 ELSE 450  -- 20km+ routes
             END
-        );
+        )
+        -- Only include rucks that have at least 3 route points after privacy clipping
+        -- This filters out rucks with insufficient GPS data for meaningful map display
+        WHERE (SELECT COUNT(*) FROM get_privacy_clipped_sampled_points(
+            session_record.id,
+            250.0,  -- Use same clipping as main query
+            CASE
+                WHEN session_record.distance_km <= 3 THEN 4
+                WHEN session_record.distance_km <= 5 THEN 6
+                WHEN session_record.distance_km <= 10 THEN 8
+                WHEN session_record.distance_km <= 15 THEN 10
+                ELSE 12
+            END,
+            CASE
+                WHEN session_record.distance_km IS NULL OR session_record.distance_km < 1 THEN 60
+                WHEN session_record.distance_km <= 3 THEN 100
+                WHEN session_record.distance_km <= 5 THEN 150
+                WHEN session_record.distance_km <= 10 THEN 250
+                WHEN session_record.distance_km <= 15 THEN 350
+                ELSE 450
+            END
+        )) >= 3;
         
         -- Build session JSON object
         sessions_json := sessions_json || json_build_object(

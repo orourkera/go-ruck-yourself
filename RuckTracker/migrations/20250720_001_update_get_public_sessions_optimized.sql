@@ -1,4 +1,5 @@
 -- Update RPC to include ruck_weight_kg and ensure proper fields in JSON response
+-- Filter out rucks with insufficient GPS data (< 3 route points after clipping)
 -- Safe to re-run: uses CREATE OR REPLACE FUNCTION
 
 -- RPC function to get public ruck sessions with optimized route data
@@ -53,7 +54,22 @@ BEGIN
     -- Determine order clause based on sort_by parameter
     CASE p_sort_by
         WHEN 'proximity_asc' THEN
-            -- Proximity sorting not available without location data
+            -- Proximity sorting requires location data - return empty result if not provided
+            IF p_latitude IS NULL OR p_longitude IS NULL THEN
+                RETURN json_build_object(
+                    'ruck_sessions', '[]'::json,
+                    'meta', json_build_object(
+                        'count', 0,
+                        'per_page', p_per_page,
+                        'page', p_page,
+                        'sort_by', p_sort_by,
+                        'error', 'Location data required for proximity sorting'
+                    )
+                );
+            END IF;
+            -- Add location-based distance calculation here in future
+            order_clause := 'ORDER BY completed_at DESC';
+        WHEN 'created_at_desc' THEN
             order_clause := 'ORDER BY completed_at DESC';
         WHEN 'calories_desc' THEN
             order_clause := 'ORDER BY calories_burned DESC NULLS LAST';
@@ -114,8 +130,10 @@ BEGIN
                 'timestamp', "timestamp"
             )
         ) INTO route_points
-        FROM get_sampled_route_points(
-            session_record.id, 
+        FROM get_privacy_clipped_sampled_points(
+            session_record.id,
+            -- Clip first/last N meters for privacy (server-side)
+            250.0,
             -- Sampling interval based on distance
             CASE
                 WHEN session_record.distance_km <= 3 THEN 4
@@ -125,15 +143,36 @@ BEGIN
                 ELSE 12
             END,
             -- Max points based on distance
-            CASE 
+            CASE
                 WHEN session_record.distance_km IS NULL OR session_record.distance_km < 1 THEN 60
-                WHEN session_record.distance_km <= 3 THEN 100   
-                WHEN session_record.distance_km <= 5 THEN 150  
-                WHEN session_record.distance_km <= 10 THEN 250 
-                WHEN session_record.distance_km <= 15 THEN 350 
+                WHEN session_record.distance_km <= 3 THEN 100
+                WHEN session_record.distance_km <= 5 THEN 150
+                WHEN session_record.distance_km <= 10 THEN 250
+                WHEN session_record.distance_km <= 15 THEN 350
                 ELSE 450  -- 20km+ routes
             END
-        );
+        )
+        -- Only include rucks that have at least 3 route points after privacy clipping
+        -- This filters out rucks with insufficient GPS data for meaningful map display
+        WHERE (SELECT COUNT(*) FROM get_privacy_clipped_sampled_points(
+            session_record.id,
+            250.0,  -- Use same clipping as main query
+            CASE
+                WHEN session_record.distance_km <= 3 THEN 4
+                WHEN session_record.distance_km <= 5 THEN 6
+                WHEN session_record.distance_km <= 10 THEN 8
+                WHEN session_record.distance_km <= 15 THEN 10
+                ELSE 12
+            END,
+            CASE
+                WHEN session_record.distance_km IS NULL OR session_record.distance_km < 1 THEN 60
+                WHEN session_record.distance_km <= 3 THEN 100
+                WHEN session_record.distance_km <= 5 THEN 150
+                WHEN session_record.distance_km <= 10 THEN 250
+                WHEN session_record.distance_km <= 15 THEN 350
+                ELSE 450
+            END
+        )) >= 3;
         
         -- Build session JSON object
         sessions_json := sessions_json || json_build_object(

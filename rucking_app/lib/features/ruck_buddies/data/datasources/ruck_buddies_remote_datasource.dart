@@ -50,6 +50,9 @@ class RuckBuddiesRemoteDataSourceImpl implements RuckBuddiesRemoteDataSource {
           sortBy = 'proximity_asc'; // Default sort for following
           followingOnly = true;
           break;
+        case 'recent':
+          sortBy = 'created_at_desc';
+          break;
         case 'calories':
           sortBy = 'calories_desc';
           break;

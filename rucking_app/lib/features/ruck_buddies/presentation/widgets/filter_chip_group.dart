@@ -22,6 +22,8 @@ class FilterChipGroup extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
+            _buildFilterChip('recent', 'Recent', Icons.access_time),
+            const SizedBox(width: 8),
             _buildFilterChip('following', 'My Buddies', Icons.people),
             const SizedBox(width: 8),
             _buildFilterChip('closest', 'Closest', Icons.location_on),
