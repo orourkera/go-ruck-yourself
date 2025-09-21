@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class PlanAuditService:
     def __init__(self, admin_client=None):
         self.admin = admin_client or get_supabase_admin_client()
-        self.model = os.getenv('OPENAI_PLAN_AUDIT_MODEL', 'gpt-3.5-turbo')
+        self.model = os.getenv('OPENAI_PLAN_AUDIT_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5'))
 
     # Public API
     def audit_and_correct_plan(self, user_id: str, plan_id: int) -> Dict[str, Any]:

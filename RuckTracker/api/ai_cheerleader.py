@@ -220,7 +220,7 @@ class AICheerleaderLogResource(Resource):
             
             # Call OpenAI with moderate length for 2-3 sentences
             completion = openai_client.chat.completions.create(
-                model="gpt-4.1",
+                model=os.getenv('OPENAI_CHEERLEADER_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},

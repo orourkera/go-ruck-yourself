@@ -578,7 +578,7 @@ Return JSON format: {"title": "...", "body": "..."}"""
             user_prompt = "\n".join(user_prompt_parts)
             
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -700,7 +700,7 @@ Return JSON format: {"title": "...", "body": "..."}"""
             user_prompt = "\n".join(lines)
 
             response = client.chat.completions.create(
-                model=os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-3.5-turbo'),
+                model=os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-5'),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}

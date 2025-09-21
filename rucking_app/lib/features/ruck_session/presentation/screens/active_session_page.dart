@@ -392,6 +392,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                       previous.elevationGain != current.elevationGain ||
                       previous.elevationLoss != current.elevationLoss ||
                       previous.steps != current.steps ||
+                      previous.elapsedSeconds != current.elapsedSeconds || // Add elapsed time check
                       previous.sessionId !=
                           current.sessionId; // Important for initial load
                 }
