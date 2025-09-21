@@ -8,7 +8,6 @@ from datetime import datetime, timezone, timedelta
 import json
 import math
 from typing import Optional, Union
-from dateutil import tz
 from ..supabase_client import get_supabase_client
 from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 from .goals import _compute_window_bounds, _km_to_mi
@@ -16,7 +15,6 @@ from ..utils.auth_helper import get_current_user_id
 from ..utils.api_response import check_auth_and_respond
 from ..services.push_notification_service import PushNotificationService, get_user_device_tokens
 from .user_coaching_plans import _record_session_against_plan
-from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -751,7 +749,7 @@ class RuckSessionStartResource(Resource):
         try:
             update = {
                 'status': 'in_progress',
-                'started_at': datetime.now(tz.tzutc()).isoformat(),
+                'started_at': datetime.now(timezone.utc).isoformat(),
             }
             resp = (
                 supabase.table('ruck_session')
@@ -822,7 +820,7 @@ class RuckSessionPauseResource(Resource):
         try:
             update = {
                 'status': 'paused',
-                'paused_at': datetime.now(tz.tzutc()).isoformat(),
+                'paused_at': datetime.now(timezone.utc).isoformat(),
             }
             resp = (
                 supabase.table('ruck_session')
@@ -854,7 +852,7 @@ class RuckSessionResumeResource(Resource):
         try:
             update = {
                 'status': 'in_progress',
-                'resumed_at': datetime.now(tz.tzutc()).isoformat(),
+                'resumed_at': datetime.now(timezone.utc).isoformat(),
             }
             resp = (
                 supabase.table('ruck_session')
@@ -945,7 +943,7 @@ class RuckSessionCompleteResource(Resource):
                 try:
                     supabase.table('ruck_session').update({
                         'status': 'in_progress',
-                        'started_at': started_at_str or datetime.now(tz.tzutc()).isoformat(),
+                        'started_at': started_at_str or datetime.now(timezone.utc).isoformat(),
                     }).eq('id', ruck_id).execute()
                     current_status = 'in_progress'
                 except Exception as e:
@@ -992,7 +990,7 @@ class RuckSessionCompleteResource(Resource):
                 # Calculate duration from timestamps (for live sessions)
                 try:
                     started_at = datetime.fromisoformat(started_at_str.replace('Z', '+00:00'))
-                    ended_at = datetime.now(tz.tzutc())
+                    ended_at = datetime.now(timezone.utc)
                     duration_seconds = int((ended_at - started_at).total_seconds())
                     logger.info(f"Calculated duration from timestamps: {duration_seconds} seconds")
                 except Exception as e:
@@ -1084,7 +1082,7 @@ class RuckSessionCompleteResource(Resource):
                 update_data['max_heart_rate'] = data['max_heart_rate']
 
             # Always set completed_at to now (UTC) when completing session
-            update_data['completed_at'] = datetime.now(tz.tzutc()).isoformat()
+            update_data['completed_at'] = datetime.now(timezone.utc).isoformat()
 
             # Pace will be calculated later using processed distance
 
@@ -1373,7 +1371,7 @@ class RuckSessionCompleteResource(Resource):
                             if isinstance(ts_val, (int, float)):
                                 # Assume ms if large
                                 sec = ts_val / 1000.0 if ts_val > 1e12 else ts_val
-                                return datetime.fromtimestamp(sec, tz=tz.tzutc()).isoformat()
+                                return datetime.fromtimestamp(sec, tz=timezone.utc).isoformat()
                             if isinstance(ts_val, str):
                                 # Pass through if ISO, else attempt parse
                                 try:
@@ -1495,7 +1493,7 @@ class RuckSessionCompleteResource(Resource):
                                 'total_duration_seconds': split.get('total_duration_seconds', 0),
                                 'calories_burned': split.get('calories_burned', 0.0),
                                 'elevation_gain_m': split_elevation_gain,
-                                'split_timestamp': split.get('timestamp') if split.get('timestamp') else datetime.now(tz.tzutc()).isoformat()
+                                'split_timestamp': split.get('timestamp') if split.get('timestamp') else datetime.now(timezone.utc).isoformat()
                             }
                             # Keep latest split data for each split_number
                             unique_map[sn] = split_record
@@ -1779,7 +1777,7 @@ class RuckSessionCompleteResource(Resource):
                             progress_lookup = supabase.table('user_goal_progress').select('id') \
                                 .eq('goal_id', goal['id']).eq('user_id', g.user.id).limit(1).execute()
 
-                            now_iso = datetime.now(tz.tzutc()).isoformat()
+                            now_iso = datetime.now(timezone.utc).isoformat()
                             payload = {
                                 'goal_id': goal['id'],
                                 'user_id': g.user.id,
@@ -1856,12 +1854,12 @@ class RuckSessionCompleteResource(Resource):
                     # First week sprint complete (if within first week)
                     user_created_resp = supabase.table('users').select('created_at').eq('id', user_id).single().execute()
                     if user_created_resp.data:
-                        from dateutil import parser, tz
+                        from dateutil import parser
                         user_created_at = parser.parse(user_created_resp.data['created_at'])
                         # Ensure user_created_at is timezone-aware
                         if user_created_at.tzinfo is None:
-                            user_created_at = user_created_at.replace(tzinfo=tz.tzutc())
-                        days_since_signup = (datetime.now(tz.tzutc()) - user_created_at).days
+                            user_created_at = user_created_at.replace(tzinfo=timezone.utc)
+                        days_since_signup = (datetime.now(timezone.utc) - user_created_at).days
                         
                         if days_since_signup <= 7:
                             notification_manager.send_first_week_sprint_notification(user_id, 4, 'first_week_sprint_complete')
@@ -2093,7 +2091,7 @@ class RuckSessionLocationResource(Resource):
                 try:
                     supabase.table('ruck_session').update({
                         'status': 'in_progress',
-                        'started_at': datetime.now(tz.tzutc()).isoformat(),
+                        'started_at': datetime.now(timezone.utc).isoformat(),
                     }).eq('id', ruck_id).execute()
                     current_status = 'in_progress'
                 except Exception as e:
@@ -2114,7 +2112,7 @@ class RuckSessionLocationResource(Resource):
                     if session_details.data and session_details.data[0].get('completed_at'):
                         from dateutil import parser
                         completed_at = parser.parse(session_details.data[0]['completed_at'])
-                        time_since_completion = datetime.now(tz.tzutc()) - completed_at
+                        time_since_completion = datetime.now(timezone.utc) - completed_at
                         
                         if time_since_completion.total_seconds() <= 300:  # 5 minutes
                             logger.info(f"[LOC_UPLOAD][ALLOW_COMPLETED_RECENT] session={ruck_id} user={g.user.id} seconds_since_complete={time_since_completion.total_seconds():.0f}")
@@ -2178,13 +2176,13 @@ class RuckSessionLocationResource(Resource):
                     # Enhanced timestamp validation
                     timestamp = point.get('timestamp')
                     if timestamp is None:
-                        timestamp = datetime.now(tz.tzutc()).isoformat()
-                    elif timestamp != datetime.now(tz.tzutc()).isoformat():
+                        timestamp = datetime.now(timezone.utc).isoformat()
+                    elif timestamp != datetime.now(timezone.utc).isoformat():
                         try:
                             from dateutil import parser
                             parsed_time = parser.parse(timestamp)
                             # Validate timestamp is not too far in future (max 1 hour ahead)
-                            now = datetime.now(tz.tzutc())
+                            now = datetime.now(timezone.utc)
                             if parsed_time > now + timedelta(hours=1):
                                 invalid_points.append(f"TIMESTAMP_FUTURE: Point {i} timestamp too far in future - {timestamp}")
                                 continue
@@ -2601,7 +2599,7 @@ class HeartRateSampleUploadResource(Resource):
                 try:
                     supabase.table('ruck_session').update({
                         'status': 'in_progress',
-                        'started_at': datetime.now(tz.tzutc()).isoformat(),
+                        'started_at': datetime.now(timezone.utc).isoformat(),
                     }).eq('id', ruck_id).execute()
                     current_status = 'in_progress'
                 except Exception as e:
@@ -2617,7 +2615,7 @@ class HeartRateSampleUploadResource(Resource):
                     if isinstance(ts_val, (int, float)):
                         # Assume ms if large
                         sec = ts_val / 1000.0 if ts_val > 1e12 else ts_val
-                        return datetime.fromtimestamp(sec, tz=tz.tzutc()).isoformat()
+                        return datetime.fromtimestamp(sec, tz=timezone.utc).isoformat()
                     if isinstance(ts_val, str):
                         try:
                             return datetime.fromisoformat(ts_val.replace('Z', '+00:00')).isoformat()
@@ -2704,7 +2702,7 @@ class RuckSessionHeartRateChunkResource(Resource):
                 try:
                     supabase.table('ruck_session').update({
                         'status': 'in_progress',
-                        'started_at': datetime.now(tz.tzutc()).isoformat(),
+                        'started_at': datetime.now(timezone.utc).isoformat(),
                     }).eq('id', ruck_id).execute()
                     current_status = 'in_progress'
                 except Exception as e:
@@ -2722,7 +2720,7 @@ class RuckSessionHeartRateChunkResource(Resource):
                     # If numeric -> epoch ms or seconds
                     if isinstance(ts_val, (int, float)):
                         sec = ts_val / 1000.0 if ts_val > 1e12 else ts_val
-                        return datetime.fromtimestamp(sec, tz=tz.tzutc()).isoformat()
+                        return datetime.fromtimestamp(sec, tz=timezone.utc).isoformat()
                     if isinstance(ts_val, str):
                         try:
                             return datetime.fromisoformat(ts_val.replace('Z', '+00:00')).isoformat()
@@ -2788,7 +2786,7 @@ class RuckSessionAutoEndResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             
             # Find active sessions that haven't had location updates recently
-            cutoff_time = datetime.now(tz.tzutc()) - timedelta(minutes=inactivity_threshold_minutes)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=inactivity_threshold_minutes)
             
             # Get active sessions
             active_sessions = supabase.table('ruck_session') \
@@ -2821,7 +2819,7 @@ class RuckSessionAutoEndResource(Resource):
                             'id': session_id,
                             'started_at': session['started_at'],
                             'last_activity': last_timestamp.isoformat(),
-                            'inactive_minutes': (datetime.now(tz.tzutc()) - last_timestamp).total_seconds() / 60
+                            'inactive_minutes': (datetime.now(timezone.utc) - last_timestamp).total_seconds() / 60
                         })
                 else:
                     # No location data - check if session is old enough to auto-end
@@ -2831,7 +2829,7 @@ class RuckSessionAutoEndResource(Resource):
                             'id': session_id,
                             'started_at': session['started_at'],
                             'last_activity': None,
-                            'inactive_minutes': (datetime.now(tz.tzutc()) - started_at).total_seconds() / 60
+                            'inactive_minutes': (datetime.now(timezone.utc) - started_at).total_seconds() / 60
                         })
             
             # Auto-end the inactive sessions if requested
@@ -2845,7 +2843,7 @@ class RuckSessionAutoEndResource(Resource):
                         supabase.table('ruck_session') \
                             .update({
                                 'status': 'completed',
-                                'completed_at': datetime.now(tz.tzutc()).isoformat(),
+                                'completed_at': datetime.now(timezone.utc).isoformat(),
                                 'notes': f'Auto-completed due to {session_info["inactive_minutes"]:.0f} minutes of inactivity'
                             }) \
                             .eq('id', session_info['id']) \
