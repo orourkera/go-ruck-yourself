@@ -215,6 +215,12 @@ def get_ruck_buddies():
     # Get pagination parameters (convert from page-based to offset-based)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+
+    # For proximity sorting, we need more sessions to choose from
+    # so the frontend has a better pool to sort by distance
+    if sort_by == 'proximity_asc':
+        per_page = min(per_page * 5, 100)  # Increase to 100 max to avoid huge payloads
+
     offset = (page - 1) * per_page
     
     # Get sort_by parameter (this matches what the frontend sends)

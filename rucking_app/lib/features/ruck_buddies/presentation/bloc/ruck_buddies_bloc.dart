@@ -59,12 +59,16 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       }
     }
 
+    // For 'closest' filter, we need more sessions to choose from
+    // so the frontend has a better pool to sort by distance
+    final effectiveLimit = filterToUse == 'closest' ? min(event.limit * 5, 100) : event.limit;
+
     // Check for cached data first (offset 0 = first page)
     final cachedData = RuckBuddiesRepositoryImpl.getCachedRuckBuddies(
       filter: filterToUse,
       latitude: lat,
       longitude: lon,
-      limit: event.limit,
+      limit: effectiveLimit,
       offset: 0,
     );
 
@@ -75,7 +79,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       emit(
         RuckBuddiesLoaded(
           ruckBuddies: cachedData,
-          hasReachedMax: cachedData.length < event.limit,
+          hasReachedMax: cachedData.length < effectiveLimit,
           filter: event.filter,
           latitude: lat,
           longitude: lon,
@@ -91,7 +95,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
     }
 
     final params = RuckBuddiesParams(
-      limit: event.limit,
+      limit: effectiveLimit,
       offset:
           0, // Offset is 0 for a new fetch, managed by FetchMoreRuckBuddiesEvent for pagination
       filter: filterToUse, // Use the potentially updated filter
@@ -127,7 +131,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
           emit(
             RuckBuddiesLoaded(
               ruckBuddies: finalResult,
-              hasReachedMax: finalResult.length < event.limit,
+              hasReachedMax: finalResult.length < effectiveLimit,
               filter: event.filter,
               latitude: lat,
               longitude: lon,
@@ -176,9 +180,12 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
       ),
     );
 
+    // For 'closest' filter, we need more sessions to choose from
+    final effectiveLimit = currentState.filter == 'closest' ? min(event.limit * 5, 100) : event.limit;
+
     final result = await getRuckBuddies(
       RuckBuddiesParams(
-        limit: event.limit,
+        limit: effectiveLimit,
         offset: currentState.ruckBuddies.length,
         filter: currentState.filter,
         latitude: currentState.latitude,
@@ -204,7 +211,7 @@ class RuckBuddiesBloc extends Bloc<RuckBuddiesEvent, RuckBuddiesState> {
         emit(
           RuckBuddiesLoaded(
             ruckBuddies: [...currentState.ruckBuddies, ...uniqueNewRuckBuddies],
-            hasReachedMax: newRuckBuddies.length < event.limit,
+            hasReachedMax: newRuckBuddies.length < effectiveLimit,
             filter: currentState.filter,
             isLoadingMore: false,
           ),

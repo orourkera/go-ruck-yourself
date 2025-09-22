@@ -775,7 +775,7 @@ class CoachingPlansResource(Resource):
                 # Archive ALL existing active plans for this user
                 for existing_plan in existing_response.data:
                     admin_supabase.table("user_coaching_plans").update({
-                        "current_status": "archived"
+                        "current_status": "cancelled"
                     }).eq("id", existing_plan["id"]).execute()
                     logger.info(f"Archived existing coaching plan {existing_plan['id']} for user {g.user_id}")
             
@@ -960,7 +960,7 @@ class CoachingPlanResource(Resource):
             
             # Handle status updates
             if 'status' in data:
-                valid_statuses = ['active', 'paused', 'completed', 'archived']
+                valid_statuses = ['active', 'paused', 'completed', 'cancelled']
                 if data['status'] not in valid_statuses:
                     return error_response(f"Invalid status. Must be one of: {valid_statuses}", status_code=400)
                 
