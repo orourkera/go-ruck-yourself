@@ -494,6 +494,11 @@ class PlanNotificationService:
         if not scheduled_date:
             return
 
+        # Check if first ruck notifications are disabled
+        if prefs.get('first_ruck_notifications_disabled', False):
+            logger.info(f"Skipping first ruck notifications for user {user_id} - disabled in preferences")
+            return
+
         session_timezone = session.get('scheduled_timezone') if session else None
         tzinfo = timezone.utc(session_timezone) if session_timezone else None
         if not tzinfo:
@@ -873,13 +878,18 @@ class PlanNotificationService:
             prefs['timezone'] = row.get('plan_notification_timezone') or 'UTC'
             prefs.setdefault('default_start_minute', 360)
             prefs.setdefault('weekly_digest_day', 'Sunday')
+
+            # Check for first ruck notification preference
+            # notification_first_ruck = False means notifications are disabled
+            prefs['first_ruck_notifications_disabled'] = not row.get('notification_first_ruck', True)
+
             return prefs
 
         try:
             resp = None
             try:
                 resp = self.admin_client.table('user_profiles').select(
-                    'coaching_tone, plan_notification_prefs, plan_quiet_hours_start, plan_quiet_hours_end, plan_evening_brief_offset_minutes, plan_notification_timezone'
+                    'coaching_tone, plan_notification_prefs, plan_quiet_hours_start, plan_quiet_hours_end, plan_evening_brief_offset_minutes, plan_notification_timezone, notification_first_ruck'
                 ).eq('user_id', user_id).limit(1).execute()
             except Exception as profile_err:
                 logger.debug(f"user_profiles lookup failed for {user_id}: {profile_err}")
@@ -888,7 +898,7 @@ class PlanNotificationService:
                 return build_preferences(resp.data[0])
 
             users_resp = self.admin_client.table('user').select(
-                'plan_notification_prefs, plan_quiet_hours_start, plan_quiet_hours_end, plan_evening_brief_offset_minutes, plan_notification_timezone, coaching_tone'
+                'plan_notification_prefs, plan_quiet_hours_start, plan_quiet_hours_end, plan_evening_brief_offset_minutes, plan_notification_timezone, coaching_tone, notification_first_ruck'
             ).eq('id', user_id).limit(1).execute()
             if users_resp.data:
                 return build_preferences(users_resp.data[0])
