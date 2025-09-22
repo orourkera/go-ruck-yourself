@@ -739,7 +739,7 @@ Return JSON format: {"title": "...", "body": "..."}"""
 
             # Fallback to core users table if profile record not available
             try:
-                users_resp = admin_client.table('users').select(
+                users_resp = admin_client.table('user').select(
                     'coaching_tone, coaching_style'
                 ).eq('id', user_id).execute()
                 if users_resp.data:

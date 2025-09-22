@@ -887,7 +887,7 @@ class PlanNotificationService:
             if resp and resp.data:
                 return build_preferences(resp.data[0])
 
-            users_resp = self.admin_client.table('users').select(
+            users_resp = self.admin_client.table('user').select(
                 'plan_notification_prefs, plan_quiet_hours_start, plan_quiet_hours_end, plan_evening_brief_offset_minutes, plan_notification_timezone, coaching_tone'
             ).eq('id', user_id).limit(1).execute()
             if users_resp.data:
@@ -1000,7 +1000,7 @@ class PlanNotificationService:
                 }
 
             # Fallback to user profile location if available
-            user_profile = self.admin_client.table('users').select(
+            user_profile = self.admin_client.table('user').select(
                 'latitude, longitude'
             ).eq('id', user_id).limit(1).execute()
 

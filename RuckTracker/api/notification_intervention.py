@@ -340,7 +340,7 @@ class CoachingNotificationInterventionResource(Resource):
         """Apply penalties for quitting."""
         try:
             # Reset streak
-            self.admin_client.table('users').update({
+            self.admin_client.table('user').update({
                 'current_streak': 0
             }).eq('id', user_id).execute()
 

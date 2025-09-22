@@ -810,7 +810,7 @@ class CoachingPlansResource(Resource):
             if equipment_weight:
                 user_update['equipment_weight_kg'] = equipment_weight
             if user_update:
-                admin_supabase.table("users").update(user_update).eq("id", g.user_id).execute()
+                admin_supabase.table("user").update(user_update).eq("id", g.user_id).execute()
 
             profile_payload = {
                 "user_id": g.user_id,
@@ -823,7 +823,7 @@ class CoachingPlansResource(Resource):
                 ).execute()
             except Exception as profile_err:
                 logger.info(f"user_profiles upsert failed, falling back to users table: {profile_err}")
-                admin_supabase.table("users").update({
+                admin_supabase.table("user").update({
                     "coaching_tone": coaching_personality
                 }).eq("id", g.user_id).execute()
             
