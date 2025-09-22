@@ -839,7 +839,8 @@ class CoachingPlansResource(Resource):
                     "training_schedule": personalized_plan.get('training_schedule'),
                     "duration_weeks": base_plan.get('duration_weeks')
                 }
-                _generate_plan_sessions(created_plan['id'], plan_session_metadata, plan_start_date)
+                # Pass user_id to enable personalized coaching points
+                _generate_plan_sessions(created_plan['id'], plan_session_metadata, plan_start_date, user_id=g.user_id)
             except Exception as session_error:
                 logger.error(f"Failed to seed plan sessions for plan {created_plan['id']}: {session_error}")
 

@@ -119,39 +119,66 @@ class AICheerleaderLogResource(Resource):
         try:
             if not openai_client:
                 return {"error": "OpenAI not configured"}, 500
-            
+
             user_id = data.get('user_id')
             current_session = data.get('current_session', {})
             # Optional personality and environment/location passthrough from client
             personality = data.get('personality') or 'AI Cheerleader'
             environment = data.get('environment') or current_session.get('environment') or {}
             location_ctx = data.get('location') or current_session.get('location') or {}
-            
+
             if not user_id:
                 return {"error": "Missing user_id"}, 400
-            
+
             logger.info(f"[AI_CHEERLEADER] Generating AI response for user {user_id}")
-            
+
             # Get user insights (structured data) and AI history
             supabase_admin = get_supabase_admin_client()
-            
+
             try:
                 # Get user insights for structured historical data
                 insights_resp = supabase_admin.table('user_insights').select('*').eq('user_id', user_id).limit(1).execute()
                 insights = insights_resp.data[0] if insights_resp.data else {}
                 logger.info(f"[AI_CHEERLEADER] Retrieved user insights for user {user_id}")
-                
+
                 # Get recent AI responses to avoid repetition
                 ai_logs_resp = supabase_admin.table('ai_cheerleader_logs').select(
                     'session_id, personality, openai_response, created_at'
                 ).eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
                 ai_logs = ai_logs_resp.data or []
                 logger.info(f"[AI_CHEERLEADER] Found {len(ai_logs)} previous AI responses for user {user_id}")
-                
+
+                # Get active coaching plan and current session's coaching points
+                coaching_points = {}
+                try:
+                    # Get active plan
+                    plan_resp = supabase_admin.table('user_coaching_plans').select(
+                        'id, current_week, start_date'
+                    ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+
+                    if plan_resp.data:
+                        plan_id = plan_resp.data[0]['id']
+                        current_week = plan_resp.data[0]['current_week']
+
+                        # Get today's plan session with coaching points
+                        from datetime import datetime
+                        today = datetime.now().date().isoformat()
+
+                        session_resp = supabase_admin.table('plan_sessions').select(
+                            'coaching_points, planned_session_type'
+                        ).eq('user_coaching_plan_id', plan_id).eq('scheduled_date', today).limit(1).execute()
+
+                        if session_resp.data and session_resp.data[0].get('coaching_points'):
+                            coaching_points = session_resp.data[0]['coaching_points']
+                            logger.info(f"[AI_CHEERLEADER] Found coaching points for today's session")
+                except Exception as cp_error:
+                    logger.warning(f"[AI_CHEERLEADER] Could not fetch coaching points: {cp_error}")
+
             except Exception as e:
                 logger.error(f"[AI_CHEERLEADER] Error fetching user insights: {e}")
                 insights = {}
                 ai_logs = []
+                coaching_points = {}
             
             # Build compact context using structured insights + current session
             def _pick(d, keys):
@@ -179,6 +206,71 @@ class AICheerleaderLogResource(Resource):
                     if len(avoid_lines) >= 4:
                         break
 
+            # Check coaching points for current interval/trigger
+            active_coaching_prompt = None
+            if coaching_points and current_session:
+                elapsed_minutes = current_session.get('duration_seconds', 0) / 60
+                current_distance_km = current_session.get('distance_km', 0)
+                current_hr = current_session.get('avg_heart_rate', 0)
+
+                # Check interval coaching
+                intervals = coaching_points.get('intervals', [])
+                if intervals:
+                    cumulative_minutes = 0
+                    for interval in intervals:
+                        interval_duration = interval.get('duration_minutes', 0)
+                        if cumulative_minutes <= elapsed_minutes < cumulative_minutes + interval_duration:
+                            active_coaching_prompt = {
+                                'type': 'interval',
+                                'instruction': interval.get('instruction', ''),
+                                'interval_type': interval.get('type', 'work')
+                            }
+                            break
+                        cumulative_minutes += interval_duration
+
+                # Check milestone triggers
+                milestones = coaching_points.get('milestones', [])
+                for milestone in milestones:
+                    trigger_distance = milestone.get('distance_km', 0)
+                    # Trigger within 100m of milestone
+                    if abs(current_distance_km - trigger_distance) < 0.1:
+                        active_coaching_prompt = {
+                            'type': 'milestone',
+                            'message': milestone.get('message', '')
+                        }
+                        break
+
+                # Check time triggers
+                time_triggers = coaching_points.get('time_triggers', [])
+                for trigger in time_triggers:
+                    trigger_minutes = trigger.get('elapsed_minutes', 0)
+                    # Trigger within 30 seconds of time
+                    if abs(elapsed_minutes - trigger_minutes) < 0.5:
+                        active_coaching_prompt = {
+                            'type': 'time_trigger',
+                            'message': trigger.get('message', '')
+                        }
+                        break
+
+                # Check heart rate zones
+                if current_hr > 0:
+                    hr_zones = coaching_points.get('heart_rate_zones', [])
+                    for zone in hr_zones:
+                        min_bpm = zone.get('min_bpm', 0)
+                        max_bpm = zone.get('max_bpm', 999)
+                        if current_hr < min_bpm:
+                            active_coaching_prompt = {
+                                'type': 'heart_rate',
+                                'instruction': f"Pick up the pace! Target heart rate: {min_bpm}-{max_bpm} bpm"
+                            }
+                            break
+                        elif current_hr > max_bpm:
+                            active_coaching_prompt = {
+                                'type': 'heart_rate',
+                                'instruction': f"Ease up a bit! Target heart rate: {min_bpm}-{max_bpm} bpm"
+                            }
+                            break
+
             # Use structured insights data instead of manual fetching
             context = {
                 'current_session': compact_current,
@@ -197,6 +289,8 @@ class AICheerleaderLogResource(Resource):
                     'longest_streak_days': insights.get('longest_streak_days', 0),
                 },
                 'avoid_repeating_lines': avoid_lines,
+                'active_coaching_prompt': active_coaching_prompt,  # CRITICAL: Include coaching trigger
+                'session_goals': coaching_points.get('session_goals', {}) if coaching_points else {}
             }
             
             # Get prompts from Remote Config
@@ -204,15 +298,35 @@ class AICheerleaderLogResource(Resource):
             
             # Format the context as JSON string
             context_str = json.dumps(context, indent=2, default=str)
-            extra_instructions = (
-                "\nInstructions:"\
-                "\n- Act as a {personality} character."\
-                "\n- Keep it SHORT: 20 words MAX. Hard cap."\
-                "\n- Vary wording every time. Do NOT repeat prior lines shown in avoid_repeating_lines."\
-                "\n- Mention location or weather ONCE if present (natural, brief)."\
-                "\n- Do NOT mention BPM/heart rate or achievements unless explicitly present AND clearly noteworthy right now."\
-                "\n- No hashtags. No internet slang. Sound natural and encouraging."\
-            ).format(personality=personality)
+
+            # Build instructions with coaching priority
+            if active_coaching_prompt:
+                # When there's an active coaching trigger, prioritize it
+                extra_instructions = (
+                    "\nINSTRUCTIONS - CRITICAL COACHING MOMENT:"\
+                    "\n- There is an ACTIVE COACHING PROMPT that MUST be addressed!"\
+                    "\n- active_coaching_prompt contains the specific instruction/message to deliver"\
+                    "\n- If type is 'interval': Tell them about the interval change (e.g., 'Time to push hard!' or 'Recovery time - ease up')"\
+                    "\n- If type is 'milestone': Celebrate the distance milestone"\
+                    "\n- If type is 'time_trigger': Use the provided message"\
+                    "\n- If type is 'heart_rate': Guide them on pace adjustment"\
+                    "\n- Make it personal and motivating while delivering the coaching instruction"\
+                    "\n- Act as a {personality} character."\
+                    "\n- Keep it to 2-3 sentences that deliver the coaching point clearly"\
+                    "\n- Do NOT ignore the active_coaching_prompt - it's time-sensitive!"
+                ).format(personality=personality)
+            else:
+                # Normal cheerleading when no specific trigger
+                extra_instructions = (
+                    "\nInstructions:"\
+                    "\n- Act as a {personality} character."\
+                    "\n- Keep it SHORT: 20 words MAX. Hard cap."\
+                    "\n- Vary wording every time. Do NOT repeat prior lines shown in avoid_repeating_lines."\
+                    "\n- If session_goals exist, occasionally reference them for motivation"\
+                    "\n- Mention location or weather ONCE if present (natural, brief)."\
+                    "\n- Do NOT mention BPM/heart rate unless explicitly addressing a heart_rate coaching prompt"\
+                    "\n- No hashtags. No internet slang. Sound natural and encouraging."
+                ).format(personality=personality)
 
             user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions)
             

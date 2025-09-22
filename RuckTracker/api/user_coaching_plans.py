@@ -42,32 +42,32 @@ class UserCoachingPlansResource(Resource):
             if auth_response:
                 return auth_response
             
-            # Get active plan with template info (with defensive error handling)
+            # Get active plan (simplified - skip the problematic foreign key join)
             client = get_supabase_client()
-            try:
-                plan_resp = client.table('user_coaching_plans').select(
-                    'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at, '
-                    'coaching_plan_templates!coaching_plan_id(id, plan_id, name, duration_weeks, base_structure, progression_rules, non_negotiables, retests, personalization_knobs, expert_tips, is_active)'
-                ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
-            except Exception as join_error:
-                # Fallback to simple query without template join if foreign key fails
-                logger.warning(f"GET /user-coaching-plans join failed for user {user_id}, falling back: {join_error}")
-                try:
-                    plan_resp = client.table('user_coaching_plans').select(
-                        'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at'
-                    ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
-                except Exception as fallback_error:
-                    logger.error(f"GET /user-coaching-plans fallback also failed for user {user_id}: {fallback_error}")
-                    return {"error": "Failed to fetch coaching plan"}, 500
+            plan_resp = client.table('user_coaching_plans').select(
+                'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at'
+            ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
             
             if not plan_resp.data:
+                logger.info(f"No active coaching plan found for user {user_id}")
                 return {"active_plan": None}, 200
                 
             plan = plan_resp.data[0]
+            logger.info(f"Found active plan for user {user_id}: plan_id={plan['id']}, coaching_plan_id={plan['coaching_plan_id']}, status={plan['current_status']}")
             
-            # Calculate plan progress (with fallback if template missing)
+            # Get template data separately
+            template_data = None
+            try:
+                template_resp = client.table('coaching_plan_templates').select(
+                    'id, plan_id, name, duration_weeks'
+                ).eq('id', plan['coaching_plan_id']).limit(1).execute()
+                if template_resp.data:
+                    template_data = template_resp.data[0]
+            except Exception as e:
+                logger.warning(f"Failed to fetch template for plan {plan['id']}: {e}")
+            
+            # Calculate plan progress
             weeks_elapsed = _calculate_weeks_elapsed(plan['start_date'])
-            template_data = plan.get('coaching_plan_templates')
             if template_data:
                 total_weeks = template_data['duration_weeks']
                 progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
@@ -77,9 +77,9 @@ class UserCoachingPlansResource(Resource):
                 progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
                 logger.warning(f"GET /user-coaching-plans using fallback duration for user {user_id}")
             
-            # Get recent plan sessions
+            # Get recent plan sessions with coaching points
             sessions_resp = client.table('plan_sessions').select(
-                'id, planned_week, planned_session_type, completion_status, plan_adherence_score, scheduled_date, completed_date'
+                'id, planned_week, planned_session_type, completion_status, plan_adherence_score, scheduled_date, completed_date, coaching_points'
             ).eq('user_coaching_plan_id', plan['id']).order('planned_week', desc=False).limit(20).execute()
             
             # Calculate adherence metrics
@@ -280,10 +280,10 @@ class UserCoachingPlanProgressResource(Resource):
             plan = plan_resp.data[0]
             template = plan['coaching_plan_templates']
             
-            # Get all plan sessions
+            # Get all plan sessions with coaching points
             sessions_resp = client.table('plan_sessions').select(
                 'id, planned_week, planned_session_type, completion_status, plan_adherence_score, '
-                'scheduled_date, completed_date, session_id'
+                'scheduled_date, completed_date, session_id, coaching_points'
             ).eq('user_coaching_plan_id', plan['id']).order('planned_week').execute()
             
             sessions = sessions_resp.data or []
@@ -402,10 +402,20 @@ def _calculate_adherence_stats(sessions):
     }
 
 
-def _generate_plan_sessions(user_plan_id, plan_metadata, start_date):
+def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=None):
     """Generate plan sessions based on personalized plan metadata."""
     try:
         client = get_supabase_admin_client()  # Use admin client to bypass RLS
+
+        # If user_id not provided, try to get it from the plan
+        if not user_id:
+            try:
+                plan_resp = client.table('user_coaching_plans').select('user_id').eq('id', user_plan_id).single().execute()
+                if plan_resp.data:
+                    user_id = plan_resp.data['user_id']
+            except Exception:
+                pass
+
         plan_structure = plan_metadata.get('plan_structure')
         if isinstance(plan_structure, str):
             try:
@@ -452,19 +462,212 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date):
             }
             return mapping.get(day_name.lower(), 0)
 
+        def generate_coaching_points(session_type: str, week_num: int) -> Dict[str, Any]:
+            """Generate coaching points based on session type and week number."""
+            # Try to get user-specific metrics for personalized coaching
+            user_metrics = {}
+            try:
+                # Get user_id from the plan
+                plan_resp = client.table('user_coaching_plans').select('user_id').eq('id', user_plan_id).single().execute()
+                if plan_resp.data:
+                    user_id = plan_resp.data['user_id']
+                    # Get user baseline metrics
+                    baseline = _get_user_performance_baseline(user_id)
+                    if baseline['has_data']:
+                        user_metrics = {
+                            'avg_pace_s_per_km': baseline['avg_pace_s_per_km'],
+                            'avg_distance_km': baseline['avg_distance_km'],
+                            'last_weight_kg': baseline['last_weight_kg']
+                        }
+            except Exception as e:
+                logger.warning(f"Could not fetch user metrics for coaching points: {e}")
+
+            # Calculate personalized targets based on user data
+            if user_metrics:
+                pace_min = int(user_metrics['avg_pace_s_per_km'] // 60)
+                pace_sec = int(user_metrics['avg_pace_s_per_km'] % 60)
+                tempo_pace = f"{pace_min - 1}:{pace_sec:02d}"  # 1 min faster for tempo
+                easy_pace = f"{pace_min + 1}:{pace_sec:02d}"  # 1 min slower for recovery
+
+                # Personalized heart rate zones (could be enhanced with age/max HR data)
+                target_hr_zone2_min = 120
+                target_hr_zone2_max = 140
+                target_hr_zone3_min = 141
+                target_hr_zone3_max = 160
+            else:
+                # No user data available - return minimal structure
+                # The personalized plan should provide all specifics
+                return {
+                    'session_goals': {
+                        'primary': 'Complete as planned',
+                        'focus_points': []
+                    }
+                }
+
+            base_coaching_points = {
+                'intervals': {
+                    'intervals': [
+                        {'type': 'warmup', 'duration_minutes': 5, 'instruction': 'Easy pace to warm up'},
+                        {'type': 'work', 'duration_minutes': 2, 'instruction': 'Push hard! Increase your pace'},
+                        {'type': 'recovery', 'duration_minutes': 2, 'instruction': 'Slow down and recover'},
+                        {'type': 'work', 'duration_minutes': 2, 'instruction': 'Back to fast pace!'},
+                        {'type': 'recovery', 'duration_minutes': 2, 'instruction': 'Easy recovery pace'},
+                        {'type': 'work', 'duration_minutes': 2, 'instruction': 'Final push! Give it your all'},
+                        {'type': 'recovery', 'duration_minutes': 2, 'instruction': 'Recover well'},
+                        {'type': 'cooldown', 'duration_minutes': 5, 'instruction': 'Cool down with easy walking'}
+                    ],
+                    'session_goals': {
+                        'primary': 'Complete high-intensity intervals with good form',
+                        'secondary': 'Maintain consistent recovery pace',
+                        'focus_points': ['breathing control', 'maintain posture during intervals', 'quick transitions']
+                    }
+                },
+                'tempo': {
+                    'intervals': [
+                        {'type': 'warmup', 'duration_minutes': 10, 'instruction': f'Gradual warm up to {tempo_pace}/km pace'},
+                        {'type': 'work', 'duration_minutes': 20 + week_num, 'instruction': f'Hold {tempo_pace}/km pace - comfortably hard'},
+                        {'type': 'cooldown', 'duration_minutes': 10, 'instruction': f'Easy cool down at {easy_pace}/km'}
+                    ],
+                    'milestones': [
+                        {'distance_km': 2, 'message': 'Settling into tempo pace nicely!'},
+                        {'distance_km': 4, 'message': 'Halfway through tempo - stay strong!'},
+                        {'distance_km': 6, 'message': 'Final push - maintain that pace!'}
+                    ],
+                    'heart_rate_zones': [
+                        {'zone': 3, 'min_bpm': target_hr_zone3_min, 'max_bpm': target_hr_zone3_max, 'instruction': f'Target heart rate: {target_hr_zone3_min}-{target_hr_zone3_max} bpm'}
+                    ],
+                    'session_goals': {
+                        'primary': f'Maintain {tempo_pace}/km pace throughout',
+                        'secondary': 'Focus on consistent breathing',
+                        'focus_points': ['steady rhythm', 'relaxed shoulders', 'consistent pace']
+                    }
+                },
+                'base_aerobic': {
+                    'time_triggers': [
+                        {'elapsed_minutes': 15, 'message': f'Perfect {easy_pace}/km pace - stay conversational'},
+                        {'elapsed_minutes': 30, 'message': 'Halfway point - perfect Zone 2 effort'},
+                        {'elapsed_minutes': 45, 'message': 'Building that aerobic base beautifully'},
+                        {'elapsed_minutes': 60, 'message': 'One hour strong! Excellent endurance work'}
+                    ],
+                    'heart_rate_zones': [
+                        {'zone': 2, 'min_bpm': target_hr_zone2_min, 'max_bpm': target_hr_zone2_max, 'instruction': f'Stay in Zone 2 ({target_hr_zone2_min}-{target_hr_zone2_max} bpm)'}
+                    ],
+                    'milestones': [
+                        {'distance_km': 3, 'message': '3K down - great consistent pacing!'},
+                        {'distance_km': 5, 'message': '5K milestone - aerobic engine building nicely!'}
+                    ],
+                    'session_goals': {
+                        'primary': f'Maintain easy {easy_pace}/km conversational pace',
+                        'secondary': 'Build aerobic endurance in Zone 2',
+                        'focus_points': ['relaxed breathing', 'efficient form', 'enjoy the movement']
+                    }
+                },
+                'hill_work': {
+                    'intervals': [
+                        {'type': 'warmup', 'duration_minutes': 10, 'instruction': 'Easy pace to warm up'},
+                        {'type': 'work', 'duration_minutes': 3, 'instruction': 'Power up the hill!'},
+                        {'type': 'recovery', 'duration_minutes': 3, 'instruction': 'Easy recovery down'},
+                        {'type': 'work', 'duration_minutes': 3, 'instruction': 'Attack the hill again!'},
+                        {'type': 'recovery', 'duration_minutes': 3, 'instruction': 'Recover on the descent'},
+                        {'type': 'work', 'duration_minutes': 3, 'instruction': 'One more strong effort!'},
+                        {'type': 'cooldown', 'duration_minutes': 10, 'instruction': 'Easy cool down on flat'}
+                    ],
+                    'session_goals': {
+                        'primary': 'Build power and strength on hills',
+                        'secondary': 'Maintain form on inclines',
+                        'focus_points': ['forward lean on hills', 'short powerful steps', 'use arms for momentum']
+                    }
+                },
+                'long_slow': {
+                    'milestones': [
+                        {'distance_km': 5, 'message': 'First 5K done - great pacing!'},
+                        {'distance_km': 10, 'message': '10K milestone - you\'re crushing it!'},
+                        {'distance_km': 15, 'message': '15K! Outstanding endurance!'}
+                    ],
+                    'time_triggers': [
+                        {'elapsed_minutes': 30, 'message': '30 minutes - settle into your rhythm'},
+                        {'elapsed_minutes': 60, 'message': '1 hour strong! Stay hydrated'},
+                        {'elapsed_minutes': 90, 'message': '90 minutes - incredible endurance!'}
+                    ],
+                    'session_goals': {
+                        'primary': 'Build endurance with sustained effort',
+                        'secondary': 'Practice fueling and hydration',
+                        'focus_points': ['consistent pace', 'mental toughness', 'proper nutrition']
+                    }
+                },
+                'recovery': {
+                    'time_triggers': [
+                        {'elapsed_minutes': 10, 'message': 'Perfect recovery pace - keep it easy'},
+                        {'elapsed_minutes': 20, 'message': 'Great active recovery session'}
+                    ],
+                    'session_goals': {
+                        'primary': 'Active recovery to promote healing',
+                        'secondary': 'Maintain movement without stress',
+                        'focus_points': ['very easy effort', 'focus on form', 'relaxation']
+                    }
+                }
+            }
+
+            # Return coaching points for the session type
+            return base_coaching_points.get(session_type, {})
+
         def add_session(week_num: int, session_payload: Dict[str, Any]):
             day_name = session_payload.get('day', 'monday')
-            session_type = session_payload.get('session_type', 'planned_session')
+            session_type_raw = session_payload.get('session_type', 'planned_session')
+
+            # Normalize session type for coaching points generation
+            # Handle variations like "Base Ruck", "Interval Ruck", "Long Posture Ruck", etc.
+            session_type = session_type_raw.lower().replace(' ', '_').replace('/', '_')
+
+            # Map common plan session types to our coaching point types
+            mapped_type = None
+            if 'interval' in session_type:
+                mapped_type = 'intervals'
+            elif 'tempo' in session_type or 'speed' in session_type:
+                mapped_type = 'tempo'
+            elif 'recovery' in session_type or 'easy' in session_type:
+                mapped_type = 'recovery'
+            elif 'hill' in session_type:
+                mapped_type = 'hill_work'
+            elif 'long' in session_type:
+                mapped_type = 'long_slow'
+            elif 'base' in session_type or 'aerobic' in session_type:
+                mapped_type = 'base_aerobic'
+            elif 'balance' in session_type or 'mobility' in session_type:
+                mapped_type = 'recovery'  # Use recovery for lighter sessions
+            elif 'posture' in session_type:
+                mapped_type = 'base_aerobic'  # Focus on form
+
             session_offset = day_to_offset(day_name)
             week_start = start_date + timedelta(weeks=week_num - 1)
             session_date = week_start + timedelta(days=session_offset)
 
+            # Get coaching points only if we could map the session type
+            if mapped_type:
+                coaching_points = generate_coaching_points(mapped_type, week_num)
+            else:
+                # For unmapped types, use minimal coaching points
+                coaching_points = {}
+
+            # Add any specific notes from the session payload to coaching points
+            if 'notes' in session_payload:
+                if 'session_goals' not in coaching_points:
+                    coaching_points['session_goals'] = {}
+                coaching_points['session_goals']['session_notes'] = session_payload['notes']
+
+            # Add weight/duration specifics if provided
+            if 'weight_kg' in session_payload:
+                coaching_points['target_weight_kg'] = session_payload['weight_kg']
+            if 'duration_minutes' in session_payload:
+                coaching_points['target_duration_minutes'] = session_payload['duration_minutes']
+
             sessions_to_create.append({
                 'user_coaching_plan_id': user_plan_id,
                 'planned_week': week_num,
-                'planned_session_type': session_type,
+                'planned_session_type': session_type_raw,  # Keep original name for display
                 'scheduled_date': session_date.isoformat(),
-                'completion_status': 'planned'
+                'completion_status': 'planned',
+                'coaching_points': coaching_points
             })
 
         for week_num in range(1, duration_weeks + 1):
@@ -474,19 +677,11 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date):
             elif training_schedule:
                 for session in training_schedule:
                     add_session(week_num, session)
-            else:
-                # Fallback: create a generic ruck session 3 times per week
-                default_sessions = [
-                    {'day': 'monday', 'session_type': 'planned_ruck'},
-                    {'day': 'wednesday', 'session_type': 'planned_ruck'},
-                    {'day': 'friday', 'session_type': 'planned_ruck'}
-                ]
-                for session in default_sessions:
-                    add_session(week_num, session)
+            # No fallback - all plans should have a template from personalization
 
         if sessions_to_create:
             client.table('plan_sessions').insert(sessions_to_create).execute()
-            logger.info(f"Generated {len(sessions_to_create)} plan sessions for user plan {user_plan_id}")
+            logger.info(f"Generated {len(sessions_to_create)} plan sessions with coaching points for user plan {user_plan_id}")
 
     except Exception as e:
         logger.error(f"Failed to generate plan sessions: {e}")
@@ -512,7 +707,7 @@ def _record_session_against_plan(user_id: str, session_id: int, user_jwt: Option
         current_week = _calculate_weeks_elapsed_from_plan(plan_data)
 
         plan_session_resp = client.table('plan_sessions').select(
-            'id, planned_week, planned_session_type, scheduled_date, scheduled_start_time, scheduled_timezone'
+            'id, planned_week, planned_session_type, scheduled_date, scheduled_start_time, scheduled_timezone, coaching_points'
         ).eq('user_coaching_plan_id', plan_id).eq('completion_status', 'planned') \
          .lte('planned_week', current_week).order('planned_week').order('id').limit(1).execute()
 
@@ -703,7 +898,7 @@ def _get_next_session_recommendation(plan, sessions):
     """Get recommendation for next session with specific targets based on user's actual performance"""
     current_week = _calculate_weeks_elapsed(plan['start_date'])
 
-    # Find next planned session
+    # Find next planned session with coaching points
     next_planned = None
     for session in sessions:
         if session['completion_status'] == 'planned' and session['planned_week'] <= current_week:
@@ -833,6 +1028,9 @@ def _get_next_session_recommendation(plan, sessions):
         else:
             personalized_message = f"Based on your recent {user_baseline['sessions_30d']} sessions averaging {user_baseline['avg_distance_km']:.1f}km. Today's targets will push you just beyond your comfort zone."
 
+    # Include coaching points in the recommendation
+    coaching_points = next_planned.get('coaching_points', {})
+
     return {
         "session_type": session_type,
         "type": session_type.replace('_', ' ').title(),
@@ -845,7 +1043,8 @@ def _get_next_session_recommendation(plan, sessions):
         "weight_kg": recommendation['weight_kg'],
         "notes": recommendation['notes'],
         "personalized": user_baseline['has_data'],
-        "personalized_message": personalized_message
+        "personalized_message": personalized_message,
+        "coaching_points": coaching_points  # This is critical for AI cheerleader
     }
 
 
