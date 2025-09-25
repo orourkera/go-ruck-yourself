@@ -9,9 +9,9 @@ class MemoryMonitorService {
   static Timer? _monitoringTimer;
   static const Duration _monitoringInterval = Duration(minutes: 2);
   static const double _warningThresholdMb =
-      700.0; // Appropriate for GPS tracking apps
+      350.0; // Warning when app uses more than typical (normal is 200-300MB)
   static const double _criticalThresholdMb =
-      1000.0; // Realistic for modern devices with Flutter + GPS
+      500.0; // Critical if app uses 500MB+ (2x normal usage)
 
   /// Start memory monitoring
   static void startMonitoring() {

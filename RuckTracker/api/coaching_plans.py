@@ -731,6 +731,11 @@ class CoachingPlansResource(Resource):
             base_plan_id = data['base_plan_id']
             coaching_personality = data['coaching_personality']
             personalization = data['personalization']
+
+            # Extract timezone from personalization (sent by Flutter app)
+            user_timezone = personalization.get('timezone', 'UTC')
+            preferred_notification_time = personalization.get('preferredNotificationTime')
+            enable_notifications = personalization.get('enableNotifications', True)
             
             # Get Supabase client
             supabase = get_supabase_client()
@@ -789,11 +794,15 @@ class CoachingPlansResource(Resource):
                 "start_date": plan_start_date.isoformat(),
                 "current_week": 1,
                 "current_status": "active",
+                "plan_notification_timezone": user_timezone,  # Store timezone at top level for notification service
                 "plan_modifications": {
                     "personalization": personalization,
                     "plan_structure": personalized_plan['personalized_structure'],
                     "adaptations": personalized_plan['adaptations'],
-                    "plan_type": base_plan_id  # Keep the string ID for reference
+                    "plan_type": base_plan_id,  # Keep the string ID for reference
+                    "user_timezone": user_timezone,
+                    "preferred_notification_time": preferred_notification_time,
+                    "enable_notifications": enable_notifications
                 }
             }
 
@@ -837,9 +846,12 @@ class CoachingPlansResource(Resource):
                     "plan_structure": personalized_plan['personalized_structure'],
                     "weekly_template": personalized_plan.get('weekly_template'),
                     "training_schedule": personalized_plan.get('training_schedule'),
-                    "duration_weeks": base_plan.get('duration_weeks')
+                    "duration_weeks": base_plan.get('duration_weeks'),
+                    "user_timezone": user_timezone,
+                    "preferred_notification_time": preferred_notification_time,
+                    "enable_notifications": enable_notifications
                 }
-                # Pass user_id to enable personalized coaching points
+                # Pass user_id and timezone to enable personalized coaching points and proper scheduling
                 _generate_plan_sessions(created_plan['id'], plan_session_metadata, plan_start_date, user_id=g.user_id)
             except Exception as session_error:
                 logger.error(f"Failed to seed plan sessions for plan {created_plan['id']}: {session_error}")

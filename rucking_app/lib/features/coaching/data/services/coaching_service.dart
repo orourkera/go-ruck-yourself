@@ -2,6 +2,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 class CoachingService {
   final ApiClient _apiClient;
@@ -17,14 +18,29 @@ class CoachingService {
     required PlanPersonalization personalization,
   }) async {
     try {
+      // Automatically detect user's timezone using IANA timezone identifier
+      String userTimezone;
+      try {
+        userTimezone = await FlutterTimezone.getLocalTimezone();
+      } catch (e) {
+        // Fallback to UTC if we can't detect timezone
+        userTimezone = 'UTC';
+        AppLogger.warning('[COACHING_SERVICE] Could not detect timezone, using UTC: $e');
+      }
+
+      // Create personalization with timezone
+      final personalizedData = personalization.toJson();
+      personalizedData['timezone'] = userTimezone;
+
+      AppLogger.info('[COACHING_SERVICE] Detected timezone: $userTimezone');
+
       final responseData = await _apiClient.post(
         '/coaching-plans', // Correct endpoint
         {
           'base_plan_id': basePlanId, // Use the plan type ID directly
           'coaching_personality':
               coachingPersonality, // Match backend field name
-          'personalization':
-              personalization.toJson(), // Include all personalization data!
+          'personalization': personalizedData, // Include personalization with timezone!
         },
       );
 

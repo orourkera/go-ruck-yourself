@@ -407,6 +407,11 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
     try:
         client = get_supabase_admin_client()  # Use admin client to bypass RLS
 
+        # Extract timezone and notification preferences from metadata
+        user_timezone = plan_metadata.get('user_timezone', 'UTC')
+        preferred_notification_time = plan_metadata.get('preferred_notification_time')
+        enable_notifications = plan_metadata.get('enable_notifications', True)
+
         # If user_id not provided, try to get it from the plan
         if not user_id:
             try:
@@ -661,14 +666,37 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
             if 'duration_minutes' in session_payload:
                 coaching_points['target_duration_minutes'] = session_payload['duration_minutes']
 
-            sessions_to_create.append({
+            # Create session with timezone information
+            session_data = {
                 'user_coaching_plan_id': user_plan_id,
                 'planned_week': week_num,
                 'planned_session_type': session_type_raw,  # Keep original name for display
                 'scheduled_date': session_date.isoformat(),
+                'scheduled_timezone': user_timezone,  # Store user's timezone
                 'completion_status': 'planned',
                 'coaching_points': coaching_points
-            })
+            }
+
+            # If user has preferred notification time and notifications enabled, set it
+            if enable_notifications and preferred_notification_time:
+                # Parse the preferred time (expected format: "HH:MM")
+                try:
+                    hour, minute = map(int, preferred_notification_time.split(':'))
+                    # Combine date with preferred time
+                    notification_time = session_date.replace(hour=hour, minute=minute)
+                    session_data['scheduled_start_time'] = notification_time.time().isoformat()
+                    # Calculate when to send notification (e.g., 1 hour before)
+                    notification_datetime = notification_time.replace(hour=max(0, hour - 1))
+                    session_data['next_notification_at'] = notification_datetime.isoformat()
+                    session_data['notification_metadata'] = {
+                        'enabled': True,
+                        'type': 'reminder',
+                        'time_before_minutes': 60
+                    }
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"Could not parse preferred notification time '{preferred_notification_time}': {e}")
+
+            sessions_to_create.append(session_data)
 
         for week_num in range(1, duration_weeks + 1):
             if weekly_template:

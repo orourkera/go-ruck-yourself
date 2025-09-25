@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:audio_session/audio_session.dart' as audio_session;
 import 'package:path_provider/path_provider.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
@@ -14,35 +15,37 @@ class AIAudioService {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
   bool _isPlaying = false;
+  audio_session.AudioSession? _session;
 
   /// Initialize the audio service
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // Configure audio player
-      await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
-      await _audioPlayer.setAudioContext(
-        AudioContext(
-          iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playback,
-            options: {
-              AVAudioSessionOptions.mixWithOthers,
-              AVAudioSessionOptions.duckOthers,
-            },
-          ),
-          android: AudioContextAndroid(
-            isSpeakerphoneOn: false,
-            stayAwake: false,
-            contentType: AndroidContentType.speech,
-            usageType: AndroidUsageType.assistanceNavigationGuidance,
-            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-          ),
+      // Get audio session instance
+      _session = await audio_session.AudioSession.instance;
+
+      // Configure for speech with ducking that properly restores
+      await _session!.configure(audio_session.AudioSessionConfiguration(
+        avAudioSessionCategory: audio_session.AVAudioSessionCategory.playback,
+        avAudioSessionCategoryOptions: audio_session.AVAudioSessionCategoryOptions.duckOthers |
+                                       audio_session.AVAudioSessionCategoryOptions.interruptSpokenAudioAndMixWithOthers,
+        avAudioSessionMode: audio_session.AVAudioSessionMode.spokenAudio,
+        avAudioSessionRouteSharingPolicy: audio_session.AVAudioSessionRouteSharingPolicy.defaultPolicy,
+        avAudioSessionSetActiveOptions: audio_session.AVAudioSessionSetActiveOptions.none,
+        androidAudioAttributes: const audio_session.AndroidAudioAttributes(
+          contentType: audio_session.AndroidAudioContentType.speech,
+          usage: audio_session.AndroidAudioUsage.assistanceNavigationGuidance,
         ),
-      );
+        androidAudioFocusGainType: audio_session.AndroidAudioFocusGainType.gainTransientMayDuck,
+        androidWillPauseWhenDucked: false,
+      ));
+
+      // Configure audio player without AudioContext (let audio_session handle it)
+      await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
 
       _isInitialized = true;
-      AppLogger.info('[AI_AUDIO] Service initialized');
+      AppLogger.info('[AI_AUDIO] Service initialized with audio_session for proper ducking');
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Initialization failed: $e');
     }
@@ -98,10 +101,15 @@ class AIAudioService {
 
   /// Play raw audio bytes through audio player
   Future<bool> _playAudioBytes(Uint8List audioBytes) async {
+    File? audioFile; // Track file for cleanup in finally/catch blocks
     try {
+      // Activate session for ducking BEFORE playing
+      await _session?.setActive(true);
+      AppLogger.info('[AI_AUDIO] Audio session activated for ducking');
+
       // Create temporary file for audio playback
       final tempDir = await getTemporaryDirectory();
-      final audioFile = File(
+      audioFile = File(
           '${tempDir.path}/ai_cheerleader_${DateTime.now().millisecondsSinceEpoch}.mp3');
 
       // Write audio bytes to temporary file
@@ -111,18 +119,36 @@ class AIAudioService {
       final completer = Completer<bool>();
       late StreamSubscription subscription;
 
-      subscription = _audioPlayer.onPlayerComplete.listen((_) {
+      subscription = _audioPlayer.onPlayerComplete.listen((_) async {
         subscription.cancel();
+
+        // CRITICAL: Deactivate session to restore other audio volume
+        await _session?.setActive(false);
+        AppLogger.info('[AI_AUDIO] Audio session deactivated - music volume restored');
+
         // Clean up temporary file
-        audioFile.deleteSync();
+        try {
+          audioFile?.deleteSync();
+        } catch (_) {
+          // Silent fail on delete - file might already be gone
+        }
         completer.complete(true);
       });
 
       // Set timeout for playback
-      Timer(const Duration(seconds: 30), () {
+      Timer(const Duration(seconds: 30), () async {
         if (!completer.isCompleted) {
           subscription.cancel();
-          audioFile.deleteSync();
+
+          // Deactivate on timeout too
+          await _session?.setActive(false);
+          AppLogger.info('[AI_AUDIO] Audio session deactivated on timeout');
+
+          try {
+            audioFile?.deleteSync();
+          } catch (_) {
+            // Silent fail on delete
+          }
           completer.complete(false);
         }
       });
@@ -132,6 +158,19 @@ class AIAudioService {
 
       return await completer.future;
     } catch (e) {
+      // Deactivate session on error
+      await _session?.setActive(false);
+      AppLogger.info('[AI_AUDIO] Audio session deactivated on error');
+
+      // CRITICAL: Clean up temp file on ANY error to prevent memory leaks
+      if (audioFile != null && audioFile.existsSync()) {
+        try {
+          audioFile.deleteSync();
+          AppLogger.info('[AI_AUDIO] Cleaned up temp file after error');
+        } catch (deleteError) {
+          AppLogger.warning('[AI_AUDIO] Failed to delete temp file: $deleteError');
+        }
+      }
       AppLogger.error('[AI_AUDIO] Audio bytes playback failed: $e');
       return false;
     }
@@ -144,7 +183,9 @@ class AIAudioService {
   Future<void> stop() async {
     try {
       await _audioPlayer.stop();
-      AppLogger.info('[AI_AUDIO] Playback stopped');
+      // Deactivate session when stopping to restore other audio
+      await _session?.setActive(false);
+      AppLogger.info('[AI_AUDIO] Playback stopped and session deactivated');
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Stop failed: $e');
     }
@@ -153,9 +194,34 @@ class AIAudioService {
   /// Dispose of resources
   Future<void> dispose() async {
     try {
+      // Stop any currently playing audio
+      await _audioPlayer.stop();
+
+      // Deactivate session to ensure other audio is restored
+      await _session?.setActive(false);
+
+      // Clean up any remaining temp files from crashed/interrupted sessions
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final files = tempDir.listSync();
+        for (var file in files) {
+          if (file is File && file.path.contains('ai_cheerleader_')) {
+            try {
+              file.deleteSync();
+              AppLogger.info('[AI_AUDIO] Cleaned up orphaned temp file: ${file.path}');
+            } catch (_) {
+              // Silent fail - file might be in use or already deleted
+            }
+          }
+        }
+      } catch (cleanupError) {
+        AppLogger.warning('[AI_AUDIO] Temp file cleanup failed: $cleanupError');
+      }
+
       await _audioPlayer.dispose();
       _isInitialized = false;
-      AppLogger.info('[AI_AUDIO] Service disposed');
+      _isPlaying = false;
+      AppLogger.info('[AI_AUDIO] Service disposed and session deactivated');
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Dispose failed: $e');
     }

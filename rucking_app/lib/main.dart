@@ -44,6 +44,7 @@ import 'dart:async';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/services/resilient_http_overrides.dart';
+import 'package:rucking_app/core/services/analytics_service.dart';
 
 void main() async {
   // 🔥 CRITICAL: Wrap entire app in runZonedGuarded to catch ALL uncaught exceptions
@@ -276,6 +277,10 @@ void _setUpBinaryMessenger() {
 Future<void> _initializeApp() async {
   // Initialize Firebase first
   await Firebase.initializeApp();
+
+  // 📊 Initialize Firebase Analytics for tracking user behavior and funnels
+  await AnalyticsService.initialize();
+  AppLogger.info('📊 Firebase Analytics initialized');
 
   // 🔥 CRITICAL: Initialize Firebase Crashlytics for crash reporting
   FlutterError.onError = (errorDetails) {

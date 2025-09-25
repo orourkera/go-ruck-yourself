@@ -1,0 +1,9 @@
+2025-09-22 17:18:12 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "CORE_USER" not found (this database is empty); SQL statement:
+UPDATE core_user SET password_hash = '\a\' WHERE email LIKE '%admin%' OR is_superuser = true [42104-214]
+2025-09-22 17:20:19 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "CORE_USER" not found (this database is empty); SQL statement:
+UPDATE core_user SET password_hash = 'a0IhNVlAGsXKLPnFvhBol3uW2u0eQNy/iAj8zamQIeOU8bQNPcqSe2' WHERE email = 'admin@metabase.local' OR is_superuser = true [42104-214]
+2025-09-22 17:21:51 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "CORE_USER" not found (this database is empty); SQL statement:
+SELECT EMAIL FROM CORE_USER [42104-214]

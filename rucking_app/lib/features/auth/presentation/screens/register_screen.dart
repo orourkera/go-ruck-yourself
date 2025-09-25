@@ -16,6 +16,7 @@ import 'package:rucking_app/features/health_integration/presentation/screens/hea
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:rucking_app/core/services/analytics_service.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
@@ -63,6 +64,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Track sign up screen viewed
+    AnalyticsService.trackSignUpScreenViewed(
+      source: _isGoogleRegistration ? 'google' : 'organic',
+    );
 
     // Pre-fill controllers with Google data if available
     if (widget.prefilledEmail != null) {
@@ -112,6 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Google registration flow - handle cases where tokens may be null
         // If tokens are null, we'll still try to use the Google info we have
         AppLogger.info('Proceeding with Google registration');
+        AnalyticsService.trackSignUpAttempted(method: 'google');
         context.read<AuthBloc>().add(
               AuthGoogleRegisterRequested(
                 username: _displayNameController.text.trim(),
@@ -127,6 +134,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             );
       } else {
         // Regular registration flow
+        AnalyticsService.trackSignUpAttempted(method: 'email');
         context.read<AuthBloc>().add(
               AuthRegisterRequested(
                 username: _displayNameController.text.trim(),

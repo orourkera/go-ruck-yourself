@@ -24,6 +24,7 @@ import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/core/services/terrain_service.dart';
 import 'package:rucking_app/core/services/terrain_tracker.dart';
+import 'package:rucking_app/core/services/memory_monitor_service.dart';
 import 'package:rucking_app/core/services/active_session_storage.dart';
 import 'package:rucking_app/core/services/session_completion_detection_service.dart';
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
@@ -117,6 +118,11 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   String? _aiCheerleaderPersonality;
   bool _aiCheerleaderExplicitContent = false;
   User? _currentUser;
+
+  // Circuit breaker for AI failures
+  int _aiCheerleaderFailureCount = 0;
+  static const int _maxAiCheerleaderFailures = 5; // More lenient - was 3
+  DateTime? _lastAiFailureTime;
 
   // Batch upload system for real-time data uploads during session
   Timer? _batchUploadTimer;
@@ -490,6 +496,36 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   /// Check for AI Cheerleader triggers and process them
   Future<void> _checkAICheerleaderTriggers(ActiveSessionRunning state) async {
     try {
+      // Reset failure count if it's been more than 5 minutes since last failure
+      // This allows AI to recover from temporary issues
+      if (_lastAiFailureTime != null &&
+          DateTime.now().difference(_lastAiFailureTime!).inMinutes > 5) {
+        if (_aiCheerleaderFailureCount > 0) {
+          AppLogger.info('[AI_CHEERLEADER] Resetting failure count after recovery period');
+          _aiCheerleaderFailureCount = 0;
+        }
+      }
+
+      // Check memory usage before processing AI cheerleader
+      try {
+        final memoryInfo = MemoryMonitorService.getCurrentMemoryInfo();
+        final memoryUsageMb = memoryInfo['memory_usage_mb'] as double;
+
+        // App memory check: Skip only if our app is using excessive memory
+        // 400MB is high for our app specifically (normal is 200-300MB)
+        if (memoryUsageMb > 400) {
+          AppLogger.info('[AI_CHEERLEADER] Skipping - app using high memory: ${memoryUsageMb.toStringAsFixed(1)}MB');
+          // Don't return here - just log it. The system has plenty of RAM
+          // Only skip if we're truly out of system memory
+        }
+
+        // Log current app memory usage for debugging
+        AppLogger.debug('[AI_CHEERLEADER] Current app memory: ${memoryUsageMb.toStringAsFixed(1)}MB');
+      } catch (e) {
+        AppLogger.warning('[AI_CHEERLEADER] Failed to check memory: $e');
+        // Continue anyway - better to try than skip entirely
+      }
+
       AppLogger.info(
           '[AI_DEBUG] Analyzing triggers for state: distance=${state.distanceKm}km, time=${state.elapsedSeconds}s');
       final trigger = _aiCheerleaderService.analyzeTriggers(
@@ -894,9 +930,33 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
       }
 
+      // Reset failure count on successful completion
+      _aiCheerleaderFailureCount = 0;
       return null;
     } catch (e, stackTrace) {
-      AppLogger.error('[AI_CHEERLEADER] Pipeline processing failed: $e');
+      // Increment failure count and track time
+      _aiCheerleaderFailureCount++;
+      _lastAiFailureTime = DateTime.now();
+
+      // Check if we've exceeded the failure threshold
+      if (_aiCheerleaderFailureCount >= _maxAiCheerleaderFailures) {
+        AppLogger.warning(
+          '[AI_CHEERLEADER] Circuit breaker triggered - disabling AI after $_aiCheerleaderFailureCount failures'
+        );
+        _aiCheerleaderEnabled = false;
+
+        // Clean up audio resources
+        try {
+          await _audioService.stop();
+          await _audioService.dispose();
+        } catch (cleanupError) {
+          AppLogger.error('[AI_CHEERLEADER] Failed to clean up audio service: $cleanupError');
+        }
+      }
+
+      AppLogger.error(
+        '[AI_CHEERLEADER] Pipeline processing failed ($_aiCheerleaderFailureCount/$_maxAiCheerleaderFailures): $e'
+      );
       AppLogger.error('[AI_CHEERLEADER] Stack trace: $stackTrace');
       return null;
     }
@@ -1618,9 +1678,27 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     MemoryPressureDetected event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.debug('Memory pressure detected, delegating to coordinator');
+    AppLogger.warning('Memory pressure detected - taking defensive actions');
 
-    // Delegate to coordinator if it exists
+    // Temporarily suspend AI cheerleader during memory pressure
+    // Note: We don't permanently disable it - just stop current audio
+    if (_aiCheerleaderEnabled) {
+      AppLogger.warning('[MEMORY_PRESSURE] Temporarily suspending AI cheerleader to conserve memory');
+
+      // Stop any currently playing audio but don't disable the feature
+      try {
+        await _audioService.stop();
+        AppLogger.info('[MEMORY_PRESSURE] AI audio stopped to free memory');
+      } catch (e) {
+        AppLogger.error('[MEMORY_PRESSURE] Failed to stop audio service: $e');
+      }
+
+      // Track this as a failure to trigger circuit breaker if it keeps happening
+      _aiCheerleaderFailureCount++;
+      _lastAiFailureTime = DateTime.now();
+    }
+
+    // Delegate to coordinator for additional cleanup
     if (_coordinator != null) {
       _coordinator!.add(event);
     } else {

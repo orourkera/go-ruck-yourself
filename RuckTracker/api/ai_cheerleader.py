@@ -130,21 +130,45 @@ class AICheerleaderLogResource(Resource):
             if not user_id:
                 return {"error": "Missing user_id"}, 400
 
+            # Simple rate limiting to prevent overwhelming the system
+            session_id = current_session.get('session_id') or 'unknown'
+            from datetime import datetime, timedelta
+
+            # Check if this user has made a request recently (cache for 30 seconds)
+            cache_key = f"ai_cheerleader_ratelimit_{user_id}_{session_id}"
+            try:
+                supabase_admin = get_supabase_admin_client()
+                # Check for recent request in last 30 seconds
+                recent_check = supabase_admin.table('ai_cheerleader_logs').select('created_at').eq(
+                    'user_id', user_id
+                ).eq('session_id', session_id).gte(
+                    'created_at', (datetime.utcnow() - timedelta(seconds=30)).isoformat()
+                ).limit(1).execute()
+
+                if recent_check.data:
+                    logger.info(f"[AI_CHEERLEADER] Rate limited for user {user_id} - too frequent")
+                    return {"message": "Keep going strong!"}, 200  # Simple fallback
+            except Exception:
+                pass  # Don't fail on rate limit check
+
             logger.info(f"[AI_CHEERLEADER] Generating AI response for user {user_id}")
 
             # Get user insights (structured data) and AI history
             supabase_admin = get_supabase_admin_client()
 
             try:
-                # Get user insights for structured historical data
-                insights_resp = supabase_admin.table('user_insights').select('*').eq('user_id', user_id).limit(1).execute()
+                # Get user insights for structured historical data - select only needed fields
+                insights_resp = supabase_admin.table('user_insights').select(
+                    'total_sessions, total_distance_km, total_duration_hours, avg_pace_per_km_seconds, '
+                    'current_streak_days, longest_streak_days, recent_avg_distance_km, recent_avg_pace_per_km_seconds'
+                ).eq('user_id', user_id).limit(1).execute()
                 insights = insights_resp.data[0] if insights_resp.data else {}
                 logger.info(f"[AI_CHEERLEADER] Retrieved user insights for user {user_id}")
 
-                # Get recent AI responses to avoid repetition
+                # Get recent AI responses to avoid repetition - reduce limit for performance
                 ai_logs_resp = supabase_admin.table('ai_cheerleader_logs').select(
-                    'session_id, personality, openai_response, created_at'
-                ).eq('user_id', user_id).order('created_at', desc=True).limit(20).execute()
+                    'openai_response'
+                ).eq('user_id', user_id).order('created_at', desc=True).limit(5).execute()  # Reduced from 20 to 5
                 ai_logs = ai_logs_resp.data or []
                 logger.info(f"[AI_CHEERLEADER] Found {len(ai_logs)} previous AI responses for user {user_id}")
 
@@ -296,8 +320,28 @@ class AICheerleaderLogResource(Resource):
             # Get prompts from Remote Config
             system_prompt, user_prompt_template = get_remote_config_prompts()
             
-            # Format the context as JSON string
+            # Format the context as JSON string with size limit for older phones
             context_str = json.dumps(context, indent=2, default=str)
+
+            # Limit context size to prevent memory issues on older devices
+            MAX_CONTEXT_CHARS = 2000  # Reasonable limit
+            if len(context_str) > MAX_CONTEXT_CHARS:
+                # Trim less important data to stay under limit
+                if 'avoid_repeating_lines' in context:
+                    context['avoid_repeating_lines'] = context['avoid_repeating_lines'][:2]  # Keep only 2 recent
+                if 'user_insights' in context:
+                    # Keep only essential insights
+                    essential_insights = {
+                        'total_sessions': context['user_insights'].get('total_sessions', 0),
+                        'current_streak_days': context['user_insights'].get('current_streak_days', 0),
+                        'recent_avg_pace_per_km_seconds': context['user_insights'].get('recent_avg_pace_per_km_seconds', 0)
+                    }
+                    context['user_insights'] = essential_insights
+
+                context_str = json.dumps(context, indent=2, default=str)
+                # If still too large, truncate
+                if len(context_str) > MAX_CONTEXT_CHARS:
+                    context_str = context_str[:MAX_CONTEXT_CHARS] + "..."
 
             # Build instructions with coaching priority
             if active_coaching_prompt:
@@ -332,18 +376,36 @@ class AICheerleaderLogResource(Resource):
             
             logger.info(f"[AI_CHEERLEADER] Calling OpenAI with {len(context_str)} chars of context")
             
-            # Call OpenAI with moderate length for 2-3 sentences
-            completion = openai_client.chat.completions.create(
-                model=os.getenv('OPENAI_CHEERLEADER_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=120,  # Increased for 2-3 sentences
-                temperature=0.7,
-            )
-            
-            ai_message = (completion.choices[0].message.content or "").strip()
+            # Call OpenAI with timeout and error handling
+            try:
+                completion = openai_client.chat.completions.create(
+                    model=os.getenv('OPENAI_CHEERLEADER_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    max_tokens=120,  # Increased for 2-3 sentences
+                    temperature=0.7,
+                    timeout=5.0  # 5 second timeout for API call
+                )
+
+                ai_message = (completion.choices[0].message.content or "").strip()
+            except Exception as openai_error:
+                logger.warning(f"[AI_CHEERLEADER] OpenAI call failed, using fallback: {str(openai_error)}")
+                # Fallback to simple encouraging message
+                fallback_messages = {
+                    'intervals': "Time to push! You've got this!",
+                    'tempo': "Keep that steady pace going strong!",
+                    'recovery': "Nice easy pace, recover well!",
+                    'milestone': "Great milestone! Keep moving forward!",
+                    'default': "You're doing great! Keep it up!"
+                }
+
+                if active_coaching_prompt:
+                    prompt_type = active_coaching_prompt.get('type', 'default')
+                    ai_message = fallback_messages.get(prompt_type, fallback_messages['default'])
+                else:
+                    ai_message = fallback_messages['default']
 
             # Moderate word cap for 2-3 sentences and cleanup (no deps)
             words = ai_message.split()

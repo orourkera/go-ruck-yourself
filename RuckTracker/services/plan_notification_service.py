@@ -86,10 +86,23 @@ class PlanCadenceAnalyzer:
         return (datetime.utcnow() - ts).days >= 3
 
     def _recompute_snapshot(self, user_id: str, plan_id: int, timezone_name: str) -> PlanBehaviorSnapshot:
-        session_timezone = session.get('scheduled_timezone') if session else None
-        tzinfo = timezone.utc(session_timezone) if session_timezone else None
-        if not tzinfo:
-            tzinfo = timezone.utc(timezone_name) or timezone.utc
+        # Get timezone from session or fall back to plan timezone
+        session_timezone = session.get('scheduled_timezone') or timezone_name
+
+        # Use pytz for proper timezone handling
+        try:
+            import pytz
+            tzinfo = pytz.timezone(session_timezone)
+        except ImportError:
+            # Fallback if pytz not installed yet
+            from datetime import timezone as dt_timezone
+            tzinfo = dt_timezone.utc
+            logger.warning(f"pytz not installed, using UTC instead of '{session_timezone}'")
+        except Exception as e:
+            # Fallback for invalid timezone
+            import pytz
+            tzinfo = pytz.UTC
+            logger.warning(f"Invalid timezone '{session_timezone}': {e}, using UTC")
         samples = self._collect_samples(user_id, plan_id)
 
         if not samples:
@@ -367,12 +380,18 @@ class PlanNotificationService:
             return
 
         timezone_name = plan.get('plan_notification_timezone') or plan.get('timezone') or 'UTC'
+        logger.info(f"Seeding notifications for plan {plan_id} with timezone {timezone_name}")
+
         behavior = self.cadence_analyzer.ensure_behavior_snapshot(user_id, plan_id, timezone_name)
         prefs = self._get_user_preferences(user_id)
         upcoming_sessions = self._fetch_upcoming_sessions(plan_id, limit=10)
 
+        logger.info(f"Found {len(upcoming_sessions)} upcoming sessions to schedule notifications for")
+
         for session in upcoming_sessions:
             self._schedule_session_notifications(user_id, plan_id, session, timezone_name, behavior, prefs)
+
+        logger.info(f"Completed notification scheduling for plan {plan_id}")
 
     def handle_session_completed(self, user_id: str, plan_id: int, plan_session_id: int, session_payload: Dict[str, Any]) -> None:
         """Send completion celebration and update future queues."""
@@ -499,10 +518,23 @@ class PlanNotificationService:
             logger.info(f"Skipping first ruck notifications for user {user_id} - disabled in preferences")
             return
 
-        session_timezone = session.get('scheduled_timezone') if session else None
-        tzinfo = timezone.utc(session_timezone) if session_timezone else None
-        if not tzinfo:
-            tzinfo = timezone.utc(timezone_name) or timezone.utc
+        # Get timezone from session or fall back to plan timezone
+        session_timezone = session.get('scheduled_timezone') or timezone_name
+
+        # Use pytz for proper timezone handling
+        try:
+            import pytz
+            tzinfo = pytz.timezone(session_timezone)
+        except ImportError:
+            # Fallback if pytz not installed yet
+            from datetime import timezone as dt_timezone
+            tzinfo = dt_timezone.utc
+            logger.warning(f"pytz not installed, using UTC instead of '{session_timezone}'")
+        except Exception as e:
+            # Fallback for invalid timezone
+            import pytz
+            tzinfo = pytz.UTC
+            logger.warning(f"Invalid timezone '{session_timezone}': {e}, using UTC")
         start_time = self._resolve_session_start_time(session, behavior, prefs)
         session_start_dt = datetime.combine(
             datetime.fromisoformat(scheduled_date).date(),

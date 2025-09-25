@@ -1854,12 +1854,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen>
       return;
     }
 
-    // Safety fallback in case the toggle is re-enabled without wiring to the
-    // new implementation yet.
-    StyledSnackBar.show(
-      context: context,
-      message: 'Sharing is temporarily unavailable.',
-    );
+    // Call the actual share implementation
+    _shareDirectly(context);
   }
 
   /// Fallback method to share directly without preview

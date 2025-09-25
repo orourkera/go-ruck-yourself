@@ -10,6 +10,7 @@ import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
+import 'package:rucking_app/core/services/analytics_service.dart';
 
 /// Unified onboarding screen that handles all permissions for both iOS and Android
 class UnifiedOnboardingScreen extends StatefulWidget {
@@ -39,6 +40,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
   void initState() {
     super.initState();
     _checkExistingPermissions();
+    // Track onboarding started
+    AnalyticsService.trackOnboardingStarted();
   }
 
   Future<void> _checkExistingPermissions() async {
@@ -100,12 +103,24 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
   Widget _buildCurrentStep() {
     // Determine which step to show
     if (!_locationPermissionGranted) {
+      // Track reaching location step
+      AnalyticsService.trackOnboardingLocationStep(alreadyGranted: false);
       return _buildLocationPermissionStep();
     } else if (!_healthPermissionGranted && Platform.isIOS) {
+      // Track reaching health step
+      AnalyticsService.trackOnboardingHealthStep(alreadyGranted: false);
       return _buildHealthPermissionStep();
     } else if (!_batteryOptimizationHandled && Platform.isAndroid) {
+      // Track reaching battery step
+      AnalyticsService.trackOnboardingBatteryStep();
       return _buildBatteryOptimizationStep();
     } else {
+      // Track onboarding completed when reaching final step
+      AnalyticsService.trackOnboardingCompleted(
+        locationGranted: _locationPermissionGranted,
+        healthGranted: _healthPermissionGranted,
+        batteryOptimized: _batteryOptimizationHandled,
+      );
       return _buildCompletedStep();
     }
   }
@@ -409,7 +424,9 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
       if (granted) {
         AppLogger.info('[ONBOARDING] Location permission granted');
+        AnalyticsService.trackLocationPermission(granted: true);
       } else {
+        AnalyticsService.trackLocationPermission(granted: false);
         StyledSnackBar.showError(
           context: context,
           message: 'Location permission is required for tracking your rucks.',
@@ -438,11 +455,14 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
 
         if (granted) {
           AppLogger.info('[ONBOARDING] Health permission granted');
+          AnalyticsService.trackHealthPermission(granted: true);
           StyledSnackBar.showSuccess(
             context: context,
             message: 'Health integration enabled!',
             duration: const Duration(seconds: 2),
           );
+        } else {
+          AnalyticsService.trackHealthPermission(granted: false);
         }
       } else {
         setState(() {
@@ -471,6 +491,7 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
       });
 
       AppLogger.info('[ONBOARDING] Battery optimization handled');
+      AnalyticsService.trackBatteryOptimization(enabled: true);
     } catch (e) {
       AppLogger.error('[ONBOARDING] Error handling battery optimization: $e');
       setState(() {
@@ -481,16 +502,25 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
   }
 
   void _skipCurrentStep() {
+    String skippedStep = '';
     setState(() {
       if (!_locationPermissionGranted) {
         // Don't allow skipping location - it's essential
         return;
       } else if (!_healthPermissionGranted) {
         _healthPermissionGranted = true;
+        skippedStep = 'health_permission';
+        AnalyticsService.trackHealthPermission(granted: false);
       } else if (!_batteryOptimizationHandled) {
         _batteryOptimizationHandled = true;
+        skippedStep = 'battery_optimization';
+        AnalyticsService.trackBatteryOptimization(enabled: false);
       }
     });
+
+    if (skippedStep.isNotEmpty) {
+      AnalyticsService.trackOnboardingSkipped(step: skippedStep);
+    }
   }
 
   void _navigateToHome() {

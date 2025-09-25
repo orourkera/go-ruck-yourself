@@ -10,6 +10,7 @@ import 'package:rucking_app/core/services/firebase_messaging_service.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:rucking_app/core/services/ai_insights_service.dart';
+import 'package:rucking_app/core/services/analytics_service.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -54,6 +55,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
                 .setCustomKey('user_username', user.username ?? 'unknown');
             FirebaseCrashlytics.instance
                 .log('User authenticated: ${user.email}');
+
+            // Set analytics user ID and properties
+            AnalyticsService.setUserId(user.userId);
+            AnalyticsService.setUserProperty(
+              name: 'prefer_metric',
+              value: user.preferMetric ? 'true' : 'false',
+            );
+            if (user.gender != null) {
+              AnalyticsService.setUserProperty(
+                name: 'gender',
+                value: user.gender,
+              );
+            }
 
             emit(Authenticated(user));
             _registerFirebaseTokenAfterAuth();
@@ -103,6 +117,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(Authenticated(fullUser));
         _registerFirebaseTokenAfterAuth();
         _prewarmHomepageInsights(fullUser);
+
+        // Track successful sign in
+        AnalyticsService.trackSignInCompleted(
+          method: 'email',
+          userId: fullUser.userId,
+        );
+        AnalyticsService.setUserId(fullUser.userId);
       } else {
         // Should not happen if login succeeded, but handle defensively
         // Maybe emit Authenticated with just loginUser? Or an error?
@@ -155,6 +176,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Register Firebase token after successful authentication
       _registerFirebaseTokenAfterAuth();
       _prewarmHomepageInsights(user);
+
+      // Track successful Google sign in
+      AnalyticsService.trackSignInCompleted(
+        method: 'google',
+        userId: user.userId,
+      );
+      AnalyticsService.setUserId(user.userId);
     } catch (e) {
       AppLogger.error('Google login failed', exception: e);
 
@@ -192,6 +220,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Register Firebase token after successful authentication
       _registerFirebaseTokenAfterAuth();
       _prewarmHomepageInsights(user);
+
+      // Track successful Apple sign in
+      AnalyticsService.trackSignInCompleted(
+        method: 'apple',
+        userId: user.userId,
+      );
+      AnalyticsService.setUserId(user.userId);
     } catch (e) {
       AppLogger.error('Apple login failed', exception: e);
       emit(AuthError('Apple login failed: $e'));
@@ -220,7 +255,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(Authenticated(user));
       _registerFirebaseTokenAfterAuth();
       _prewarmHomepageInsights(user);
+
+      // Track successful sign up
+      AnalyticsService.trackSignUpCompleted(
+        method: 'email',
+        userId: user.userId,
+      );
+      AnalyticsService.setUserId(user.userId);
     } catch (e) {
+      // Track failed sign up
+      String errorMessage = e.toString();
+      AnalyticsService.trackSignUpFailed(
+        method: 'email',
+        error: errorMessage,
+      );
+
       if (e.toString().contains('ConflictException') ||
           e.toString().contains('already exists')) {
         emit(AuthUserAlreadyExists(
@@ -253,7 +302,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(Authenticated(user));
       _registerFirebaseTokenAfterAuth();
       _prewarmHomepageInsights(user);
+
+      // Track successful Google sign up
+      AnalyticsService.trackSignUpCompleted(
+        method: 'google',
+        userId: user.userId,
+      );
+      AnalyticsService.setUserId(user.userId);
     } catch (e) {
+      // Track failed Google sign up
+      AnalyticsService.trackSignUpFailed(
+        method: 'google',
+        error: e.toString(),
+      );
       emit(AuthError('Google registration failed: $e'));
     }
   }

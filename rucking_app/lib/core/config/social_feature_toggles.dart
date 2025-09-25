@@ -6,6 +6,6 @@ class SocialFeatureToggles {
 
   /// Instagram sharing is fully disabled. UI entry points should hide or show
   /// a friendly message and no background services should attempt to run.
-  static const bool instagramSharingEnabled = false;
+  static const bool instagramSharingEnabled = true;
 }
 

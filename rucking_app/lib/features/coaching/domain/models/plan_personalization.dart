@@ -11,6 +11,9 @@ class PlanPersonalization {
   final int? streakTimeframeDays;
   final String? equipmentType;
   final double? equipmentWeight;
+  // Notification preferences
+  final String? preferredNotificationTime;
+  final bool? enableNotifications;
   // Custom fields from plan-specific questions
   final Map<String, dynamic>? customResponses;
 
@@ -27,6 +30,8 @@ class PlanPersonalization {
     this.streakTimeframeDays,
     this.equipmentType,
     this.equipmentWeight,
+    this.preferredNotificationTime,
+    this.enableNotifications,
     this.customResponses,
   });
 
@@ -43,6 +48,8 @@ class PlanPersonalization {
     int? streakTimeframeDays,
     String? equipmentType,
     double? equipmentWeight,
+    String? preferredNotificationTime,
+    bool? enableNotifications,
     Map<String, dynamic>? customResponses,
   }) {
     return PlanPersonalization(
@@ -59,6 +66,8 @@ class PlanPersonalization {
       streakTimeframeDays: streakTimeframeDays ?? this.streakTimeframeDays,
       equipmentType: equipmentType ?? this.equipmentType,
       equipmentWeight: equipmentWeight ?? this.equipmentWeight,
+      preferredNotificationTime: preferredNotificationTime ?? this.preferredNotificationTime,
+      enableNotifications: enableNotifications ?? this.enableNotifications,
       customResponses: customResponses ?? this.customResponses,
     );
   }
@@ -77,6 +86,8 @@ class PlanPersonalization {
       'streakTimeframeDays': streakTimeframeDays,
       'equipmentType': equipmentType,
       'equipmentWeight': equipmentWeight,
+      'preferredNotificationTime': preferredNotificationTime,
+      'enableNotifications': enableNotifications,
       'customResponses': customResponses,
     };
   }
@@ -95,6 +106,8 @@ class PlanPersonalization {
       streakTimeframeDays: json['streakTimeframeDays'] as int?,
       equipmentType: json['equipmentType'] as String?,
       equipmentWeight: (json['equipmentWeight'] as num?)?.toDouble(),
+      preferredNotificationTime: json['preferredNotificationTime'] as String?,
+      enableNotifications: json['enableNotifications'] as bool?,
       customResponses: json['customResponses'] as Map<String, dynamic>?,
     );
   }
