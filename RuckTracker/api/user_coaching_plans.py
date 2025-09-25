@@ -679,6 +679,17 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
             week_start = start_date + timedelta(weeks=week_num - 1)
             session_date = week_start + timedelta(days=session_offset)
 
+            # Convert to user's timezone for proper date representation
+            import pytz
+            try:
+                user_tz = pytz.timezone(user_timezone)
+                # Create datetime in user timezone (use noon to avoid DST issues)
+                session_datetime = user_tz.localize(datetime.combine(session_date, datetime.min.time().replace(hour=12)))
+                session_date_str = session_datetime.date().isoformat()
+            except:
+                # Fallback to UTC if timezone conversion fails
+                session_date_str = session_date.isoformat()
+
             # Get coaching points only if we could map the session type
             if mapped_type:
                 coaching_points = generate_coaching_points(mapped_type, week_num)
@@ -703,7 +714,7 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
                 'user_coaching_plan_id': user_plan_id,
                 'planned_week': week_num,
                 'planned_session_type': session_type_raw,  # Keep original name for display
-                'scheduled_date': session_date.isoformat(),
+                'scheduled_date': session_date_str,
                 'scheduled_timezone': user_timezone,  # Store user's timezone
                 'completion_status': 'planned',
                 'coaching_points': coaching_points
