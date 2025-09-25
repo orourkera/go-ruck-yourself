@@ -57,24 +57,6 @@ class UserCoachingPlansResource(Resource):
             
             if not active_plans:
                 logger.info(f"No active coaching plan found for user {user_id}")
-                # FOR DEBUGGING: Check if this is our test user and force return a plan
-                if user_id == "11683829-2c73-46fc-82f1-f905d5316c30":
-                    logger.info("DEBUGGING: Forcing return of plan for test user")
-                    fake_plan = {
-                        "id": 38,
-                        "template": {
-                            "name": "12-Mile Ruck Event Prep",
-                            "duration_weeks": 8,
-                            "plan_id": "event-prep"
-                        },
-                        "personality": "Southern Redneck",
-                        "start_date": "2025-09-25",
-                        "current_week": 1,
-                        "weeks_elapsed": 0,
-                        "progress_percent": 0.0,
-                        "recent_sessions": []
-                    }
-                    return {"active_plan": fake_plan}, 200
                 return {"active_plan": None}, 200
 
             plan = active_plans[0]
@@ -102,31 +84,53 @@ class UserCoachingPlansResource(Resource):
                 progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
                 logger.warning(f"GET /user-coaching-plans using fallback duration for user {user_id}")
             
-            # Get recent plan sessions with coaching points
+            # Get ALL plan sessions with coaching points for complete plan view
             sessions_resp = client.table('plan_sessions').select(
-                'id, planned_week, planned_session_type, completion_status, plan_adherence_score, scheduled_date, completed_date, coaching_points'
-            ).eq('user_coaching_plan_id', plan['id']).order('planned_week', desc=False).limit(20).execute()
-            
+                'id, user_coaching_plan_id, session_id, planned_week, planned_session_type, completion_status, plan_adherence_score, notes, scheduled_date, completed_date, scheduled_start_time, scheduled_timezone, coaching_points'
+            ).eq('user_coaching_plan_id', plan['id']).order('planned_week', desc=False).order('id', desc=False).execute()
+
             # Calculate adherence metrics
             sessions = sessions_resp.data or []
             adherence_stats = _calculate_adherence_stats(sessions)
-            
+
+            # Build weekly structure from plan sessions
+            weekly_template = _build_weekly_template_from_sessions(sessions)
+
+            # Get next session recommendation
+            next_session = _get_next_session_recommendation_simple(plan, sessions)
+
+            # Build complete template data with weekly structure
+            complete_template = template_data or {
+                "name": "Custom Plan",
+                "duration_weeks": total_weeks,
+                "plan_id": plan.get('coaching_plan_id', 'unknown')
+            }
+
+            # Add weekly structure to template
+            if weekly_template:
+                complete_template["base_structure"] = {
+                    "weekly_template": weekly_template
+                }
+
             return {
                 "active_plan": {
                     "id": plan['id'],
-                    "template": template_data or {
-                        "name": "Default Plan",
-                        "duration_weeks": total_weeks,
-                        "plan_id": plan.get('coaching_plan_id', 'unknown')
-                    },
+                    "template": complete_template,
+                    "plan_name": complete_template.get("name", "Custom Plan"),
+                    "name": complete_template.get("name", "Custom Plan"),
+                    "duration_weeks": total_weeks,
                     "personality": plan['coaching_personality'],
+                    "coaching_personality": plan['coaching_personality'],
                     "start_date": plan['start_date'],
                     "current_week": plan['current_week'],
                     "weeks_elapsed": weeks_elapsed,
                     "progress_percent": progress_percent,
+                    "adherence_percentage": adherence_stats['overall_adherence'],
                     "modifications": plan['plan_modifications'],
                     "adherence_stats": adherence_stats,
-                    "recent_sessions": sessions[-10:]  # Last 10 sessions
+                    "plan_sessions": sessions,  # Complete sessions list
+                    "recent_sessions": sessions[-10:],  # Last 10 sessions
+                    "next_session": next_session
                 }
             }, 200
             
@@ -1204,12 +1208,119 @@ def _get_next_milestone(weeks_elapsed, total_weeks):
         (8, "2 months - Routine established"),
         (12, "3 months - Lifestyle integration")
     ]
-    
+
     for week, description in milestones:
         if weeks_elapsed < week:
             return {"week": week, "description": description}
-            
+
     if weeks_elapsed < total_weeks:
         return {"week": total_weeks, "description": "Plan completion"}
-        
+
     return {"message": "All milestones achieved!"}
+
+
+def _build_weekly_template_from_sessions(sessions):
+    """Build weekly template structure from plan sessions"""
+    if not sessions:
+        return []
+
+    # Group sessions by week to find the weekly pattern
+    weekly_sessions = {}
+    for session in sessions:
+        week = session['planned_week']
+        if week not in weekly_sessions:
+            weekly_sessions[week] = []
+        weekly_sessions[week].append(session)
+
+    # Use the first week as the template pattern
+    first_week = min(weekly_sessions.keys()) if weekly_sessions else 1
+    first_week_sessions = weekly_sessions.get(first_week, [])
+
+    # Convert to day-based template format
+    day_mapping = {
+        'monday': 'mon',
+        'tuesday': 'tue',
+        'wednesday': 'wed',
+        'thursday': 'thu',
+        'friday': 'fri',
+        'saturday': 'sat',
+        'sunday': 'sun'
+    }
+
+    # Build weekly template from scheduled dates and session types
+    weekly_template = []
+    for session in first_week_sessions:
+        try:
+            # Parse the scheduled date to determine day of week
+            scheduled_date = session.get('scheduled_date')
+            if scheduled_date:
+                from datetime import datetime
+                date_obj = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+                day_name = date_obj.strftime('%A').lower()
+                day_key = day_mapping.get(day_name, 'monday')
+
+                # Extract coaching points for session details (handle JSON string)
+                coaching_points = {}
+                coaching_points_raw = session.get('coaching_points')
+                if coaching_points_raw:
+                    try:
+                        import json
+                        coaching_points = json.loads(coaching_points_raw) if isinstance(coaching_points_raw, str) else coaching_points_raw
+                    except (json.JSONDecodeError, TypeError):
+                        coaching_points = {}
+
+                session_data = {
+                    'day': day_key,
+                    'session_type': session['planned_session_type'],
+                    'type': session['planned_session_type']
+                }
+
+                # Add duration and distance if available in coaching points
+                if 'target_duration_minutes' in coaching_points:
+                    session_data['duration'] = coaching_points['target_duration_minutes']
+                if 'target_weight_kg' in coaching_points:
+                    session_data['weight_kg'] = coaching_points['target_weight_kg']
+
+                weekly_template.append(session_data)
+        except Exception as e:
+            logger.warning(f"Failed to parse session date {session.get('scheduled_date')}: {e}")
+            continue
+
+    return weekly_template
+
+
+def _get_next_session_recommendation_simple(plan, sessions):
+    """Simple next session recommendation"""
+    current_week = plan.get('current_week', 1)
+
+    # Find next planned session
+    next_planned = None
+    for session in sessions:
+        if session['completion_status'] == 'planned' and session['planned_week'] >= current_week:
+            next_planned = session
+            break
+
+    if not next_planned:
+        return None
+
+    # Extract coaching points data if available (handle JSON string)
+    coaching_points = {}
+    coaching_points_raw = next_planned.get('coaching_points')
+    if coaching_points_raw:
+        try:
+            import json
+            coaching_points = json.loads(coaching_points_raw) if isinstance(coaching_points_raw, str) else coaching_points_raw
+        except (json.JSONDecodeError, TypeError):
+            coaching_points = {}
+
+    return {
+        "session_type": next_planned['planned_session_type'],
+        "type": next_planned['planned_session_type'].replace('_', ' ').title(),
+        "scheduled_date": next_planned['scheduled_date'],
+        "week": next_planned['planned_week'],
+        "duration_minutes": coaching_points.get('target_duration_minutes'),
+        "weight_kg": coaching_points.get('target_weight_kg'),
+        "distance_km": coaching_points.get('distance_km'),
+        "notes": coaching_points.get('session_goals', {}).get('session_notes', ''),
+        "description": next_planned['planned_session_type'].replace('_', ' ').title()
+    }
