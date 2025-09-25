@@ -68,9 +68,15 @@ class CoachingService {
   /// Get active coaching plan for the current user
   Future<Map<String, dynamic>?> getActiveCoachingPlan() async {
     print('🔍🔍🔍 [COACHING_SERVICE] Fetching active coaching plan...');
+    print('🔍🔍🔍 [COACHING_SERVICE] API endpoint: ${ApiEndpoints.userCoachingPlansActive}');
     try {
-      final responseData =
-          await _apiClient.get(ApiEndpoints.userCoachingPlansActive);
+      print('🔍🔍🔍 [COACHING_SERVICE] Making API call...');
+      final responseData = await _apiClient.get(ApiEndpoints.userCoachingPlansActive)
+          .timeout(Duration(seconds: 30), onTimeout: () {
+        print('🔍🔍🔍 [COACHING_SERVICE] API call TIMEOUT after 30 seconds');
+        throw Exception('API call timeout');
+      });
+      print('🔍🔍🔍 [COACHING_SERVICE] API call completed successfully');
       print('🔍🔍🔍 [COACHING_SERVICE] Raw API response: $responseData');
       AppLogger.info('[COACHING_SERVICE] API response: $responseData');
 

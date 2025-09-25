@@ -99,8 +99,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final coachingService = GetIt.instance<CoachingService>();
       final plan = await coachingService.getActiveCoachingPlan();
 
-      print('[PROFILE] Coaching plan check - plan: $plan');
-      print('[PROFILE] Has coaching plan: ${plan != null}');
+      print('🟡 [PROFILE] Coaching plan check - plan: $plan');
+      print('🟡 [PROFILE] Has coaching plan: ${plan != null}');
+      if (plan != null) {
+        print('🟡 [PROFILE] Plan details: ${plan.toString()}');
+        print('🟡 [PROFILE] Plan keys: ${plan.keys.toList()}');
+        if (plan.containsKey('id')) print('🟡 [PROFILE] Plan ID: ${plan['id']}');
+        if (plan.containsKey('template')) print('🟡 [PROFILE] Plan template: ${plan['template']}');
+      }
 
       if (mounted) {
         setState(() {
@@ -110,7 +116,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
-      print('[PROFILE] Error checking coaching plan: $e');
+      print('🔴 [PROFILE] Error checking coaching plan: $e');
+      print('🔴 [PROFILE] Error type: ${e.runtimeType}');
+      print('🔴 [PROFILE] Stack trace: ${StackTrace.current}');
       // No plan or error - don't show the menu item
       if (mounted) {
         setState(() {
@@ -539,9 +547,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 },
                               ),
                             ),
+                            // Debug: Always show coaching plan check
+                            const Divider(),
+                            _buildClickableItem(
+                              icon: Icons.refresh,
+                              label: 'Check for Coaching Plan (Debug)',
+                              onTap: () {
+                                print('🟡 [PROFILE] Manual coaching plan check triggered');
+                                _checkForCoachingPlan();
+                              },
+                            ),
                             // Only show Coaching Plan if user has one
                             if (_hasCoachingPlan) ...[
-                              const Divider(),
                               _buildClickableItem(
                                 icon: Icons.fitness_center,
                                 label: 'Coaching Plan',
@@ -553,6 +570,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           const CoachingPlanDetailsScreen(),
                                     ),
                                   ).then((_) => _checkForCoachingPlan());
+                                },
+                              ),
+                            ] else ...[
+                              _buildClickableItem(
+                                icon: Icons.info_outline,
+                                label: 'No Coaching Plan Found',
+                                onTap: () {
+                                  print('🟡 [PROFILE] No coaching plan - _hasCoachingPlan: $_hasCoachingPlan');
+                                  print('🟡 [PROFILE] _activeCoachingPlan: $_activeCoachingPlan');
+                                  print('🟡 [PROFILE] _isFetchingCoachingPlan: $_isFetchingCoachingPlan');
                                 },
                               ),
                             ],

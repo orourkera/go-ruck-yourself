@@ -86,8 +86,8 @@ class PlanCadenceAnalyzer:
         return (datetime.utcnow() - ts).days >= 3
 
     def _recompute_snapshot(self, user_id: str, plan_id: int, timezone_name: str) -> PlanBehaviorSnapshot:
-        # Get timezone from session or fall back to plan timezone
-        session_timezone = session.get('scheduled_timezone') or timezone_name
+        # Use plan timezone (session-specific timezone handled elsewhere)
+        session_timezone = timezone_name
 
         # Use pytz for proper timezone handling
         try:

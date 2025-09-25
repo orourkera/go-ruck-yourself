@@ -334,16 +334,8 @@ class PlanCustomQuestions {
         required: true,
       ),
       NumberQuestion(
-        id: 'event_distance',
-        prompt: 'Event distance (km)?',
-        defaultValue: 19.3,
-        min: 5,
-        max: 50,
-        helperText: '12 miles = 19.3km',
-      ),
-      NumberQuestion(
         id: 'event_load',
-        prompt: 'Required event load (kg)?',
+        prompt: 'Required event load?', // Unit will be added dynamically based on user preference
         min: 5,
         max: 50,
         helperText: "The weight you'll carry during the event",

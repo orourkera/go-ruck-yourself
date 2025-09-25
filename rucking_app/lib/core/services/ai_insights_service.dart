@@ -69,7 +69,6 @@ class AIInsightsService {
                   coachingProgressWrapper['next_session'] as Map)
               : null;
         } catch (e) {
-          AppLogger.debug('[AI_INSIGHTS] Could not fetch coaching progress: $e');
           // Continue without progress data
         }
       }
@@ -108,8 +107,6 @@ class AIInsightsService {
       final userInput = _buildUserContextInput(context);
       final sb = StringBuffer();
       bool gotDelta = false;
-      AppLogger.info(
-          '[AI_INSIGHTS] Streaming homepage insight (GPT-5 reasoning model)…');
       await _responsesService!.stream(
         model: _getReasoningModel(),
         instructions: instructions,
@@ -123,9 +120,6 @@ class AIInsightsService {
           onDelta(d);
         },
         onComplete: (full) {
-          AppLogger.info(
-              '[AI_INSIGHTS] Stream complete; attempting to parse JSON. Snippet: ' +
-                  (full.length > 200 ? full.substring(0, 200) : full));
           final insight = _parseAIResponse(full, context);
           onFinal(insight);
         },
@@ -175,8 +169,6 @@ class AIInsightsService {
         generatedAt: DateTime.now(),
       );
       await _saveHomeCache(userId, insight);
-      AppLogger.info(
-          '[AI_INSIGHTS] Prewarmed homepage insight cache for $userId');
     } catch (e) {
       AppLogger.warning(
           '[AI_INSIGHTS] Failed to prewarm homepage insights: $e');
@@ -212,8 +204,6 @@ class AIInsightsService {
   /// Fetch user insights snapshot from the API
   Future<Map<String, dynamic>> _fetchUserInsights() async {
     try {
-      AppLogger.info(
-          '[AI_INSIGHTS] Fetching user insights from ${ApiEndpoints.userInsights}?fresh=1');
       final response = await _apiClient.get(
         ApiEndpoints.userInsights,
         queryParams: {'fresh': 1},

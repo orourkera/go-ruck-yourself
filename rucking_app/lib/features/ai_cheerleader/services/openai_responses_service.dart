@@ -67,7 +67,7 @@ class OpenAIResponsesService {
       body['text'] = {'format': textFormat};
     }
 
-    AppLogger.info('[OPENAI_SSE] Starting stream to $uri with model=$model');
+    // AppLogger.info('[OPENAI_SSE] Starting stream to $uri with model=$model');
     AppLogger.debug(
         '[OPENAI_SSE] Request body: ${jsonEncode(body).substring(0, jsonEncode(body).length.clamp(0, 500))}...');
     final req = http.Request('POST', uri)
@@ -98,7 +98,7 @@ class OpenAIResponsesService {
           final map = jsonDecode(dataStr) as Map<String, dynamic>;
           final type = map['type']?.toString() ?? '';
 
-          AppLogger.debug('[OPENAI_SSE] Processing event: $type');
+          // AppLogger.debug('[OPENAI_SSE] Processing event: $type');
 
           // Handle different Responses API events
           if (type == 'response.output_text.delta') {
@@ -106,12 +106,12 @@ class OpenAIResponsesService {
             if (delta.isNotEmpty) {
               full.write(delta);
               if (onDelta != null) onDelta(delta);
-              AppLogger.debug(
-                  '[OPENAI_SSE] Got delta: ${delta.substring(0, delta.length.clamp(0, 50))}...');
+              // AppLogger.debug(
+              //     '[OPENAI_SSE] Got delta: ${delta.substring(0, delta.length.clamp(0, 50))}...');
             }
           } else if (type == 'response.output_item.done') {
             // This is the key event where we should extract the final text
-            AppLogger.info('[OPENAI_SSE] Processing output_item.done event...');
+            // AppLogger.info('[OPENAI_SSE] Processing output_item.done event...');
 
             // The key field here is 'item' - extract from item first
             final item = map['item'] as Map<String, dynamic>?;
@@ -166,7 +166,7 @@ class OpenAIResponsesService {
               }
             }
           } else if (type == 'response.completed') {
-            AppLogger.info('[OPENAI_SSE] Response completed event');
+            // AppLogger.info('[OPENAI_SSE] Response completed event');
             // If we don't have content yet, try to extract from the completed response
             if (full.isEmpty) {
               final response = map['response'] as Map<String, dynamic>?;
@@ -257,7 +257,7 @@ class OpenAIResponsesService {
               }
             }
           } else {
-            AppLogger.debug('[OPENAI_SSE] Other event: $type');
+            // AppLogger.debug('[OPENAI_SSE] Other event: $type');
           }
         } catch (e) {
           AppLogger.warning(
@@ -266,7 +266,7 @@ class OpenAIResponsesService {
       });
 
       final out = full.toString();
-      AppLogger.info('[OPENAI_SSE] Completed stream; bytes=${out.length}');
+      // AppLogger.info('[OPENAI_SSE] Completed stream; bytes=${out.length}');
       onComplete(out);
     } catch (e) {
       AppLogger.error('[OPENAI_SSE] Stream error: $e');

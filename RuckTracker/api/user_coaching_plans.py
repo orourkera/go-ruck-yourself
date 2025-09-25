@@ -44,15 +44,23 @@ class UserCoachingPlansResource(Resource):
             
             # Get active plan (simplified - skip the problematic foreign key join)
             client = get_supabase_client()
+            logger.info(f"Querying for active plan for user_id: {user_id}")
             plan_resp = client.table('user_coaching_plans').select(
-                'id, coaching_plan_id, coaching_personality, start_date, current_week, current_status, plan_modifications, created_at'
-            ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+                '*'
+            ).eq('user_id', user_id).order('created_at', desc=True).limit(5).execute()
+            logger.info(f"All plans for user: {plan_resp.data}")
+
+            # Filter for active plans from the results
+            active_plans = [p for p in (plan_resp.data or []) if p.get('current_status') == 'active']
+            logger.info(f"Active plans found: {len(active_plans)}")
+            if active_plans:
+                logger.info(f"Using active plan: {active_plans[0]['id']}")
             
-            if not plan_resp.data:
+            if not active_plans:
                 logger.info(f"No active coaching plan found for user {user_id}")
                 return {"active_plan": None}, 200
-                
-            plan = plan_resp.data[0]
+
+            plan = active_plans[0]
             logger.info(f"Found active plan for user {user_id}: plan_id={plan['id']}, coaching_plan_id={plan['coaching_plan_id']}, status={plan['current_status']}")
             
             # Get template data separately

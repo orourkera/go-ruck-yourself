@@ -209,7 +209,7 @@ class PlanAuditService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=600,
+                max_completion_tokens=600,
                 temperature=0.2
             )
 

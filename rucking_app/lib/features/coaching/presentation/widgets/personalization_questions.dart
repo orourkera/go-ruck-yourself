@@ -31,7 +31,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   // Provide sensible defaults so controls like sliders start in an enabled state
   PlanPersonalization _personalization =
       const PlanPersonalization(trainingDaysPerWeek: 4);
-  bool _useMetric = true;  // User's metric preference
+  bool _useMetric = true; // User's metric preference
 
   @override
   void initState() {
@@ -57,7 +57,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       Map<String, dynamic> customResponses = {};
 
       // For load capacity plan - set current max load
-      if (widget.planType?.id == 'load-capacity' && insights['ruck_weight'] != null) {
+      if (widget.planType?.id == 'load-capacity' &&
+          insights['ruck_weight'] != null) {
         customResponses['current_max_load'] = insights['ruck_weight'];
       }
 
@@ -66,10 +67,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         customResponses['current_pace'] = insights['avg_pace'];
       }
 
-      // For event prep - suggest distance based on avg distance
-      if (widget.planType?.id == 'event-prep' && insights['avg_distance'] != null) {
-        final avgDistance = insights['avg_distance'] as double;
-        customResponses['event_distance'] = (avgDistance * 2).round(); // Suggest double their average
+      // For event prep - hardcode 12 miles (19.3 km) since this is the specific challenge
+      if (widget.planType?.id == 'event-prep') {
+        customResponses['event_distance'] = 19.3; // 12 miles in km
       }
 
       if (customResponses.isNotEmpty) {
@@ -77,17 +77,51 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           customResponses: customResponses,
         );
       }
+
+      // Pre-populate equipment data from history if available
+      double? equipmentWeight;
+
+      if (insights['ruck_weight'] != null && insights['ruck_weight'] > 0) {
+        equipmentWeight = (insights['ruck_weight'] as num).toDouble();
+      } else if (insights['average_ruck_weight'] != null &&
+          insights['average_ruck_weight'] > 0) {
+        equipmentWeight = (insights['average_ruck_weight'] as num).toDouble();
+      }
+
+      if (equipmentWeight != null) {
+        _personalization = _personalization.copyWith(
+          equipmentType:
+              'rucksack', // Default to rucksack if they have weight history
+          equipmentWeight: equipmentWeight,
+        );
+      }
     }
   }
 
   Future<void> _loadMetricPreference() async {
     final prefs = await SharedPreferences.getInstance();
-    final preferMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+    final preferMetric = prefs.getBool('prefer_metric') ??
+        prefs.getBool('preferMetric') ??
+        false; // Default to false (imperial) to test
+    print('🔧 [PERSONALIZATION] Loading metric preference: $preferMetric');
     if (mounted) {
       setState(() {
         _useMetric = preferMetric;
       });
     }
+  }
+
+  bool get _hasEquipmentHistory {
+    // Check if user has ruck weight history
+    final insights = widget.userInsights;
+    if (insights == null) return false;
+
+    // Check for any indication of weight usage
+    final ruckWeight = insights['ruck_weight'];
+    final averageRuckWeight = insights['average_ruck_weight'];
+
+    return (ruckWeight != null && ruckWeight > 0) ||
+        (averageRuckWeight != null && averageRuckWeight > 0);
   }
 
   List<String> get _questions {
@@ -97,7 +131,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     switch (planId) {
       case 'daily-discipline':
         // Custom questions first for streak
-        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        final customQuestions =
+            PlanCustomQuestions.getQuestionsForPlan(planId!);
         for (final question in customQuestions) {
           questions.add(question.prompt);
         }
@@ -111,7 +146,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
       case 'fat-loss':
         // Weight loss target first
-        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        final customQuestions =
+            PlanCustomQuestions.getQuestionsForPlan(planId!);
         if (customQuestions.isNotEmpty) {
           questions.add(customQuestions[0].prompt); // Weight loss target
         }
@@ -122,8 +158,11 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           "How many days/week can you realistically train?",
           "Which days usually work best?",
           "What's your biggest challenge to hitting this goal?",
-          "What equipment do you have?",
         ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          questions.add("What equipment do you have?");
+        }
         // Remaining custom questions
         for (int i = 1; i < customQuestions.length; i++) {
           questions.add(customQuestions[i].prompt);
@@ -133,7 +172,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
       case 'load-capacity':
         // Target load first
-        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        final customQuestions =
+            PlanCustomQuestions.getQuestionsForPlan(planId!);
         if (customQuestions.isNotEmpty) {
           questions.add(customQuestions[0].prompt); // Target load
         }
@@ -144,8 +184,11 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           "How many days/week can you realistically train?",
           "Which days usually work best?",
           "What's your biggest challenge to hitting this goal?",
-          "What equipment do you have?",
         ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          questions.add("What equipment do you have?");
+        }
         // Remaining custom questions
         for (int i = 1; i < customQuestions.length; i++) {
           questions.add(customQuestions[i].prompt);
@@ -155,19 +198,22 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
       case 'event-prep':
         // Event date first
-        final customQuestions = PlanCustomQuestions.getQuestionsForPlan(planId!);
+        final customQuestions =
+            PlanCustomQuestions.getQuestionsForPlan(planId!);
         if (customQuestions.isNotEmpty) {
           questions.add(customQuestions[0].prompt); // Event date
         }
-        // Base questions
+        // Base questions (removed success definition since we have specific event date)
         questions.addAll([
           "What's your why for this goal?",
-          "In 8–12 weeks, what would make you say this was a win?",
           "How many days/week can you realistically train?",
           "Which days usually work best?",
           "What's your biggest challenge to hitting this goal?",
-          "What equipment do you have?",
         ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          questions.add("What equipment do you have?");
+        }
         // Remaining custom questions
         for (int i = 1; i < customQuestions.length; i++) {
           questions.add(customQuestions[i].prompt);
@@ -183,11 +229,15 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           "How many days/week can you realistically train?",
           "Which days usually work best?",
           "What's your biggest challenge to hitting this goal?",
-          "What equipment do you have?",
         ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          questions.add("What equipment do you have?");
+        }
         // Add custom questions
         if (widget.planType != null) {
-          final customQuestions = PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
+          final customQuestions =
+              PlanCustomQuestions.getQuestionsForPlan(widget.planType!.id);
           for (final question in customQuestions) {
             questions.add(question.prompt);
           }
@@ -275,7 +325,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     switch (planId) {
       case 'daily-discipline':
         // Custom questions first
-        final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(planId!);
+        final customQuestionMaps =
+            PlanCustomQuestions.getQuestionMapsForPlan(planId!);
         for (final questionConfig in customQuestionMaps) {
           pages.add(_buildCustomQuestion(questionConfig));
         }
@@ -288,22 +339,75 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         break;
 
       case 'fat-loss':
-      case 'load-capacity':
-      case 'event-prep':
-        // First custom question comes first (weight target/load target/event date)
-        final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(planId!);
+        // Weight loss target first
+        final customQuestionMaps =
+            PlanCustomQuestions.getQuestionMapsForPlan(planId!);
         if (customQuestionMaps.isNotEmpty) {
           pages.add(_buildCustomQuestion(customQuestionMaps[0]));
         }
-        // Then base questions
+        // Base questions
         pages.addAll([
           _buildWhyQuestion(),
           _buildSuccessQuestion(),
           _buildTrainingDaysQuestion(),
           _buildPreferredDaysQuestion(),
           _buildChallengesQuestion(),
-          _buildEquipmentQuestion(),
         ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          pages.add(_buildEquipmentQuestion());
+        }
+        // Then remaining custom questions
+        for (int i = 1; i < customQuestionMaps.length; i++) {
+          pages.add(_buildCustomQuestion(customQuestionMaps[i]));
+        }
+        pages.add(_buildMinimumSessionQuestion());
+        break;
+
+      case 'load-capacity':
+        // Target load first
+        final customQuestionMaps =
+            PlanCustomQuestions.getQuestionMapsForPlan(planId!);
+        if (customQuestionMaps.isNotEmpty) {
+          pages.add(_buildCustomQuestion(customQuestionMaps[0]));
+        }
+        // Base questions
+        pages.addAll([
+          _buildWhyQuestion(),
+          _buildSuccessQuestion(),
+          _buildTrainingDaysQuestion(),
+          _buildPreferredDaysQuestion(),
+          _buildChallengesQuestion(),
+        ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          pages.add(_buildEquipmentQuestion());
+        }
+        // Then remaining custom questions
+        for (int i = 1; i < customQuestionMaps.length; i++) {
+          pages.add(_buildCustomQuestion(customQuestionMaps[i]));
+        }
+        pages.add(_buildMinimumSessionQuestion());
+        break;
+
+      case 'event-prep':
+        // First custom question comes first (event date)
+        final customQuestionMaps =
+            PlanCustomQuestions.getQuestionMapsForPlan(planId!);
+        if (customQuestionMaps.isNotEmpty) {
+          pages.add(_buildCustomQuestion(customQuestionMaps[0]));
+        }
+        // Then base questions (removed success definition since we have specific event date)
+        pages.addAll([
+          _buildWhyQuestion(),
+          _buildTrainingDaysQuestion(),
+          _buildPreferredDaysQuestion(),
+          _buildChallengesQuestion(),
+        ]);
+        // Only ask about equipment if user doesn't have weight history
+        if (!_hasEquipmentHistory) {
+          pages.add(_buildEquipmentQuestion());
+        }
         // Then remaining custom questions
         for (int i = 1; i < customQuestionMaps.length; i++) {
           pages.add(_buildCustomQuestion(customQuestionMaps[i]));
@@ -323,7 +427,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         ]);
         // Add custom questions after base questions
         if (widget.planType != null) {
-          final customQuestionMaps = PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
+          final customQuestionMaps =
+              PlanCustomQuestions.getQuestionMapsForPlan(widget.planType!.id);
           for (final questionConfig in customQuestionMaps) {
             pages.add(_buildCustomQuestion(questionConfig));
           }
@@ -349,7 +454,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           case 2: // Minimum session length
             return true;
           case 3: // Why question
-            return _personalization.why != null && _personalization.why!.isNotEmpty;
+            return _personalization.why != null &&
+                _personalization.why!.isNotEmpty;
           case 4: // Success definition (optional)
             return true;
           case 5: // Challenges
@@ -366,7 +472,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             return _personalization.customResponses != null &&
                 _personalization.customResponses!['weight_loss_target'] != null;
           case 1: // Why
-            return _personalization.why != null && _personalization.why!.isNotEmpty;
+            return _personalization.why != null &&
+                _personalization.why!.isNotEmpty;
           case 2: // Success (optional)
             return true;
           case 3: // Training days
@@ -397,7 +504,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             return _personalization.customResponses != null &&
                 _personalization.customResponses!['target_load'] != null;
           case 1: // Why
-            return _personalization.why != null && _personalization.why!.isNotEmpty;
+            return _personalization.why != null &&
+                _personalization.why!.isNotEmpty;
           case 2: // Success (optional)
             return true;
           case 3: // Training days
@@ -422,34 +530,54 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         }
 
       case 'event-prep':
-        // Event date first, then base, then other custom
+        final includesEquipmentQuestion = !_hasEquipmentHistory;
         switch (_currentQuestionIndex) {
           case 0: // Event date
             return _personalization.customResponses != null &&
                 _personalization.customResponses!['event_date'] != null;
           case 1: // Why
-            return _personalization.why != null && _personalization.why!.isNotEmpty;
-          case 2: // Success (optional)
-            return true;
-          case 3: // Training days
+            return _personalization.why != null &&
+                _personalization.why!.isNotEmpty;
+          case 2: // Training days
             return _personalization.trainingDaysPerWeek != null;
-          case 4: // Preferred days
-            return _personalization.preferredDays != null &&
-                _personalization.preferredDays!.isNotEmpty;
-          case 5: // Challenges
+          case 3: // Preferred days
+            // Optional for event prep; treat empty as flexible schedule
+            return true;
+          case 4: // Challenges
             return _personalization.challenges != null &&
                 _personalization.challenges!.isNotEmpty;
-          case 6: // Equipment
-            return true;
-          case 7: // Event distance
-            return _personalization.customResponses != null &&
-                _personalization.customResponses!['event_distance'] != null;
-          case 8: // Event load
+          case 5:
+            if (includesEquipmentQuestion) {
+              // Equipment question is informational; always allow
+              return true;
+            }
+            // Without equipment step, this index is event load
             return _personalization.customResponses != null &&
                 _personalization.customResponses!['event_load'] != null;
-          case 9: // Time goal (optional)
+          case 6:
+            if (includesEquipmentQuestion) {
+              // Event load when equipment question present
+              return _personalization.customResponses != null &&
+                  _personalization.customResponses!['event_load'] != null;
+            }
+            // Time goal (optional) when equipment question skipped
             return true;
-          case 10: // Minimum session
+          case 7:
+            if (includesEquipmentQuestion) {
+              // Time goal (optional) when equipment question present
+              return true;
+            }
+            // Minimum session when equipment question skipped
+            return _personalization.minimumSessionMinutes != null;
+          case 8:
+            if (includesEquipmentQuestion) {
+              // Minimum session when equipment question present
+              return _personalization.minimumSessionMinutes != null;
+            }
+            // This case shouldn't be reached when equipment is skipped
+            return true;
+          case 9:
+            // Minimum session when equipment question present
             return _personalization.minimumSessionMinutes != null;
           default:
             return true;
@@ -459,7 +587,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         // Standard order for other plans
         switch (_currentQuestionIndex) {
           case 0: // Why
-            return _personalization.why != null && _personalization.why!.isNotEmpty;
+            return _personalization.why != null &&
+                _personalization.why!.isNotEmpty;
           case 1: // Success (optional)
             return true;
           case 2: // Training days
@@ -489,7 +618,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       child: Scaffold(
         backgroundColor: AppColors.backgroundLight,
         appBar: AppBar(
-          title: Text('Personalize Your Plan (${_currentQuestionIndex + 1}/${_questions.length})'),
+          title: Text(
+              'Personalize Your Plan (${_currentQuestionIndex + 1}/${_questions.length})'),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -670,7 +800,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         _personalization.customResponses != null &&
         _personalization.customResponses!['streak_days'] != null) {
       final streakDays = _personalization.customResponses!['streak_days'];
-      questionText = "After $streakDays days, what would make you say this was a win? (Optional)";
+      questionText =
+          "After $streakDays days, what would make you say this was a win? (Optional)";
     }
 
     return _buildQuestionCard(
@@ -691,8 +822,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: widget.planType?.id == 'daily-discipline'
-                ? 'Optional - What would success look like?'
-                : 'What would success look like?',
+                  ? 'Optional - What would success look like?'
+                  : 'What would success look like?',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -814,7 +945,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         _personalization.customResponses != null &&
         _personalization.customResponses!['streak_days'] != null) {
       final streakDays = _personalization.customResponses!['streak_days'];
-      questionText = "Which days usually work best for your $streakDays-day journey? (Optional)";
+      questionText =
+          "Which days usually work best for your $streakDays-day journey? (Optional)";
     }
 
     return _buildQuestionCard(
@@ -824,8 +956,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         children: [
           Text(
             isDailyDiscipline
-              ? 'Select any days that work particularly well for you (skip if flexible):'
-              : 'Select your preferred training days (you can choose multiple):',
+                ? 'Select any days that work particularly well for you (skip if flexible):'
+                : 'Select your preferred training days (you can choose multiple):',
             style: AppTextStyles.bodyMedium.copyWith(
               color: Colors.grey[600],
             ),
@@ -1332,7 +1464,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     }
 
     // Get current value from customResponses
-    var currentValue = (_personalization.customResponses?[id] as num?)?.toDouble() ?? defaultValue;
+    var currentValue =
+        (_personalization.customResponses?[id] as num?)?.toDouble() ??
+            defaultValue;
 
     // If we have a stored value in kg but showing in lbs, convert it
     if (id == 'weight_loss_target' && !_useMetric && unit == 'lbs') {
@@ -1408,8 +1542,9 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
     // Check if custom is selected for special handling
     final isCustomSelected = currentValue == 'custom' ||
-        (currentValue is int && !options.any((opt) =>
-            (opt is Map ? opt['value'] : opt) == currentValue));
+        (currentValue is int &&
+            !options.any(
+                (opt) => (opt is Map ? opt['value'] : opt) == currentValue));
 
     return _buildQuestionCard(
       question: prompt,
@@ -1477,7 +1612,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
-                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                    color:
+                        isSelected ? AppColors.primary : Colors.grey.shade300,
                   ),
                 ),
               );
@@ -1528,8 +1664,35 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     final helperText = config['helper_text'] as String?;
     final placeholder = config['placeholder'] as String?;
 
+    // Get current value and convert for display if needed
+    final currentValue = _personalization.customResponses?[id];
+    String initialText = '';
+    if (currentValue != null) {
+      if (id == 'event_load' && !_useMetric && currentValue is num) {
+        // Convert stored kg back to lbs for display
+        final lbsValue = currentValue.toDouble() / 0.453592;
+        initialText = lbsValue.toStringAsFixed(1);
+      } else if (currentValue is num) {
+        initialText = currentValue.toString();
+      }
+    }
+
+    // Adjust prompt, unit, and validation for weight-related questions based on user preference
+    String displayPrompt = prompt;
+    String? displayUnit = unit;
+
+    if (id == 'event_load') {
+      if (_useMetric) {
+        displayPrompt = 'Required event load (kg)?';
+        displayUnit = 'kg';
+      } else {
+        displayPrompt = 'Required event load (lbs)?';
+        displayUnit = 'lbs';
+      }
+    }
+
     return _buildQuestionCard(
-      question: prompt,
+      question: displayPrompt,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1543,11 +1706,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             ),
             const SizedBox(height: 16),
           ],
-          TextField(
-            keyboardType: TextInputType.number,
+          TextFormField(
+            key: ValueKey('${id}_${_useMetric}_$initialText'),
+            initialValue: initialText,
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: false),
             decoration: InputDecoration(
               hintText: placeholder ?? 'Enter value',
-              suffixText: unit,
+              suffixText: displayUnit,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1557,18 +1723,27 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               ),
             ),
             onChanged: (value) {
-              final numValue = num.tryParse(value);
-              if (numValue != null) {
-                setState(() {
-                  final customResponses = Map<String, dynamic>.from(
-                    _personalization.customResponses ?? {},
-                  );
-                  customResponses[id] = numValue;
-                  _personalization = _personalization.copyWith(
-                    customResponses: customResponses,
-                  );
-                });
-              }
+              final sanitized = value.replaceAll(',', '.').trim();
+              final numValue = double.tryParse(sanitized);
+              setState(() {
+                final customResponses = Map<String, dynamic>.from(
+                    _personalization.customResponses ?? {});
+
+                if (numValue == null) {
+                  customResponses.remove(id);
+                } else {
+                  double finalValue = numValue;
+                  if (id == 'event_load' && !_useMetric) {
+                    // Convert from lbs to kg for storage
+                    finalValue = numValue * 0.453592;
+                  }
+                  customResponses[id] = finalValue;
+                }
+
+                _personalization = _personalization.copyWith(
+                  customResponses: customResponses,
+                );
+              });
             },
           ),
         ],
@@ -1632,7 +1807,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     final helperText = config['helper_text'] as String?;
 
     // Get current values from customResponses
-    final restData = _personalization.customResponses?[id] as Map<String, dynamic>? ?? {};
+    final restData =
+        _personalization.customResponses?[id] as Map<String, dynamic>? ?? {};
     final restCount = restData['count'] as int? ?? 0;
     final restPeriod = restData['period'] as String? ?? 'per_week';
 
@@ -1657,7 +1833,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               Expanded(
                 child: TextField(
                   keyboardType: TextInputType.number,
-                  controller: TextEditingController(text: restCount > 0 ? restCount.toString() : ''),
+                  controller: TextEditingController(
+                      text: restCount > 0 ? restCount.toString() : ''),
                   decoration: InputDecoration(
                     hintText: '0',
                     labelText: 'Rest days',
@@ -1695,7 +1872,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Period',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1705,9 +1883,17 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                     ),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'per_week', child: Text('Per week', overflow: TextOverflow.ellipsis)),
-                    DropdownMenuItem(value: 'per_month', child: Text('Per month', overflow: TextOverflow.ellipsis)),
-                    DropdownMenuItem(value: 'total', child: Text('Total', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(
+                        value: 'per_week',
+                        child:
+                            Text('Per week', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(
+                        value: 'per_month',
+                        child:
+                            Text('Per month', overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem(
+                        value: 'total',
+                        child: Text('Total', overflow: TextOverflow.ellipsis)),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -1732,12 +1918,12 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
           const SizedBox(height: 12),
           Text(
             restCount == 0
-              ? 'No rest days - going for an unbroken streak!'
-              : restPeriod == 'per_week'
-                ? '$restCount rest ${restCount == 1 ? "day" : "days"} per week'
-                : restPeriod == 'per_month'
-                  ? '$restCount rest ${restCount == 1 ? "day" : "days"} per month'
-                  : '$restCount rest ${restCount == 1 ? "day" : "days"} total in the streak',
+                ? 'No rest days - going for an unbroken streak!'
+                : restPeriod == 'per_week'
+                    ? '$restCount rest ${restCount == 1 ? "day" : "days"} per week'
+                    : restPeriod == 'per_month'
+                        ? '$restCount rest ${restCount == 1 ? "day" : "days"} per month'
+                        : '$restCount rest ${restCount == 1 ? "day" : "days"} total in the streak',
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w500,
@@ -1780,7 +1966,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
               final picked = await showDatePicker(
                 context: context,
-                initialDate: currentDate ?? DateTime.now().add(Duration(days: minDays)),
+                initialDate:
+                    currentDate ?? DateTime.now().add(Duration(days: minDays)),
                 firstDate: DateTime.now().add(Duration(days: minDays)),
                 lastDate: DateTime.now().add(Duration(days: maxDays)),
               );

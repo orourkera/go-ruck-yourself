@@ -333,8 +333,6 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     // Force refresh on any data change since behavioral patterns are now much richer
     if (newSessionCount != oldSessionCount ||
         newAchievementCount != oldAchievementCount) {
-      AppLogger.info(
-          '[AI_INSIGHTS_WIDGET] Data change detected - forcing insight refresh (sessions: $oldSessionCount->$newSessionCount, achievements: $oldAchievementCount->$newAchievementCount)');
       _generateInsights(force: true); // Force refresh to bypass cache
     }
   }
@@ -349,9 +347,6 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       final user = authState.user;
       final key = 'ai_home_cache_${user.userId}_${DateTime.now().yyyymmdd}';
       await prefs.remove(key);
-
-      AppLogger.info(
-          '[AI_INSIGHTS_WIDGET] Cleared insight cache for ${user.username}');
 
       // Regenerate insights
       if (mounted) {
@@ -387,7 +382,6 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
       final timeOfDay = _getTimeOfDay(now);
       final dayOfWeek = DateFormat('EEEE').format(now);
 
-      AppLogger.info('[AI_INSIGHTS] Generating insights for ${user.username}');
 
       // Try cache first (daily). If found, render immediately but continue to refresh via stream.
       if (!force) {
@@ -413,8 +407,6 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
         _streamingText = '';
         _isLoading = false;
       }
-      AppLogger.info(
-          '[AI_INSIGHTS_WIDGET] Stream kick-off (user=${user.username})');
       // Fire-and-forget to avoid awaiting until the stream completes
       // ignore: unawaited_futures
       aiService.streamHomepageInsights(
@@ -436,7 +428,6 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
           await _saveCachedInsight(user.userId, insight);
         },
         onError: (e) {
-          AppLogger.error('[AI_INSIGHTS] Streaming error: $e');
           // Fall back to non-streaming generation
         },
       );
@@ -485,12 +476,8 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
     // Always show widget during loading or if we have insights
     // Only hide if we explicitly failed and have no fallback
     if (!_isLoading && _currentInsight == null && _hasError) {
-      AppLogger.debug('[AI_INSIGHTS] Widget hidden due to error state');
       return const SizedBox.shrink();
     }
-
-    AppLogger.debug(
-        '[AI_INSIGHTS] Widget rendering: loading=$_isLoading, hasInsight=${_currentInsight != null}, hasError=$_hasError');
 
     return Card(
       // Tighter outer spacing so the card blends into the feed

@@ -19,6 +19,7 @@ import 'package:rucking_app/features/coaching/domain/models/science_based_plan.d
 import 'package:rucking_app/features/coaching/presentation/widgets/personalization_questions.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
 import 'package:rucking_app/features/coaching/presentation/screens/coaching_plan_details_screen.dart';
+import 'package:rucking_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/rucker_rating_widget.dart';
 
 enum PlanCreationStep {
@@ -891,35 +892,69 @@ Keep it under 200 words, motivational, and specific to their answers.
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final statusBarHeight = mediaQuery.padding.top;
+    final statusBarColor = _getStatusBarColor();
+    final overlayStyle =
+        statusBarColor.computeLuminance() > 0.5
+            ? SystemUiOverlayStyle.dark
+            : SystemUiOverlayStyle.light;
+
     return GestureDetector(
       onTap: () {
         // Dismiss keyboard when tapping anywhere
         FocusScope.of(context).unfocus();
         FocusManager.instance.primaryFocus?.unfocus();
       },
-      child: Scaffold(
-        backgroundColor: AppColors.backgroundLight,
-        appBar: _currentStep != PlanCreationStep.greeting &&
-                _currentStep != PlanCreationStep.creating &&
-                _currentStep != PlanCreationStep.generatingSummary &&
-                _currentStep != PlanCreationStep.complete &&
-                _currentStep != PlanCreationStep.personalization // Hide AppBar during personalization
-            ? AppBar(
-                title: const Text('AI Coaching Plan'),
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: _onBackPressed,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: overlayStyle,
+        child: Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          appBar: _currentStep != PlanCreationStep.greeting &&
+                  _currentStep != PlanCreationStep.creating &&
+                  _currentStep != PlanCreationStep.generatingSummary &&
+                  _currentStep != PlanCreationStep.complete &&
+                  _currentStep != PlanCreationStep.personalization
+              ? AppBar(
+                  title: const Text('AI Coaching Plan'),
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  systemOverlayStyle: overlayStyle,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: _onBackPressed,
+                  ),
+                )
+              : null,
+          body: Stack(
+            children: [
+              if (statusBarHeight > 0)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: statusBarHeight,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: statusBarColor),
+                  ),
                 ),
-              )
-            : null,
-        body: SafeArea(
-          child: _buildCurrentStep(),
+              SafeArea(
+                child: _buildCurrentStep(),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Color _getStatusBarColor() {
+    if (_currentStep == PlanCreationStep.commitment &&
+        _selectedPersonality != null) {
+      return _selectedPersonality!.color;
+    }
+    return AppColors.primary;
   }
 
   Widget _buildCurrentStep() {
@@ -1794,7 +1829,7 @@ Keep it under 200 words, motivational, and specific to their answers.
                   onPressed: () {
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (context) => const CoachingPlanDetailsScreen(),
+                        builder: (context) => const ProfileScreen(),
                       ),
                     );
                   },

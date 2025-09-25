@@ -41,24 +41,12 @@ class OpenAIService {
     double? temperatureOverride,
     Duration? timeoutOverride,
   }) async {
-    AppLogger.error(
-        '[OPENAI_SERVICE_DEBUG] ===== GENERATE MESSAGE METHOD CALLED =====');
-    AppLogger.error(
-        '[OPENAI_SERVICE_DEBUG] This proves the OpenAIService.generateMessage is being called');
     try {
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] Step 1: Starting generateMessage try block');
-      AppLogger.info(
-          '[OPENAI] Generating message for $personality personality');
-
-      AppLogger.error('[OPENAI_SERVICE_DEBUG] Step 2: About to build prompt');
       // Support a direct prompt override when provided in context (e.g., AIInsightsService)
       String prompt;
       final directPrompt = context['prompt'];
       if (directPrompt is String && directPrompt.trim().isNotEmpty) {
         prompt = directPrompt;
-        AppLogger.info(
-            '[OPENAI_DEBUG] Using direct prompt override from context');
       } else {
         try {
           prompt = _buildPrompt(
@@ -70,34 +58,11 @@ class OpenAIService {
             context['environment'] ?? <String, dynamic>{},
             context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
           );
-          AppLogger.error(
-              '[OPENAI_SERVICE_DEBUG] Step 3: Prompt built successfully');
         } catch (e, stackTrace) {
-          AppLogger.error(
-              '[OPENAI_SERVICE_DEBUG] FATAL: _buildPrompt failed with error: $e');
-          AppLogger.error('[OPENAI_SERVICE_DEBUG] Stack trace: $stackTrace');
+          AppLogger.error('[OPENAI] Failed to build prompt: $e');
           return null;
         }
       }
-
-      // Debug logging: Show full prompt being sent to OpenAI
-      AppLogger.info('[OPENAI_DEBUG] Full prompt being sent to OpenAI:');
-      AppLogger.info('[OPENAI_DEBUG] ===== START PROMPT =====');
-      AppLogger.info('[OPENAI_DEBUG] $prompt');
-      AppLogger.info('[OPENAI_DEBUG] ===== END PROMPT =====');
-
-      // Debug logging: Show context components
-      AppLogger.info('[OPENAI_DEBUG] Context components:');
-      AppLogger.info('[OPENAI_DEBUG] - Trigger: ${context['trigger']}');
-      AppLogger.info('[OPENAI_DEBUG] - Session: ${context['session']}');
-      AppLogger.info('[OPENAI_DEBUG] - User: ${context['user']}');
-      AppLogger.info('[OPENAI_DEBUG] - Environment: ${context['environment']}');
-
-      // Make OpenAI API call with timeout
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] Step 4: About to call OpenAI.instance.chat.create...');
-      AppLogger.info(
-          '[OPENAI_DEBUG] About to call OpenAI.instance.chat.create...');
 
       final useO3 = (modelOverride ?? _model).toLowerCase().startsWith('o3');
       final completion = useO3
@@ -131,18 +96,8 @@ class OpenAIService {
               )
               .timeout(timeoutOverride ?? _timeout);
 
-      AppLogger.info('[OPENAI_DEBUG] OpenAI API call completed successfully');
-      AppLogger.info(
-          '[OPENAI_DEBUG] Response choices count: ${completion.choices.length}');
-
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] Step 5: OpenAI API call completed successfully');
-
       var message =
           completion.choices.first.message.content?.first.text?.trim();
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] Step 6: Extracted message from response');
-      AppLogger.info('[OPENAI_DEBUG] Extracted message: $message');
 
       if (message != null && message.isNotEmpty) {
         // 1) Strip hashtags
@@ -187,11 +142,6 @@ class OpenAIService {
 
         // Check if the response mentions location and record it for future tracking
         _recordLocationMentionIfPresent(message, context);
-        AppLogger.error(
-            '[OPENAI_SERVICE_DEBUG] Step 7: Message is valid, about to log to database');
-        AppLogger.info(
-            '[OPENAI_DEBUG] Generated message: "${message.substring(0, 50)}..."');
-        AppLogger.info('[OPENAI_DEBUG] About to call _logSimpleResponse...');
 
         // Log simple response if logger is available
         _logSimpleResponse(
@@ -200,32 +150,18 @@ class OpenAIService {
           response: message,
           isExplicit: explicitContent,
         );
-        AppLogger.error(
-            '[OPENAI_SERVICE_DEBUG] Step 8: _logSimpleResponse call completed');
-        AppLogger.info('[OPENAI_DEBUG] _logSimpleResponse call completed');
         return message;
       } else {
-        AppLogger.warning('[OPENAI_DEBUG] Empty response from OpenAI');
+        AppLogger.warning('[OPENAI] Empty response from OpenAI');
         return null;
       }
-    } on TimeoutException catch (e, stackTrace) {
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] FATAL: Request timed out after ${_timeout.inSeconds}s: $e');
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] Timeout stack trace: $stackTrace');
-      AppLogger.error('[OPENAI] Request timed out');
+    } on TimeoutException catch (e) {
+      AppLogger.error('[OPENAI] Request timed out after ${_timeout.inSeconds}s');
       return null;
-    } on SocketException catch (e, stackTrace) {
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] FATAL: Network error - no internet connection: $e');
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] Socket error stack trace: $stackTrace');
-      AppLogger.error('[OPENAI] Network error - no internet connection');
+    } on SocketException catch (e) {
+      AppLogger.error('[OPENAI] Network error: $e');
       return null;
-    } catch (e, stackTrace) {
-      AppLogger.error(
-          '[OPENAI_SERVICE_DEBUG] FATAL: Unexpected error in generateMessage: $e');
-      AppLogger.error('[OPENAI_SERVICE_DEBUG] Full stack trace: $stackTrace');
+    } catch (e) {
       AppLogger.error('[OPENAI] Failed to generate message: $e');
       return null;
     }

@@ -34,27 +34,52 @@ BEGIN
     WITH span30 AS (
       SELECT SUM(distance_km) as dist_km, SUM(elevation_gain_m) as elev_m, SUM(duration_seconds) as dur_s, COUNT(*) as sessions
       FROM ruck_session
-      WHERE user_id = u_id AND status = 'completed' AND completed_at >= now_utc - INTERVAL '30 days'
+      WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
+        AND completed_at >= now_utc - INTERVAL '30 days'
     ),
     span90 AS (
       SELECT SUM(distance_km) as dist_km, SUM(elevation_gain_m) as elev_m, SUM(duration_seconds) as dur_s, COUNT(*) as sessions
       FROM ruck_session
-      WHERE user_id = u_id AND status = 'completed' AND completed_at >= now_utc - INTERVAL '90 days'
+      WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
+        AND completed_at >= now_utc - INTERVAL '90 days'
     ),
     all_time AS (
       SELECT SUM(distance_km) as dist_km, SUM(elevation_gain_m) as elev_m, COUNT(*) as sessions
       FROM ruck_session
       WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
     ),
     last_done AS (
       SELECT completed_at, distance_km, ruck_weight_kg
       FROM ruck_session
       WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
       ORDER BY completed_at DESC
       LIMIT 1
+    ),
+    last_weighted AS (
+      SELECT completed_at, ruck_weight_kg
+      FROM ruck_session
+      WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
+        AND ruck_weight_kg IS NOT NULL AND ruck_weight_kg > 0
+      ORDER BY completed_at DESC
+      LIMIT 1
+    ),
+    load_stats AS (
+      SELECT
+        AVG(NULLIF(ruck_weight_kg, 0)) AS avg_weight_kg,
+        COUNT(*) FILTER (WHERE ruck_weight_kg IS NOT NULL AND ruck_weight_kg > 0) AS sessions_with_weight
+      FROM ruck_session
+      WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
     )
     SELECT jsonb_build_object(
       'prefer_metric', prefer_metric,
+      'average_ruck_weight_kg', COALESCE(load_stats.avg_weight_kg, 0),
+      'sessions_with_weight', COALESCE(load_stats.sessions_with_weight, 0),
       'totals_30d', jsonb_build_object(
         'distance_km', COALESCE(span30.dist_km,0),
         'elevation_m', COALESCE(span30.elev_m,0),
@@ -72,7 +97,7 @@ BEGIN
         'days_since_last', CASE WHEN (SELECT completed_at FROM last_done) IS NULL THEN NULL
                                ELSE EXTRACT(EPOCH FROM (now_utc - (SELECT completed_at FROM last_done)))/86400 END,
         'last_ruck_distance_km', (SELECT distance_km FROM last_done),
-        'last_ruck_weight_kg', (SELECT ruck_weight_kg FROM last_done)
+        'last_ruck_weight_kg', COALESCE((SELECT ruck_weight_kg FROM last_weighted), (SELECT ruck_weight_kg FROM last_done))
       ),
       'all_time', jsonb_build_object(
         'distance_km', COALESCE(all_time.dist_km,0),
@@ -99,6 +124,7 @@ BEGIN
       SELECT id, completed_at
       FROM ruck_session
       WHERE user_id = u_id AND status = 'completed'
+        AND COALESCE(duration_seconds, 0) >= 300
       ORDER BY completed_at DESC
       LIMIT 100
     ),

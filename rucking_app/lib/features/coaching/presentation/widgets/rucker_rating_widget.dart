@@ -35,7 +35,9 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
     try {
       // Load metric preference
       final prefs = await SharedPreferences.getInstance();
-      _useMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+      _useMetric = prefs.getBool('prefer_metric') ??
+          prefs.getBool('preferMetric') ??
+          true;
 
       // Fetch user insights
       final response = await _apiClient.get(
@@ -43,8 +45,25 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
         queryParams: {'fresh': 1},
       );
 
+      bool? preferMetricFromServer;
+      if (response is Map<String, dynamic>) {
+        final insights = response['insights'];
+        if (insights is Map<String, dynamic>) {
+          final facts = insights['facts'];
+          if (facts is Map<String, dynamic>) {
+            final preferMetricValue = facts['prefer_metric'];
+            if (preferMetricValue is bool) {
+              preferMetricFromServer = preferMetricValue;
+            }
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
+          if (preferMetricFromServer != null) {
+            _useMetric = preferMetricFromServer!;
+          }
           _userInsights = response;
           _isLoading = false;
         });
@@ -67,7 +86,8 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
   Map<String, dynamic> _extractRatingData() {
     if (_userInsights == null) return {};
 
-    final insights = Map<String, dynamic>.from(_userInsights!['insights'] ?? {});
+    final insights =
+        Map<String, dynamic>.from(_userInsights!['insights'] ?? {});
     final facts = Map<String, dynamic>.from(insights['facts'] ?? {});
 
     // Extract key metrics
@@ -77,6 +97,9 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
     final user = Map<String, dynamic>.from(facts['user'] ?? {});
     final recency = Map<String, dynamic>.from(facts['recency'] ?? {});
     final splits = facts['recent_splits'] as List? ?? [];
+    final preferMetric = facts['prefer_metric'] as bool?;
+    final averageRuckWeightKg =
+        (facts['average_ruck_weight_kg'] as num?)?.toDouble();
 
     // Calculate average pace from recent splits
     double avgPaceMinPerKm = 0;
@@ -101,16 +124,36 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
     // Get sessions and distance
     final sessions30d = totals30d['sessions'] as int? ?? 0;
     final distance30d = (totals30d['distance_km'] as num?)?.toDouble() ?? 0.0;
-    final avgSessionDistance = sessions30d > 0 ? distance30d / sessions30d : 0.0;
+    final avgSessionDistance =
+        sessions30d > 0 ? distance30d / sessions30d : 0.0;
 
     // Get weight data
     final userWeight = (user['weight'] as num?)?.toDouble() ??
-                      (demographics['weight'] as num?)?.toDouble();
+        (demographics['weight'] as num?)?.toDouble();
 
     // Get usual ruck weight (from recent sessions or equipment settings)
-    final lastRuckWeight = (recency['last_ruck_weight_kg'] as num?)?.toDouble();
+    double? ruckWeight = (recency['last_ruck_weight_kg'] as num?)?.toDouble();
+    if (ruckWeight != null && ruckWeight <= 0) {
+      ruckWeight = null;
+    }
     final equipmentWeight = (user['equipment_weight_kg'] as num?)?.toDouble();
-    final ruckWeight = lastRuckWeight ?? equipmentWeight;
+    if ((ruckWeight == null || ruckWeight <= 0) &&
+        averageRuckWeightKg != null &&
+        averageRuckWeightKg > 0) {
+      ruckWeight = averageRuckWeightKg;
+    }
+    if ((ruckWeight == null || ruckWeight <= 0) &&
+        equipmentWeight != null &&
+        equipmentWeight > 0) {
+      ruckWeight = equipmentWeight;
+    }
+    if (ruckWeight == null || ruckWeight <= 0) {
+      final insightsWeight = (insights['ruck_weight'] as num?)?.toDouble() ??
+          (facts['average_ruck_weight'] as num?)?.toDouble();
+      if (insightsWeight != null && insightsWeight > 0) {
+        ruckWeight = insightsWeight;
+      }
+    }
 
     // Calculate experience level
     final allTimeSessions = allTime['sessions'] as int? ?? 0;
@@ -136,13 +179,19 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
       'user_weight': userWeight,
       'ruck_weight': ruckWeight,
       'total_distance': (allTime['distance_km'] as num?)?.toDouble() ?? 0.0,
+      'average_ruck_weight': averageRuckWeightKg,
+      'prefer_metric': preferMetric ?? _useMetric,
     };
   }
 
   String _formatPace(double paceMinPerKm) {
     if (paceMinPerKm <= 0) return '--:--';
-    final minutes = paceMinPerKm.floor();
-    final seconds = ((paceMinPerKm - minutes) * 60).round();
+    var paceValue = paceMinPerKm;
+    if (!_useMetric) {
+      paceValue = paceMinPerKm / 0.621371; // Convert to min/mi
+    }
+    final minutes = paceValue.floor();
+    final seconds = ((paceValue - minutes) * 60).round();
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
@@ -155,7 +204,7 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
   }
 
   String _formatWeight(double? kg) {
-    if (kg == null) return '--';
+    if (kg == null || kg <= 0) return '--';
     if (!_useMetric) {
       final lbs = kg * 2.20462;
       return '${lbs.round()} lbs';
@@ -302,7 +351,8 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
                       Text(
                         ratingData['experience_level'],
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: _getRatingColor(ratingData['experience_level']),
+                          color:
+                              _getRatingColor(ratingData['experience_level']),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -310,9 +360,11 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _getRatingColor(ratingData['experience_level']).withOpacity(0.1),
+                    color: _getRatingColor(ratingData['experience_level'])
+                        .withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -339,7 +391,8 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
                       child: _buildStatCard(
                         icon: Icons.calendar_today,
                         label: 'Weekly Avg',
-                        value: '${ratingData['weekly_avg'].toStringAsFixed(1)}x',
+                        value:
+                            '${ratingData['weekly_avg'].toStringAsFixed(1)}x',
                         color: AppColors.primary,
                       ),
                     ),
@@ -363,7 +416,8 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
                       child: _buildStatCard(
                         icon: Icons.speed,
                         label: 'Avg Pace',
-                        value: '${_formatPace(ratingData['avg_pace'])}/${_useMetric ? "km" : "mi"}',
+                        value:
+                            '${_formatPace(ratingData['avg_pace'])}/${_useMetric ? "km" : "mi"}',
                         color: AppColors.success,
                       ),
                     ),

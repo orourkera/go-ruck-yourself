@@ -49,7 +49,7 @@ class AnalyticsService {
   /// Set user ID for tracking (call after authentication)
   static Future<void> setUserId(String? userId) async {
     try {
-      await _analytics.setUserId(userId: userId);
+      await _analytics.setUserId(id: userId);
       if (userId != null) {
         AppLogger.info('[ANALYTICS] User ID set: ${userId.substring(0, 8)}...');
       }
@@ -235,10 +235,18 @@ class AnalyticsService {
       // Log locally for debugging
       AppLogger.debug('[ANALYTICS] Event: $eventName, Params: $parameters');
 
+      // Convert dynamic map to Object map for Firebase Analytics
+      final Map<String, Object> firebaseParams = {};
+      parameters.forEach((key, value) {
+        if (value != null) {
+          firebaseParams[key] = value;
+        }
+      });
+
       // Send to Firebase
       _analytics.logEvent(
         name: eventName,
-        parameters: parameters,
+        parameters: firebaseParams,
       );
     } catch (e) {
       AppLogger.error('[ANALYTICS] Failed to track event $eventName: $e');
