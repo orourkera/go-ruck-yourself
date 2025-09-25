@@ -42,8 +42,8 @@ class UserCoachingPlansResource(Resource):
             if auth_response:
                 return auth_response
             
-            # Get active plan (simplified - skip the problematic foreign key join)
-            client = get_supabase_client()
+            # Get active plan using admin client for reliable access
+            client = get_supabase_admin_client()
             logger.info(f"Querying for active plan for user_id: {user_id}")
             try:
                 plan_resp = client.table('user_coaching_plans').select(
@@ -52,7 +52,7 @@ class UserCoachingPlansResource(Resource):
                 logger.info(f"Query successful, plans found: {len(plan_resp.data or [])}")
                 active_plans = plan_resp.data or []
             except Exception as e:
-                logger.error(f"Supabase query failed: {e}")
+                logger.error(f"Supabase admin query failed: {e}")
                 return {"active_plan": None}, 200
             
             if not active_plans:
