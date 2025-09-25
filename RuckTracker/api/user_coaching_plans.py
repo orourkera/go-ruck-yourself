@@ -45,33 +45,21 @@ class UserCoachingPlansResource(Resource):
             # Get active plan (simplified - skip the problematic foreign key join)
             client = get_supabase_client()
             logger.info(f"Querying for active plan for user_id: {user_id}")
-            plan_resp = client.table('user_coaching_plans').select(
-                '*'
-            ).eq('user_id', user_id).order('created_at', desc=True).limit(5).execute()
-            logger.info(f"All plans for user: {plan_resp.data}")
-
-            # Filter for active plans from the results
-            active_plans = [p for p in (plan_resp.data or []) if p.get('current_status') == 'active']
-            logger.info(f"Active plans found: {len(active_plans)}")
-            if active_plans:
-                logger.info(f"Using active plan: {active_plans[0]['id']}")
+            try:
+                plan_resp = client.table('user_coaching_plans').select(
+                    '*'
+                ).eq('user_id', user_id).eq('current_status', 'active').limit(1).execute()
+                logger.info(f"Query successful, plans found: {len(plan_resp.data or [])}")
+                active_plans = plan_resp.data or []
+            except Exception as e:
+                logger.error(f"Supabase query failed: {e}")
+                return {"active_plan": None}, 200
             
             if not active_plans:
                 logger.info(f"No active coaching plan found for user {user_id}")
-                # Temporary fix: if user is the specific user with plan ID 38, return it directly
-                if user_id == "11683829-2c73-46fc-82f1-f905d5316c30":
-                    plan = {
-                        'id': 38,
-                        'coaching_plan_id': 3,
-                        'coaching_personality': 'Southern Redneck',
-                        'start_date': '2025-09-25',
-                        'current_week': 1,
-                        'current_status': 'active'
-                    }
-                else:
-                    return {"active_plan": None}, 200
-            else:
-                plan = active_plans[0]
+                return {"active_plan": None}, 200
+
+            plan = active_plans[0]
             logger.info(f"Found active plan for user {user_id}: plan_id={plan['id']}, coaching_plan_id={plan['coaching_plan_id']}, status={plan['current_status']}")
             
             # Get template data separately
