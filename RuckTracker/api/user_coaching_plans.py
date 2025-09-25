@@ -73,24 +73,27 @@ class UserCoachingPlansResource(Resource):
             except Exception as e:
                 logger.warning(f"Failed to fetch template for plan {plan['id']}: {e}")
             
-            # Calculate plan progress
-            weeks_elapsed = _calculate_weeks_elapsed(plan['start_date'])
-            if template_data:
-                total_weeks = template_data['duration_weeks']
-                progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
-            else:
-                # Fallback when template data is missing
-                total_weeks = 8  # Default duration
-                progress_percent = min(weeks_elapsed / total_weeks * 100, 100)
-                logger.warning(f"GET /user-coaching-plans using fallback duration for user {user_id}")
-            
-            # Get ALL plan sessions with coaching points for complete plan view
+            # Get ALL plan sessions with coaching points for complete plan view first
             sessions_resp = client.table('plan_sessions').select(
                 'id, user_coaching_plan_id, session_id, planned_week, planned_session_type, completion_status, plan_adherence_score, notes, scheduled_date, completed_date, scheduled_start_time, scheduled_timezone, coaching_points'
             ).eq('user_coaching_plan_id', plan['id']).order('planned_week', desc=False).order('id', desc=False).execute()
 
-            # Calculate adherence metrics
             sessions = sessions_resp.data or []
+
+            # Calculate real plan duration from sessions data
+            if template_data and template_data.get('duration_weeks'):
+                total_weeks = template_data['duration_weeks']
+            elif sessions:
+                # Calculate from actual sessions
+                total_weeks = max(session['planned_week'] for session in sessions) if sessions else 1
+            else:
+                total_weeks = 1
+
+            # Calculate plan progress
+            weeks_elapsed = _calculate_weeks_elapsed(plan['start_date'])
+            progress_percent = min(weeks_elapsed / total_weeks * 100, 100) if total_weeks > 0 else 0
+
+            # Calculate adherence metrics
             adherence_stats = _calculate_adherence_stats(sessions)
 
             # Build weekly structure from plan sessions
