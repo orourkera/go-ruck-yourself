@@ -1712,7 +1712,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             const SizedBox(height: 16),
           ],
           TextFormField(
-            key: ValueKey('${id}_${_useMetric}_$initialText'),
+            key: ValueKey('${id}_$_useMetric'),  // Remove initialText from key to prevent rebuilds
             initialValue: initialText,
             keyboardType: const TextInputType.numberWithOptions(
                 decimal: true, signed: false),
@@ -1731,38 +1731,41 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
               final sanitized = value.replaceAll(',', '.').trim();
               final numValue = double.tryParse(sanitized);
               double? finalStoredValue;
-              setState(() {
-                final customResponses = Map<String, dynamic>.from(
-                    _personalization.customResponses ?? {});
 
-                if (numValue == null) {
-                  customResponses.remove(id);
-                  if (id == 'event_load') {
-                    customResponses.remove('eventLoadKg');
-                  }
-                } else {
-                  double finalValue = numValue;
-                  if (id == 'event_load' && !_useMetric) {
-                    // Convert from lbs to kg for storage
-                    finalValue = numValue * 0.453592;
-                  }
-                  customResponses[id] = finalValue;
-                  if (id == 'event_load') {
-                    customResponses['eventLoadKg'] = finalValue;
-                  }
-                  finalStoredValue = finalValue;
+              final customResponses = Map<String, dynamic>.from(
+                  _personalization.customResponses ?? {});
+
+              if (numValue == null || numValue <= 0) {
+                customResponses.remove(id);
+                if (id == 'event_load') {
+                  customResponses.remove('eventLoadKg');
                 }
+              } else {
+                double finalValue = numValue;
+                if (id == 'event_load' && !_useMetric) {
+                  // Convert from lbs to kg for storage
+                  finalValue = numValue * 0.453592;
+                }
+                customResponses[id] = finalValue;
+                if (id == 'event_load') {
+                  customResponses['eventLoadKg'] = finalValue;
+                }
+                finalStoredValue = finalValue;
+              }
 
-                _personalization = _personalization.copyWith(
-                  customResponses: customResponses,
-                  equipmentWeight: id == 'event_load' && finalStoredValue != null
-                      ? finalStoredValue
-                      : _personalization.equipmentWeight,
-                  equipmentType: id == 'event_load' && finalStoredValue != null
-                      ? (_personalization.equipmentType ?? 'rucksack')
-                      : _personalization.equipmentType,
-                );
-              });
+              // Update without setState to preserve focus
+              _personalization = _personalization.copyWith(
+                customResponses: customResponses,
+                equipmentWeight: id == 'event_load' && finalStoredValue != null
+                    ? finalStoredValue
+                    : _personalization.equipmentWeight,
+                equipmentType: id == 'event_load' && finalStoredValue != null
+                    ? (_personalization.equipmentType ?? 'rucksack')
+                    : _personalization.equipmentType,
+              );
+
+              // Notify parent widget of change
+              widget.onPersonalizationChanged(_personalization);
             },
           ),
         ],

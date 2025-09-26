@@ -153,8 +153,6 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Your Coaching Plan'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
         actions: [
           if (!_isLoading && _planData != null) ...[
             IconButton(

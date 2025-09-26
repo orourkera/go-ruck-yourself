@@ -558,7 +558,7 @@ Keep it concise, specific to THEIR inputs, and actionable. Focus on practical ru
             'You are a rucking coach creating a PERSONALIZED plan for $username. Take their specific inputs (days available, challenges, goals, custom answers) and create a plan that addresses THEIR situation. Do NOT show generic templates. Every recommendation should tie back to what THEY told you. Use markdown formatting with bullets (•), bold text, and ## headers. Be specific with weights, distances, and paces based on their current fitness and goals.',
         input: prompt,
         temperature: 0.7,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 3000,
         onDelta: (delta) {
           if (mounted) {
             setState(() {
@@ -695,7 +695,7 @@ Keep it concise, specific to their inputs, and motivating. Use bullet points and
             'You are creating a PERSONALIZED $streakDays-day rucking streak plan. Use ONLY the specific numbers provided - this is a $streakDays-day plan, NOT 8 weeks. Every detail must match their actual inputs. Do not use generic templates. Make it specific to their $streakDays-day goal with $restDescription.',
         input: prompt,
         temperature: 0.7,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 3000,
         onDelta: (delta) {
           if (mounted) {
             setState(() {
