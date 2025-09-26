@@ -434,17 +434,64 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
 
     logger.info(f"Total sessions in weekly_template: {len(weekly_template)}")
 
-    # If no sessions were parsed, create a basic template from user preferences
-    if not weekly_template and preferred_days:
-        logger.info(f"No sessions parsed from AI plan, creating basic template from preferred days: {preferred_days}")
-        for i, day in enumerate(preferred_days[:personalization.get('trainingDaysPerWeek', 3)]):
-            session_types = ['Long Ruck', 'Tempo Ruck', 'Recovery Ruck', 'Interval Ruck']
-            weekly_template.append({
-                'day': day.lower(),
-                'session_type': session_types[i % len(session_types)],
-                'duration_minutes': min_session_time + (10 if i == 0 else 0),
-                'weight_kg': round(equipment_weight * (0.8 if i == 0 else 0.7), 1),
-            })
+    # If no sessions were parsed OR this is an event-prep plan, create a basic template
+    # Event prep plans have progressive weeks, not a repeating template
+    if not weekly_template or base_plan_id == 'event-prep':
+        logger.info(f"Creating basic template for event prep or unparsed plan. Preferred days: {preferred_days}")
+        weekly_template = []  # Reset in case of event-prep
+
+        # For event prep, create a balanced weekly template
+        training_days = personalization.get('trainingDaysPerWeek', 3)
+        days_to_use = preferred_days[:training_days] if preferred_days else ['tuesday', 'thursday', 'saturday']
+
+        # Create event-specific template based on training days
+        if base_plan_id == 'event-prep':
+            # Event prep needs: long ruck, speed work, and recovery
+            if training_days >= 4:
+                session_plan = [
+                    ('Long Ruck', 1.0, 60),  # Full weight, longer duration
+                    ('Interval Training', 0.8, 35),  # Slightly less weight, speed work
+                    ('Tempo Ruck', 0.9, 45),  # Near full weight, moderate duration
+                    ('Recovery Ruck', 0.6, 30),  # Light weight, minimum duration
+                    ('Hills/Strength', 0.7, 40),  # Moderate weight, cross training
+                ]
+            elif training_days == 3:
+                session_plan = [
+                    ('Long Ruck', 1.0, 60),
+                    ('Speed/Intervals', 0.8, 35),
+                    ('Tempo Ruck', 0.9, 45),
+                ]
+            else:  # 2 days or less
+                session_plan = [
+                    ('Progressive Ruck', 0.9, 45),
+                    ('Speed Work', 0.8, 30),
+                ]
+
+            for i, day in enumerate(days_to_use):
+                if i < len(session_plan):
+                    session_type, weight_factor, base_duration = session_plan[i]
+                else:
+                    # Extra days get recovery work
+                    session_type, weight_factor, base_duration = ('Active Recovery', 0.5, min_session_time)
+
+                weekly_template.append({
+                    'day': day.lower(),
+                    'session_type': session_type,
+                    'duration_minutes': max(min_session_time, base_duration),
+                    'weight_kg': round(equipment_weight * weight_factor, 1),
+                })
+        else:
+            # Generic template for other plan types
+            for i, day in enumerate(days_to_use):
+                session_types = ['Long Ruck', 'Tempo Ruck', 'Recovery Ruck', 'Interval Ruck']
+                weekly_template.append({
+                    'day': day.lower(),
+                    'session_type': session_types[i % len(session_types)],
+                    'duration_minutes': min_session_time + (10 if i == 0 else 0),
+                    'weight_kg': round(equipment_weight * (0.8 if i == 0 else 0.7), 1),
+                })
+
+        logger.info(f"Created weekly template with {len(weekly_template)} sessions")
 
     # Extract duration from AI plan text
     # Look for patterns like "12 weeks", "16-week", "8 week plan"
