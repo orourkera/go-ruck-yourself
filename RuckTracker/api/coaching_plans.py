@@ -330,6 +330,124 @@ def customization_value(personalization: Dict[str, Any], key: str):
     custom = personalization.get('customResponses', {})
     return custom.get(key)
 
+def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], personalization: Dict[str, Any], base_plan_id: str) -> Dict[str, Any]:
+    """
+    Parse the AI-generated plan (markdown text) that the user approved and create a structured plan.
+    This ensures the backend uses exactly what the user saw and approved.
+    """
+    import re
+
+    # Start with base structure from template
+    personalized_structure = json.loads(json.dumps(base_plan.get('base_structure', {})))
+
+    # Parse the AI plan to extract weekly sessions
+    weekly_template = []
+
+    # Common patterns in AI-generated plans
+    # Look for day-based patterns like "Tuesday: Long Ruck", "Friday: Recovery"
+    day_pattern = r'(?:^|\n)\*?\s*(?P<day>Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*(?P<session_type>[^\n]+)'
+
+    # Look for session details like duration, weight, pace
+    duration_pattern = r'(\d+)(?:-(\d+))?\s*min'
+    weight_pattern = r'(\d+(?:\.\d+)?)\s*kg'
+    distance_pattern = r'(\d+(?:\.\d+)?)\s*km'
+
+    # Extract user's equipment weight from personalization
+    equipment_weight = personalization.get('equipment_weight', 20.0)
+    min_session_time = personalization.get('minimum_session_minutes', 30)
+    preferred_days = personalization.get('preferred_days', [])
+
+    # Find all day/session matches in the AI plan
+    matches = re.finditer(day_pattern, ai_plan_text, re.MULTILINE | re.IGNORECASE)
+
+    for match in matches:
+        day = match.group('day').lower()
+        session_type_raw = match.group('session_type').strip()
+
+        # Extract session details from the surrounding context
+        # Look ahead in the text for details about this session
+        start_pos = match.end()
+        end_pos = min(start_pos + 500, len(ai_plan_text))  # Look ahead 500 chars
+        session_context = ai_plan_text[start_pos:end_pos]
+
+        # Extract duration
+        duration_match = re.search(duration_pattern, session_context)
+        if duration_match:
+            duration = int(duration_match.group(1))
+            if duration_match.group(2):  # Range like "30-45"
+                duration = f"{duration_match.group(1)}-{duration_match.group(2)}"
+        else:
+            duration = min_session_time
+
+        # Extract weight
+        weight_match = re.search(weight_pattern, session_context)
+        if weight_match:
+            weight = float(weight_match.group(1))
+        else:
+            # Use sensible defaults based on session type
+            if 'recovery' in session_type_raw.lower() or 'easy' in session_type_raw.lower():
+                weight = equipment_weight * 0.5
+            elif 'long' in session_type_raw.lower():
+                weight = equipment_weight * 0.8
+            else:
+                weight = equipment_weight * 0.7
+
+        # Extract distance if mentioned
+        distance_match = re.search(distance_pattern, session_context)
+        distance = float(distance_match.group(1)) if distance_match else None
+
+        # Create session entry
+        session = {
+            'day': day,
+            'session_type': session_type_raw,
+            'duration_minutes': duration,
+            'weight_kg': round(weight, 1),
+        }
+
+        if distance:
+            session['distance_km'] = distance
+
+        # Add any notes found in the context
+        if 'focus on' in session_context.lower():
+            notes_match = re.search(r'focus on ([^.\n]+)', session_context, re.IGNORECASE)
+            if notes_match:
+                session['notes'] = f"Focus on {notes_match.group(1)}"
+
+        weekly_template.append(session)
+
+    # If no sessions were parsed, create a basic template from user preferences
+    if not weekly_template and preferred_days:
+        for i, day in enumerate(preferred_days[:personalization.get('trainingDaysPerWeek', 3)]):
+            session_types = ['Long Ruck', 'Tempo Ruck', 'Recovery Ruck', 'Interval Ruck']
+            weekly_template.append({
+                'day': day.lower(),
+                'session_type': session_types[i % len(session_types)],
+                'duration_minutes': min_session_time + (10 if i == 0 else 0),
+                'weight_kg': round(equipment_weight * (0.8 if i == 0 else 0.7), 1),
+            })
+
+    # Add the weekly template to the structure
+    personalized_structure['weekly_template'] = weekly_template
+    personalized_structure['ai_generated'] = True
+    personalized_structure['duration_weeks'] = base_plan.get('duration_weeks', 12)
+
+    # Extract any adaptations mentioned in the AI plan
+    adaptations = []
+    if 'build' in ai_plan_text.lower() and 'base' in ai_plan_text.lower():
+        adaptations.append("Building base fitness as identified in your personalized plan")
+    if 'taper' in ai_plan_text.lower():
+        adaptations.append("Includes strategic taper as outlined in your plan")
+    if 'progression' in ai_plan_text.lower():
+        adaptations.append("Progressive overload following your approved plan")
+
+    return {
+        'base_plan_id': base_plan_id,
+        'personalized_structure': personalized_structure,
+        'adaptations': adaptations,
+        'ai_plan_source': True,  # Flag that this came from AI
+        'weekly_template': weekly_template,
+    }
+
 def _build_event_prep_weekly_template(calculations: Dict[str, Any], personalization: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Construct a progressive 12-week event prep schedule with week-specific sessions."""
     duration_weeks = 12
@@ -697,6 +815,13 @@ def personalize_plan(
         base_plan = templates.get(base_plan_id)
         if not base_plan:
             raise ValueError(f"Unknown base plan: {base_plan_id}")
+
+    # Check if user has AI-generated plan (what they approved in the UI)
+    ai_generated_plan = personalization.get('aiGeneratedPlan')
+    if ai_generated_plan:
+        # Parse the AI plan and create a structured weekly template from it
+        logger.info(f"Using AI-generated plan for user {user_id}")
+        return _parse_ai_generated_plan(ai_generated_plan, base_plan, personalization, base_plan_id)
     
     # Get user insights for history-aware personalization
     user_insights = None

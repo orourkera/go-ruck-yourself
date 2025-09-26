@@ -16,6 +16,8 @@ class PlanPersonalization {
   final bool? enableNotifications;
   // Custom fields from plan-specific questions
   final Map<String, dynamic>? customResponses;
+  // AI-generated plan that user approved
+  final String? aiGeneratedPlan;
 
   const PlanPersonalization({
     this.why,
@@ -33,6 +35,7 @@ class PlanPersonalization {
     this.preferredNotificationTime,
     this.enableNotifications,
     this.customResponses,
+    this.aiGeneratedPlan,
   });
 
   PlanPersonalization copyWith({
@@ -51,6 +54,7 @@ class PlanPersonalization {
     String? preferredNotificationTime,
     bool? enableNotifications,
     Map<String, dynamic>? customResponses,
+    String? aiGeneratedPlan,
   }) {
     return PlanPersonalization(
       why: why ?? this.why,
@@ -69,6 +73,7 @@ class PlanPersonalization {
       preferredNotificationTime: preferredNotificationTime ?? this.preferredNotificationTime,
       enableNotifications: enableNotifications ?? this.enableNotifications,
       customResponses: customResponses ?? this.customResponses,
+      aiGeneratedPlan: aiGeneratedPlan ?? this.aiGeneratedPlan,
     );
   }
 
@@ -89,6 +94,7 @@ class PlanPersonalization {
       'preferredNotificationTime': preferredNotificationTime,
       'enableNotifications': enableNotifications,
       'customResponses': customResponses,
+      'aiGeneratedPlan': aiGeneratedPlan,
     };
   }
 
@@ -109,6 +115,7 @@ class PlanPersonalization {
       preferredNotificationTime: json['preferredNotificationTime'] as String?,
       enableNotifications: json['enableNotifications'] as bool?,
       customResponses: json['customResponses'] as Map<String, dynamic>?,
+      aiGeneratedPlan: json['aiGeneratedPlan'] as String?,
     );
   }
 

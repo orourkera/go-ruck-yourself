@@ -813,11 +813,16 @@ Keep it under 200 words, motivational, and specific to their answers.
     });
 
     try {
+      // Add the AI-generated plan to the personalization
+      final personalizationWithAIPlan = _personalization!.copyWith(
+        aiGeneratedPlan: _planPreviewSummary,
+      );
+
       // Create the personalized coaching plan via API
       final planData = await _coachingService.createCoachingPlan(
         basePlanId: _selectedPlanType!.id,
         coachingPersonality: _selectedPersonality!.id,
-        personalization: _personalization!,
+        personalization: personalizationWithAIPlan,
       );
 
       // The planData is the response data from backend: {plan_id, message, start_date, duration_weeks}
