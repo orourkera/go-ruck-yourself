@@ -454,6 +454,16 @@ ${remainingDailyDeficit > 500 ? "This is aggressive - consider a longer timeline
             20;
         final timeGoal = customResponses['time_goal'] ?? 'Finish strong';
 
+        // Get user's unit preference (will be set above)
+        final prefs = await SharedPreferences.getInstance();
+        final useMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+
+        // Convert to display units
+        final displayDistance = useMetric ? eventDistance : eventDistance * 0.621371;
+        final displayLoad = useMetric ? eventLoad : eventLoad * 2.20462;
+        final distanceUnit = useMetric ? 'km' : 'miles';
+        final weightUnit = useMetric ? 'kg' : 'lbs';
+
         // Calculate weeks until event
         String weeksUntilEvent = '8';  // default
         if (eventDate != null) {
@@ -473,8 +483,8 @@ ${remainingDailyDeficit > 500 ? "This is aggressive - consider a longer timeline
         planSpecificDetails = '''
 - Event Date: ${eventDate != null ? DateTime.parse(eventDate).toLocal().toString().split(' ')[0] : 'TBD'}
 - CRITICAL: Create a $weeksUntilEvent-WEEK plan (event is in $weeksUntilEvent weeks!)
-- Event Distance: ${eventDistance}km
-- Event Load: ${eventLoad}kg
+- Event Distance: ${displayDistance.toStringAsFixed(1)} $distanceUnit
+- Event Load: ${displayLoad.toStringAsFixed(0)} $weightUnit
 - Time Goal: $timeGoal
 
 IMPORTANT: This is a $weeksUntilEvent-week plan, NOT 16 weeks. Scale the progression appropriately for $weeksUntilEvent weeks.''';
@@ -491,6 +501,13 @@ IMPORTANT: This is a $weeksUntilEvent-week plan, NOT 16 weeks. Scale the progres
         break;
     }
 
+    // Get user's unit preference
+    final prefs = await SharedPreferences.getInstance();
+    final useMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+    final distanceUnit = useMetric ? 'km' : 'miles';
+    final weightUnit = useMetric ? 'kg' : 'lbs';
+    final paceUnit = useMetric ? 'min/km' : 'min/mile';
+
     // Add user insights context if available
     String userInsightsContext = '';
     if (_userInsights != null) {
@@ -500,19 +517,29 @@ IMPORTANT: This is a $weeksUntilEvent-week plan, NOT 16 weeks. Scale the progres
       final weeklyAvg = _userInsights!['weekly_avg'] ?? 0.0;
       final ruckWeight = _userInsights!['ruck_weight'];
 
+      // Convert values to user's preferred units
+      final displayDistance = useMetric ? avgDistance : avgDistance * 0.621371;
+      final displayWeight = useMetric ? ruckWeight : (ruckWeight != null ? ruckWeight * 2.20462 : null);
+      final displayPace = useMetric ? avgPace : avgPace * 1.60934;
+
       userInsightsContext = '''
 
 USER'S CURRENT FITNESS PROFILE:
 - Experience Level: $experienceLevel
 - Current Weekly Frequency: ${weeklyAvg.toStringAsFixed(1)} sessions/week
-- Average Distance: ${avgDistance.toStringAsFixed(1)} km per session
-- Average Pace: ${avgPace > 0 ? '${avgPace.toStringAsFixed(1)} min/km' : 'N/A'}
-- Typical Ruck Weight: ${ruckWeight != null ? '${ruckWeight.toStringAsFixed(0)} kg' : 'N/A'}
+- Average Distance: ${displayDistance.toStringAsFixed(1)} $distanceUnit per session
+- Average Pace: ${displayPace > 0 ? '${displayPace.toStringAsFixed(1)} $paceUnit' : 'N/A'}
+- Typical Ruck Weight: ${displayWeight != null ? '${displayWeight.toStringAsFixed(0)} $weightUnit' : 'N/A'}
 ''';
     }
 
     final prompt = '''
 Create a PERSONALIZED ${_selectedPlanType!.name} rucking plan for $username based on their specific inputs.
+
+IMPORTANT: Use ${useMetric ? 'METRIC' : 'IMPERIAL'} units throughout the plan:
+- Distance in $distanceUnit
+- Weight in $weightUnit
+- Pace in $paceUnit
 
 USER'S PERSONALIZATION:
 - Why: ${_personalization!.why?.join(', ') ?? 'Personal growth'}

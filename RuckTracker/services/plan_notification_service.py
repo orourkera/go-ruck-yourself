@@ -384,7 +384,8 @@ class PlanNotificationService:
 
         behavior = self.cadence_analyzer.ensure_behavior_snapshot(user_id, plan_id, timezone_name)
         prefs = self._get_user_preferences(user_id)
-        upcoming_sessions = self._fetch_upcoming_sessions(plan_id, limit=10)
+        # Fetch all sessions for the plan to schedule notifications for the entire duration
+        upcoming_sessions = self._fetch_upcoming_sessions(plan_id, limit=100)
 
         logger.info(f"Found {len(upcoming_sessions)} upcoming sessions to schedule notifications for")
 
