@@ -444,9 +444,14 @@ ${remainingDailyDeficit > 500 ? "This is aggressive - consider a longer timeline
         break;
 
       case 'event-prep':
-        final eventDate = customResponses['event_date'];
-        final eventDistance = customResponses['event_distance'] ?? 19.3;
-        final eventLoad = customResponses['event_load'] ?? 20;
+        final eventDate = customResponses['event_date'] ??
+            customResponses['eventDate'];
+        final eventDistance = customResponses['event_distance'] ??
+            customResponses['eventDistanceKm'] ??
+            19.3;
+        final eventLoad = customResponses['event_load'] ??
+            customResponses['eventLoadKg'] ??
+            20;
         final timeGoal = customResponses['time_goal'] ?? 'Finish strong';
         planSpecificDetails = '''
 - Event Date: ${eventDate != null ? DateTime.parse(eventDate).toLocal().toString().split(' ')[0] : 'TBD'}

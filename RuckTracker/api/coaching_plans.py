@@ -448,6 +448,123 @@ def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Di
     
     return weekly_template
 
+
+def _build_event_prep_weekly_template(calculations: Dict[str, Any], personalization: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Construct a progressive 12-week event prep schedule with week-specific sessions."""
+    duration_weeks = 12
+    min_session_time = personalization.get('minimum_session_minutes', 35)
+    preferred_days = personalization.get('preferred_days', [])
+    event_load = float(calculations.get('max_weight_kg') or personalization.get('equipment_weight') or 20.0)
+    event_distance_km = float(calculations.get('event_distance_km') or 19.3)
+    starting_load = float(calculations.get('starting_weight_kg') or max(10.0, event_load * 0.55))
+    load_step = float(calculations.get('progression_weight_kg') or max(1.0, event_load * 0.08))
+    target_pace = float(calculations.get('target_pace_min_per_km') or 8.4)
+    easy_pace = target_pace + 1.2
+    tempo_pace = max(6.8, target_pace - 0.7)
+
+    default_days = ['tuesday', 'thursday', 'saturday', 'sunday']
+    if preferred_days:
+        mapped = []
+        for idx, day in enumerate(default_days):
+            mapped.append(preferred_days[idx % len(preferred_days)].lower())
+        default_days = mapped
+
+    long_distances = [8, 10, 12, 14, 15.5, 17, 18.5, event_distance_km,
+                      event_distance_km * 0.75, event_distance_km * 0.6,
+                      event_distance_km * 0.5, event_distance_km * 0.35]
+    long_distances = [round(max(6.0, min(event_distance_km, d)), 1) for d in long_distances]
+
+    long_weights = []
+    current_load = starting_load
+    for week_idx in range(duration_weeks):
+        if week_idx < 8:
+            current_load = min(event_load, starting_load + load_step * week_idx)
+        else:
+            current_load = event_load
+        long_weights.append(round(current_load, 1))
+
+    def long_duration(distance_km: float, intensity: str = 'easy') -> int:
+        pace = easy_pace if intensity == 'easy' else target_pace
+        minutes = distance_km * pace
+        return max(int(minutes + 5), min_session_time + (15 if distance_km >= 12 else 5))
+
+    def tempo_duration(week_no: int) -> int:
+        base = 40 + min(week_no * 3, 18)
+        return max(int(base), min_session_time)
+
+    def interval_structure(week_no: int) -> List[Dict[str, Any]]:
+        reps = min(8, 6 + week_no // 2)
+        blocks: List[Dict[str, Any]] = []
+        for _ in range(reps):
+            blocks.append({'type': 'work', 'duration_minutes': 2, 'instruction': 'RPE 7-8 fast march'})
+            blocks.append({'type': 'recovery', 'duration_minutes': 2, 'instruction': 'RPE 2-3 easy walk'})
+        return blocks
+
+    sessions: List[Dict[str, Any]] = []
+
+    for week_idx in range(duration_weeks):
+        week_num = week_idx + 1
+        long_distance = long_distances[week_idx]
+        long_weight = long_weights[week_idx]
+        long_intensity = 'target' if week_num >= 9 else 'easy'
+        long_duration_minutes = long_duration(long_distance, long_intensity)
+
+        is_taper = week_num >= 10
+        taper_factor = 0.6 if week_num == 10 else 0.5 if week_num == 11 else 0.4 if week_num == 12 else 1.0
+
+        tempo_minutes = tempo_duration(week_num)
+        if is_taper:
+            tempo_minutes = int(max(min_session_time, tempo_minutes * taper_factor))
+            long_duration_minutes = int(max(min_session_time + 10, long_duration_minutes * taper_factor))
+
+        sessions.extend([
+            {
+                'week': week_num,
+                'day': default_days[0],
+                'session_type': 'Tempo Ruck',
+                'duration_minutes': tempo_minutes,
+                'target_pace_min_per_km': tempo_pace,
+                'target_weight_kg': round(long_weight * 0.7, 1),
+                'notes': 'Warm-up 10 min, main set @ RPE 6-7, negative split final rep.'
+            },
+            {
+                'week': week_num,
+                'day': default_days[1],
+                'session_type': 'Interval Ruck',
+                'duration_minutes': max(min_session_time, 35 + week_num * 2 if not is_taper else 30),
+                'intervals': interval_structure(week_num),
+                'target_weight_kg': round(long_weight * 0.6, 1),
+                'notes': 'Alternate fast marches with brisk recovery. Add hills when available.'
+            },
+            {
+                'week': week_num,
+                'day': default_days[2],
+                'session_type': 'Event Simulation Long Ruck' if week_num == 9 else 'Long Endurance Ruck',
+                'duration_minutes': long_duration_minutes,
+                'target_weight_kg': long_weight,
+                'target_distance_km': round(long_distance, 1),
+                'notes': 'Fuel every 35 min, focus on posture and cadence.' if week_num != 9 else
+                         f'Full rehearsal: {round(long_distance,1)} km at event load. Hold goal pace (~{target_pace:.1f} min/km) and nutrition plan.'
+            },
+            {
+                'week': week_num,
+                'day': default_days[3],
+                'session_type': 'Recovery / Mobility',
+                'duration_minutes': max(20, int(min_session_time * 0.75)),
+                'notes': 'Easy walk + mobility and core stability. Keep HR low.'
+            }
+        ])
+
+        if week_num % 3 == 0 and not is_taper:
+            sessions.append({
+                'week': week_num,
+                'day': 'friday',
+                'session_type': 'Strength & Stability Circuit',
+                'duration_minutes': 35,
+                'notes': 'Step-ups, lunges, suitcase carries, plank variations (2-3 rounds).'
+            })
+
+    return sessions
 def personalize_plan(
     base_plan_id: str,
     personalization: Dict[str, Any],
@@ -892,7 +1009,7 @@ class CoachingPlansResource(Resource):
             try:
                 plan_session_metadata = {
                     "plan_structure": personalized_plan['personalized_structure'],
-                    "weekly_template": personalized_plan.get('weekly_template'),
+                    "weekly_template": personalized_plan['personalized_structure'].get('weekly_template'),
                     "training_schedule": personalized_plan.get('training_schedule'),
                     "duration_weeks": base_plan.get('duration_weeks'),
                     "user_timezone": user_timezone,

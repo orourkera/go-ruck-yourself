@@ -194,13 +194,63 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _planData == null
+          : (_planData == null ||
+                  _planData!['duration_weeks'] == null ||
+                  (_planData!['plan_sessions'] == null ||
+                      (_planData!['plan_sessions'] as List?)?.isEmpty == true))
               ? _buildNoPlanView()
               : _buildPlanView(),
     );
   }
 
   Widget _buildNoPlanView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Coaching Plan Data',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Your coaching plan exists but has no sessions.\nPlease delete this plan and create a new one.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _showDeleteConfirmationDialog,
+              icon: const Icon(Icons.delete),
+              label: const Text('Delete This Plan'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanView() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -449,7 +499,13 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
   Widget _buildProgressIndicator() {
     final weeksCompleted = _calculateWeeksCompleted();
     final totalWeeks = _planData!['template']?['duration_weeks'] ??
-                      _planData!['duration_weeks'] ?? 8;
+                      _planData!['duration_weeks'];
+
+    // Don't show progress if we don't have real data
+    if (totalWeeks == null || totalWeeks == 0) {
+      return const SizedBox.shrink();
+    }
+
     final progress = weeksCompleted / totalWeeks;
 
     return Column(

@@ -450,6 +450,7 @@ def _calculate_adherence_stats(sessions):
 def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=None):
     """Generate plan sessions based on personalized plan metadata."""
     try:
+        logger.info(f"Starting session generation for plan {user_plan_id}")
         client = get_supabase_admin_client()  # Use admin client to bypass RLS
 
         # Extract timezone and notification preferences from metadata
@@ -466,6 +467,7 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
             except Exception:
                 pass
 
+        # Try multiple sources for plan structure
         plan_structure = plan_metadata.get('plan_structure')
         if isinstance(plan_structure, str):
             try:
@@ -484,18 +486,32 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
         if not isinstance(plan_structure, dict):
             plan_structure = {}
 
-        weekly_template = plan_structure.get('weekly_template')
-        if not weekly_template:
-            weekly_template = plan_metadata.get('weekly_template', [])
+        # Look for weekly template in multiple places
+        weekly_template = None
 
+        # First check plan_structure
+        if plan_structure.get('weekly_template'):
+            weekly_template = plan_structure['weekly_template']
+        # Then check base_structure directly
+        elif plan_metadata.get('base_structure', {}).get('weekly_template'):
+            weekly_template = plan_metadata['base_structure']['weekly_template']
+        # Then check root of metadata
+        elif plan_metadata.get('weekly_template'):
+            weekly_template = plan_metadata['weekly_template']
+
+        # Also check for training_schedule as fallback
         training_schedule = plan_metadata.get('training_schedule', [])
+
+        # If still no weekly_template but we have training_schedule, use that
+        if not weekly_template and training_schedule:
+            weekly_template = training_schedule
 
         duration_weeks = plan_metadata.get('duration_weeks') or plan_structure.get('duration_weeks')
         if not duration_weeks:
             duration_weeks = plan_metadata.get('weeks')
 
         if not duration_weeks:
-            logger.warning(f"Cannot generate sessions for plan {user_plan_id}: duration_weeks missing")
+            logger.error(f"Cannot generate sessions for plan {user_plan_id}: duration_weeks missing from metadata keys: {plan_metadata.keys()}")
             return
 
         sessions_to_create = []

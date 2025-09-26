@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 
 class WeeklyScheduleView extends StatelessWidget {
   final Map<String, dynamic> planData;
@@ -19,7 +20,25 @@ class WeeklyScheduleView extends StatelessWidget {
                           planData['template']?['base_structure']?['weekly_template'] ??
                           planData['plan_structure']?['weekly_template'] ?? [];
     final totalWeeks = planData['template']?['duration_weeks'] ??
-                      planData['duration_weeks'] ?? 8;
+                      planData['duration_weeks'];
+
+    // Don't show anything if we don't have real data
+    if (totalWeeks == null || totalWeeks == 0 ||
+        planData['plan_sessions'] == null ||
+        (planData['plan_sessions'] as List?)?.isEmpty == true) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Text(
+            'No plan data found',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 16,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,113 +329,82 @@ class WeeklyScheduleView extends StatelessWidget {
   }
 
   Map<String, dynamic> _getWeekSessions(int week) {
-    // Generate week-specific sessions based on plan template
-    // This should come from the plan_structure.weekly_template
-    final template = planData['modifications']?['weekly_template'] ??
-                    planData['template']?['base_structure']?['weekly_template'] ??
-                    planData['plan_structure']?['weekly_template'] ?? [];
+    final planSessions = planData['plan_sessions'] ?? [];
+    final weekSessions = <String, dynamic>{};
+    final dayMapping = {
+      1: 'monday', 2: 'tuesday', 3: 'wednesday',
+      4: 'thursday', 5: 'friday', 6: 'saturday', 0: 'sunday'
+    };
 
-    // Default schedule if no template
-    if (template.isEmpty) {
-      if (week <= 2) {
-        // Base building weeks
-        return {
-          'mon': {'type': 'base_aerobic', 'duration': 30, 'distance': 3.0},
-          'wed': {'type': 'recovery', 'duration': 20, 'distance': 2.0},
-          'fri': {'type': 'base_aerobic', 'duration': 35, 'distance': 3.5},
-          'sun': {'type': 'long_slow', 'duration': 45, 'distance': 4.5},
-        };
-      } else if (week <= 5) {
-        // Progressive weeks
-        return {
-          'mon': {'type': 'tempo', 'duration': 35, 'distance': 3.5},
-          'tue': {'type': 'recovery', 'duration': 20, 'distance': 2.0},
-          'thu': {'type': 'intervals', 'duration': 30, 'distance': 3.0},
-          'sat': {'type': 'base_aerobic', 'duration': 40, 'distance': 4.0},
-          'sun': {'type': 'long_slow', 'duration': 60, 'distance': 6.0},
-        };
-      } else {
-        // Peak/Taper weeks
-        return {
-          'mon': {'type': 'tempo', 'duration': 40, 'distance': 4.0},
-          'wed': {'type': 'recovery', 'duration': 25, 'distance': 2.5},
-          'thu': {'type': 'hill_work', 'duration': 35, 'distance': 3.0},
-          'sat': {'type': 'base_aerobic', 'duration': 45, 'distance': 5.0},
-        };
+    // Calculate the start and end of the target week
+    final planStartDate = DateTime.parse(planData['start_date']);
+    final targetWeekStart = planStartDate.add(Duration(days: (week - 1) * 7));
+    final targetWeekEnd = targetWeekStart.add(Duration(days: 6));
+
+    for (var session in planSessions) {
+      final scheduledDate = session['scheduled_date'];
+      if (scheduledDate != null) {
+        final sessionDate = DateTime.parse(scheduledDate);
+
+        // Check if this session falls within the target week
+        if (sessionDate.isAfter(targetWeekStart.subtract(Duration(days: 1))) &&
+            sessionDate.isBefore(targetWeekEnd.add(Duration(days: 1)))) {
+
+          final dayName = dayMapping[sessionDate.weekday % 7];
+          final shortDay = dayName?.substring(0, 3);
+
+          if (shortDay != null) {
+            // Parse coaching points for duration/distance
+            Map<String, dynamic> coachingPoints = {};
+            if (session['coaching_points'] is String) {
+              try {
+                coachingPoints = jsonDecode(session['coaching_points']);
+              } catch (e) {
+                // Ignore JSON parse errors
+              }
+            } else if (session['coaching_points'] is Map) {
+              coachingPoints = Map<String, dynamic>.from(session['coaching_points']);
+            }
+
+            weekSessions[shortDay] = {
+              'type': session['planned_session_type']?.toString().toLowerCase().replaceAll(' ', '_'),
+              'session_type': session['planned_session_type'],
+              'duration': coachingPoints['target_duration_minutes'],
+              'distance': coachingPoints['distance_km'],
+              'weight_kg': coachingPoints['target_weight_kg'],
+              'completion_status': session['completion_status'],
+              'scheduled_date': scheduledDate,
+              'id': session['id']
+            };
+          }
+        }
       }
     }
 
-    // Use template if available
-    // TODO: Parse weekly_template properly
-    return {};
+    return weekSessions;
   }
 
   String _getSessionTitle(Map<String, dynamic> session) {
-    final type = session['type'] ?? 'training';
-    switch (type) {
-      case 'base_aerobic':
-        return 'Base Ruck';
-      case 'tempo':
-        return 'Tempo Ruck';
-      case 'intervals':
-        return 'Speed Intervals';
-      case 'recovery':
-        return 'Recovery';
-      case 'long_slow':
-        return 'Long Ruck';
-      case 'hill_work':
-        return 'Hill Training';
-      default:
-        return 'Training';
-    }
+    final sessionType = session['session_type'] ?? session['type'];
+    return sessionType?.toString() ?? '';
   }
 
   String _getSessionDescription(Map<String, dynamic> session) {
     final distance = session['distance'] ?? 0;
-    final intensity = _getIntensityDescription(session['type']);
-    return '$distance km • $intensity';
+    final sessionType = session['session_type'] ?? session['type'] ?? '';
+    return '${distance.toStringAsFixed(1)} km • ${sessionType.toString()}';
   }
 
   String _getSessionDuration(Map<String, dynamic> session) {
-    final duration = session['duration'] ?? 30;
-    return '$duration min';
+    final duration = session['duration'];
+    return duration != null ? '$duration min' : '';
   }
 
   String _getIntensityDescription(String? type) {
-    switch (type) {
-      case 'base_aerobic':
-        return 'Easy pace';
-      case 'tempo':
-        return 'Moderate effort';
-      case 'intervals':
-        return 'High intensity';
-      case 'recovery':
-        return 'Very easy';
-      case 'long_slow':
-        return 'Sustainable pace';
-      case 'hill_work':
-        return 'Varied effort';
-      default:
-        return 'Moderate';
-    }
+    return type ?? '';
   }
 
   Color _getSessionColor(String? type) {
-    switch (type) {
-      case 'base_aerobic':
-        return Colors.blue;
-      case 'tempo':
-        return Colors.orange;
-      case 'intervals':
-        return Colors.red;
-      case 'recovery':
-        return Colors.green;
-      case 'long_slow':
-        return Colors.indigo;
-      case 'hill_work':
-        return Colors.purple;
-      default:
-        return Colors.grey;
-    }
+    return Colors.blue;
   }
 }

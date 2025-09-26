@@ -69,7 +69,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
       // For event prep - hardcode 12 miles (19.3 km) since this is the specific challenge
       if (widget.planType?.id == 'event-prep') {
-        customResponses['event_distance'] = 19.3; // 12 miles in km
+        customResponses['event_distance'] = 19.3; // legacy key
+        customResponses['eventDistanceKm'] = 19.3;
       }
 
       if (customResponses.isNotEmpty) {
@@ -100,10 +101,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
 
   Future<void> _loadMetricPreference() async {
     final prefs = await SharedPreferences.getInstance();
-    final preferMetric = prefs.getBool('prefer_metric') ??
-        prefs.getBool('preferMetric') ??
-        false; // Default to false (imperial) to test
-    print('🔧 [PERSONALIZATION] Loading metric preference: $preferMetric');
+    final preferMetric =
+        prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
     if (mounted) {
       setState(() {
         _useMetric = preferMetric;
@@ -534,7 +533,8 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
         switch (_currentQuestionIndex) {
           case 0: // Event date
             return _personalization.customResponses != null &&
-                _personalization.customResponses!['event_date'] != null;
+                (_personalization.customResponses!['event_date'] != null ||
+                    _personalization.customResponses!['eventDate'] != null);
           case 1: // Why
             return _personalization.why != null &&
                 _personalization.why!.isNotEmpty;
@@ -553,12 +553,14 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             }
             // Without equipment step, this index is event load
             return _personalization.customResponses != null &&
-                _personalization.customResponses!['event_load'] != null;
+                (_personalization.customResponses!['eventLoadKg'] != null ||
+                    _personalization.customResponses!['event_load'] != null);
           case 6:
             if (includesEquipmentQuestion) {
               // Event load when equipment question present
               return _personalization.customResponses != null &&
-                  _personalization.customResponses!['event_load'] != null;
+                  (_personalization.customResponses!['eventLoadKg'] != null ||
+                      _personalization.customResponses!['event_load'] != null);
             }
             // Time goal (optional) when equipment question skipped
             return true;
@@ -1538,7 +1540,10 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     final helperText = config['helper_text'] as String?;
 
     // Get current value(s) from customResponses
-    final currentValue = _personalization.customResponses?[id];
+    dynamic currentValue = _personalization.customResponses?[id];
+    if (currentValue == null && id == 'event_load') {
+      currentValue = _personalization.customResponses?['eventLoadKg'];
+    }
 
     // Check if custom is selected for special handling
     final isCustomSelected = currentValue == 'custom' ||
@@ -1725,12 +1730,16 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
             onChanged: (value) {
               final sanitized = value.replaceAll(',', '.').trim();
               final numValue = double.tryParse(sanitized);
+              double? finalStoredValue;
               setState(() {
                 final customResponses = Map<String, dynamic>.from(
                     _personalization.customResponses ?? {});
 
                 if (numValue == null) {
                   customResponses.remove(id);
+                  if (id == 'event_load') {
+                    customResponses.remove('eventLoadKg');
+                  }
                 } else {
                   double finalValue = numValue;
                   if (id == 'event_load' && !_useMetric) {
@@ -1738,10 +1747,20 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                     finalValue = numValue * 0.453592;
                   }
                   customResponses[id] = finalValue;
+                  if (id == 'event_load') {
+                    customResponses['eventLoadKg'] = finalValue;
+                  }
+                  finalStoredValue = finalValue;
                 }
 
                 _personalization = _personalization.copyWith(
                   customResponses: customResponses,
+                  equipmentWeight: id == 'event_load' && finalStoredValue != null
+                      ? finalStoredValue
+                      : _personalization.equipmentWeight,
+                  equipmentType: id == 'event_load' && finalStoredValue != null
+                      ? (_personalization.equipmentType ?? 'rucksack')
+                      : _personalization.equipmentType,
                 );
               });
             },
@@ -1940,8 +1959,10 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     final helperText = config['helper_text'] as String?;
     final validation = config['validation'] as Map<String, dynamic>?;
 
-    final currentDate = _personalization.customResponses?[id] != null
-        ? DateTime.parse(_personalization.customResponses![id] as String)
+    final storedDateString = _personalization.customResponses?[id] ??
+        _personalization.customResponses?['eventDate'];
+    final DateTime? currentDate = storedDateString != null
+        ? DateTime.tryParse(storedDateString as String)
         : null;
 
     return _buildQuestionCard(
@@ -1977,7 +1998,11 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                   final customResponses = Map<String, dynamic>.from(
                     _personalization.customResponses ?? {},
                   );
-                  customResponses[id] = picked.toIso8601String();
+                  final iso = picked.toIso8601String();
+                  customResponses[id] = iso;
+                  if (id == 'event_date') {
+                    customResponses['eventDate'] = iso;
+                  }
                   _personalization = _personalization.copyWith(
                     customResponses: customResponses,
                   );

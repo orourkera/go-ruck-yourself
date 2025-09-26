@@ -107,8 +107,6 @@ class CoachingService {
       }
 
       final normalized = _normalizeActivePlan(activePlan);
-      print(
-          '🔍🔍🔍 [COACHING_SERVICE] Normalized plan: ${normalized.toString()}');
       AppLogger.info(
           '[COACHING_SERVICE] Active plan normalized: ${normalized['plan_name']}');
       return normalized;
@@ -185,10 +183,11 @@ class CoachingService {
       ..['plan_name'] = planName
       ..['name'] = planName
       ..['duration_weeks'] =
-          raw['duration_weeks'] ?? template['duration_weeks'] ?? 8
-      ..['duration'] = raw['duration_weeks'] ?? template['duration_weeks'] ?? 8
-      ..['current_week'] = raw['current_week'] ?? 1
-      ..['weekNumber'] = raw['current_week'] ?? 1
+          raw['duration_weeks'] ?? template['duration_weeks']
+      ..['duration'] = raw['duration_weeks'] ?? template['duration_weeks']
+      ..['current_week'] = raw['current_week']
+      ..['weekNumber'] = raw['current_week']
+      ..['start_date'] = raw['start_date']
       ..['current_phase'] = raw['current_phase'] ??
           raw['phase'] ??
           raw['plan_phase'] ??
