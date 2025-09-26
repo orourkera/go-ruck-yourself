@@ -927,8 +927,6 @@ Keep it under 200 words, motivational, and specific to their answers.
                   _currentStep != PlanCreationStep.personalization
               ? AppBar(
                   title: const Text('AI Coaching Plan'),
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
                   elevation: 0,
                   systemOverlayStyle: overlayStyle,
                   leading: IconButton(
