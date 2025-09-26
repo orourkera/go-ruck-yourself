@@ -340,12 +340,15 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
     # Start with base structure from template
     personalized_structure = json.loads(json.dumps(base_plan.get('base_structure', {})))
 
+    import logging
+    logger = logging.getLogger(__name__)
+
     # Parse the AI plan to extract weekly sessions
     weekly_template = []
 
     # Common patterns in AI-generated plans
-    # Look for day-based patterns like "Tuesday: Long Ruck", "Friday: Recovery"
-    day_pattern = r'(?:^|\n)\*?\s*(?P<day>Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday):\s*(?P<session_type>[^\n]+)'
+    # Look for day-based patterns like "Tuesday: Long Ruck", "### **TUESDAY (Main Ruck)**", "FRIDAY:"
+    day_pattern = r'(?:^|\n)(?:###?\s*\**)?\s*(?P<day>Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:\s*\([^)]+\))?\s*(?:\**)?\s*[:\-]\s*(?P<session_type>[^\n]+)?'
 
     # Look for session details like duration, weight, pace
     duration_pattern = r'(\d+)(?:-(\d+))?\s*min'
@@ -357,12 +360,25 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
     min_session_time = personalization.get('minimum_session_minutes', 30)
     preferred_days = personalization.get('preferred_days', [])
 
+    logger.info(f"Parsing AI plan text (length: {len(ai_plan_text)})")
+    logger.info(f"Equipment weight: {equipment_weight}, min session time: {min_session_time}")
+
     # Find all day/session matches in the AI plan
+    matches = re.finditer(day_pattern, ai_plan_text, re.MULTILINE | re.IGNORECASE)
+    matches_list = list(matches)
+    logger.info(f"Found {len(matches_list)} day pattern matches in AI plan")
+
+    # Reset the matches iterator
     matches = re.finditer(day_pattern, ai_plan_text, re.MULTILINE | re.IGNORECASE)
 
     for match in matches:
         day = match.group('day').lower()
-        session_type_raw = match.group('session_type').strip()
+        session_type_raw = match.group('session_type') or ''
+        session_type_raw = session_type_raw.strip()
+
+        # Skip if no session type found
+        if not session_type_raw:
+            continue
 
         # Extract session details from the surrounding context
         # Look ahead in the text for details about this session
@@ -399,7 +415,7 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
         # Create session entry
         session = {
             'day': day,
-            'session_type': session_type_raw,
+            'session_type': session_type_raw if session_type_raw else f'{day.capitalize()} Ruck',
             'duration_minutes': duration,
             'weight_kg': round(weight, 1),
         }
@@ -414,9 +430,13 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
                 session['notes'] = f"Focus on {notes_match.group(1)}"
 
         weekly_template.append(session)
+        logger.info(f"Added session: {day} - {session_type_raw}")
+
+    logger.info(f"Total sessions in weekly_template: {len(weekly_template)}")
 
     # If no sessions were parsed, create a basic template from user preferences
     if not weekly_template and preferred_days:
+        logger.info(f"No sessions parsed from AI plan, creating basic template from preferred days: {preferred_days}")
         for i, day in enumerate(preferred_days[:personalization.get('trainingDaysPerWeek', 3)]):
             session_types = ['Long Ruck', 'Tempo Ruck', 'Recovery Ruck', 'Interval Ruck']
             weekly_template.append({
