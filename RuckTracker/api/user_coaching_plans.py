@@ -247,7 +247,14 @@ class UserCoachingPlansResource(Resource):
                 except:
                     return {"error": "Invalid start_date format"}, 400
             else:
-                start_date_parsed = datetime.now().date()
+                # Use user's timezone for "today"
+                import pytz
+                try:
+                    user_tz = pytz.timezone(user_timezone)
+                    start_date_parsed = datetime.now(user_tz).date()
+                except:
+                    # Fallback to UTC if timezone fails
+                    start_date_parsed = datetime.now().date()
                 
             # Create user coaching plan using admin client to bypass RLS
             admin_client = get_supabase_admin_client()
@@ -263,9 +270,15 @@ class UserCoachingPlansResource(Resource):
             
             plan_resp = admin_client.table('user_coaching_plans').insert(plan_data).execute()
             created_plan = plan_resp.data[0]
-            
-            # Generate initial plan sessions
-            _generate_plan_sessions(created_plan['id'], template, start_date_parsed)
+
+            # Generate initial plan sessions with personalization data
+            plan_metadata = {
+                **template,  # Include all template fields
+                'user_timezone': user_timezone,
+                'preferred_notification_time': personalization_data.get('preferred_notification_time') if personalization_data else None,
+                'enable_notifications': personalization_data.get('enable_notifications', True) if personalization_data else True,
+            }
+            _generate_plan_sessions(created_plan['id'], plan_metadata, start_date_parsed, user_id)
             
             logger.info(f"Created coaching plan {created_plan['id']} for user {user_id}")
             
@@ -679,16 +692,8 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
             week_start = start_date + timedelta(weeks=week_num - 1)
             session_date = week_start + timedelta(days=session_offset)
 
-            # Convert to user's timezone for proper date representation
-            import pytz
-            try:
-                user_tz = pytz.timezone(user_timezone)
-                # Create datetime in user timezone (use noon to avoid DST issues)
-                session_datetime = user_tz.localize(datetime.combine(session_date, datetime.min.time().replace(hour=12)))
-                session_date_str = session_datetime.date().isoformat()
-            except:
-                # Fallback to UTC if timezone conversion fails
-                session_date_str = session_date.isoformat()
+            # Session date is already calculated correctly from timezone-aware start_date
+            session_date_str = session_date.isoformat()
 
             # Get coaching points only if we could map the session type
             if mapped_type:
