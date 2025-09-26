@@ -443,6 +443,7 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
     return {
         'base_plan_id': base_plan_id,
         'personalized_structure': personalized_structure,
+        'training_schedule': [],  # AI plan doesn't use structured schedule
         'adaptations': adaptations,
         'ai_plan_source': True,  # Flag that this came from AI
         'weekly_template': weekly_template,

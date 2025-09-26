@@ -1763,9 +1763,6 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
                     ? (_personalization.equipmentType ?? 'rucksack')
                     : _personalization.equipmentType,
               );
-
-              // Notify parent widget of change
-              widget.onPersonalizationChanged(_personalization);
             },
           ),
         ],
