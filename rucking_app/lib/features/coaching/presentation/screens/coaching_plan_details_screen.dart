@@ -251,50 +251,6 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
   }
 
   Widget _buildPlanView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.fitness_center,
-            size: 80,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No active coaching plan',
-            style: AppTextStyles.headlineMedium.copyWith(
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Create a personalized plan to get started',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: Colors.grey[500],
-            ),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pushReplacementNamed('/create-plan');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Create Plan'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlanView() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
