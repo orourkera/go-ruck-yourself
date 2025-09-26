@@ -287,7 +287,48 @@ def _calculate_specific_weights_and_times(personalization: Dict[str, Any], user_
                 calculations['session_times']['balance_ruck'] = max(25, min_session_time - 5)
                 calculations['session_times']['speed_ruck'] = max(20, min_session_time - 10)
     
+    # Additional calculations for event prep plans
+    if base_plan_id == 'event-prep':
+        custom_responses = personalization.get('customResponses', {})
+        event_load = custom_responses.get('eventLoadKg') or customization_value(personalization, 'event_load')
+        event_distance = custom_responses.get('eventDistanceKm') or customization_value(personalization, 'event_distance') or 19.3
+        target_finish = custom_responses.get('targetFinishTime') or personalization.get('success_definition')
+
+        if event_load and event_load > 0:
+            calculations['max_weight_kg'] = float(event_load)
+            # Start around 60% of target load with gradual 5-8% bumps each phase
+            calculations['starting_weight_kg'] = round(float(event_load) * 0.6, 1)
+            calculations['progression_weight_kg'] = max(1.0, round(float(event_load) * 0.1, 1))
+
+        if isinstance(event_distance, (int, float)) and event_distance > 0:
+            calculations['event_distance_km'] = float(event_distance)
+
+        # Parse target finish time (HH:MM:SS or MM:SS)
+        target_pace_min_per_km = None
+        if isinstance(target_finish, str) and target_finish:
+            time_parts = [int(part) for part in target_finish.split(':')]
+            try:
+                if len(time_parts) == 3:
+                    hours, minutes, seconds = time_parts
+                elif len(time_parts) == 2:
+                    hours, minutes, seconds = 0, time_parts[0], time_parts[1]
+                else:
+                    hours = minutes = seconds = 0
+                total_minutes = hours * 60 + minutes + seconds / 60.0
+                distance_km = calculations.get('event_distance_km') or 19.3
+                if distance_km > 0:
+                    target_pace_min_per_km = round(total_minutes / distance_km, 2)
+            except ValueError:
+                target_pace_min_per_km = None
+
+        calculations['target_pace_min_per_km'] = target_pace_min_per_km or 8.4  # ~13:30 min/mi default
+
     return calculations
+
+
+def customization_value(personalization: Dict[str, Any], key: str):
+    custom = personalization.get('customResponses', {})
+    return custom.get(key)
 
 def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Dict[str, Any],
                                            personalization: Dict[str, Any], user_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -358,6 +399,7 @@ def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Di
         })
     
     elif base_plan_id == 'fat-loss':
+        # existing fat-loss logic ...
         # Generate fat-loss specific template with calculated weights/times
         base_ruck_time = session_times.get('long_ruck', max(45, min_session_time + 15))
         
@@ -388,6 +430,12 @@ def _generate_weekly_template_with_specifics(base_plan_id: str, calculations: Di
             }
         ])
     
+    elif base_plan_id == 'event-prep':
+        weekly_template = _build_event_prep_weekly_template(
+            calculations=calculations,
+            personalization=personalization
+        )
+
     # Add difficulty assessment to each session
     difficulty = calculations.get('difficulty_assessment', 'appropriate')
     for session in weekly_template:
