@@ -451,6 +451,7 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
     """Generate plan sessions based on personalized plan metadata."""
     try:
         logger.info(f"Starting session generation for plan {user_plan_id}")
+        logger.info(f"Plan metadata keys: {list(plan_metadata.keys())}")
         client = get_supabase_admin_client()  # Use admin client to bypass RLS
 
         # Extract timezone and notification preferences from metadata
@@ -506,14 +507,24 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
         if not weekly_template and training_schedule:
             weekly_template = training_schedule
 
+        logger.info(f"Weekly template found: {weekly_template is not None}, length: {len(weekly_template) if weekly_template else 0}")
+        logger.info(f"Training schedule found: {len(training_schedule) if training_schedule else 0}")
+
         duration_weeks = plan_metadata.get('duration_weeks') or plan_structure.get('duration_weeks')
         if not duration_weeks:
             duration_weeks = plan_metadata.get('weeks')
+
+        logger.info(f"Duration weeks: {duration_weeks}")
 
         if not duration_weeks:
             logger.error(f"Cannot generate sessions for plan {user_plan_id}: duration_weeks missing from metadata keys: {plan_metadata.keys()}")
             return
 
+        if not weekly_template:
+            logger.error(f"No weekly template found for plan {user_plan_id}, cannot generate sessions")
+            return
+
+        logger.info(f"Generating sessions for {duration_weeks} weeks with {len(weekly_template)} sessions per week")
         sessions_to_create = []
 
         def day_to_offset(day_name: str) -> int:
@@ -764,19 +775,28 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
 
         for week_num in range(1, duration_weeks + 1):
             if weekly_template:
+                logger.info(f"Adding sessions for week {week_num} from weekly_template")
                 for session in weekly_template:
                     add_session(week_num, session)
             elif training_schedule:
+                logger.info(f"Adding sessions for week {week_num} from training_schedule")
                 for session in training_schedule:
                     add_session(week_num, session)
             # No fallback - all plans should have a template from personalization
 
+        logger.info(f"Total sessions to create: {len(sessions_to_create)}")
+
         if sessions_to_create:
-            client.table('plan_sessions').insert(sessions_to_create).execute()
+            logger.info(f"Inserting {len(sessions_to_create)} sessions into plan_sessions table")
+            result = client.table('plan_sessions').insert(sessions_to_create).execute()
+            logger.info(f"Insert result: {result.data[0] if result.data else 'no data returned'}")
             logger.info(f"Generated {len(sessions_to_create)} plan sessions with coaching points for user plan {user_plan_id}")
+        else:
+            logger.warning(f"No sessions to create for plan {user_plan_id}")
 
     except Exception as e:
         logger.error(f"Failed to generate plan sessions: {e}")
+        logger.exception("Full traceback:")
 
 
 def _record_session_against_plan(user_id: str, session_id: int, user_jwt: Optional[str] = None) -> Dict[str, Any]:

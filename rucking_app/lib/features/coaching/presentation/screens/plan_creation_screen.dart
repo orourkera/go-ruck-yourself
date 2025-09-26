@@ -453,11 +453,31 @@ ${remainingDailyDeficit > 500 ? "This is aggressive - consider a longer timeline
             customResponses['eventLoadKg'] ??
             20;
         final timeGoal = customResponses['time_goal'] ?? 'Finish strong';
+
+        // Calculate weeks until event
+        String weeksUntilEvent = '8';  // default
+        if (eventDate != null) {
+          try {
+            final event = DateTime.parse(eventDate);
+            final now = DateTime.now();
+            final daysUntil = event.difference(now).inDays;
+            final weeksUntil = (daysUntil / 7).ceil();
+            if (weeksUntil > 0) {
+              weeksUntilEvent = weeksUntil.toString();
+            }
+          } catch (e) {
+            // Use default
+          }
+        }
+
         planSpecificDetails = '''
 - Event Date: ${eventDate != null ? DateTime.parse(eventDate).toLocal().toString().split(' ')[0] : 'TBD'}
+- CRITICAL: Create a $weeksUntilEvent-WEEK plan (event is in $weeksUntilEvent weeks!)
 - Event Distance: ${eventDistance}km
 - Event Load: ${eventLoad}kg
-- Time Goal: $timeGoal''';
+- Time Goal: $timeGoal
+
+IMPORTANT: This is a $weeksUntilEvent-week plan, NOT 16 weeks. Scale the progression appropriately for $weeksUntilEvent weeks.''';
         break;
 
       case 'age-strong':
@@ -1992,6 +2012,25 @@ Keep it under 200 words, motivational, and specific to their answers.
   }
 
   String _getDynamicDuration() {
+    // For Event Prep, calculate actual weeks until event
+    if (_selectedPlanType?.id == 'event-prep' &&
+        _personalization?.customResponses != null) {
+      final eventDateStr = _personalization!.customResponses!['event_date'] ??
+          _personalization!.customResponses!['eventDate'];
+      if (eventDateStr != null) {
+        try {
+          final eventDate = DateTime.parse(eventDateStr);
+          final now = DateTime.now();
+          final daysUntilEvent = eventDate.difference(now).inDays;
+          final weeksUntilEvent = (daysUntilEvent / 7).ceil();
+          if (weeksUntilEvent > 0) {
+            return '$weeksUntilEvent weeks';
+          }
+        } catch (e) {
+          // Fall through to default
+        }
+      }
+    }
     // For Daily Discipline, use the actual streak days
     if (_selectedPlanType?.id == 'daily-discipline' &&
         _personalization?.customResponses != null) {

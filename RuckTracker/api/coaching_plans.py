@@ -1154,19 +1154,32 @@ class CoachingPlansResource(Resource):
             created_plan = response.data[0]
             
             try:
+                # Log what we're about to send
+                logger.info(f"Preparing session metadata for plan {created_plan['id']}")
+
+                weekly_template = personalized_plan['personalized_structure'].get('weekly_template') or personalized_plan.get('weekly_template')
+                duration_weeks = personalized_plan['personalized_structure'].get('duration_weeks') or base_plan.get('duration_weeks', 12)
+
+                logger.info(f"Weekly template: {weekly_template}")
+                logger.info(f"Duration weeks: {duration_weeks}")
+
                 plan_session_metadata = {
                     "plan_structure": personalized_plan['personalized_structure'],
-                    "weekly_template": personalized_plan['personalized_structure'].get('weekly_template') or personalized_plan.get('weekly_template'),
+                    "weekly_template": weekly_template,
                     "training_schedule": personalized_plan.get('training_schedule'),
-                    "duration_weeks": personalized_plan['personalized_structure'].get('duration_weeks') or base_plan.get('duration_weeks', 12),
+                    "duration_weeks": duration_weeks,
                     "user_timezone": user_timezone,
                     "preferred_notification_time": preferred_notification_time,
                     "enable_notifications": enable_notifications
                 }
+
+                logger.info(f"Calling _generate_plan_sessions for plan {created_plan['id']} with {duration_weeks} weeks")
                 # Pass user_id and timezone to enable personalized coaching points and proper scheduling
                 _generate_plan_sessions(created_plan['id'], plan_session_metadata, plan_start_date, user_id=g.user_id)
+                logger.info(f"Successfully called _generate_plan_sessions for plan {created_plan['id']}")
             except Exception as session_error:
                 logger.error(f"Failed to seed plan sessions for plan {created_plan['id']}: {session_error}")
+                logger.exception("Full traceback:")
 
             try:
                 plan_notification_service.seed_plan_schedule(g.user_id, created_plan['id'])
