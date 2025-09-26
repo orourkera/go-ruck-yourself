@@ -426,10 +426,29 @@ def _parse_ai_generated_plan(ai_plan_text: str, base_plan: Dict[str, Any], perso
                 'weight_kg': round(equipment_weight * (0.8 if i == 0 else 0.7), 1),
             })
 
+    # Extract duration from AI plan text
+    # Look for patterns like "12 weeks", "16-week", "8 week plan"
+    duration_weeks = None
+    weeks_pattern = r'(\d+)\s*(?:-\s*)?week'
+    weeks_match = re.search(weeks_pattern, ai_plan_text, re.IGNORECASE)
+    if weeks_match:
+        duration_weeks = int(weeks_match.group(1))
+
+    # If not found, look for "Week 1" through "Week N" patterns to find the max
+    if not duration_weeks:
+        week_num_pattern = r'Week\s+(\d+)'
+        week_numbers = re.findall(week_num_pattern, ai_plan_text, re.IGNORECASE)
+        if week_numbers:
+            duration_weeks = max(int(w) for w in week_numbers)
+
+    # Default to base plan duration if still not found
+    if not duration_weeks:
+        duration_weeks = base_plan.get('duration_weeks', 12)
+
     # Add the weekly template to the structure
     personalized_structure['weekly_template'] = weekly_template
     personalized_structure['ai_generated'] = True
-    personalized_structure['duration_weeks'] = base_plan.get('duration_weeks', 12)
+    personalized_structure['duration_weeks'] = duration_weeks
 
     # Extract any adaptations mentioned in the AI plan
     adaptations = []
@@ -1137,9 +1156,9 @@ class CoachingPlansResource(Resource):
             try:
                 plan_session_metadata = {
                     "plan_structure": personalized_plan['personalized_structure'],
-                    "weekly_template": personalized_plan['personalized_structure'].get('weekly_template'),
+                    "weekly_template": personalized_plan['personalized_structure'].get('weekly_template') or personalized_plan.get('weekly_template'),
                     "training_schedule": personalized_plan.get('training_schedule'),
-                    "duration_weeks": base_plan.get('duration_weeks'),
+                    "duration_weeks": personalized_plan['personalized_structure'].get('duration_weeks') or base_plan.get('duration_weeks', 12),
                     "user_timezone": user_timezone,
                     "preferred_notification_time": preferred_notification_time,
                     "enable_notifications": enable_notifications
