@@ -18,6 +18,8 @@ class PlanPersonalization {
   final Map<String, dynamic>? customResponses;
   // AI-generated plan that user approved
   final String? aiGeneratedPlan;
+  // User's unit preference
+  final bool? preferMetric;
 
   const PlanPersonalization({
     this.why,
@@ -36,6 +38,7 @@ class PlanPersonalization {
     this.enableNotifications,
     this.customResponses,
     this.aiGeneratedPlan,
+    this.preferMetric,
   });
 
   PlanPersonalization copyWith({
@@ -55,6 +58,7 @@ class PlanPersonalization {
     bool? enableNotifications,
     Map<String, dynamic>? customResponses,
     String? aiGeneratedPlan,
+    bool? preferMetric,
   }) {
     return PlanPersonalization(
       why: why ?? this.why,
@@ -74,6 +78,7 @@ class PlanPersonalization {
       enableNotifications: enableNotifications ?? this.enableNotifications,
       customResponses: customResponses ?? this.customResponses,
       aiGeneratedPlan: aiGeneratedPlan ?? this.aiGeneratedPlan,
+      preferMetric: preferMetric ?? this.preferMetric,
     );
   }
 
@@ -95,6 +100,7 @@ class PlanPersonalization {
       'enableNotifications': enableNotifications,
       'customResponses': customResponses,
       'aiGeneratedPlan': aiGeneratedPlan,
+      'preferMetric': preferMetric,
     };
   }
 
@@ -116,6 +122,7 @@ class PlanPersonalization {
       enableNotifications: json['enableNotifications'] as bool?,
       customResponses: json['customResponses'] as Map<String, dynamic>?,
       aiGeneratedPlan: json['aiGeneratedPlan'] as String?,
+      preferMetric: json['preferMetric'] as bool?,
     );
   }
 

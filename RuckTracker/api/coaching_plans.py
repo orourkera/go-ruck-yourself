@@ -46,8 +46,11 @@ def _convert_to_structured_plan(ai_plan_text: str, plan_type: str, personalizati
         training_days = personalization.get('trainingDaysPerWeek', 3)
         preferred_days = personalization.get('preferredDays', [])
         equipment_weight = personalization.get('equipmentWeight', 20)
+        prefer_metric = personalization.get('preferMetric', True)  # Default to metric if not specified
 
-        system_prompt = """You are a fitness coach converting a rucking plan into structured data.
+        # Determine which units the AI plan is using based on user preference
+        if prefer_metric:
+            system_prompt = """You are a fitness coach converting a rucking plan into structured data.
         Extract the weekly training template from the plan. For progressive plans (like event prep),
         extract the most representative week's schedule.
 
@@ -55,9 +58,27 @@ def _convert_to_structured_plan(ai_plan_text: str, plan_type: str, personalizati
         - day must be lowercase: "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
         - session_type should be descriptive: "Long Ruck", "Interval Training", "Tempo Ruck", "Recovery", etc.
         - duration_minutes should be a single number (if range given, use the middle)
-        - weight_kg should be in kilograms (convert from lbs if needed: 1 lb = 0.453592 kg)
-        - distance_km is optional, in kilometers
+        - weight_kg should be in kilograms (the plan already uses kg)
+        - distance_km should be in kilometers (the plan already uses km)
         - pace_per_km is optional, format as "MM:SS" (e.g., "8:30")
+        """
+        else:
+            # User prefers imperial units - plan was generated in imperial
+            system_prompt = """You are a fitness coach converting a rucking plan into structured data.
+        Extract the weekly training template from the plan. For progressive plans (like event prep),
+        extract the most representative week's schedule.
+
+        IMPORTANT: The plan uses IMPERIAL units (miles and lbs). You MUST convert them:
+        - Convert miles to kilometers: 1 mile = 1.60934 km
+        - Convert lbs to kilograms: 1 lb = 0.453592 kg
+
+        Rules:
+        - day must be lowercase: "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+        - session_type should be descriptive: "Long Ruck", "Interval Training", "Tempo Ruck", "Recovery", etc.
+        - duration_minutes should be a single number (if range given, use the middle)
+        - weight_kg must be in kilograms (convert from lbs: multiply by 0.453592)
+        - distance_km must be in kilometers (convert from miles: multiply by 1.60934)
+        - pace_per_km is optional, convert from pace/mile if given
         """
 
         user_prompt = f"""Convert this coaching plan to structured format:
@@ -105,6 +126,7 @@ def _create_fallback_template(personalization: Dict[str, Any], plan_type: str) -
     preferred_days = personalization.get('preferredDays', ['tuesday', 'thursday', 'saturday'])
     equipment_weight = personalization.get('equipmentWeight', 20)
     min_session_time = personalization.get('minimumSessionMinutes', 30)
+    prefer_metric = personalization.get('preferMetric', True)
 
     weekly_template = []
     session_types = ['Long Ruck', 'Tempo Ruck', 'Interval Training', 'Recovery']

@@ -61,6 +61,8 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
 
   late OpenAIResponsesService _openAiService;
   late CoachingService _coachingService;
+  bool _hasExistingPlan = false;
+  bool _checkingExistingPlan = true;
 
   // Define the 6 coaching plan types
   final List<CoachingPlanType> _planTypes = [
@@ -144,6 +146,72 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
   void _initializeServices() {
     _openAiService = GetIt.I<OpenAIResponsesService>();
     _coachingService = GetIt.I<CoachingService>();
+    _checkForExistingPlan();
+  }
+
+  Future<void> _checkForExistingPlan() async {
+    try {
+      final existingPlan = await _coachingService.getActiveCoachingPlan();
+      if (mounted) {
+        setState(() {
+          _hasExistingPlan = existingPlan != null &&
+                            existingPlan['duration_weeks'] != null &&
+                            (existingPlan['plan_sessions'] != null &&
+                             (existingPlan['plan_sessions'] as List).isNotEmpty);
+          _checkingExistingPlan = false;
+        });
+
+        if (_hasExistingPlan) {
+          // Show dialog about existing plan
+          _showExistingPlanDialog();
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error checking for existing plan: $e');
+      if (mounted) {
+        setState(() {
+          _checkingExistingPlan = false;
+        });
+      }
+    }
+  }
+
+  void _showExistingPlanDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Active Plan Found'),
+          content: const Text(
+            'You already have an active coaching plan. You need to complete or delete your current plan before creating a new one.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop(); // Pop the plan creation screen
+              },
+              child: const Text('Go Back'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const CoachingPlanDetailsScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text('View Current Plan'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -949,6 +1017,30 @@ Keep it under 200 words, motivational, and specific to their answers.
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking for existing plan
+    if (_checkingExistingPlan) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                color: AppColors.primary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Checking existing plans...',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final mediaQuery = MediaQuery.of(context);
     final statusBarHeight = mediaQuery.padding.top;
     final statusBarColor = _getStatusBarColor();

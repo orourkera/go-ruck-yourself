@@ -16,16 +16,23 @@ class WeeklyScheduleView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final weeklyTemplate = planData['modifications']?['weekly_template'] ??
+    // Try to get the weekly template from various possible locations
+    final weeklyTemplate = planData['plan_modifications']?['plan_structure']?['weekly_template'] ??
+                          planData['modifications']?['weekly_template'] ??
                           planData['template']?['base_structure']?['weekly_template'] ??
                           planData['plan_structure']?['weekly_template'] ?? [];
-    final totalWeeks = planData['template']?['duration_weeks'] ??
+
+    // Try to get duration_weeks from various possible locations
+    final totalWeeks = planData['plan_modifications']?['plan_structure']?['duration_weeks'] ??
+                      planData['template']?['duration_weeks'] ??
                       planData['duration_weeks'];
+
+    // Get actual plan sessions to determine real structure
+    final planSessions = planData['plan_sessions'] as List? ?? [];
 
     // Don't show anything if we don't have real data
     if (totalWeeks == null || totalWeeks == 0 ||
-        planData['plan_sessions'] == null ||
-        (planData['plan_sessions'] as List?)?.isEmpty == true) {
+        planSessions.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
@@ -196,11 +203,35 @@ class WeeklyScheduleView extends StatelessWidget {
   }
 
   Widget _buildUpcomingSessions(BuildContext context) {
-    final nextSession = planData['recent_sessions']?.isNotEmpty == true
-        ? planData['recent_sessions'][0]
-        : planData['next_session'] ?? {};
+    // Get sessions for the current week from plan_sessions
+    final planSessions = planData['plan_sessions'] as List? ?? [];
 
-    if (nextSession == null || nextSession.isEmpty) return const SizedBox.shrink();
+    // Filter sessions for the current week
+    final currentWeekSessions = planSessions.where((session) {
+      return session['week'] == currentWeek;
+    }).toList();
+
+    if (currentWeekSessions.isEmpty) return const SizedBox.shrink();
+
+    // Find the next upcoming session
+    final now = DateTime.now();
+    Map<String, dynamic>? nextSession;
+
+    for (var session in currentWeekSessions) {
+      if (session['scheduled_date'] != null) {
+        final sessionDate = DateTime.parse(session['scheduled_date']);
+        if (sessionDate.isAfter(now) || DateUtils.isSameDay(sessionDate, now)) {
+          nextSession = session;
+          break;
+        }
+      }
+    }
+
+    if (nextSession == null && currentWeekSessions.isNotEmpty) {
+      nextSession = currentWeekSessions.first;
+    }
+
+    if (nextSession == null) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -332,8 +363,8 @@ class WeeklyScheduleView extends StatelessWidget {
     final planSessions = planData['plan_sessions'] ?? [];
     final weekSessions = <String, dynamic>{};
     final dayMapping = {
-      1: 'monday', 2: 'tuesday', 3: 'wednesday',
-      4: 'thursday', 5: 'friday', 6: 'saturday', 0: 'sunday'
+      1: 'mon', 2: 'tue', 3: 'wed',
+      4: 'thu', 5: 'fri', 6: 'sat', 7: 'sun'
     };
 
     // Calculate the start and end of the target week
@@ -350,10 +381,9 @@ class WeeklyScheduleView extends StatelessWidget {
         if (sessionDate.isAfter(targetWeekStart.subtract(Duration(days: 1))) &&
             sessionDate.isBefore(targetWeekEnd.add(Duration(days: 1)))) {
 
-          final dayName = dayMapping[sessionDate.weekday % 7];
-          final shortDay = dayName?.substring(0, 3);
+          final dayName = dayMapping[sessionDate.weekday];
 
-          if (shortDay != null) {
+          if (dayName != null) {
             // Parse coaching points for duration/distance
             Map<String, dynamic> coachingPoints = {};
             if (session['coaching_points'] is String) {
@@ -366,14 +396,16 @@ class WeeklyScheduleView extends StatelessWidget {
               coachingPoints = Map<String, dynamic>.from(session['coaching_points']);
             }
 
-            weekSessions[shortDay] = {
+            weekSessions[dayName] = {
               'type': session['planned_session_type']?.toString().toLowerCase().replaceAll(' ', '_'),
               'session_type': session['planned_session_type'],
-              'duration': coachingPoints['target_duration_minutes'],
-              'distance': coachingPoints['distance_km'],
-              'weight_kg': coachingPoints['target_weight_kg'],
+              'duration': coachingPoints['target_duration_minutes'] ?? session['duration_minutes'],
+              'distance': coachingPoints['distance_km'] ?? session['distance_km'],
+              'weight_kg': coachingPoints['target_weight_kg'] ?? session['weight_kg'],
               'completion_status': session['completion_status'],
               'scheduled_date': scheduledDate,
+              'description': session['description'],
+              'notes': session['notes'],
               'id': session['id']
             };
           }
@@ -390,9 +422,17 @@ class WeeklyScheduleView extends StatelessWidget {
   }
 
   String _getSessionDescription(Map<String, dynamic> session) {
-    final distance = session['distance'] ?? 0;
-    final sessionType = session['session_type'] ?? session['type'] ?? '';
-    return '${distance.toStringAsFixed(1)} km • ${sessionType.toString()}';
+    final parts = <String>[];
+
+    if (session['distance'] != null && session['distance'] > 0) {
+      parts.add('${session['distance'].toStringAsFixed(1)} km');
+    }
+
+    if (session['weight_kg'] != null && session['weight_kg'] > 0) {
+      parts.add('${session['weight_kg'].toStringAsFixed(0)} kg');
+    }
+
+    return parts.isNotEmpty ? parts.join(' • ') : 'Training session';
   }
 
   String _getSessionDuration(Map<String, dynamic> session) {

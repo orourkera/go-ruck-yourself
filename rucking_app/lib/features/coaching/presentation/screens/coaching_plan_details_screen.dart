@@ -349,7 +349,7 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
                   // Full weekly schedule
                   WeeklyScheduleView(
                     planData: _planData!,
-                    currentWeek: _planData!['current_week'] ?? 1,
+                    currentWeek: _calculateWeeksCompleted(),
                   ),
                 ],
               ),
@@ -452,7 +452,9 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
 
   Widget _buildProgressIndicator() {
     final weeksCompleted = _calculateWeeksCompleted();
-    final totalWeeks = _planData!['template']?['duration_weeks'] ??
+    // Try multiple locations where duration_weeks might be stored
+    final totalWeeks = _planData!['plan_modifications']?['plan_structure']?['duration_weeks'] ??
+                      _planData!['template']?['duration_weeks'] ??
                       _planData!['duration_weeks'];
 
     // Don't show progress if we don't have real data

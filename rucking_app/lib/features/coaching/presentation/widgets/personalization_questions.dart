@@ -297,6 +297,7 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       final completedPersonalization = _personalization.copyWith(
         minimumSessionMinutes: _personalization.minimumSessionMinutes ?? 15,
         unloadedOk: _personalization.unloadedOk ?? false,
+        preferMetric: _useMetric,
       );
       widget.onPersonalizationComplete(completedPersonalization);
     }
