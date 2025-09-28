@@ -463,8 +463,13 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
 
         // Get user's metric preference for display
         final prefs = await SharedPreferences.getInstance();
-        final useMetric = prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
-        final weightLossTarget = useMetric ? weightLossTargetKg : weightLossTargetKg * 2.20462;
+        final storedPreference =
+            prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric');
+        final authPreferMetric =
+            authState is Authenticated ? authState.user.preferMetric : null;
+        final useMetric = storedPreference ?? authPreferMetric ?? true;
+        final weightLossTarget =
+            useMetric ? weightLossTargetKg : weightLossTargetKg * 2.20462;
         final weightUnit = useMetric ? 'kg' : 'lbs';
 
         // Calculate calorie requirements (using kg for calculation)
@@ -481,7 +486,7 @@ class _PlanCreationScreenState extends State<PlanCreationScreen>
         final remainingDailyDeficit = (remainingWeeklyDeficit / 7).round();
 
         planSpecificDetails = '''
-- Weight Loss Goal: ${weightLossTarget.toStringAsFixed(1)}$weightUnit over 12 weeks
+- Weight Loss Goal: ${weightLossTarget.toStringAsFixed(1)} $weightUnit over 12 weeks
 - Current Activity Level: $currentActivity
 - Complementary Activities: ${complementary.isNotEmpty ? complementary.join(', ') : 'Rucking only'}
 

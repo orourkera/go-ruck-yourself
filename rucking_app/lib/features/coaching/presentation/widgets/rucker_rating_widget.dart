@@ -133,9 +133,31 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
 
     // Get usual ruck weight (from recent sessions or equipment settings)
     double? ruckWeight = (recency['last_ruck_weight_kg'] as num?)?.toDouble();
+
+    // Debug logging to see what we're getting
+    AppLogger.debug('Recency data: $recency');
+    AppLogger.debug('Last ruck weight from recency: ${recency['last_ruck_weight_kg']}');
+
     if (ruckWeight != null && ruckWeight <= 0) {
       ruckWeight = null;
     }
+
+    // Try to get from recent_splits if available
+    if ((ruckWeight == null || ruckWeight <= 0) && splits.isNotEmpty) {
+      double totalWeight = 0;
+      int weightCount = 0;
+      for (var session in splits) {
+        final weight = (session['weight_kg'] as num?)?.toDouble();
+        if (weight != null && weight > 0) {
+          totalWeight += weight;
+          weightCount++;
+        }
+      }
+      if (weightCount > 0) {
+        ruckWeight = totalWeight / weightCount;
+      }
+    }
+
     final equipmentWeight = (user['equipment_weight_kg'] as num?)?.toDouble();
     if ((ruckWeight == null || ruckWeight <= 0) &&
         averageRuckWeightKg != null &&
@@ -152,6 +174,15 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
           (facts['average_ruck_weight'] as num?)?.toDouble();
       if (insightsWeight != null && insightsWeight > 0) {
         ruckWeight = insightsWeight;
+      }
+    }
+
+    // Final fallback - check if user has set default equipment weight in preferences
+    if (ruckWeight == null || ruckWeight <= 0) {
+      final defaultWeight = (user['default_ruck_weight_kg'] as num?)?.toDouble() ??
+          (facts['default_equipment_weight'] as num?)?.toDouble();
+      if (defaultWeight != null && defaultWeight > 0) {
+        ruckWeight = defaultWeight;
       }
     }
 

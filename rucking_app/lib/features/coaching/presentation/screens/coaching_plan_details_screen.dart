@@ -451,18 +451,17 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
   }
 
   Widget _buildProgressIndicator() {
-    final weeksCompleted = _calculateWeeksCompleted();
-    // Try multiple locations where duration_weeks might be stored
-    final totalWeeks = _planData!['plan_modifications']?['plan_structure']?['duration_weeks'] ??
-                      _planData!['template']?['duration_weeks'] ??
-                      _planData!['duration_weeks'];
+    // Calculate progress based on completed sessions
+    final planSessions = _planData!['plan_sessions'] as List? ?? [];
+    final completedCount = planSessions.where((s) => s['completion_status'] == 'completed').length;
+    final totalCount = planSessions.length;
 
     // Don't show progress if we don't have real data
-    if (totalWeeks == null || totalWeeks == 0) {
+    if (totalCount == 0) {
       return const SizedBox.shrink();
     }
 
-    final progress = weeksCompleted / totalWeeks;
+    final progress = completedCount / totalCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,7 +470,7 @@ class _CoachingPlanDetailsScreenState extends State<CoachingPlanDetailsScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Week $weeksCompleted of $totalWeeks',
+              '$completedCount of $totalCount sessions completed',
               style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w600,
               ),

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_personalization.dart';
 import 'package:rucking_app/features/coaching/domain/models/coaching_plan_type.dart';
 import 'package:rucking_app/features/coaching/domain/models/plan_custom_questions.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 
 class PersonalizationQuestions extends StatefulWidget {
   final void Function(PlanPersonalization) onPersonalizationComplete;
@@ -100,12 +102,24 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
   }
 
   Future<void> _loadMetricPreference() async {
+    bool? preferMetric;
+
+    if (mounted) {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is Authenticated) {
+        preferMetric = authState.user.preferMetric;
+      }
+    }
+
     final prefs = await SharedPreferences.getInstance();
-    final preferMetric =
-        prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric') ?? true;
+    final storedPreference =
+        prefs.getBool('prefer_metric') ?? prefs.getBool('preferMetric');
+
+    final useMetric = storedPreference ?? preferMetric ?? true;
+
     if (mounted) {
       setState(() {
-        _useMetric = preferMetric;
+        _useMetric = useMetric;
       });
     }
   }

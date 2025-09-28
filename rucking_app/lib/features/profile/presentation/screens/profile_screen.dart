@@ -1110,22 +1110,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String planName = (template?['name'] as String?) ??
         (plan['plan_name'] as String?) ??
         'Coaching Plan';
-    final int currentWeek = (plan['current_week'] as num?)?.toInt() ?? 1;
-    final int totalWeeks = (template?['duration_weeks'] as num?)?.toInt() ??
-        (plan['duration_weeks'] as num?)?.toInt() ??
-        currentWeek;
+
+    // Calculate progress based on actual sessions
+    final planSessions = plan['plan_sessions'] as List? ?? [];
+    final completedCount = planSessions.where((s) => s['completion_status'] == 'completed').length;
+    final totalSessionCount = planSessions.length;
+    final progressPercent = totalSessionCount > 0
+        ? (completedCount / totalSessionCount * 100).clamp(0, 100)
+        : 0.0;
+
     final String personality =
         _formatPersonality(plan['personality'] ?? plan['coaching_personality']);
-    final double progressPercent =
-        ((plan['progress_percent'] as num?)?.toDouble() ?? 0).clamp(0, 100);
-    final Map<String, dynamic>? adherenceStats =
-        plan['adherence_stats'] as Map<String, dynamic>?;
-    final int completedSessions =
-        (adherenceStats?['completed_sessions'] as num?)?.toInt() ?? 0;
-    final int totalSessions =
-        (adherenceStats?['total_sessions'] as num?)?.toInt() ?? 0;
-    final double adherencePercent =
-        (adherenceStats?['overall_adherence'] as num?)?.toDouble() ?? 0;
+
     final String? startDateLabel =
         _formatPlanStartDate(plan['start_date'] as String?);
 
@@ -1171,7 +1167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Week $currentWeek of $totalWeeks • $personality',
+                        '$completedCount of $totalSessionCount sessions • $personality',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: secondaryText,
                         ),
@@ -1218,34 +1214,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 Text(
-                  totalSessions > 0
-                      ? '$completedSessions/$totalSessions sessions'
-                      : '$completedSessions sessions',
+                  totalSessionCount > 0
+                      ? '$completedCount/$totalSessionCount sessions'
+                      : '$completedCount sessions',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: secondaryText,
                   ),
                 ),
               ],
             ),
-            if (adherenceStats != null) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(
-                    Icons.insights,
-                    size: 18,
-                    color: accentColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Adherence ${adherencePercent.toStringAsFixed(0)}%',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
             const SizedBox(height: 20),
             Align(
               alignment: Alignment.centerRight,

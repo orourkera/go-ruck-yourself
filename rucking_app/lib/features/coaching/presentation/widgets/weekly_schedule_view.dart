@@ -16,28 +16,16 @@ class WeeklyScheduleView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Try to get the weekly template from various possible locations
-    final weeklyTemplate = planData['plan_modifications']?['plan_structure']?['weekly_template'] ??
-                          planData['modifications']?['weekly_template'] ??
-                          planData['template']?['base_structure']?['weekly_template'] ??
-                          planData['plan_structure']?['weekly_template'] ?? [];
-
-    // Try to get duration_weeks from various possible locations
-    final totalWeeks = planData['plan_modifications']?['plan_structure']?['duration_weeks'] ??
-                      planData['template']?['duration_weeks'] ??
-                      planData['duration_weeks'];
-
     // Get actual plan sessions to determine real structure
     final planSessions = planData['plan_sessions'] as List? ?? [];
 
     // Don't show anything if we don't have real data
-    if (totalWeeks == null || totalWeeks == 0 ||
-        planSessions.isEmpty) {
+    if (planSessions.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32.0),
           child: Text(
-            'No plan data found',
+            'No plan sessions found',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 16,
@@ -50,21 +38,22 @@ class WeeklyScheduleView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Week selector
-        _buildWeekSelector(context, totalWeeks),
+        // Progress indicator
+        _buildProgressIndicator(context),
         const SizedBox(height: 20),
 
-        // Weekly calendar view
-        _buildWeekCalendar(context, weeklyTemplate),
-        const SizedBox(height: 20),
-
-        // Session details
-        _buildUpcomingSessions(context),
+        // Session list view
+        _buildSessionsList(context),
       ],
     );
   }
 
-  Widget _buildWeekSelector(BuildContext context, int totalWeeks) {
+  Widget _buildProgressIndicator(BuildContext context) {
+    final planSessions = planData['plan_sessions'] as List? ?? [];
+    final completedCount = planSessions.where((s) => s['completion_status'] == 'completed').length;
+    final totalCount = planSessions.length;
+    final progressPercent = totalCount > 0 ? (completedCount / totalCount * 100) : 0.0;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -75,40 +64,48 @@ class WeeklyScheduleView extends StatelessWidget {
           width: 1,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Week $currentWeek of $totalWeeks',
-            style: AppTextStyles.titleMedium.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
-          ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: Icon(Icons.chevron_left, color: AppColors.primary),
-                onPressed: currentWeek > 1 ? () {} : null,
+              Text(
+                '$completedCount of $totalCount sessions completed',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
               ),
-              IconButton(
-                icon: Icon(Icons.chevron_right, color: AppColors.primary),
-                onPressed: currentWeek < totalWeeks ? () {} : null,
+              Text(
+                '${progressPercent.toStringAsFixed(0)}%',
+                style: AppTextStyles.bodyLarge.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: progressPercent / 100,
+            backgroundColor: AppColors.primary.withOpacity(0.1),
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWeekCalendar(BuildContext context, List<dynamic> weeklyTemplate) {
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  Widget _buildSessionsList(BuildContext context) {
+    final planSessions = planData['plan_sessions'] as List? ?? [];
     final today = DateTime.now();
-    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final dateFormat = DateFormat('EEE, MMM d');
 
-    // Get the week's sessions from template or generate default
-    final weekSessions = _getWeekSessions(currentWeek);
+    // Sort sessions by scheduled_date
+    final sortedSessions = List.from(planSessions)
+      ..sort((a, b) => DateTime.parse(a['scheduled_date'])
+          .compareTo(DateTime.parse(b['scheduled_date'])));
 
     return Container(
       decoration: BoxDecoration(
@@ -116,16 +113,27 @@ class WeeklyScheduleView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        children: List.generate(7, (index) {
-          final dayDate = startOfWeek.add(Duration(days: index));
-          final dayName = days[index];
-          final isToday = DateUtils.isSameDay(dayDate, today);
-          final daySession = weekSessions[dayName.toLowerCase()];
+        children: sortedSessions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final session = entry.value;
+          final sessionDate = DateTime.parse(session['scheduled_date']);
+          final isToday = DateUtils.isSameDay(sessionDate, today);
+          final isPast = sessionDate.isBefore(today) && !isToday;
+          final isCompleted = session['completion_status'] == 'completed';
+
+          // Parse coaching points
+          Map<String, dynamic> coachingPoints = {};
+          if (session['coaching_points'] is String) {
+            try {
+              coachingPoints = jsonDecode(session['coaching_points']);
+            } catch (e) {}
+          }
 
           return Container(
             decoration: BoxDecoration(
-              color: isToday ? AppColors.primary.withOpacity(0.05) : null,
-              border: index < 6
+              color: isToday ? AppColors.primary.withOpacity(0.05) :
+                     isCompleted ? Colors.green.withOpacity(0.05) : null,
+              border: index < sortedSessions.length - 1
                 ? Border(bottom: BorderSide(color: Colors.grey.shade300))
                 : null,
             ),
@@ -134,62 +142,70 @@ class WeeklyScheduleView extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isToday ? AppColors.primary : Colors.grey.shade200,
+                  color: isCompleted ? Colors.green :
+                         isToday ? AppColors.primary :
+                         isPast ? Colors.grey.shade400 : Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      dayName,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: isToday ? Colors.white : Colors.grey[600],
-                        fontSize: 10,
-                      ),
+                child: isCompleted
+                  ? Icon(Icons.check, color: Colors.white)
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          sessionDate.day.toString(),
+                          style: AppTextStyles.titleMedium.copyWith(
+                            color: (isToday || isPast) ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          DateFormat('MMM').format(sessionDate),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: (isToday || isPast) ? Colors.white : Colors.grey[600],
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      dayDate.day.toString(),
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: isToday ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+              ),
+              title: Text(
+                session['planned_session_type'] ?? 'Session',
+                style: AppTextStyles.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w600,
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
                 ),
               ),
-              title: daySession != null
-                ? Text(
-                    _getSessionTitle(daySession),
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  )
-                : Text(
-                    'Rest Day',
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      color: Colors.grey[500],
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              subtitle: daySession != null
-                ? Text(
-                    _getSessionDescription(daySession),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateFormat.format(sessionDate),
                     style: AppTextStyles.bodySmall.copyWith(
                       color: Colors.grey[600],
                     ),
-                  )
-                : null,
-              trailing: daySession != null
+                  ),
+                  if (coachingPoints['target_weight_kg'] != null ||
+                      coachingPoints['target_duration_minutes'] != null)
+                    Text(
+                      _buildSessionDetails(coachingPoints),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                ],
+              ),
+              trailing: coachingPoints['target_duration_minutes'] != null
                 ? Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getSessionColor(daySession['type']).withOpacity(0.1),
+                      color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      _getSessionDuration(daySession),
+                      '${coachingPoints['target_duration_minutes']} min',
                       style: AppTextStyles.bodySmall.copyWith(
-                        color: _getSessionColor(daySession['type']),
+                        color: AppColors.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -197,9 +213,20 @@ class WeeklyScheduleView extends StatelessWidget {
                 : null,
             ),
           );
-        }),
+        }).toList(),
       ),
     );
+  }
+
+  String _buildSessionDetails(Map<String, dynamic> coachingPoints) {
+    final parts = <String>[];
+    if (coachingPoints['target_weight_kg'] != null) {
+      parts.add('${coachingPoints['target_weight_kg']} kg');
+    }
+    if (coachingPoints['distance_km'] != null) {
+      parts.add('${coachingPoints['distance_km']} km');
+    }
+    return parts.join(' • ');
   }
 
   Widget _buildUpcomingSessions(BuildContext context) {
@@ -357,6 +384,63 @@ class WeeklyScheduleView extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Map<String, dynamic> _getCurrentWeekSessions() {
+    final planSessions = planData['plan_sessions'] ?? [];
+    final weekSessions = <String, dynamic>{};
+    final dayMapping = {
+      1: 'mon', 2: 'tue', 3: 'wed',
+      4: 'thu', 5: 'fri', 6: 'sat', 7: 'sun'
+    };
+
+    // Get current week's Monday and Sunday
+    final today = DateTime.now();
+    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final endOfWeek = startOfWeek.add(Duration(days: 6));
+
+    for (var session in planSessions) {
+      final scheduledDate = session['scheduled_date'];
+      if (scheduledDate != null) {
+        final sessionDate = DateTime.parse(scheduledDate);
+
+        // Check if this session falls within the current week
+        if (sessionDate.isAfter(startOfWeek.subtract(Duration(days: 1))) &&
+            sessionDate.isBefore(endOfWeek.add(Duration(days: 1)))) {
+
+          final dayName = dayMapping[sessionDate.weekday];
+
+          if (dayName != null) {
+            // Parse coaching points for duration/distance
+            Map<String, dynamic> coachingPoints = {};
+            if (session['coaching_points'] is String) {
+              try {
+                coachingPoints = jsonDecode(session['coaching_points']);
+              } catch (e) {
+                // Ignore JSON parse errors
+              }
+            } else if (session['coaching_points'] is Map) {
+              coachingPoints = Map<String, dynamic>.from(session['coaching_points']);
+            }
+
+            weekSessions[dayName] = {
+              'type': session['planned_session_type']?.toString().toLowerCase().replaceAll(' ', '_'),
+              'session_type': session['planned_session_type'],
+              'duration': coachingPoints['target_duration_minutes'] ?? session['duration_minutes'],
+              'distance': coachingPoints['distance_km'] ?? session['distance_km'],
+              'weight_kg': coachingPoints['target_weight_kg'] ?? session['weight_kg'],
+              'completion_status': session['completion_status'],
+              'scheduled_date': scheduledDate,
+              'description': session['description'],
+              'notes': session['notes'],
+              'id': session['id']
+            };
+          }
+        }
+      }
+    }
+
+    return weekSessions;
   }
 
   Map<String, dynamic> _getWeekSessions(int week) {
