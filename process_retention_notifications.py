@@ -40,10 +40,12 @@ def main():
         from RuckTracker.services.retention_background_jobs import retention_background_jobs
         from RuckTracker.services.plan_notification_service import plan_notification_service
         from RuckTracker.services.plan_audit_service import plan_audit_service
+        from RuckTracker.services.lifecycle_notification_service import process_lifecycle_notifications
 
         # Process all due notifications
         processed_count = retention_background_jobs.process_scheduled_notifications()
         plan_processed = plan_notification_service.process_scheduled_notifications()
+        lifecycle_stats = process_lifecycle_notifications()
         audits_processed = plan_audit_service.process_pending_reviews(limit=25)
 
         if processed_count > 0:
@@ -56,6 +58,17 @@ def main():
         else:
             logger.info("ℹ️ No coaching plan notifications were due")
         
+        new_user_pushes = lifecycle_stats.get('new_user_pushes', 0)
+        reactivation_pushes = lifecycle_stats.get('single_ruck_reactivations', 0)
+        if new_user_pushes or reactivation_pushes:
+            logger.info(
+                "✅ Lifecycle pushes sent - new_user: %s, single_ruck: %s",
+                new_user_pushes,
+                reactivation_pushes,
+            )
+        else:
+            logger.info("ℹ️ No lifecycle cohort pushes were due")
+
         if audits_processed > 0:
             logger.info(f"✅ Processed {audits_processed} pending plan audits")
         else:

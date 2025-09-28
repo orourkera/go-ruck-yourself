@@ -77,6 +77,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Ruck needs access to your camera to capture photos of your ruck sessions to share with the community.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ruck uses the microphone so you can record quick voice notes and participate in social audio features during your ruck sessions.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ruck needs access to your photo library to select photos of your ruck sessions to share with the community.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

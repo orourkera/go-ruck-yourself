@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:audio_session/audio_session.dart' as audio_session;
-import 'package:path_provider/path_provider.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Service for playing AI cheerleader audio with fallback to TTS
@@ -28,16 +26,21 @@ class AIAudioService {
       // Configure for speech with ducking that properly restores
       await _session!.configure(audio_session.AudioSessionConfiguration(
         avAudioSessionCategory: audio_session.AVAudioSessionCategory.playback,
-        avAudioSessionCategoryOptions: audio_session.AVAudioSessionCategoryOptions.duckOthers |
-                                       audio_session.AVAudioSessionCategoryOptions.interruptSpokenAudioAndMixWithOthers,
+        avAudioSessionCategoryOptions:
+            audio_session.AVAudioSessionCategoryOptions.duckOthers |
+                audio_session.AVAudioSessionCategoryOptions
+                    .interruptSpokenAudioAndMixWithOthers,
         avAudioSessionMode: audio_session.AVAudioSessionMode.spokenAudio,
-        avAudioSessionRouteSharingPolicy: audio_session.AVAudioSessionRouteSharingPolicy.defaultPolicy,
-        avAudioSessionSetActiveOptions: audio_session.AVAudioSessionSetActiveOptions.none,
+        avAudioSessionRouteSharingPolicy:
+            audio_session.AVAudioSessionRouteSharingPolicy.defaultPolicy,
+        avAudioSessionSetActiveOptions:
+            audio_session.AVAudioSessionSetActiveOptions.none,
         androidAudioAttributes: const audio_session.AndroidAudioAttributes(
           contentType: audio_session.AndroidAudioContentType.speech,
           usage: audio_session.AndroidAudioUsage.assistanceNavigationGuidance,
         ),
-        androidAudioFocusGainType: audio_session.AndroidAudioFocusGainType.gainTransientMayDuck,
+        androidAudioFocusGainType:
+            audio_session.AndroidAudioFocusGainType.gainTransientMayDuck,
         androidWillPauseWhenDucked: false,
       ));
 
@@ -45,7 +48,8 @@ class AIAudioService {
       await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
 
       _isInitialized = true;
-      AppLogger.info('[AI_AUDIO] Service initialized with audio_session for proper ducking');
+      AppLogger.info(
+          '[AI_AUDIO] Service initialized with audio_session for proper ducking');
     } catch (e) {
       AppLogger.error('[AI_AUDIO] Initialization failed: $e');
     }
@@ -101,76 +105,28 @@ class AIAudioService {
 
   /// Play raw audio bytes through audio player
   Future<bool> _playAudioBytes(Uint8List audioBytes) async {
-    File? audioFile; // Track file for cleanup in finally/catch blocks
     try {
       // Activate session for ducking BEFORE playing
       await _session?.setActive(true);
       AppLogger.info('[AI_AUDIO] Audio session activated for ducking');
 
-      // Create temporary file for audio playback
-      final tempDir = await getTemporaryDirectory();
-      audioFile = File(
-          '${tempDir.path}/ai_cheerleader_${DateTime.now().millisecondsSinceEpoch}.mp3');
+      bool completed = true;
 
-      // Write audio bytes to temporary file
-      await audioFile.writeAsBytes(audioBytes);
+      await _audioPlayer.play(BytesSource(audioBytes));
 
-      // Set up completion listener BEFORE starting playback
-      final completer = Completer<bool>();
-      late StreamSubscription subscription;
-
-      subscription = _audioPlayer.onPlayerComplete.listen((_) async {
-        subscription.cancel();
-
-        // CRITICAL: Deactivate session to restore other audio volume
-        await _session?.setActive(false);
-        AppLogger.info('[AI_AUDIO] Audio session deactivated - music volume restored');
-
-        // Clean up temporary file
-        try {
-          audioFile?.deleteSync();
-        } catch (_) {
-          // Silent fail on delete - file might already be gone
-        }
-        completer.complete(true);
-      });
-
-      // Set timeout for playback
-      Timer(const Duration(seconds: 30), () async {
-        if (!completer.isCompleted) {
-          subscription.cancel();
-
-          // Deactivate on timeout too
-          await _session?.setActive(false);
-          AppLogger.info('[AI_AUDIO] Audio session deactivated on timeout');
-
-          try {
-            audioFile?.deleteSync();
-          } catch (_) {
-            // Silent fail on delete
-          }
-          completer.complete(false);
-        }
-      });
-
-      // Play the audio file AFTER setting up listeners
-      await _audioPlayer.play(DeviceFileSource(audioFile.path));
-
-      return await completer.future;
-    } catch (e) {
-      // Deactivate session on error
-      await _session?.setActive(false);
-      AppLogger.info('[AI_AUDIO] Audio session deactivated on error');
-
-      // CRITICAL: Clean up temp file on ANY error to prevent memory leaks
-      if (audioFile != null && audioFile.existsSync()) {
-        try {
-          audioFile.deleteSync();
-          AppLogger.info('[AI_AUDIO] Cleaned up temp file after error');
-        } catch (deleteError) {
-          AppLogger.warning('[AI_AUDIO] Failed to delete temp file: $deleteError');
-        }
+      try {
+        await _audioPlayer.onPlayerComplete.first
+            .timeout(const Duration(seconds: 30));
+      } on TimeoutException {
+        completed = false;
+        AppLogger.warning('[AI_AUDIO] Playback timed out');
+        await _audioPlayer.stop();
       }
+
+      await _session?.setActive(false);
+      return completed;
+    } catch (e) {
+      await _session?.setActive(false);
       AppLogger.error('[AI_AUDIO] Audio bytes playback failed: $e');
       return false;
     }
@@ -199,24 +155,6 @@ class AIAudioService {
 
       // Deactivate session to ensure other audio is restored
       await _session?.setActive(false);
-
-      // Clean up any remaining temp files from crashed/interrupted sessions
-      try {
-        final tempDir = await getTemporaryDirectory();
-        final files = tempDir.listSync();
-        for (var file in files) {
-          if (file is File && file.path.contains('ai_cheerleader_')) {
-            try {
-              file.deleteSync();
-              AppLogger.info('[AI_AUDIO] Cleaned up orphaned temp file: ${file.path}');
-            } catch (_) {
-              // Silent fail - file might be in use or already deleted
-            }
-          }
-        }
-      } catch (cleanupError) {
-        AppLogger.warning('[AI_AUDIO] Temp file cleanup failed: $cleanupError');
-      }
 
       await _audioPlayer.dispose();
       _isInitialized = false;

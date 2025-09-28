@@ -119,6 +119,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   bool _aiCheerleaderExplicitContent = false;
   User? _currentUser;
 
+  // AI Cheerleader caching + resource guardrails
+  Map<String, dynamic>? _cachedCheerHistory;
+  DateTime? _lastCheerHistoryFetch;
+  Map<String, dynamic>? _cachedCoachingContext;
+  DateTime? _lastCoachingContextFetch;
+  DateTime? _lastAiMemorySkip;
+  static const Duration _cheerHistoryCacheTtl = Duration(minutes: 10);
+  static const Duration _coachingContextCacheTtl = Duration(minutes: 10);
+  static const Duration _aiMemorySkipCooldown = Duration(minutes: 3);
+  static const double _aiCheerleaderMemorySoftLimitMb = 360.0;
+
   // Circuit breaker for AI failures
   int _aiCheerleaderFailureCount = 0;
   static const int _maxAiCheerleaderFailures = 5; // More lenient - was 3
@@ -209,6 +220,95 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     on<SessionRecovered>(_onSessionRecovered);
   }
 
+  void _resetAICaches() {
+    _cachedCheerHistory = null;
+    _cachedCoachingContext = null;
+    _lastCheerHistoryFetch = null;
+    _lastCoachingContextFetch = null;
+    _lastAiMemorySkip = null;
+  }
+
+  void _logAiDebug(String message) {
+    if (kDebugMode) {
+      AppLogger.debug(message);
+    }
+  }
+
+  Future<Map<String, dynamic>?> _loadCheerHistory() async {
+    final now = DateTime.now();
+    if (_cachedCheerHistory != null &&
+        _lastCheerHistoryFetch != null &&
+        now.difference(_lastCheerHistoryFetch!) < _cheerHistoryCacheTtl) {
+      return _cachedCheerHistory;
+    }
+
+    try {
+      final historyResp = await _apiClient.get(
+        ApiEndpoints.aiCheerleaderLogs,
+        queryParams: const {
+          'limit': '20',
+          'offset': '0',
+        },
+      );
+
+      if (historyResp is Map<String, dynamic>) {
+        _cachedCheerHistory = historyResp;
+      } else {
+        _cachedCheerHistory = null;
+      }
+    } catch (e) {
+      _logAiDebug('[AI_CHEERLEADER_DEBUG] Failed to fetch history: $e');
+      // Keep previously cached value (if any) without overriding
+    } finally {
+      _lastCheerHistoryFetch = now;
+    }
+
+    return _cachedCheerHistory;
+  }
+
+  Future<Map<String, dynamic>?> _loadCoachingPlanContext() async {
+    final now = DateTime.now();
+    if (_cachedCoachingContext != null &&
+        _lastCoachingContextFetch != null &&
+        now.difference(_lastCoachingContextFetch!) < _coachingContextCacheTtl) {
+      return _cachedCoachingContext;
+    }
+
+    try {
+      final coachingService = GetIt.instance<CoachingService>();
+      final plan = await coachingService.getActiveCoachingPlan();
+      Map<String, dynamic>? context;
+
+      if (plan != null) {
+        final progressResponse =
+            await coachingService.getCoachingPlanProgress();
+        final progress = progressResponse['progress'] is Map
+            ? Map<String, dynamic>.from(progressResponse['progress'])
+            : null;
+        final nextSession = progressResponse['next_session'] is Map
+            ? Map<String, dynamic>.from(progressResponse['next_session'])
+            : null;
+
+        context = coachingService.buildAIPlanContext(
+          plan: plan,
+          progress: progress,
+          nextSession: nextSession,
+        );
+      } else {
+        context = null;
+      }
+
+      _cachedCoachingContext = context;
+    } catch (e) {
+      _logAiDebug('[AI_CHEERLEADER_DEBUG] Failed to fetch coaching plan: $e');
+      // Preserve previous cached context if available
+    } finally {
+      _lastCoachingContextFetch = now;
+    }
+
+    return _cachedCoachingContext;
+  }
+
   Future<void> _onSessionStarted(
       SessionStarted event, Emitter<ActiveSessionState> emit) async {
     AppLogger.info('Starting session with delegation to coordinator');
@@ -218,6 +318,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       _aiCheerleaderEnabled = event.aiCheerleaderEnabled;
       _aiCheerleaderPersonality = event.aiCheerleaderPersonality;
       _aiCheerleaderExplicitContent = event.aiCheerleaderExplicitContent;
+      _resetAICaches();
 
       // Reset AI Cheerleader service for new session
       if (_aiCheerleaderEnabled) {
@@ -414,8 +515,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       } else {
         _lastAICheerleaderCheck = now;
 
-        AppLogger.info(
-            '[AI_DEBUG] Checking AI triggers - enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
+        _logAiDebug(
+            'Checking AI triggers (enabled=$_aiCheerleaderEnabled personality=$_aiCheerleaderPersonality user=${_currentUser?.username})');
 
         // Fire and forget with complete isolation
         Future.microtask(() async {
@@ -423,7 +524,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           try {
             await _checkAICheerleaderTriggers(coordinatorState);
           } catch (e, stack) {
-            AppLogger.error('[AI_CHEERLEADER] Isolated trigger check failed: $e');
+            AppLogger.error(
+                '[AI_CHEERLEADER] Isolated trigger check failed: $e');
             AppLogger.error('[AI_CHEERLEADER] Stack: $stack');
             // Log to Sentry but don't crash the session
             await AppErrorHandler.handleError(
@@ -443,8 +545,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         });
       }
     } else {
-      AppLogger.info(
-          '[AI_DEBUG] AI triggers skipped - enabled: $_aiCheerleaderEnabled, running: ${coordinatorState is ActiveSessionRunning}, personality: $_aiCheerleaderPersonality, user: ${_currentUser?.username}');
+      _logAiDebug(
+          'AI triggers skipped (enabled=$_aiCheerleaderEnabled running=${coordinatorState is ActiveSessionRunning} personality=$_aiCheerleaderPersonality user=${_currentUser?.username})');
     }
 
     // Instead of calling emit directly, we use a custom event to safely forward states
@@ -496,14 +598,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   /// Check for AI Cheerleader triggers and process them
   Future<void> _checkAICheerleaderTriggers(ActiveSessionRunning state) async {
     try {
+      final now = DateTime.now();
+
       // Reset failure count if it's been more than 5 minutes since last failure
-      // This allows AI to recover from temporary issues
       if (_lastAiFailureTime != null &&
-          DateTime.now().difference(_lastAiFailureTime!).inMinutes > 5) {
-        if (_aiCheerleaderFailureCount > 0) {
-          AppLogger.info('[AI_CHEERLEADER] Resetting failure count after recovery period');
-          _aiCheerleaderFailureCount = 0;
-        }
+          now.difference(_lastAiFailureTime!).inMinutes > 5 &&
+          _aiCheerleaderFailureCount > 0) {
+        _logAiDebug('Resetting AI cheerleader failure count after cooldown');
+        _aiCheerleaderFailureCount = 0;
       }
 
       // Check memory usage before processing AI cheerleader
@@ -511,32 +613,32 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final memoryInfo = MemoryMonitorService.getCurrentMemoryInfo();
         final memoryUsageMb = memoryInfo['memory_usage_mb'] as double;
 
-        // App memory check: Skip only if our app is using excessive memory
-        // 400MB is high for our app specifically (normal is 200-300MB)
-        if (memoryUsageMb > 400) {
-          AppLogger.info('[AI_CHEERLEADER] Skipping - app using high memory: ${memoryUsageMb.toStringAsFixed(1)}MB');
-          // Don't return here - just log it. The system has plenty of RAM
-          // Only skip if we're truly out of system memory
+        if (memoryUsageMb > _aiCheerleaderMemorySoftLimitMb) {
+          if (_lastAiMemorySkip == null ||
+              now.difference(_lastAiMemorySkip!) > _aiMemorySkipCooldown) {
+            AppLogger.warning(
+              '[AI_CHEERLEADER] Skipping cheer trigger due to high memory usage: ${memoryUsageMb.toStringAsFixed(1)}MB',
+            );
+            _lastAiMemorySkip = now;
+          }
+          return;
         }
 
-        // Log current app memory usage for debugging
-        AppLogger.debug('[AI_CHEERLEADER] Current app memory: ${memoryUsageMb.toStringAsFixed(1)}MB');
+        _lastAiMemorySkip = null;
+        _logAiDebug(
+            'AI cheerleader memory check: ${memoryUsageMb.toStringAsFixed(1)}MB');
       } catch (e) {
-        AppLogger.warning('[AI_CHEERLEADER] Failed to check memory: $e');
-        // Continue anyway - better to try than skip entirely
+        _logAiDebug('AI cheerleader memory check failed: $e');
       }
 
-      AppLogger.info(
-          '[AI_DEBUG] Analyzing triggers for state: distance=${state.distanceKm}km, time=${state.elapsedSeconds}s');
+      _logAiDebug(
+          'Analyzing AI triggers distance=${state.distanceKm}km time=${state.elapsedSeconds}s');
       final trigger = _aiCheerleaderService.analyzeTriggers(
         state,
         preferMetric: _currentUser!.preferMetric,
       );
-      AppLogger.info(
-          '[AI_DEBUG] Trigger analysis result: ${trigger?.type.name ?? 'null'}');
+      _logAiDebug('Trigger result: ${trigger?.type.name ?? 'none'}');
       if (trigger != null) {
-        AppLogger.info(
-            '[AI_CHEERLEADER] Trigger detected: ${trigger.type.name}');
         await _processAICheerleaderTrigger(trigger, state);
       } else {
         // No trigger debug logging removed for performance (very frequent)
@@ -552,40 +654,22 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     AICheerleaderManualTriggerRequested event,
     Emitter<ActiveSessionState> emit,
   ) async {
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER BUTTON PRESSED =======');
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] AI Cheerleader enabled: $_aiCheerleaderEnabled');
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] AI Cheerleader personality: $_aiCheerleaderPersonality');
-    AppLogger.warning('[AI_CHEERLEADER_DEBUG] Current user: $_currentUser');
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] Current state type: ${state.runtimeType}');
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] State is ActiveSessionRunning: ${state is ActiveSessionRunning}');
+    _logAiDebug('Manual AI cheerleader trigger requested');
+    _logAiDebug(
+        'AI enabled: $_aiCheerleaderEnabled, personality: $_aiCheerleaderPersonality');
 
     if (!_aiCheerleaderEnabled ||
         _aiCheerleaderPersonality == null ||
         _currentUser == null ||
         state is! ActiveSessionRunning) {
-      AppLogger.error(
-          '[AI_CHEERLEADER_DEBUG] Manual trigger REJECTED - conditions not met:');
-      AppLogger.error(
-          '[AI_CHEERLEADER_DEBUG] - AI enabled: $_aiCheerleaderEnabled');
-      AppLogger.error(
-          '[AI_CHEERLEADER_DEBUG] - Personality set: $_aiCheerleaderPersonality');
-      AppLogger.error(
-          '[AI_CHEERLEADER_DEBUG] - User exists: ${_currentUser != null}');
-      AppLogger.error(
-          '[AI_CHEERLEADER_DEBUG] - Session running: ${state is ActiveSessionRunning}');
+      AppLogger.warning(
+          '[AI_CHEERLEADER] Manual trigger rejected – missing prerequisites');
       return;
     }
 
     final runningState = state as ActiveSessionRunning;
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] Session state OK - proceeding with trigger');
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] Session elapsed: ${runningState.elapsedSeconds}s, distance: ${runningState.distanceKm}km');
+    _logAiDebug(
+        'Manual trigger proceeding elapsed=${runningState.elapsedSeconds}s distance=${runningState.distanceKm}km');
 
     // Create a special manual trigger with current session context
     final manualTrigger = CheerleaderTrigger(
@@ -597,12 +681,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       },
     );
 
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] Manual trigger created, calling _processAICheerleaderTrigger...');
     final generatedMessage =
         await _processAICheerleaderTrigger(manualTrigger, runningState);
-    AppLogger.warning(
-        '[AI_CHEERLEADER_DEBUG] ======= MANUAL TRIGGER PROCESSING COMPLETE =======');
 
     // Emit UI-visible message if available
     if (generatedMessage != null && generatedMessage.isNotEmpty) {
@@ -610,7 +690,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // AppLogger.info('[AI_CHEERLEADER_UI] Emitting AI cheer message to UI');
       emit(runningState.copyWith(aiCheerMessage: generatedMessage));
     } else {
-      AppLogger.warning('[AI_CHEERLEADER_UI] No message generated to emit');
+      _logAiDebug('Manual trigger produced no message');
     }
   }
 
@@ -618,57 +698,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   Future<String?> _processAICheerleaderTrigger(
       CheerleaderTrigger trigger, ActiveSessionRunning state) async {
     try {
-      AppLogger.warning('[AI_CHEERLEADER_DEBUG] Step 1: Assembling context...');
+      _logAiDebug('AI cheerleader trigger ${trigger.type.name} started');
+
       // 1. Fetch historical user data for richer AI context
-      Map<String, dynamic>? history;
-      try {
-        AppLogger.info(
-            '[AI_CHEERLEADER_DEBUG] Fetching user history from ${ApiEndpoints.aiCheerleaderLogs}');
-        final historyResp =
-            await _apiClient.get(ApiEndpoints.aiCheerleaderLogs, queryParams: {
-          'limit': 20,
-          'offset': 0,
-        });
-        if (historyResp is Map<String, dynamic>) {
-          history = historyResp;
-          AppLogger.info(
-              '[AI_CHEERLEADER_DEBUG] User history fetched successfully');
-        } else {
-          AppLogger.warning(
-              '[AI_CHEERLEADER_DEBUG] Unexpected user history response type: ${historyResp.runtimeType}');
-        }
-      } catch (e) {
-        AppLogger.warning(
-            '[AI_CHEERLEADER_DEBUG] Failed to fetch user history (continuing without it): $e');
-      }
+      final history = await _loadCheerHistory();
 
       // 2. Fetch coaching plan data for AI context
-      Map<String, dynamic>? coachingPlan;
-      try {
-        final coachingService = GetIt.instance<CoachingService>();
-        final plan = await coachingService.getActiveCoachingPlan();
-        final progressResponse =
-            await coachingService.getCoachingPlanProgress();
-        final progress = progressResponse['progress'] is Map
-            ? Map<String, dynamic>.from(progressResponse['progress'])
-            : null;
-        final nextSession = progressResponse['next_session'] is Map
-            ? Map<String, dynamic>.from(progressResponse['next_session'])
-            : null;
-
-        coachingPlan = coachingService.buildAIPlanContext(
-          plan: plan,
-          progress: progress,
-          nextSession: nextSession,
-        );
-
-        if (coachingPlan != null) {
-          AppLogger.info(
-              '[AI_CHEERLEADER_DEBUG] Fetched coaching plan data: ${coachingPlan['plan_name']}');
-        }
-      } catch (e) {
-        AppLogger.info('[AI_CHEERLEADER_DEBUG] No coaching plan available: $e');
-      }
+      final coachingPlan = await _loadCoachingPlanContext();
 
       // 3. Assemble context for AI generation (including history and coaching plan if available)
       final context = _aiCheerleaderService.assembleContext(
@@ -680,43 +716,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         history: history,
         coachingPlan: coachingPlan,
       );
-      AppLogger.warning(
-          '[AI_CHEERLEADER_DEBUG] Step 1 complete: Context assembled');
-      AppLogger.warning(
-          '[AI_CHEERLEADER_DEBUG] Context keys: ${context.keys.toList()}');
-
-      // Inspect assembled context typing and normalize environment before any location work
-      AppLogger.info(
-          '[AI_CONTEXT_DEBUG] Context runtimeType: ${context.runtimeType}');
-      final envRawBefore = context['environment'];
-      AppLogger.info(
-          '[AI_CONTEXT_DEBUG] Environment (pre-normalization) type: ${envRawBefore?.runtimeType}');
-      AppLogger.info(
-          '[AI_CONTEXT_DEBUG] Environment (pre-normalization) value: $envRawBefore');
-      try {
-        if (envRawBefore is Map) {
-          final envKeys = (envRawBefore as Map).keys.toList();
-          AppLogger.info('[AI_CONTEXT_DEBUG] Environment keys: $envKeys');
-        }
-      } catch (_) {}
+      _logAiDebug('Context assembled for trigger ${trigger.type.name}');
 
       // Normalize environment to Map<String, dynamic> to avoid Map<String, String> inference downstream
-      final Map<String, dynamic> _normalizedEnv = (envRawBefore is Map)
+      final envRawBefore = context['environment'];
+      final Map<String, dynamic> normalizedEnv = (envRawBefore is Map)
           ? Map<String, dynamic>.from(envRawBefore as Map)
           : <String, dynamic>{};
-      context['environment'] = _normalizedEnv;
-      AppLogger.info(
-          '[AI_CONTEXT_DEBUG] Environment normalized type: ${context['environment']?.runtimeType}');
-      AppLogger.info(
-          '[AI_CONTEXT_DEBUG] Environment normalized value: ${context['environment']}');
+      context['environment'] = normalizedEnv;
 
       // 2. Add location context if available
-      AppLogger.warning(
-          '[AI_CHEERLEADER_DEBUG] Step 2: Adding location context...');
-      AppLogger.warning('[AI_LOCATION_DEBUG] Checking location context...');
-      AppLogger.warning('[AI_LOCATION_DEBUG] State type: ${state.runtimeType}');
-      AppLogger.warning(
-          '[AI_LOCATION_DEBUG] About to access state.locationPoints...');
+      _logAiDebug('Attempting to enrich location context');
 
       try {
         // SAFETY: Check if locationPoints exists and is accessible
@@ -732,66 +742,39 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             (state.locationPoints != null && state.locationPoints.isNotEmpty)
                 ? state.locationPoints.last
                 : null;
-        AppLogger.warning(
-            '[AI_LOCATION_DEBUG] Last location extracted: $lastLocation');
-        AppLogger.warning(
-            '[AI_LOCATION_DEBUG] Last location type: ${lastLocation.runtimeType}');
-
         if (lastLocation != null) {
-          AppLogger.warning(
-              '[AI_LOCATION_DEBUG] Last location coords: ${lastLocation.latitude}, ${lastLocation.longitude}');
-          AppLogger.warning(
-              '[AI_LOCATION_DEBUG] About to call getLocationContext...');
-
           final locationContext = await _locationContextService
               .getLocationContext(
-            lastLocation.latitude,
-            lastLocation.longitude,
-          )
+                lastLocation.latitude,
+                lastLocation.longitude,
+              )
               .timeout(
-            Duration(seconds: 5),
-            onTimeout: () {
-              AppLogger.warning(
-                  '[AI_LOCATION_DEBUG] Location context call timed out after 5 seconds');
-              return null;
-            },
-          );
-          AppLogger.warning(
-              '[AI_LOCATION_DEBUG] getLocationContext call completed');
-
-          AppLogger.info(
-              '[AI_LOCATION_DEBUG] Location context result: $locationContext');
+                const Duration(seconds: 5),
+                onTimeout: () => null,
+              );
 
           if (locationContext != null) {
-            // Ensure environment is a mutable Map<String, dynamic> before adding location
-            final envRaw = context['environment'];
-            AppLogger.warning(
-                '[AI_LOCATION_DEBUG] Environment before update - type: ${envRaw.runtimeType}, value: $envRaw');
-
-            // Create a dynamic-typed copy to avoid Map<String, String> value type restriction
-            final Map<String, dynamic> environment = (envRaw is Map)
-                ? Map<String, dynamic>.from(envRaw as Map)
-                : <String, dynamic>{};
-
-            environment['location'] = {
+            final environment =
+                (context['environment'] as Map<String, dynamic>?) ??
+                    <String, dynamic>{};
+            final locationSummary = {
               'description': locationContext.description,
               'city': locationContext.city,
               'terrain': locationContext.terrain,
-              'landmark':
-                  locationContext.landmark ?? '', // Handle nullable landmark
+              'landmark': locationContext.landmark,
               'weatherCondition': locationContext.weatherCondition,
               'temperature': locationContext.temperature,
             };
-            context['environment'] = environment;
-            AppLogger.info(
-                '[AI_LOCATION_DEBUG] Added location to context: ${environment['location']}');
+            locationSummary.removeWhere((key, value) =>
+                value == null || (value is String && value.isEmpty));
+            if (locationSummary.isNotEmpty) {
+              environment['location'] = locationSummary;
+            }
 
-            // Also populate a dedicated weather map for OpenAIService prompt consumption
-            // OpenAIService._buildBaseContext expects environment['weather'] with keys like tempF/tempC and condition/summary
             final weatherMap = <String, dynamic>{};
-            if (locationContext.temperature != null) {
-              weatherMap['tempF'] =
-                  locationContext.temperature; // Fahrenheit already
+            final tempF = locationContext.temperature;
+            if (tempF != null) {
+              weatherMap['tempF'] = tempF;
             }
             final condition = locationContext.weatherCondition;
             if (condition != null && condition.isNotEmpty) {
@@ -799,36 +782,16 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             }
             if (weatherMap.isNotEmpty) {
               environment['weather'] = weatherMap;
-              context['environment'] =
-                  environment; // reassign to ensure updated ref
-              AppLogger.info(
-                  '[AI_LOCATION_DEBUG] Added weather to context: ${environment['weather']}');
             }
-          } else {
-            AppLogger.warning(
-                '[AI_LOCATION_DEBUG] Location context service returned null');
+
+            context['environment'] = environment;
+            _logAiDebug('Location context added to AI environment');
           }
-        } else {
-          AppLogger.warning(
-              '[AI_LOCATION_DEBUG] No location points available in session state');
         }
       } catch (e) {
         AppLogger.error('[AI_LOCATION_DEBUG] Error in location processing: $e');
-        AppLogger.error('[AI_LOCATION_DEBUG] Error type: ${e.runtimeType}');
-        AppLogger.warning(
-            '[AI_LOCATION_DEBUG] Continuing without location context due to error');
-        // Don't rethrow - continue without location context
       }
-      AppLogger.warning(
-          '[AI_CHEERLEADER_DEBUG] Step 2 complete: Location context processed');
-
-      // 3. Generate motivational text with OpenAI (LOCAL GENERATION ONLY)
-      AppLogger.warning(
-          '[AI_CHEERLEADER_DEBUG] Step 3: Calling LOCAL OpenAI service...');
-      AppLogger.info(
-          '[AI_CHEERLEADER_DEBUG] Using local OpenAI generation with full context');
-      AppLogger.info(
-          '[AI_CHEERLEADER_DEBUG] Personality: $_aiCheerleaderPersonality, Explicit: $_aiCheerleaderExplicitContent');
+      _logAiDebug('AI environment prepared for OpenAI generation');
 
       final messageStartTime = DateTime.now();
       String? message;
@@ -839,8 +802,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           personality: _aiCheerleaderPersonality!,
           explicitContent: _aiCheerleaderExplicitContent,
         );
-        AppLogger.info(
-            '[AI_CHEERLEADER_DEBUG] Local OpenAI service returned: $message');
+        _logAiDebug('OpenAI generated message: $message');
       } catch (e) {
         AppLogger.error(
             '[AI_CHEERLEADER_DEBUG] Local OpenAI service failed: $e');
@@ -850,13 +812,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final generationTimeMs =
           messageEndTime.difference(messageStartTime).inMilliseconds;
 
-      AppLogger.warning(
-          '[AI_CHEERLEADER_DEBUG] Step 3 complete: OpenAI call finished');
-      AppLogger.info(
-          '[AI_CHEERLEADER_DEBUG] Received message from OpenAI: $message');
-
       if (message != null && message.isNotEmpty) {
-        AppLogger.info('[AI_CHEERLEADER] Generated message: "$message"');
+        _logAiDebug('AI cheerleader message ready for playback');
 
         // 4. Synthesize speech with ElevenLabs
         final synthesisStartTime = DateTime.now();
@@ -870,7 +827,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         final synthesisSuccess = audioBytes != null;
 
         if (audioBytes != null) {
-          AppLogger.info('[AI_CHEERLEADER] Audio synthesized successfully');
+          _logAiDebug('ElevenLabs synthesis succeeded');
 
           // 5. Play audio through audio service
           final playbackSuccess = await _audioService.playCheerleaderAudio(
@@ -880,8 +837,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           );
 
           if (playbackSuccess) {
-            AppLogger.info(
-                '[AI_CHEERLEADER] Audio playback completed successfully');
+            _logAiDebug('Cheerleader audio playback finished');
           } else {
             AppLogger.warning('[AI_CHEERLEADER] Audio playback failed');
           }
@@ -893,12 +849,34 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         // 5. Log interaction to analytics
         try {
           final aiAnalyticsService = GetIt.instance<AIAnalyticsService>();
+          final triggerCtx = context['trigger'] is Map
+              ? Map<String, dynamic>.from(context['trigger'] as Map)
+              : {
+                  'type': trigger.type.name,
+                  'data': trigger.data,
+                };
+          final sessionCtx = context['session'] is Map
+              ? Map<String, dynamic>.from(context['session'] as Map)
+              : <String, dynamic>{};
+          final distanceCtx = sessionCtx['distance'] is Map
+              ? Map<String, dynamic>.from(sessionCtx['distance'] as Map)
+              : <String, dynamic>{};
+          final elapsedCtx = sessionCtx['elapsedTime'] is Map
+              ? Map<String, dynamic>.from(sessionCtx['elapsedTime'] as Map)
+              : <String, dynamic>{};
+          final promptSummary = jsonEncode({
+            'trigger': triggerCtx,
+            'distance': distanceCtx['primaryValue'],
+            'elapsed_seconds': elapsedCtx['elapsedSeconds'],
+            'personality': _aiCheerleaderPersonality,
+          });
+
           await aiAnalyticsService.logInteraction(
             sessionId: state.sessionId,
             userId: _currentUser!.userId,
             personality: _aiCheerleaderPersonality!,
             triggerType: trigger.type.toString(),
-            openaiPrompt: context.toString(),
+            openaiPrompt: promptSummary,
             openaiResponse: message,
             elevenlabsVoiceId: _aiCheerleaderPersonality!,
             sessionContext: {
@@ -918,20 +896,18 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
             synthesisSuccess: synthesisSuccess,
             synthesisTimeMs: synthesisTimeMs,
           );
-          AppLogger.info(
-              '[AI_ANALYTICS] Interaction logged successfully for automatic trigger');
+          _logAiDebug('AI analytics interaction logged');
         } catch (e) {
           AppLogger.error(
               '[AI_ANALYTICS] Failed to log automatic trigger interaction: $e');
         }
+        _aiCheerleaderFailureCount = 0;
         // Return the generated message for optional UI display
         return message;
       } else {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
       }
 
-      // Reset failure count on successful completion
-      _aiCheerleaderFailureCount = 0;
       return null;
     } catch (e, stackTrace) {
       // Increment failure count and track time
@@ -941,8 +917,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       // Check if we've exceeded the failure threshold
       if (_aiCheerleaderFailureCount >= _maxAiCheerleaderFailures) {
         AppLogger.warning(
-          '[AI_CHEERLEADER] Circuit breaker triggered - disabling AI after $_aiCheerleaderFailureCount failures'
-        );
+            '[AI_CHEERLEADER] Circuit breaker triggered - disabling AI after $_aiCheerleaderFailureCount failures');
         _aiCheerleaderEnabled = false;
 
         // Clean up audio resources
@@ -950,13 +925,13 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
           await _audioService.stop();
           await _audioService.dispose();
         } catch (cleanupError) {
-          AppLogger.error('[AI_CHEERLEADER] Failed to clean up audio service: $cleanupError');
+          AppLogger.error(
+              '[AI_CHEERLEADER] Failed to clean up audio service: $cleanupError');
         }
       }
 
       AppLogger.error(
-        '[AI_CHEERLEADER] Pipeline processing failed ($_aiCheerleaderFailureCount/$_maxAiCheerleaderFailures): $e'
-      );
+          '[AI_CHEERLEADER] Pipeline processing failed ($_aiCheerleaderFailureCount/$_maxAiCheerleaderFailures): $e');
       AppLogger.error('[AI_CHEERLEADER] Stack trace: $stackTrace');
       return null;
     }
@@ -1683,7 +1658,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Temporarily suspend AI cheerleader during memory pressure
     // Note: We don't permanently disable it - just stop current audio
     if (_aiCheerleaderEnabled) {
-      AppLogger.warning('[MEMORY_PRESSURE] Temporarily suspending AI cheerleader to conserve memory');
+      AppLogger.warning(
+          '[MEMORY_PRESSURE] Temporarily suspending AI cheerleader to conserve memory');
 
       // Stop any currently playing audio but don't disable the feature
       try {
@@ -1715,7 +1691,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     // Debug timer updates
     if (event.state is ActiveSessionRunning) {
       final running = event.state as ActiveSessionRunning;
-      print('[TIMER_FIX] Emitting state with elapsedSeconds: ${running.elapsedSeconds}');
+      print(
+          '[TIMER_FIX] Emitting state with elapsedSeconds: ${running.elapsedSeconds}');
     }
     // Safely emit the coordinator state within an event handler context
     emit(event.state);

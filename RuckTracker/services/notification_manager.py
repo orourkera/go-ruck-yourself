@@ -376,7 +376,71 @@ class NotificationManager:
                 'click_action': 'FLUTTER_NOTIFICATION_CLICK'
             }
         )
-    
+
+    def send_new_user_activation_notification(self, recipient_id: str, hours_since_signup: int, context: Dict[str, Any]) -> bool:
+        """Send push to new users who haven't completed their first ruck."""
+        tone = self._get_user_coaching_profile(recipient_id).get('coaching_tone')
+        notification_type = f'new_user_day{1 if hours_since_signup < 48 else 3}'
+
+        payload_context = {
+            'hours_since_signup': hours_since_signup,
+            'timezone': context.get('timezone'),
+            'prefer_metric': context.get('prefer_metric', True),
+            'target': 'first_ruck'
+        }
+
+        if tone:
+            content = self._get_retention_notification_content(notification_type, tone, payload_context)
+        else:
+            payload_context.update(context)
+            content = self._generate_ai_retention_notification(recipient_id, notification_type, payload_context)
+
+        return self.send_notification(
+            recipients=[recipient_id],
+            notification_type=f'retention_{notification_type}',
+            title=content['title'],
+            body=content['body'],
+            data={
+                'retention_type': notification_type,
+                'hours_since_signup': hours_since_signup,
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+            }
+        )
+
+    def send_single_ruck_reactivation_notification(
+        self,
+        recipient_id: str,
+        days_since_last: int,
+        context: Dict[str, Any]
+    ) -> bool:
+        """Send push to users who completed exactly one ruck and lapsed."""
+        tone = self._get_user_coaching_profile(recipient_id).get('coaching_tone')
+        notification_type = 'single_ruck_day7'
+
+        payload_context = {
+            'days_since_last': days_since_last,
+            'last_ruck': context.get('last_ruck'),
+            'current_weather': context.get('current_weather'),
+            'target': 'second_ruck'
+        }
+
+        if tone:
+            content = self._get_retention_notification_content(notification_type, tone, payload_context)
+        else:
+            content = self._generate_ai_retention_notification(recipient_id, notification_type, payload_context)
+
+        return self.send_notification(
+            recipients=[recipient_id],
+            notification_type=f'retention_{notification_type}',
+            title=content['title'],
+            body=content['body'],
+            data={
+                'retention_type': notification_type,
+                'days_since_last': days_since_last,
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+            }
+        )
+
     def send_session_2_celebration_notification(self, recipient_id: str, session_data: Dict[str, Any]) -> bool:
         """Send AI-personalized Session 2 celebration notification"""
         user_profile = self._get_user_coaching_profile(recipient_id)
@@ -556,9 +620,58 @@ Generate a push notification with:
 
 Return JSON format: {"title": "...", "body": "..."}"""
             
+            elif context['notification_type'] == 'session_1_to_2_day2':
+                system_prompt = """You are a motivational rucking coach generating a push notification to encourage someone to complete their second ruck session. They completed their first ruck 48 hours ago and are at risk of losing momentum.
+
+Generate a push notification with:
+- An urgent but supportive title (max 50 characters)
+- A motivating body message (max 120 characters)
+- Reference their last ruck performance if available
+- Include weather context if provided
+- Emphasize the importance of not losing momentum
+- Make it feel achievable and worthwhile
+
+Return JSON format: {"title": "...", "body": "..."}"""
+
+            elif context['notification_type'] == 'new_user_day1':
+                system_prompt = """You are a world-class onboarding coach for a rucking app. A user created an account about 24 hours ago but hasn't logged a first ruck yet.
+
+Generate a push notification with:
+- Inspiring title < 50 characters that sparks action.
+- Supportive, specific body (<120 characters) that removes friction and points to an easy win (e.g., 15-minute first ruck, using gear they already have).
+- Incorporate local weather or time-of-day cues when provided.
+- Sound fun, confident, and personalized; avoid generic app marketing.
+- Include a call-to-action rooted in feelings (e.g., momentum, stress relief, curiosity).
+
+Return JSON format: {"title": "...", "body": "..."}"""
+
+            elif context['notification_type'] == 'new_user_day3':
+                system_prompt = """You are a motivational rucking coach. A user signed up ~72 hours ago but still hasn’t completed their first ruck.
+
+Generate a push notification with:
+- Empathetic title (<50 characters) acknowledging real-life busyness.
+- Body (<120 characters) that offers a specific, low-barrier invitation (e.g., 10-minute walk with backpack) and highlights how they’ll feel afterward.
+- If weather/time info exists, weave it in naturally.
+- Convey that it’s totally normal to be starting now, and that momentum begins with one short session.
+- Deliver a friendly nudge without pressure.
+
+Return JSON format: {"title": "...", "body": "..."}"""
+
+            elif context['notification_type'] == 'single_ruck_day7':
+                system_prompt = """You are a motivational rucking coach. A user completed exactly one ruck about 7 days ago and hasn’t logged another.
+
+Generate a push notification with:
+- Title (<50 characters) celebrating their first win and hinting at what’s next.
+- Body (<120 characters) that references their last ruck stats (distance/time) when available, encourages a quick return, and points to an achievable session.
+- If you have weather or location details, incorporate them so the message feels timely.
+- Emphasize that session #2 is where real momentum builds.
+- Keep tone positive, personal, and action-oriented.
+
+Return JSON format: {"title": "...", "body": "..."}"""
+
             else:
                 return None
-            
+
             # Build user prompt with context
             user_prompt_parts = [f"Generate a retention notification for: {context['notification_type']}"]
             
@@ -574,9 +687,12 @@ Return JSON format: {"title": "...", "body": "..."}"""
             if context.get('current_weather'):
                 weather = context['current_weather']
                 user_prompt_parts.append(f"Current weather: {weather.get('temperature', 'N/A')}°C, {weather.get('description', 'N/A')}")
-            
+
+            if context.get('hours_since_signup'):
+                user_prompt_parts.append(f"Hours since signup: {context['hours_since_signup']}")
+
             user_prompt = "\n".join(user_prompt_parts)
-            
+
             response = client.chat.completions.create(
                 model=os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
                 messages=[
@@ -826,6 +942,60 @@ Return JSON format: {"title": "...", "body": "..."}"""
                 'minimalist': {
                     'title': '✅ Session 2',
                     'body': 'Two down. Momentum building.'
+                }
+            },
+            'new_user_day1': {
+                'drill_sergeant': {
+                    'title': 'Day 1: Move!',
+                    'body': '24 hours since signup. Throw on a pack, march 15 minutes, prove to yourself you’re serious.'
+                },
+                'supportive_friend': {
+                    'title': 'Let’s take that first step',
+                    'body': 'Grab a backpack, load a couple books, and stroll 10 minutes today. You’ll feel amazing after that first ruck.'
+                },
+                'data_nerd': {
+                    'title': 'Prime moment to start',
+                    'body': 'Habits stick best within 24h of intent. A 0.8 km shakeout ruck tonight keeps your streak probability high.'
+                },
+                'minimalist': {
+                    'title': 'Backpack. Door. Go.',
+                    'body': '10 minutes. Light pack. First ruck done.'
+                }
+            },
+            'new_user_day3': {
+                'drill_sergeant': {
+                    'title': 'Momentum slipping',
+                    'body': '72 hours since signup. Lace up, move 12 minutes tonight, and reclaim the fire you felt on day one!'
+                },
+                'supportive_friend': {
+                    'title': 'Life’s busy—I get it',
+                    'body': 'Sneak in a short ruck tonight. Even 0.5 km with a backpack resets your momentum and boosts your mood.'
+                },
+                'data_nerd': {
+                    'title': 'Habit clock is ticking',
+                    'body': 'Day 3 is the drop-off point for most. Beat the stat: 12-minute ruck now raises success odds by 68%.'
+                },
+                'minimalist': {
+                    'title': 'Day 3 check-in',
+                    'body': 'Backpack + 12 minutes. Do it tonight.'
+                }
+            },
+            'single_ruck_day7': {
+                'drill_sergeant': {
+                    'title': 'Session 2 awaits',
+                    'body': 'Seven days since your first ruck. Lace up and lock in session #2 before rust sets in!'
+                },
+                'supportive_friend': {
+                    'title': 'Ride that first-ruck high',
+                    'body': 'You loved that first ruck! A quick follow-up this week keeps the good vibes rolling. I’ve got your back.'
+                },
+                'data_nerd': {
+                    'title': 'Momentum decay spotted',
+                    'body': 'Your inaugural ruck was 7 days ago. Logging #2 within 10 days ups long-term consistency by 3x.'
+                },
+                'minimalist': {
+                    'title': 'Second ruck time',
+                    'body': 'Session #2 today. Let’s go.'
                 }
             },
             'first_week_sprint_push': {
