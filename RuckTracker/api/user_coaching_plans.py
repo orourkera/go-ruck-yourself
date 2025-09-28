@@ -306,25 +306,61 @@ class UserCoachingPlanProgressResource(Resource):
             if auth_response:
                 return auth_response
             
-            # Get active plan (fixed to match actual database schema)
+            # Get active plan without relying on joined template (avoid missing-row issues)
             client = get_supabase_client()
-            query = client.table('user_coaching_plans').select(
-                'id, coaching_plan_id, start_date, current_week, '
-                'coaching_plan_templates!coaching_plan_id(plan_id, name, duration_weeks, base_structure, retests)'
+            plan_query = client.table('user_coaching_plans').select(
+                'id, coaching_plan_id, start_date, current_week, plan_modifications'
             ).eq('user_id', user_id).eq('current_status', 'active')
-            
-            # If plan_id is provided, filter by it as well
+
             if plan_id:
-                query = query.eq('id', plan_id)
-            
-            plan_resp = query.limit(1).execute()
-            
+                plan_query = plan_query.eq('id', plan_id)
+
+            plan_resp = plan_query.limit(1).execute()
+
             if not plan_resp.data:
                 return {"error": "No active coaching plan found"}, 404
-                
+
             plan = plan_resp.data[0]
-            template = plan['coaching_plan_templates']
-            
+            template = None
+
+            # Try to load template metadata (non-fatal if missing)
+            base_plan_id = plan.get('coaching_plan_id')
+            if base_plan_id:
+                try:
+                    template_resp = client.table('coaching_plan_templates').select(
+                        'plan_id, name, duration_weeks, base_structure, retests'
+                    ).eq('id', base_plan_id).maybe_single().execute()
+                    template = template_resp.data
+                except Exception as template_err:
+                    logger.warning(f"Unable to load template metadata for plan {plan['id']}: {template_err}")
+
+            if not template:
+                try:
+                    modifications = plan.get('plan_modifications')
+                    if isinstance(modifications, str):
+                        import json
+                        modifications = json.loads(modifications)
+                    if isinstance(modifications, dict):
+                        structure = modifications.get('plan_structure') or {}
+                        template = {
+                            'plan_id': modifications.get('plan_type'),
+                            'name': modifications.get('plan_name') or 'Coaching Plan',
+                            'duration_weeks': structure.get('duration_weeks') or 12,
+                            'base_structure': structure,
+                            'retests': structure.get('retests') if isinstance(structure, dict) else {}
+                        }
+                except Exception as fallback_err:
+                    logger.warning(f"Failed to parse plan_modifications for plan {plan['id']}: {fallback_err}")
+
+            if not template:
+                template = {
+                    'plan_id': None,
+                    'name': 'Coaching Plan',
+                    'duration_weeks': 12,
+                    'base_structure': {},
+                    'retests': {}
+                }
+
             # Get all plan sessions with coaching points
             sessions_resp = client.table('plan_sessions').select(
                 'id, planned_week, planned_session_type, completion_status, plan_adherence_score, '
@@ -527,6 +563,8 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
         logger.info(f"Generating sessions for {duration_weeks} weeks with {len(weekly_template)} sessions per week")
         sessions_to_create = []
 
+        base_weekday = start_date.weekday()
+
         def day_to_offset(day_name: str) -> int:
             mapping = {
                 'monday': 0,
@@ -537,7 +575,10 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
                 'saturday': 5,
                 'sunday': 6
             }
-            return mapping.get(day_name.lower(), 0)
+            desired = mapping.get(day_name.lower())
+            if desired is None:
+                return 0
+            return (desired - base_weekday) % 7
 
         def generate_coaching_points(session_type: str, week_num: int) -> Dict[str, Any]:
             """Generate coaching points based on session type and week number."""
@@ -740,6 +781,10 @@ def _generate_plan_sessions(user_plan_id, plan_metadata, start_date, user_id=Non
                 coaching_points['target_weight_kg'] = session_payload['weight_kg']
             if 'duration_minutes' in session_payload:
                 coaching_points['target_duration_minutes'] = session_payload['duration_minutes']
+            if 'target_distance_km' in session_payload:
+                coaching_points['target_distance_km'] = session_payload['target_distance_km']
+            if 'distance_km' in session_payload and 'target_distance_km' not in coaching_points:
+                coaching_points['target_distance_km'] = session_payload['distance_km']
 
             # Create session with timezone information
             session_data = {

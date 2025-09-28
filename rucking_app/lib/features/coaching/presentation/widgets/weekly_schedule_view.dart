@@ -195,22 +195,7 @@ class WeeklyScheduleView extends StatelessWidget {
                     ),
                 ],
               ),
-              trailing: coachingPoints['target_duration_minutes'] != null
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${coachingPoints['target_duration_minutes']} min',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )
-                : null,
+              trailing: _buildTrailingMetrics(coachingPoints),
             ),
           );
         }).toList(),
@@ -218,13 +203,61 @@ class WeeklyScheduleView extends StatelessWidget {
     );
   }
 
+  Widget? _buildTrailingMetrics(Map<String, dynamic> coachingPoints) {
+    final duration = coachingPoints['target_duration_minutes'];
+    final distance = coachingPoints['target_distance_km'] ?? coachingPoints['distance_km'];
+    if (duration == null && distance == null) return null;
+
+    final chips = <Widget>[];
+    if (duration != null) {
+      chips.add(_metricChip('${duration} min'));
+    }
+    if (distance != null) {
+      final distanceValue = (distance is num) ? distance.toStringAsFixed(distance % 1 == 0 ? 0 : 1) : distance.toString();
+      chips.add(_metricChip('$distanceValue km'));
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: chips,
+    );
+  }
+
+  Widget _metricChip(String label) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   String _buildSessionDetails(Map<String, dynamic> coachingPoints) {
     final parts = <String>[];
-    if (coachingPoints['target_weight_kg'] != null) {
-      parts.add('${coachingPoints['target_weight_kg']} kg');
+    final duration = coachingPoints['target_duration_minutes'];
+    final distance = coachingPoints['target_distance_km'] ?? coachingPoints['distance_km'];
+    final weight = coachingPoints['target_weight_kg'];
+
+    if (duration != null) {
+      parts.add('${duration} min');
     }
-    if (coachingPoints['distance_km'] != null) {
-      parts.add('${coachingPoints['distance_km']} km');
+    if (distance != null) {
+      final distanceValue = (distance is num) ? distance.toStringAsFixed(distance % 1 == 0 ? 0 : 1) : distance.toString();
+      parts.add('$distanceValue km');
+    }
+    if (weight != null) {
+      final weightValue = (weight is num) ? weight.toStringAsFixed(weight % 1 == 0 ? 0 : 1) : weight.toString();
+      parts.add('$weightValue kg');
     }
     return parts.join(' • ');
   }
