@@ -11,6 +11,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/core/services/analytics_service.dart';
+import 'package:rucking_app/features/onboarding/presentation/screens/strava_onboarding_screen.dart';
 
 /// Unified onboarding screen that handles all permissions for both iOS and Android
 class UnifiedOnboardingScreen extends StatefulWidget {
@@ -35,6 +36,8 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
   bool _healthPermissionGranted =
       !Platform.isIOS; // Auto-grant on non-iOS platforms
   bool _batteryOptimizationHandled = false;
+  bool _stravaConnected = false;
+  bool _stravaStepShown = false; // Track if we've shown Strava screen
 
   @override
   void initState() {
@@ -114,6 +117,22 @@ class _UnifiedOnboardingScreenState extends State<UnifiedOnboardingScreen> {
       // Track reaching battery step
       AnalyticsService.trackOnboardingBatteryStep();
       return _buildBatteryOptimizationStep();
+    } else if (!_stravaStepShown) {
+      // Show Strava connection screen after all permissions
+      return StravaOnboardingScreen(
+        onComplete: () {
+          setState(() {
+            _stravaStepShown = true;
+            _stravaConnected = true;
+          });
+        },
+        onSkip: () {
+          setState(() {
+            _stravaStepShown = true;
+            _stravaConnected = false;
+          });
+        },
+      );
     } else {
       // Track onboarding completed when reaching final step
       AnalyticsService.trackOnboardingCompleted(

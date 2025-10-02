@@ -70,6 +70,8 @@ import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/new_user_coaching_sheet.dart';
 import 'package:rucking_app/features/coaching/presentation/widgets/coaching_plan_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:rucking_app/core/services/strava_prompt_service.dart';
+import 'package:rucking_app/shared/widgets/strava_prompt_bottom_sheet.dart';
 
 LatLng _getRouteCenter(List<LatLng> points) {
   if (points.isEmpty) return LatLng(40.421, -3.678); // Default center (Madrid)
@@ -163,8 +165,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     // Check if user is new and should see coaching prompt
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkNewUserCoachingPrompt();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkNewUserCoachingPrompt();
+      // Check for Strava prompt after coaching (with delay to avoid overlap)
+      Future.delayed(const Duration(seconds: 2), () {
+        _checkStravaPrompt();
+      });
     });
   }
 
@@ -188,6 +194,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Share prompts are now handled directly after session completion
     // No need to check on app resume to avoid spam
+  }
+
+  Future<void> _checkStravaPrompt() async {
+    try {
+      final stravaPromptService = StravaPromptService();
+
+      // Get session count for the user
+      final repository = GetIt.instance<SessionRepository>();
+      final sessions = await repository.fetchSessionHistory();
+      final sessionCount = sessions.where((s) => s.duration.inSeconds >= 300).length;
+
+      // Check if we should show the prompt
+      final shouldShow = await stravaPromptService.shouldShowPrompt(
+        sessionCount: sessionCount,
+      );
+
+      if (shouldShow && mounted) {
+        // Small delay to ensure UI is ready
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (mounted) {
+          await StravaPromptBottomSheet.show(context);
+        }
+      }
+    } catch (e) {
+      developer.log('Error checking for Strava prompt: $e');
+    }
   }
 
   Future<void> _checkNewUserCoachingPrompt() async {

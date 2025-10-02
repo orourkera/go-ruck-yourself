@@ -103,9 +103,9 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       TextEditingController();
 
   // AI Cheerleader state variables
-  bool _aiCheerleaderEnabled = false;
-  String _aiCheerleaderPersonality = 'Supportive Friend';
-  bool _aiCheerleaderExplicitContent = false;
+  bool _aiCheerleaderEnabled = true; // Default to enabled
+  String _aiCheerleaderPersonality = 'Drill Sergeant'; // Best performing personality
+  bool _aiCheerleaderExplicitContent = true; // Users prefer authentic voice
 
   /// Loads preferences and last used values (ruck weight and duration)
   Future<void> _loadDefaults() async {
@@ -149,12 +149,12 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         _userWeightController.text = lastUserWeight;
       }
 
-      // Load AI Cheerleader preferences
-      _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? false;
+      // Load AI Cheerleader preferences (default to true for new users)
+      _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? true;
 
       // Validate saved personality exists in current options
       final savedPersonality =
-          prefs.getString('aiCheerleaderPersonality') ?? 'Supportive Friend';
+          prefs.getString('aiCheerleaderPersonality') ?? 'Drill Sergeant';
       const availablePersonalities = [
         'Supportive Friend',
         'Drill Sergeant',
@@ -175,7 +175,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                   Random().nextInt(availablePersonalities.length)];
 
       _aiCheerleaderExplicitContent =
-          prefs.getBool('aiCheerleaderExplicitContent') ?? false;
+          prefs.getBool('aiCheerleaderExplicitContent') ?? true;
     } catch (e) {
       // Fallback to defaults on error
       _ruckWeight = AppConfig.defaultRuckWeight;

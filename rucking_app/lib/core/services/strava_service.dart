@@ -17,11 +17,14 @@ class StravaConnectionStatus {
   });
 
   factory StravaConnectionStatus.fromJson(Map<String, dynamic> json) {
+    // Check if Strava is connected based on presence of athlete_id
+    final bool isConnected = json['strava_athlete_id'] != null;
+
     return StravaConnectionStatus(
-      connected: json['connected'] ?? false,
-      athleteId: json['athlete_id']?.toString(),
-      connectedAt: json['connected_at'] != null
-          ? DateTime.tryParse(json['connected_at'])
+      connected: isConnected,
+      athleteId: json['strava_athlete_id']?.toString(),
+      connectedAt: json['strava_connected_at'] != null
+          ? DateTime.tryParse(json['strava_connected_at'])
           : null,
     );
   }
@@ -34,7 +37,10 @@ class StravaService {
   Future<StravaConnectionStatus> getConnectionStatus() async {
     try {
       final response = await _apiClient.get('/auth/strava/status');
-      return StravaConnectionStatus.fromJson(response);
+      AppLogger.debug('[STRAVA] Connection status response: $response');
+      final status = StravaConnectionStatus.fromJson(response);
+      AppLogger.debug('[STRAVA] Parsed connection status - connected: ${status.connected}, athleteId: ${status.athleteId}');
+      return status;
     } catch (e) {
       AppLogger.error('[STRAVA] Failed to get connection status: $e');
 

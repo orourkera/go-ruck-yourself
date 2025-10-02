@@ -12,6 +12,8 @@ import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.da
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
+import 'package:rucking_app/core/services/api_client.dart';
+import 'package:get_it/get_it.dart';
 
 /// Service for generating motivational text using OpenAI GPT-4o
 class OpenAIService {
@@ -42,62 +44,41 @@ class OpenAIService {
     Duration? timeoutOverride,
   }) async {
     try {
-      // Support a direct prompt override when provided in context (e.g., AIInsightsService)
-      String prompt;
-      final directPrompt = context['prompt'];
-      if (directPrompt is String && directPrompt.trim().isNotEmpty) {
-        prompt = directPrompt;
-      } else {
-        try {
-          prompt = _buildPrompt(
-            personality,
-            explicitContent,
-            context['trigger'] ?? <String, dynamic>{},
-            context['session'] ?? <String, dynamic>{},
-            context['user'] ?? <String, dynamic>{},
-            context['environment'] ?? <String, dynamic>{},
-            context['history'] ?? context['userHistory'] ?? <String, dynamic>{},
-          );
-        } catch (e, stackTrace) {
-          AppLogger.error('[OPENAI] Failed to build prompt: $e');
-          return null;
-        }
+      // Call backend API which includes coaching points logic
+      final apiClient = GetIt.instance<ApiClient>();
+
+      // Extract user_id from context
+      final userId = context['user']?['userId'] ?? context['user']?['id'];
+      if (userId == null) {
+        AppLogger.error('[OPENAI] No user_id found in context');
+        return null;
       }
 
-      final useO3 = (modelOverride ?? _model).toLowerCase().startsWith('o3');
-      final completion = useO3
-          ? await OpenAI.instance.chat.create(
-              model: modelOverride ?? _model,
-              messages: [
-                OpenAIChatCompletionChoiceMessageModel(
-                  content: [
-                    OpenAIChatCompletionChoiceMessageContentItemModel.text(
-                        prompt),
-                  ],
-                  role: OpenAIChatMessageRole.user,
-                ),
-              ],
-              // Do NOT pass maxTokens or temperature for o3 models (Responses API semantics)
-            ).timeout(timeoutOverride ?? _timeout)
-          : await OpenAI.instance.chat
-              .create(
-                model: modelOverride ?? _model,
-                messages: [
-                  OpenAIChatCompletionChoiceMessageModel(
-                    content: [
-                      OpenAIChatCompletionChoiceMessageContentItemModel.text(
-                          prompt),
-                    ],
-                    role: OpenAIChatMessageRole.user,
-                  ),
-                ],
-                maxTokens: maxTokensOverride ?? _maxTokens,
-                temperature: temperatureOverride ?? _temperature,
-              )
-              .timeout(timeoutOverride ?? _timeout);
+      // Prepare request payload for backend
+      final requestData = {
+        'user_id': userId,
+        'current_session': context['session'] ?? {},
+        'personality': personality,
+        'environment': context['environment'] ?? {},
+        'location': context['location'] ?? {},
+        'trigger': context['trigger'] ?? {},
+        'explicit_content': explicitContent,
+      };
 
-      var message =
-          completion.choices.first.message.content?.first.text?.trim();
+      AppLogger.info('[OPENAI] Calling backend /api/ai-cheerleader with coaching points');
+
+      final response = await apiClient.post(
+        '/ai-cheerleader',
+        requestData,
+      ).timeout(timeoutOverride ?? _timeout);
+
+      // Backend returns { "message": "...", "coaching_trigger": {...} }
+      var message = response['message'] as String?;
+
+      // Log if coaching trigger was used
+      if (response['coaching_trigger'] != null) {
+        AppLogger.info('[OPENAI] Coaching trigger applied: ${response['coaching_trigger']}');
+      }
 
       if (message != null && message.isNotEmpty) {
         // 1) Strip hashtags
@@ -152,17 +133,17 @@ class OpenAIService {
         );
         return message;
       } else {
-        AppLogger.warning('[OPENAI] Empty response from OpenAI');
+        AppLogger.warning('[OPENAI] Empty response from backend AI cheerleader');
         return null;
       }
     } on TimeoutException catch (e) {
-      AppLogger.error('[OPENAI] Request timed out after ${_timeout.inSeconds}s');
+      AppLogger.error('[OPENAI] Backend AI cheerleader request timed out');
       return null;
     } on SocketException catch (e) {
-      AppLogger.error('[OPENAI] Network error: $e');
+      AppLogger.error('[OPENAI] Network error calling backend: $e');
       return null;
     } catch (e) {
-      AppLogger.error('[OPENAI] Failed to generate message: $e');
+      AppLogger.error('[OPENAI] Failed to get AI message from backend: $e');
       return null;
     }
   }

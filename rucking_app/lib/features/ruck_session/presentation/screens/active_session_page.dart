@@ -196,7 +196,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
             elevationLoss: finalState.elevationLoss,
             ruckWeight: finalState.ruckWeightKg,
             heartRateSamples: finalState.heartRateSamples,
-            splits: finalState.splits.isEmpty ? null : finalState.splits,
+            splits: finalState.splits,
             terrainSegments: null,
             aiCompletionInsight: finalState.aiCompletionInsight,
             steps: finalState.steps,

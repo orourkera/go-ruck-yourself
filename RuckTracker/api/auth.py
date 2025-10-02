@@ -1061,8 +1061,8 @@ class StravaStatusResource(Resource):
             
             response_data = {
                 'connected': is_connected,
-                'athlete_id': user_data.get('strava_athlete_id'),
-                'connected_at': user_data.get('strava_connected_at')
+                'strava_athlete_id': user_data.get('strava_athlete_id'),
+                'strava_connected_at': user_data.get('strava_connected_at')
             }
             
             return response_data, 200

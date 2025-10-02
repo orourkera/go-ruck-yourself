@@ -708,17 +708,39 @@ class PlanNotificationService:
             }
         )
 
-        self._mark_audit_entry(row['id'], status='sent')
+        # Save payload with sent notification
+        payload = {
+            'title': title,
+            'body': body,
+            'data': {
+                'type': notification_type,
+                'plan_id': plan_id,
+                'plan_session_id': session_id,
+                'context': session_context
+            }
+        }
+        self._mark_audit_entry(row['id'], status='sent', payload=payload)
         if session_id and notification_type != 'plan_missed_followup':
             self._update_session_next_notification(session_id, None)
 
-    def _mark_audit_entry(self, audit_id: int, status: str) -> None:
+        # Update last_notification_type on plan_sessions
+        if session_id:
+            try:
+                self.admin_client.table('plan_sessions').update({
+                    'last_notification_type': notification_type
+                }).eq('id', session_id).execute()
+            except Exception as exc:
+                logger.error(f"Failed to update last_notification_type for session {session_id}: {exc}")
+
+    def _mark_audit_entry(self, audit_id: int, status: str, payload: Optional[Dict[str, Any]] = None) -> None:
         try:
-            payload = {
+            update_data = {
                 'status': status,
                 'sent_at': datetime.utcnow().isoformat() if status == 'sent' else None
             }
-            self.admin_client.table('plan_notification_audit').update(payload).eq('id', audit_id).execute()
+            if payload:
+                update_data['payload'] = payload
+            self.admin_client.table('plan_notification_audit').update(update_data).eq('id', audit_id).execute()
         except Exception as exc:
             logger.error(f"Failed to mark plan_notification_audit {audit_id} as {status}: {exc}")
 

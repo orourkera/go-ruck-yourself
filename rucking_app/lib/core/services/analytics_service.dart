@@ -210,6 +210,17 @@ class AnalyticsService {
     );
   }
 
+  /// Track Strava connection from onboarding
+  static void trackStravaConnection({required bool connected, String? source}) {
+    trackEvent(
+      connected ? 'strava_connected' : 'strava_skipped',
+      {
+        'source': source ?? 'onboarding',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
   // ============= EXISTING METHODS (ENHANCED) =============
 
   /// Track deep link events
