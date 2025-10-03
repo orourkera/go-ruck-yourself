@@ -517,7 +517,7 @@ class AICheerleaderLogResource(Resource):
             try:
                 model_name = os.getenv(
                     'OPENAI_CHEERLEADER_MODEL',
-                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4.1'),
+                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5'),
                 )
                 completion = openai_client.chat.completions.create(
                     model=model_name,
