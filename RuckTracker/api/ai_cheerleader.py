@@ -378,8 +378,12 @@ class AICheerleaderLogResource(Resource):
             
             # Call OpenAI with timeout and error handling
             try:
+                model_name = os.getenv(
+                    'OPENAI_CHEERLEADER_MODEL',
+                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o-mini'),
+                )
                 completion = openai_client.chat.completions.create(
-                    model=os.getenv('OPENAI_CHEERLEADER_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
+                    model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
@@ -391,7 +395,10 @@ class AICheerleaderLogResource(Resource):
 
                 ai_message = (completion.choices[0].message.content or "").strip()
             except Exception as openai_error:
-                logger.warning(f"[AI_CHEERLEADER] OpenAI call failed, using fallback: {str(openai_error)}")
+                logger.warning(
+                    f"[AI_CHEERLEADER] OpenAI call failed (model={model_name}), using fallback: {openai_error}",
+                    exc_info=True,
+                )
                 # Fallback to simple encouraging message
                 fallback_messages = {
                     'intervals': "Time to push! You've got this!",

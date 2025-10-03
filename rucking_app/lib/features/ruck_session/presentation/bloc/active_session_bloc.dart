@@ -745,6 +745,14 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       );
       _logAiDebug('Context assembled for trigger ${trigger.type.name}');
 
+      // Ensure user identifiers are present for backend validation
+      final userContext = context['user'] is Map
+          ? Map<String, dynamic>.from(context['user'] as Map)
+          : <String, dynamic>{};
+      userContext['userId'] ??= _currentUser!.userId;
+      userContext['id'] ??= _currentUser!.userId;
+      context['user'] = userContext;
+
       // Normalize environment to Map<String, dynamic> to avoid Map<String, String> inference downstream
       final envRawBefore = context['environment'];
       final Map<String, dynamic> normalizedEnv = (envRawBefore is Map)

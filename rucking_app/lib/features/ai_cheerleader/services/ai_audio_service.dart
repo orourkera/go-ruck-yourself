@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:audio_session/audio_session.dart' as audio_session;
 import 'package:rucking_app/core/utils/app_logger.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Service for playing AI cheerleader audio with fallback to TTS
 class AIAudioService {
@@ -112,7 +114,13 @@ class AIAudioService {
 
       bool completed = true;
 
-      await _audioPlayer.play(BytesSource(audioBytes));
+      // Write bytes to a temporary MP3 file so AVPlayer recognizes the format.
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File(
+          '${tempDir.path}/ai_cheerleader_${DateTime.now().millisecondsSinceEpoch}.mp3');
+      await tempFile.writeAsBytes(audioBytes, flush: true);
+
+      await _audioPlayer.play(DeviceFileSource(tempFile.path));
 
       try {
         await _audioPlayer.onPlayerComplete.first
@@ -121,6 +129,16 @@ class AIAudioService {
         completed = false;
         AppLogger.warning('[AI_AUDIO] Playback timed out');
         await _audioPlayer.stop();
+      }
+
+      // Clean up the temp file once playback is handled.
+      try {
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
+      } catch (e) {
+        AppLogger.warning(
+            '[AI_AUDIO] Failed to delete temp audio file ${tempFile.path}: $e');
       }
 
       await _session?.setActive(false);

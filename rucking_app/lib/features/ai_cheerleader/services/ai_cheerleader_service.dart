@@ -44,7 +44,8 @@ class AICheerleaderService {
   String? _lastMentionedLocation;
   double? _lastMentionedLatitude;
   double? _lastMentionedLongitude;
-  static const int _locationMentionCooldownMinutes = 12; // Don't mention location again for 12 minutes
+  static const int _locationMentionCooldownMinutes =
+      12; // Don't mention location again for 12 minutes
 
   /// Analyzes session state and returns trigger type if one should fire
   CheerleaderTrigger? analyzeTriggers(ActiveSessionRunning state,
@@ -104,8 +105,12 @@ class AICheerleaderService {
   CheerleaderTrigger? _checkDistanceMilestone(ActiveSessionRunning state,
       {required bool preferMetric}) {
     // Validate distance is valid before processing
-    if (state.distanceKm == null || state.distanceKm.isNaN || state.distanceKm.isInfinite || state.distanceKm < 0) {
-      AppLogger.warning('[AI_MILESTONE] Invalid distance: ${state.distanceKm}km, skipping milestone check');
+    if (state.distanceKm == null ||
+        state.distanceKm.isNaN ||
+        state.distanceKm.isInfinite ||
+        state.distanceKm < 0) {
+      AppLogger.warning(
+          '[AI_MILESTONE] Invalid distance: ${state.distanceKm}km, skipping milestone check');
       return null;
     }
 
@@ -180,7 +185,8 @@ class AICheerleaderService {
         _lastHrSpikeCooldownSec =
             _randomInt(_timeCheckMinSec, _timeCheckMaxSec);
         // Heart rate spike logging reduced for performance
-        if (p > 0.8) { // Only log high-confidence spikes
+        if (p > 0.8) {
+          // Only log high-confidence spikes
           AppLogger.info('[AI_CHEERLEADER] Heart rate spike: ${currentHR}bpm');
         }
         return CheerleaderTrigger(
@@ -304,6 +310,8 @@ class AICheerleaderService {
             : null,
       },
       'user': <String, dynamic>{
+        'userId': user.userId,
+        'id': user.userId,
         'username': user.username,
         'preferMetric': user.preferMetric,
         'totalSessions': user.stats?.totalRucks ?? 0,
@@ -387,12 +395,12 @@ class AICheerleaderService {
     final timeSinceLastMention = now.difference(_lastLocationMentionTime!);
     if (timeSinceLastMention.inMinutes < _locationMentionCooldownMinutes) {
       // Only include if location has changed significantly (>1km)
-      if (currentLatitude != null && currentLongitude != null &&
-          _lastMentionedLatitude != null && _lastMentionedLongitude != null) {
-        final distance = _calculateDistance(
-          _lastMentionedLatitude!, _lastMentionedLongitude!,
-          currentLatitude, currentLongitude
-        );
+      if (currentLatitude != null &&
+          currentLongitude != null &&
+          _lastMentionedLatitude != null &&
+          _lastMentionedLongitude != null) {
+        final distance = _calculateDistance(_lastMentionedLatitude!,
+            _lastMentionedLongitude!, currentLatitude, currentLongitude);
         return distance > 1000; // More than 1km difference
       }
       return false;
@@ -417,13 +425,16 @@ class AICheerleaderService {
   }
 
   /// Calculate distance between two coordinates in meters
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371000; // Earth radius in meters
     final double dLat = (lat2 - lat1) * (math.pi / 180);
     final double dLon = (lon2 - lon1) * (math.pi / 180);
     final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1 * (math.pi / 180)) * math.cos(lat2 * (math.pi / 180)) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
+        math.cos(lat1 * (math.pi / 180)) *
+            math.cos(lat2 * (math.pi / 180)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
     final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
