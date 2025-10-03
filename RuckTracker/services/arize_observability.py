@@ -39,16 +39,17 @@ class ArizeObserver:
             return
 
         self.api_key = os.getenv('ARIZE_API_KEY')
-        self.space_key = os.getenv('ARIZE_SPACE_KEY')
+        # Support both old space_key and new space_id
+        self.space_id = os.getenv('ARIZE_SPACE_ID') or os.getenv('ARIZE_SPACE_KEY')
         self.enabled = os.getenv('ARIZE_ENABLED', 'false').lower() == 'true'
         self.environment = os.getenv('ARIZE_ENVIRONMENT', 'production')
 
         self.client = None
-        if ARIZE_AVAILABLE and self.enabled and self.api_key and self.space_key:
+        if ARIZE_AVAILABLE and self.enabled and self.api_key and self.space_id:
             try:
                 self.client = ArizeClient(
                     api_key=self.api_key,
-                    space_key=self.space_key
+                    space_id=self.space_id
                 )
                 logger.info(f"✅ Arize observability initialized for environment: {self.environment}")
             except Exception as e:
@@ -57,7 +58,7 @@ class ArizeObserver:
         elif not self.enabled:
             logger.info("Arize observability is disabled (ARIZE_ENABLED=false)")
         else:
-            logger.warning("Arize observability not configured. Set ARIZE_API_KEY, ARIZE_SPACE_KEY, and ARIZE_ENABLED=true")
+            logger.warning("Arize observability not configured. Set ARIZE_API_KEY, ARIZE_SPACE_ID (or ARIZE_SPACE_KEY), and ARIZE_ENABLED=true")
 
         self._initialized = True
 
