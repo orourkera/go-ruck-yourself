@@ -102,6 +102,7 @@ class ArizeObserver:
             bool: True if logged successfully, False otherwise
         """
         if not self.client or not self.enabled:
+            logger.warning(f"Arize logging skipped - client: {bool(self.client)}, enabled: {self.enabled}")
             return False
 
         try:
@@ -175,10 +176,10 @@ class ArizeObserver:
             )
 
             if response.status_code == 200:
-                logger.debug(f"✅ Logged LLM call to Arize: {context_type} / {model}")
+                logger.info(f"✅ Logged LLM call to Arize: {context_type} / {model}")
                 return True
             else:
-                logger.warning(f"Failed to log to Arize: {response.status_code} - {response.text}")
+                logger.error(f"Failed to log to Arize: {response.status_code} - {response.text}")
                 return False
 
         except Exception as e:
