@@ -5,6 +5,7 @@ Tracks all OpenAI API calls with prompt/response logging, latency, and metadata
 import os
 import time
 import logging
+import json
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import uuid
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Safe import for Arize
 try:
     from arize.pandas.logger import Client as ArizeClient
-    from arize.utils.types import ModelTypes, Environments, Schema, EmbeddingColumnNames
+    from arize.utils.types import ModelTypes, Environments, Schema
     ARIZE_AVAILABLE = True
 except ImportError:
     logger.warning("Arize SDK not available. Install with: pip install arize")
@@ -39,18 +40,23 @@ class ArizeObserver:
             return
 
         self.api_key = os.getenv('ARIZE_API_KEY')
-        # Support both old space_key and new space_id
-        self.space_id = os.getenv('ARIZE_SPACE_ID') or os.getenv('ARIZE_SPACE_KEY')
+        # Support both old space_key env naming and new space_id naming conventions
+        self.space_key = os.getenv('ARIZE_SPACE_KEY') or os.getenv('ARIZE_SPACE_ID')
         self.enabled = os.getenv('ARIZE_ENABLED', 'false').lower() == 'true'
         self.environment = os.getenv('ARIZE_ENVIRONMENT', 'production')
+        self.organization_key = os.getenv('ARIZE_ORGANIZATION_KEY')
 
         self.client = None
-        if ARIZE_AVAILABLE and self.enabled and self.api_key and self.space_id:
+        if ARIZE_AVAILABLE and self.enabled and self.api_key and self.space_key:
             try:
-                self.client = ArizeClient(
-                    api_key=self.api_key,
-                    space_id=self.space_id
-                )
+                client_kwargs = {
+                    'space_key': self.space_key,
+                    'api_key': self.api_key,
+                }
+                if self.organization_key:
+                    client_kwargs['organization_key'] = self.organization_key
+
+                self.client = ArizeClient(**client_kwargs)
                 logger.info(f"✅ Arize observability initialized for environment: {self.environment}")
             except Exception as e:
                 logger.error(f"Failed to initialize Arize client: {e}")
@@ -58,7 +64,7 @@ class ArizeObserver:
         elif not self.enabled:
             logger.info("Arize observability is disabled (ARIZE_ENABLED=false)")
         else:
-            logger.warning("Arize observability not configured. Set ARIZE_API_KEY, ARIZE_SPACE_ID (or ARIZE_SPACE_KEY), and ARIZE_ENABLED=true")
+            logger.warning("Arize observability not configured. Set ARIZE_API_KEY, ARIZE_SPACE_KEY (or ARIZE_SPACE_ID), and ARIZE_ENABLED=true")
 
         self._initialized = True
 
@@ -247,10 +253,29 @@ def observe_openai_call(
         context_type: Type of usage (ai_cheerleader, coaching, etc.)
         **kwargs: Additional metadata (prompt_tokens, completion_tokens, etc.)
     """
-    logger.warning(f"🔍 ARIZE DEBUG: observe_openai_call called: context_type={context_type}, model={model}")
+    logger.debug(f"🔍 ARIZE DEBUG: observe_openai_call called: context_type={context_type}, model={model}")
 
     # Combine messages into a single prompt string
-    prompt = "\n\n".join([f"{msg['role']}: {msg['content']}" for msg in messages])
+    prompt_parts: List[str] = []
+    for msg in messages or []:
+        role = msg.get('role', 'unknown')
+        content = msg.get('content', '')
+        if isinstance(content, list):
+            # Some SDKs return content as list of dicts
+            flattened = []
+            for item in content:
+                if isinstance(item, dict):
+                    flattened.append(str(item.get('text') or item.get('content') or item))
+                else:
+                    flattened.append(str(item))
+            content = "\n".join(flattened)
+        elif isinstance(content, dict):
+            content = json.dumps(content, ensure_ascii=False)
+        else:
+            content = str(content)
+        prompt_parts.append(f"{role}: {content}")
+
+    prompt = "\n\n".join(prompt_parts)
 
     arize_observer.log_llm_call(
         model=model,

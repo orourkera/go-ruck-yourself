@@ -494,6 +494,7 @@ class ApiClient {
                   endpoint.startsWith('/goals')) &&
               endpoint != '/users/register') ||
           endpoint.startsWith('/duel-') ||
+          endpoint.startsWith('/observability') ||
           endpoint ==
               '/device-token'; // Ensure device token registration is authenticated
       // Explicitly do not set auth token for auth/refresh endpoint

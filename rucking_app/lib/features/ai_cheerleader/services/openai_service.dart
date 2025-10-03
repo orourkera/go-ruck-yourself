@@ -13,6 +13,7 @@ import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/core/services/api_client.dart';
+import 'package:rucking_app/core/services/ai_observability_service.dart';
 import 'package:get_it/get_it.dart';
 
 /// Service for generating motivational text using OpenAI GPT-4o
@@ -30,8 +31,12 @@ class OpenAIService {
       <String>[]; // stores last few AI outputs (trimmed)
 
   final SimpleAILogger? _logger;
+  final AiObservabilityService? _observabilityService;
 
-  OpenAIService({SimpleAILogger? logger}) : _logger = logger;
+  OpenAIService({SimpleAILogger? logger, AiObservabilityService? observabilityService})
+      : _logger = logger,
+        _observabilityService =
+            observabilityService ?? GetIt.I<AiObservabilityService>();
 
   /// Generates motivational message based on context and personality
   Future<String?> generateMessage({
@@ -179,6 +184,7 @@ class OpenAIService {
         'Output just the title text.'
       ].join('\n');
 
+      final stopwatch = Stopwatch()..start();
       final completion = await OpenAI.instance.chat
           .create(
             model: _model,
@@ -194,8 +200,36 @@ class OpenAIService {
             temperature: 0.9, // Increased for more creative titles
           )
           .timeout(const Duration(seconds: 4));
+      stopwatch.stop();
+      final latencyMs = stopwatch.elapsedMicroseconds / 1000.0;
 
       var title = completion.choices.first.message.content?.first.text?.trim();
+
+      if (_observabilityService != null) {
+        _observabilityService!.logLLMCall(
+          contextType: 'strava_activity_title',
+          model: _model,
+          messages: [
+            {'role': 'user', 'content': prompt},
+          ],
+          response: title ?? '',
+          latencyMs: latencyMs,
+          metadata: {
+            'distance_km': distanceKm,
+            'duration_minutes': duration.inMinutes,
+            'ruck_weight_kg': ruckWeightKg,
+            'prefer_metric': preferMetric,
+            if (city != null) 'city': city,
+            if (startTime != null)
+              'start_time_iso': startTime.toIso8601String(),
+          },
+          promptTokens: completion.usage?.promptTokens,
+          completionTokens: completion.usage?.completionTokens,
+          totalTokens: completion.usage?.totalTokens,
+          temperature: 0.9,
+          maxTokens: 32,
+        );
+      }
       if (title == null || title.isEmpty) return null;
       // Sanitize: single line, clamp length (keep emojis)
       title = title.replaceAll('\n', ' ').trim();
@@ -229,6 +263,7 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG][SUMMARY] $prompt');
       AppLogger.info('[OPENAI_DEBUG][SUMMARY] ===== END PROMPT =====');
 
+      final stopwatch = Stopwatch()..start();
       final completion = await OpenAI.instance.chat
           .create(
             model: _summaryModel,
@@ -244,9 +279,35 @@ class OpenAIService {
             temperature: 0.5, // slightly tighter for summaries
           )
           .timeout(_timeout);
+      stopwatch.stop();
+      final latencyMs = stopwatch.elapsedMicroseconds / 1000.0;
 
       var message =
           completion.choices.first.message.content?.first.text?.trim();
+
+      if (_observabilityService != null) {
+        _observabilityService!.logLLMCall(
+          contextType: 'session_summary',
+          model: _summaryModel,
+          messages: [
+            {'role': 'user', 'content': prompt},
+          ],
+          response: message ?? '',
+          latencyMs: latencyMs,
+          metadata: {
+            'context_size': context.length,
+            'has_coaching_context':
+                context.containsKey('coachingPlan') ||
+                    context.containsKey('coaching_plan'),
+            'has_weather': context.containsKey('weather'),
+          },
+          promptTokens: completion.usage?.promptTokens,
+          completionTokens: completion.usage?.completionTokens,
+          totalTokens: completion.usage?.totalTokens,
+          temperature: 0.5,
+          maxTokens: _maxTokens,
+        );
+      }
 
       if (message == null || message.isEmpty) return null;
 
@@ -303,6 +364,7 @@ class OpenAIService {
       AppLogger.info('[OPENAI_DEBUG][SUMMARY] $prompt');
       AppLogger.info('[OPENAI_DEBUG][SUMMARY] ===== END PROMPT =====');
 
+      final stopwatch = Stopwatch()..start();
       final completion = await OpenAI.instance.chat
           .create(
             model: _summaryModel,
@@ -318,9 +380,33 @@ class OpenAIService {
             temperature: 0.5, // slightly tighter for summaries
           )
           .timeout(_timeout);
+      stopwatch.stop();
+      final latencyMs = stopwatch.elapsedMicroseconds / 1000.0;
 
       var message =
           completion.choices.first.message.content?.first.text?.trim();
+
+      if (_observabilityService != null) {
+        _observabilityService!.logLLMCall(
+          contextType: 'session_summary_with_plan',
+          model: _summaryModel,
+          messages: [
+            {'role': 'user', 'content': prompt},
+          ],
+          response: message ?? '',
+          latencyMs: latencyMs,
+          metadata: {
+            'context_size': context.length,
+            'has_coaching_plan': coachingPlan != null,
+            'plan_keys': coachingPlan?.keys.take(6).toList(),
+          },
+          promptTokens: completion.usage?.promptTokens,
+          completionTokens: completion.usage?.completionTokens,
+          totalTokens: completion.usage?.totalTokens,
+          temperature: 0.5,
+          maxTokens: _maxTokens,
+        );
+      }
 
       if (message == null || message.isEmpty) return null;
 

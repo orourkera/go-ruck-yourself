@@ -7,6 +7,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/network/api_endpoints.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/models/weather.dart';
+import 'package:rucking_app/core/services/ai_observability_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
@@ -16,14 +17,18 @@ class AIInsightsService {
   final OpenAIService _openAIService;
   final ApiClient _apiClient;
   final OpenAIResponsesService? _responsesService;
+  final AiObservabilityService? _observabilityService;
 
   AIInsightsService({
     required OpenAIService openAIService,
     required ApiClient apiClient,
     OpenAIResponsesService? responsesService,
+    AiObservabilityService? observabilityService,
   })  : _openAIService = openAIService,
         _apiClient = apiClient,
-        _responsesService = responsesService ?? getIt<OpenAIResponsesService>();
+        _responsesService = responsesService ?? getIt<OpenAIResponsesService>(),
+        _observabilityService =
+            observabilityService ?? getIt<AiObservabilityService>();
 
   /// Stream homepage insights using the Responses API (o3 streaming).
   /// onDelta receives incremental text; onFinal receives the parsed AIInsight.
@@ -107,8 +112,11 @@ class AIInsightsService {
       final userInput = _buildUserContextInput(context);
       final sb = StringBuffer();
       bool gotDelta = false;
+      final reasoningModel = _getReasoningModel();
+      final stopwatch = Stopwatch()..start();
+      String streamedOutput = '';
       await _responsesService!.stream(
-        model: _getReasoningModel(),
+        model: reasoningModel,
         instructions: instructions,
         input: userInput,
         store: false, // Don't store insights for privacy
@@ -120,6 +128,7 @@ class AIInsightsService {
           onDelta(d);
         },
         onComplete: (full) {
+          streamedOutput = full;
           final insight = _parseAIResponse(full, context);
           onFinal(insight);
         },
@@ -127,6 +136,26 @@ class AIInsightsService {
           if (onError != null) onError(e);
         },
       );
+      stopwatch.stop();
+
+      if (_observabilityService != null && streamedOutput.isNotEmpty) {
+        _observabilityService!.logLLMCall(
+          contextType: 'homepage_insights_stream',
+          model: reasoningModel,
+          messages: [
+            {'role': 'system', 'content': instructions},
+            {'role': 'user', 'content': userInput},
+          ],
+          response: streamedOutput,
+          latencyMs: stopwatch.elapsedMicroseconds / 1000.0,
+          metadata: {
+            'prefer_metric': preferMetric,
+            'has_coaching_plan': coachingPlan != null,
+            'username_length': username.length,
+            'produced_deltas': gotDelta,
+          },
+        );
+      }
       // If we never received a delta, provide a non-streaming fallback for better UX
       if (!gotDelta) {
         AppLogger.warning(

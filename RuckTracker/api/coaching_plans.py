@@ -1,6 +1,7 @@
 from flask import request, g
 from flask_restful import Resource
 import logging
+import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import json
@@ -13,6 +14,7 @@ from ..utils.api_response import success_response, error_response
 from .user_coaching_plans import _generate_plan_sessions
 from RuckTracker.services.plan_notification_service import plan_notification_service
 from RuckTracker.services.plan_audit_service import plan_audit_service
+from RuckTracker.services.arize_observability import observe_openai_call
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +96,7 @@ def _convert_to_structured_plan(ai_plan_text: str, plan_type: str, personalizati
         Extract the weekly sessions. For progressive plans, use week 3-4 as representative."""
 
         # Use OpenAI structured outputs with Pydantic model
+        start_time = time.time()
         completion = client.beta.chat.completions.parse(
             model="gpt-4o-mini-2024-07-18",  # Use mini for cost efficiency
             messages=[
@@ -103,6 +106,32 @@ def _convert_to_structured_plan(ai_plan_text: str, plan_type: str, personalizati
             response_format=StructuredCoachingPlan,
             temperature=0.1,  # Low temperature for consistency
         )
+        latency_ms = (time.time() - start_time) * 1000
+
+        try:
+            observe_openai_call(
+                model="gpt-4o-mini-2024-07-18",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response=str(getattr(getattr(completion.choices[0], 'message', None), 'content', '')),
+                latency_ms=latency_ms,
+                user_id=getattr(getattr(g, 'user', None), 'id', None),
+                context_type='coaching_plan_structured_output',
+                prompt_tokens=getattr(getattr(completion, 'usage', None), 'prompt_tokens', None),
+                completion_tokens=getattr(getattr(completion, 'usage', None), 'completion_tokens', None),
+                total_tokens=getattr(getattr(completion, 'usage', None), 'total_tokens', None),
+                temperature=0.1,
+                max_tokens=None,
+                metadata={
+                    'plan_type': plan_type,
+                    'training_days': training_days,
+                    'prefer_metric': prefer_metric,
+                },
+            )
+        except Exception as telemetry_err:
+            logger.debug(f"[COACHING_PLAN] Telemetry logging failed: {telemetry_err}")
 
         # Get the parsed result
         structured_plan = completion.choices[0].message.parsed

@@ -33,6 +33,7 @@ import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_serv
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_responses_service.dart';
 import 'package:rucking_app/core/services/ai_insights_service.dart';
+import 'package:rucking_app/core/services/ai_observability_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
@@ -179,13 +180,20 @@ Future<void> setupServiceLocator() async {
     final openaiApiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
     final elevenLabsApiKey = dotenv.env['ELEVEN_LABS_API_KEY'] ?? '';
 
+    // Observability + logging helpers
+    getIt.registerSingleton<AiObservabilityService>(
+      AiObservabilityService(getIt<ApiClient>()),
+    );
+
     // Register SimpleAILogger first
     GetIt.I.registerSingleton<SimpleAILogger>(
         SimpleAILogger(GetIt.I<ApiClient>()));
 
     // Register OpenAIService with logger dependency
-    GetIt.I.registerSingleton<OpenAIService>(
-        OpenAIService(logger: GetIt.I<SimpleAILogger>()));
+    GetIt.I.registerSingleton<OpenAIService>(OpenAIService(
+      logger: GetIt.I<SimpleAILogger>(),
+      observabilityService: GetIt.I<AiObservabilityService>(),
+    ));
 
     // Initialize OpenAI with API key
     if (openaiApiKey.isNotEmpty) {
@@ -202,6 +210,7 @@ Future<void> setupServiceLocator() async {
       openAIService: GetIt.I<OpenAIService>(),
       apiClient: GetIt.I<ApiClient>(),
       responsesService: GetIt.I<OpenAIResponsesService>(),
+      observabilityService: GetIt.I<AiObservabilityService>(),
     ));
 
     GetIt.I.registerSingleton<ElevenLabsService>(

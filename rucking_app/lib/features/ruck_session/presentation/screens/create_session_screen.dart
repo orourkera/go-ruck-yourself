@@ -181,6 +181,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
       _ruckWeight = AppConfig.defaultRuckWeight;
       _durationController.text = '30'; // Default duration on error
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });

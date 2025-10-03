@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .notification_manager import notification_manager
 from ..supabase_client import get_supabase_admin_client
+from .arize_observability import observe_openai_call
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +205,7 @@ class PlanAuditService:
 
             user_prompt = json.dumps(plan_summary)
 
+            start_time = time.time()
             resp = client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -213,7 +216,34 @@ class PlanAuditService:
                 temperature=0.2
             )
 
+            latency_ms = (time.time() - start_time) * 1000
             content = resp.choices[0].message.content.strip()
+
+            try:
+                observe_openai_call(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    response=content,
+                    latency_ms=latency_ms,
+                    user_id=user_id,
+                    session_id=str(plan.get('id')) if plan.get('id') else None,
+                    context_type='plan_audit',
+                    prompt_tokens=getattr(getattr(resp, 'usage', None), 'prompt_tokens', None),
+                    completion_tokens=getattr(getattr(resp, 'usage', None), 'completion_tokens', None),
+                    total_tokens=getattr(getattr(resp, 'usage', None), 'total_tokens', None),
+                    temperature=0.2,
+                    max_tokens=600,
+                    metadata={
+                        'plan_id': plan.get('id'),
+                        'session_count': len(sessions),
+                        'template_id': plan.get('coaching_plan_id'),
+                    }
+                )
+            except Exception as telemetry_err:
+                logger.warning(f"[PLAN_AUDIT] Failed to log Arize telemetry: {telemetry_err}")
             try:
                 parsed = json.loads(content)
             except Exception:

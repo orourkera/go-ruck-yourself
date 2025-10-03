@@ -1349,14 +1349,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
   void _scheduleSharePromptCheck() {
     // Use a more significant delay to allow navigation to complete and context to be ready
     Future.delayed(const Duration(seconds: 2), () async {
-      // Find the home screen context by getting the navigator's current context
-      final navigatorContext =
-          Navigator.of(context, rootNavigator: true).context;
-      if (!navigatorContext.mounted) return;
+      if (!mounted) return;
+
+      // Store context in a local variable to avoid accessing it after disposal
+      final localContext = context;
 
       try {
         // Get session achievements if any
-        final authState = context.read<AuthBloc>().state;
+        final authState = localContext.read<AuthBloc>().state;
         String? achievement;
         bool isPR = false;
         int? sessionNumber;
@@ -1368,7 +1368,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
 
         // Call SharePromptLogic to check if we should show the prompt
         await SharePromptLogic.maybeShowPrompt(
-          context: navigatorContext,
+          context: localContext,
           sessionId: widget.ruckId,
           distanceKm: widget.distance,
           duration: widget.duration,

@@ -1,6 +1,7 @@
 from flask import request, g, jsonify
 from flask_restful import Resource
 import logging
+import time
 from typing import Any, Dict
 import re
 from datetime import datetime, timezone, timedelta
@@ -8,6 +9,7 @@ import os
 import json
 
 from ..supabase_client import get_supabase_client
+from ..services.arize_observability import observe_openai_call
 from .schemas import GoalCreateSchema, SUPPORTED_METRICS, SUPPORTED_UNITS, SUPPORTED_WINDOWS
 from ..utils.ai_guardrails import prefilter_user_input, validate_goal_draft_payload
 
@@ -199,6 +201,7 @@ def _llm_parse_goal(cleaned_text: str) -> Dict[str, Any] | None:
     )
 
     try:
+        start_time = time.time()
         completion = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -208,7 +211,31 @@ def _llm_parse_goal(cleaned_text: str) -> Dict[str, Any] | None:
             max_tokens=200,
             temperature=0.2,
         )
+        latency_ms = (time.time() - start_time) * 1000
         content = (completion.choices[0].message.content or "").strip()
+
+        try:
+            observe_openai_call(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response=content,
+                latency_ms=latency_ms,
+                user_id=getattr(getattr(g, 'user', None), 'id', None),
+                context_type='goal_draft_parser',
+                prompt_tokens=getattr(getattr(completion, 'usage', None), 'prompt_tokens', None),
+                completion_tokens=getattr(getattr(completion, 'usage', None), 'completion_tokens', None),
+                total_tokens=getattr(getattr(completion, 'usage', None), 'total_tokens', None),
+                temperature=0.2,
+                max_tokens=200,
+                metadata={
+                    'original_text_sample': cleaned_text[:200],
+                },
+            )
+        except Exception as telemetry_err:
+            logger.debug(f"[GOALS_PARSE] Telemetry logging failed: {telemetry_err}")
         # Must be raw JSON; attempt to find JSON object boundaries if any extra text leaked
         start = content.find('{')
         end = content.rfind('}')
@@ -257,6 +284,7 @@ def _llm_compose_message(original_text: str, draft: Dict[str, Any] | None) -> st
             "- One sentence only, friendly and direct.\n"
             "- No markdown, no lists, no emojis.\n"
         )
+        start_time = time.time()
         resp = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -266,7 +294,32 @@ def _llm_compose_message(original_text: str, draft: Dict[str, Any] | None) -> st
             max_tokens=60,
             temperature=0.3,
         )
+        latency_ms = (time.time() - start_time) * 1000
         msg = (resp.choices[0].message.content or '').strip()
+
+        try:
+            observe_openai_call(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": sys},
+                    {"role": "user", "content": user},
+                ],
+                response=msg,
+                latency_ms=latency_ms,
+                user_id=getattr(getattr(g, 'user', None), 'id', None),
+                context_type='goal_helper_reply',
+                prompt_tokens=getattr(getattr(resp, 'usage', None), 'prompt_tokens', None),
+                completion_tokens=getattr(getattr(resp, 'usage', None), 'completion_tokens', None),
+                total_tokens=getattr(getattr(resp, 'usage', None), 'total_tokens', None),
+                temperature=0.3,
+                max_tokens=60,
+                metadata={
+                    'original_text_sample': original_text[:200],
+                    'has_draft': bool(draft),
+                },
+            )
+        except Exception as telemetry_err:
+            logger.debug(f"[GOALS_PARSE] Telemetry logging failed: {telemetry_err}")
         if msg:
             return msg
     except Exception as e:
