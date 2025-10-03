@@ -498,7 +498,12 @@ class CheckSessionAchievementsResource(Resource):
                     required_distance_km = 80 if 'km' in achievement_name else 80 / 1.60934
                 elif '50' in achievement_name and ('km' in achievement_name or 'mi' in achievement_name):
                     required_distance_km = 50 if 'km' in achievement_name else 50 / 1.60934
-                # Add more for 42km, 20km, etc.
+                elif '42' in achievement_name and ('km' in achievement_name or 'mi' in achievement_name):
+                    required_distance_km = 42 if 'km' in achievement_name else 42 / 1.60934
+                elif '20' in achievement_name and ('km' in achievement_name or 'mi' in achievement_name):
+                    required_distance_km = 20 if 'km' in achievement_name else 20 / 1.60934
+                elif '12' in achievement_name and ('km' in achievement_name or 'mi' in achievement_name):
+                    required_distance_km = 12 if 'km' in achievement_name else 12 / 1.60934
 
                 session_distance = session.get('distance_km', 0)
                 if required_distance_km > 0:
