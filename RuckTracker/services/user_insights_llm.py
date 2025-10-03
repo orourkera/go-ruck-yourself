@@ -1,6 +1,7 @@
 import logging
 import json
 import os
+import time
 from typing import Optional, Dict, Any
 
 try:
@@ -9,6 +10,7 @@ except Exception:  # pragma: no cover
     OpenAI = None  # type: ignore
 
 from ..supabase_client import get_supabase_admin_client
+from .arize_observability import observe_openai_call
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +51,35 @@ def generate_llm_candidates(facts: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             {"role": "system", "content": INSIGHT_SYSTEM_PROMPT},
             {"role": "user", "content": INSIGHT_USER_PROMPT + "\n" + facts_str},
         ]
+
+        # Track timing for Arize
+        start_time = time.time()
+        model_name = "gpt-4o-mini"
+
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model_name,
             messages=messages,
             temperature=0.2,
             max_tokens=350,
         )
+
+        latency_ms = (time.time() - start_time) * 1000
         content = resp.choices[0].message.content or "{}"
+
+        # Log to Arize
+        observe_openai_call(
+            model=model_name,
+            messages=messages,
+            response=content if isinstance(content, str) else str(content),
+            latency_ms=latency_ms,
+            user_id=facts.get('user_id'),  # If available in facts
+            context_type='user_insights',
+            prompt_tokens=resp.usage.prompt_tokens if resp.usage else None,
+            completion_tokens=resp.usage.completion_tokens if resp.usage else None,
+            total_tokens=resp.usage.total_tokens if resp.usage else None,
+            temperature=0.2,
+            max_tokens=350,
+        )
         # Some SDKs return as list of content parts
         if isinstance(content, list):
             content = "".join([str(x) for x in content])

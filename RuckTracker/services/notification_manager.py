@@ -3,9 +3,11 @@ Unified Notification Manager
 Handles both database logging and push notifications atomically
 """
 import logging
+import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from .push_notification_service import PushNotificationService, get_user_device_tokens
+from .arize_observability import observe_openai_call
 
 logger = logging.getLogger(__name__)
 
@@ -693,8 +695,12 @@ Return JSON format: {"title": "...", "body": "..."}"""
 
             user_prompt = "\n".join(user_prompt_parts)
 
+            # Track timing for Arize
+            start_time = time.time()
+            model_name = os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5'))
+
             response = client.chat.completions.create(
-                model=os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5')),
+                model=model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -702,8 +708,31 @@ Return JSON format: {"title": "...", "body": "..."}"""
                 max_tokens=150,
                 temperature=0.7
             )
-            
+
+            latency_ms = (time.time() - start_time) * 1000
             content = response.choices[0].message.content.strip()
+
+            # Log to Arize
+            observe_openai_call(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response=content,
+                latency_ms=latency_ms,
+                user_id=user_id,
+                context_type='retention_notification',
+                prompt_tokens=response.usage.prompt_tokens if response.usage else None,
+                completion_tokens=response.usage.completion_tokens if response.usage else None,
+                total_tokens=response.usage.total_tokens if response.usage else None,
+                temperature=0.7,
+                max_tokens=150,
+                metadata={
+                    'notification_type': notification_type,
+                    'session_count': context.get('session_count'),
+                }
+            )
             
             # Parse JSON response
             try:
@@ -815,8 +844,12 @@ Return JSON format: {"title": "...", "body": "..."}"""
 
             user_prompt = "\n".join(lines)
 
+            # Track timing for Arize
+            start_time = time.time()
+            model_name = os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-5')
+
             response = client.chat.completions.create(
-                model=os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-5'),
+                model=model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -825,7 +858,32 @@ Return JSON format: {"title": "...", "body": "..."}"""
                 temperature=0.7
             )
 
+            latency_ms = (time.time() - start_time) * 1000
             content = response.choices[0].message.content.strip()
+
+            # Log to Arize
+            observe_openai_call(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response=content,
+                latency_ms=latency_ms,
+                user_id=user_id,
+                context_type='plan_notification',
+                prompt_tokens=response.usage.prompt_tokens if response.usage else None,
+                completion_tokens=response.usage.completion_tokens if response.usage else None,
+                total_tokens=response.usage.total_tokens if response.usage else None,
+                temperature=0.7,
+                max_tokens=150,
+                metadata={
+                    'notification_type': notification_type,
+                    'tone': tone,
+                    'adherence_percent': context.get('adherence_percent'),
+                }
+            )
+
             parsed_content = json.loads(content)
             if 'title' in parsed_content and 'body' in parsed_content:
                 return parsed_content
