@@ -44,6 +44,39 @@ _prompt_cache = None
 _cache_timestamp = None
 CACHE_DURATION = 300  # 5 minutes in seconds
 
+
+def _get_from_session(session: dict, *path_variants, default=None):
+    """Safely extract nested values from the client-provided session payload.
+
+    Supports multiple path variants (snake_case, camelCase, nested) so we stay
+    compatible with the Flutter context payload without silently dropping data.
+    """
+
+    for variant in path_variants:
+        value = session
+        for key in variant:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(key)
+        if value not in (None, ''):
+            return value
+    return default
+
+
+def _coerce_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 def get_remote_config_prompts():
     """Fetch AI cheerleader prompts from Firebase Remote Config with caching"""
     global _prompt_cache, _cache_timestamp
@@ -159,11 +192,32 @@ class AICheerleaderLogResource(Resource):
             try:
                 # Get user insights for structured historical data - select only needed fields
                 insights_resp = supabase_admin.table('user_insights').select(
-                    'total_sessions, total_distance_km, total_duration_hours, avg_pace_per_km_seconds, '
-                    'current_streak_days, longest_streak_days, recent_avg_distance_km, recent_avg_pace_per_km_seconds'
+                    'facts, insights'
                 ).eq('user_id', user_id).limit(1).execute()
-                insights = insights_resp.data[0] if insights_resp.data else {}
-                logger.info(f"[AI_CHEERLEADER] Retrieved user insights for user {user_id}")
+
+                insights = {}
+                if insights_resp.data:
+                    raw = insights_resp.data[0]
+                    facts = raw.get('facts') or {}
+                    insights_blob = raw.get('insights') or {}
+
+                    totals_all = facts.get('all_time', {})
+                    totals_30d = facts.get('totals_30d', {})
+                    recency = facts.get('recency', {})
+
+                    streaks = insights_blob.get('streaks', {})
+
+                    insights = {
+                        'total_sessions': totals_all.get('sessions', 0),
+                        'total_distance_km': totals_all.get('distance_km', 0.0),
+                        'total_duration_hours': totals_all.get('duration_s', 0) / 3600 if totals_all.get('duration_s') else 0,
+                        'recent_avg_distance_km': totals_30d.get('distance_km', 0.0),
+                        'recent_avg_pace_per_km_seconds': recency.get('last_pace_s_per_km'),
+                        'current_streak_days': streaks.get('current_streak_days', 0),
+                        'longest_streak_days': streaks.get('longest_streak_days', 0),
+                    }
+
+                logger.info(f"[AI_CHEERLEADER] Retrieved user insights for user {user_id}: keys={list(insights.keys())}")
 
                 # Get recent AI responses to avoid repetition - reduce limit for performance
                 ai_logs_resp = supabase_admin.table('ai_cheerleader_logs').select(
@@ -208,17 +262,97 @@ class AICheerleaderLogResource(Resource):
             def _pick(d, keys):
                 return {k: d.get(k) for k in keys if k in d}
 
-            cs_keys = [
-                'status', 'distance_km', 'duration_seconds', 'average_pace', 'steps', 'is_paused',
-                'elevation_gain_m', 'elevation_loss_m', 'ruck_weight_kg', 'avg_heart_rate'
-            ]
-            compact_current = _pick(current_session, cs_keys)
-            
+            # Harmonize incoming session payload (Flutter camelCase) with backend expectations
+            distance_km = _get_from_session(
+                current_session,
+                ('distance_km',),
+                ('distanceKm',),
+                ('distance', 'distanceKm'),
+            )
+            distance_miles = _get_from_session(
+                current_session,
+                ('distance_miles',),
+                ('distanceMiles',),
+                ('distance', 'distanceMiles'),
+            )
+            elapsed_seconds = _get_from_session(
+                current_session,
+                ('duration_seconds',),
+                ('elapsedSeconds',),
+                ('elapsedTime', 'elapsedSeconds'),
+            )
+            elapsed_minutes = _get_from_session(
+                current_session,
+                ('elapsedMinutes',),
+                ('elapsedTime', 'elapsedMinutes'),
+            )
+            current_pace = _get_from_session(
+                current_session,
+                ('pace',),
+                ('pace', 'pace'),
+                ('average_pace',),
+            )
+            average_pace = _get_from_session(
+                current_session,
+                ('average_pace',),
+                ('pace', 'average'),
+            )
+            steps_count = _get_from_session(current_session, ('steps',))
+            calories = _get_from_session(
+                current_session,
+                ('calories',),
+                ('performance', 'calories'),
+            )
+            elevation_gain = _get_from_session(
+                current_session,
+                ('elevation_gain_m',),
+                ('elevationGain',),
+                ('performance', 'elevationGain'),
+            )
+            elevation_loss = _get_from_session(
+                current_session,
+                ('elevation_loss_m',),
+                ('elevationLoss',),
+            )
+            heart_rate = _get_from_session(
+                current_session,
+                ('avg_heart_rate',),
+                ('heartRate',),
+                ('performance', 'heartRate'),
+            )
+            ruck_weight = _get_from_session(
+                current_session,
+                ('ruck_weight_kg',),
+                ('ruckWeightKg',),
+                ('ruckWeight',),
+            )
+            is_paused = _get_from_session(current_session, ('is_paused',), ('isPaused',))
+
+            compact_current = {
+                'session_id': state.sessionId if hasattr(state, 'sessionId') else current_session.get('session_id'),
+                'distance_km': _coerce_float(distance_km),
+                'distance_miles': _coerce_float(distance_miles),
+                'elapsed_seconds': _coerce_int(elapsed_seconds),
+                'elapsed_minutes': _coerce_int(elapsed_minutes),
+                'pace_current': _coerce_float(current_pace),
+                'pace_average': _coerce_float(average_pace),
+                'steps': _coerce_int(steps_count),
+                'calories': _coerce_float(calories),
+                'elevation_gain_m': _coerce_float(elevation_gain),
+                'elevation_loss_m': _coerce_float(elevation_loss),
+                'heart_rate': _coerce_int(heart_rate),
+                'ruck_weight_kg': _coerce_float(ruck_weight),
+                'is_paused': bool(is_paused) if is_paused is not None else None,
+                'raw': current_session,
+            }
+            # Remove None values to keep prompt concise
+            compact_current = {k: v for k, v in compact_current.items() if v not in (None, '')}
+
             # Add environment/weather data (not in insights)
             if environment:
-                compact_current['environment'] = _pick(environment, ['weather', 'temperature_c', 'temperature_f', 'conditions']) or environment
+                compact_current['environment'] = environment
             if location_ctx:
-                compact_current['location'] = _pick(location_ctx, ['city', 'region', 'country', 'lat', 'lng']) or location_ctx
+                compact_current['location'] = location_ctx
 
             # Extract last few AI lines to avoid repeating phrasing
             avoid_lines = []
@@ -363,13 +497,14 @@ class AICheerleaderLogResource(Resource):
                 # Normal cheerleading when no specific trigger
                 extra_instructions = (
                     "\nInstructions:"\
-                    "\n- Act as a {personality} character."\
-                    "\n- Keep it SHORT: 20 words MAX. Hard cap."\
-                    "\n- Vary wording every time. Do NOT repeat prior lines shown in avoid_repeating_lines."\
-                    "\n- If session_goals exist, occasionally reference them for motivation"\
-                    "\n- Mention location or weather ONCE if present (natural, brief)."\
-                    "\n- Do NOT mention BPM/heart rate unless explicitly addressing a heart_rate coaching prompt"\
-                    "\n- No hashtags. No internet slang. Sound natural and encouraging."
+                    "\n- Act as a {personality} character with wit and swagger."\
+                    "\n- Deliver 2 short sentences (max ~45 words total). Encourage, tease, or celebrate with confidence."\
+                    "\n- Reference specific context: distance, elapsed time, pace trend, heart rate, goals, or streaks. Pick the most interesting stat."\
+                    "\n- If location or weather is present, weave it in once with a clever nod—avoid repeating the same weather line back to back."\
+                    "\n- Draw on historical insights or coaching plan tidbits when available (e.g., streaks, recent wins, plan week)."\
+                    "\n- Vary language every time. No stock phrases. Avoid 'Keep it up' unless you twist it uniquely."\
+                    "\n- Never mention BPM explicitly unless the coaching prompt demands heart-rate guidance."\
+                    "\n- Sound like a charismatic friend giving inside jokes or bold comparisons. No hashtags or internet slang."\
                 ).format(personality=personality)
 
             user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions)
@@ -380,7 +515,7 @@ class AICheerleaderLogResource(Resource):
             try:
                 model_name = os.getenv(
                     'OPENAI_CHEERLEADER_MODEL',
-                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o-mini'),
+                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4.1'),
                 )
                 completion = openai_client.chat.completions.create(
                     model=model_name,

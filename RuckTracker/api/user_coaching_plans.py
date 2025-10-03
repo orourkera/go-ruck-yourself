@@ -307,7 +307,8 @@ class UserCoachingPlanProgressResource(Resource):
                 return auth_response
             
             # Get active plan without relying on joined template (avoid missing-row issues)
-            client = get_supabase_client()
+            # Use admin client so authenticated users aren't blocked by RLS/record ownership
+            client = get_supabase_admin_client()
             plan_query = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, start_date, current_week, plan_modifications'
             ).eq('user_id', user_id).eq('current_status', 'active')
