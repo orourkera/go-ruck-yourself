@@ -328,8 +328,10 @@ class AICheerleaderLogResource(Resource):
             )
             is_paused = _get_from_session(current_session, ('is_paused',), ('isPaused',))
 
+            session_identifier = current_session.get('session_id') or current_session.get('sessionId') or session_id
+
             compact_current = {
-                'session_id': state.sessionId if hasattr(state, 'sessionId') else current_session.get('session_id'),
+                'session_id': session_identifier,
                 'distance_km': _coerce_float(distance_km),
                 'distance_miles': _coerce_float(distance_miles),
                 'elapsed_seconds': _coerce_int(elapsed_seconds),

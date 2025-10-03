@@ -305,13 +305,17 @@ class UserCoachingPlanProgressResource(Resource):
             auth_response = check_auth_and_respond(user_id)
             if auth_response:
                 return auth_response
-            
+
+            if not user_id:
+                logger.error("[COACHING_PLANS] get_current_user_id returned None")
+                return {"error": "Unauthorized"}, 401
+
             # Get active plan without relying on joined template (avoid missing-row issues)
             # Use admin client so authenticated users aren't blocked by RLS/record ownership
             client = get_supabase_admin_client()
             plan_query = client.table('user_coaching_plans').select(
                 'id, coaching_plan_id, start_date, current_week, plan_modifications'
-            ).eq('user_id', user_id).eq('current_status', 'active')
+            ).eq('user_id', str(user_id)).eq('current_status', 'active')
 
             # Only filter by plan_id if it's provided and not 'null' string
             if plan_id and plan_id != 'null':
@@ -990,10 +994,13 @@ def _calculate_comprehensive_progress(plan, template, sessions):
 def _get_user_performance_baseline(user_id):
     """Get user's recent performance metrics from user_insights"""
     try:
+        if not user_id:
+            raise ValueError('user_id is required for performance baseline')
+
         client = get_supabase_admin_client()
 
         # Get user insights
-        result = client.table('user_insights').select('facts').eq('user_id', user_id).single().execute()
+        result = client.table('user_insights').select('facts').eq('user_id', str(user_id)).single().execute()
 
         if result.data and 'facts' in result.data:
             facts = result.data['facts']
