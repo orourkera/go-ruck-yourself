@@ -540,28 +540,31 @@ class AICheerleaderLogResource(Resource):
                 ai_message = (completion.choices[0].message.content or "").strip()
 
                 # Log to Arize for observability
-                observe_openai_call(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    response=ai_message,
-                    latency_ms=latency_ms,
-                    user_id=user_id,
-                    session_id=request_body.get('session_id'),
-                    context_type='ai_cheerleader',
-                    prompt_tokens=completion.usage.prompt_tokens if completion.usage else None,
-                    completion_tokens=completion.usage.completion_tokens if completion.usage else None,
-                    total_tokens=completion.usage.total_tokens if completion.usage else None,
-                    temperature=0.7,
-                    max_tokens=120,
-                    metadata={
-                        'personality': personality,
-                        'has_coaching_prompt': bool(active_coaching_prompt),
-                        'coaching_prompt_type': active_coaching_prompt.get('type') if active_coaching_prompt else None,
-                    }
-                )
+                try:
+                    observe_openai_call(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        response=ai_message,
+                        latency_ms=latency_ms,
+                        user_id=user_id,
+                        session_id=request_body.get('session_id'),
+                        context_type='ai_cheerleader',
+                        prompt_tokens=completion.usage.prompt_tokens if completion.usage else None,
+                        completion_tokens=completion.usage.completion_tokens if completion.usage else None,
+                        total_tokens=completion.usage.total_tokens if completion.usage else None,
+                        temperature=0.7,
+                        max_tokens=120,
+                        metadata={
+                            'personality': personality,
+                            'has_coaching_prompt': bool(active_coaching_prompt),
+                            'coaching_prompt_type': active_coaching_prompt.get('type') if active_coaching_prompt else None,
+                        }
+                    )
+                except Exception as arize_error:
+                    logger.error(f"[AI_CHEERLEADER] Failed to log to Arize: {arize_error}", exc_info=True)
             except Exception as openai_error:
                 logger.warning(
                     f"[AI_CHEERLEADER] OpenAI call failed (model={model_name}), using fallback: {openai_error}",
