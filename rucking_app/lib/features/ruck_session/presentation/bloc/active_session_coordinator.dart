@@ -21,6 +21,7 @@ import 'package:rucking_app/core/models/location_point.dart';
 
 import 'package:rucking_app/features/ruck_session/domain/services/heart_rate_service.dart';
 import 'package:rucking_app/features/ruck_session/domain/services/split_tracking_service.dart';
+import 'package:rucking_app/features/ruck_session/domain/models/session_split.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/active_session_bloc.dart';
 import 'package:rucking_app/features/ruck_session/presentation/bloc/events/session_events.dart'
     as manager_events;
