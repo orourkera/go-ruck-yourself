@@ -18,7 +18,7 @@ import time
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
 from RuckTracker.services.plan_notification_service import plan_notification_service
-from RuckTracker.config import get_supabase_admin_client
+from RuckTracker.supabase_client import get_supabase_admin_client
 from RuckTracker.api.user_coaching_plans import _generate_plan_sessions
 
 # Configure logging - Reduced verbosity
