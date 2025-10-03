@@ -78,7 +78,7 @@ BEGIN
     
     FOR session_record IN
         EXECUTE '
-        SELECT 
+        SELECT
             rs.id,
             rs.user_id,
             rs.distance_km,
@@ -95,7 +95,15 @@ BEGIN
             -- Social counts
             (SELECT COUNT(*) FROM ruck_likes WHERE ruck_id = rs.id) as like_count,
             (SELECT COUNT(*) FROM ruck_comments WHERE ruck_id = rs.id) as comment_count,
-            (SELECT EXISTS(SELECT 1 FROM ruck_likes WHERE ruck_id = rs.id AND user_id = $1)) as is_liked_by_current_user
+            (SELECT EXISTS(SELECT 1 FROM ruck_likes WHERE ruck_id = rs.id AND user_id = $1)) as is_liked_by_current_user,
+            -- Check if this is the user''s first completed ruck (for badge display)
+            (SELECT COUNT(*) = 1
+             FROM ruck_session
+             WHERE user_id = rs.user_id
+               AND status = ''completed''
+               AND duration_seconds >= 300
+               AND distance_km >= 0.5
+               AND started_at <= rs.started_at) as first_ruck
         FROM ruck_session rs
         JOIN "user" u ON rs.user_id = u.id
         WHERE 
@@ -181,6 +189,7 @@ BEGIN
             'like_count', session_record.like_count,
             'comment_count', session_record.comment_count,
             'is_liked_by_current_user', session_record.is_liked_by_current_user,
+            'first_ruck', session_record.first_ruck,
             'location_points', COALESCE(route_points, '[]'::json)
         );
     END LOOP;
