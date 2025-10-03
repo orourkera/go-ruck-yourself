@@ -247,6 +247,8 @@ def observe_openai_call(
         context_type: Type of usage (ai_cheerleader, coaching, etc.)
         **kwargs: Additional metadata (prompt_tokens, completion_tokens, etc.)
     """
+    logger.info(f"🔍 observe_openai_call called: context_type={context_type}, model={model}")
+
     # Combine messages into a single prompt string
     prompt = "\n\n".join([f"{msg['role']}: {msg['content']}" for msg in messages])
 
