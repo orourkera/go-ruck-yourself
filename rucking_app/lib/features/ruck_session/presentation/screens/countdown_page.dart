@@ -24,6 +24,7 @@ import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
+import 'package:rucking_app/core/services/device_performance_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// A dedicated countdown page that shows a countdown before starting a ruck session
@@ -116,6 +117,7 @@ class _CountdownPageState extends State<CountdownPage>
       elevenLabsService: locator<ElevenLabsService>(),
       locationContextService: locator<LocationContextService>(),
       audioService: locator<AIAudioService>(),
+      devicePerformanceService: locator<DevicePerformanceService>(),
     );
 
     // Start countdown after a brief delay to ensure screen is visible

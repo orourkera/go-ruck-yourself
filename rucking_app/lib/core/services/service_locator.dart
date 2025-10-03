@@ -4,7 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/core/services/enhanced_api_client.dart';
-import 'package:rucking_app/core/services/auth_service_consolidated.dart' as auth;
+import 'package:rucking_app/core/services/auth_service_consolidated.dart'
+    as auth;
 import 'package:rucking_app/core/services/avatar_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
@@ -37,6 +38,7 @@ import 'package:rucking_app/features/ai_cheerleader/services/location_context_se
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/simple_ai_logger.dart';
+import 'package:rucking_app/core/services/device_performance_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -138,6 +140,10 @@ Future<void> setupServiceLocator() async {
     getIt
         .registerSingleton<FeatureFlags>(FeatureFlags(getIt<StorageService>()));
     await getIt<FeatureFlags>().initialize();
+
+    final devicePerformanceService = DevicePerformanceService();
+    await devicePerformanceService.initialize();
+    getIt.registerSingleton<DevicePerformanceService>(devicePerformanceService);
 
     // Connect services to resolve circular dependencies
     // apiClient already constructed with StorageService via constructor; no setter needed
@@ -261,7 +267,6 @@ Future<void> setupServiceLocator() async {
     getIt.registerSingleton<ActiveSessionStorage>(
         ActiveSessionStorage(getIt<SharedPreferences>()));
 
-
     // Session cleanup service for defensive maintenance
     getIt.registerSingleton<SessionCleanupService>(
         SessionCleanupService(getIt<ActiveSessionStorage>()));
@@ -331,6 +336,7 @@ Future<void> setupServiceLocator() async {
           elevenLabsService: getIt<ElevenLabsService>(),
           locationContextService: getIt<LocationContextService>(),
           audioService: getIt<AIAudioService>(),
+          devicePerformanceService: getIt<DevicePerformanceService>(),
         ));
 
     // Register session bloc for operations like delete

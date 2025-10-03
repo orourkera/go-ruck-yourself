@@ -89,12 +89,9 @@ class _AIInsightsWidgetState extends State<AIInsightsWidget> {
           _activeCoachingPlan = plan;
         });
 
-        // If user has a plan, show next workout. Otherwise generate AI insights
-        if (plan != null) {
-          _showNextPlannedWorkout(plan);
-        } else {
-          _generateInsights();
-        }
+        // Generate AI insights regardless of whether user has a plan
+        // The AI service will incorporate coaching plan data into the narrative
+        _generateInsights();
       }
     } catch (e) {
       AppLogger.error('[AI_INSIGHTS_WIDGET] Failed to check coaching plan: $e');

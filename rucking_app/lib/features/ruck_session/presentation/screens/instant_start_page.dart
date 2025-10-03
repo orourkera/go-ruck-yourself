@@ -21,6 +21,7 @@ import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
+import 'package:rucking_app/core/services/device_performance_service.dart';
 
 class InstantStartPage extends StatefulWidget {
   final ActiveSessionArgs args;
@@ -56,6 +57,7 @@ class _InstantStartPageState extends State<InstantStartPage> {
       elevenLabsService: locator<ElevenLabsService>(),
       locationContextService: locator<LocationContextService>(),
       audioService: locator<AIAudioService>(),
+      devicePerformanceService: locator<DevicePerformanceService>(),
     );
 
     // Kick off the session immediately

@@ -361,6 +361,14 @@ class LocationServiceImpl implements LocationService {
         return null;
       }
 
+      // Handle timeout exceptions gracefully - these are environmental, not bugs
+      if (e is TimeoutException) {
+        AppLogger.warning(
+            'Location request timed out - poor GPS signal or indoors');
+        // Don't report timeouts to Sentry - they're expected in poor GPS conditions
+        return null;
+      }
+
       // Monitor location retrieval failures (critical for fitness tracking) - wrapped to prevent secondary errors
       try {
         await AppErrorHandler.handleError(

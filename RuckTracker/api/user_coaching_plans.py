@@ -312,7 +312,8 @@ class UserCoachingPlanProgressResource(Resource):
                 'id, coaching_plan_id, start_date, current_week, plan_modifications'
             ).eq('user_id', user_id).eq('current_status', 'active')
 
-            if plan_id:
+            # Only filter by plan_id if it's provided and not 'null' string
+            if plan_id and plan_id != 'null':
                 plan_query = plan_query.eq('id', plan_id)
 
             plan_resp = plan_query.limit(1).execute()

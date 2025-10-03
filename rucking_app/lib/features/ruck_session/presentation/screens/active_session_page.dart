@@ -30,6 +30,7 @@ import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
+import 'package:rucking_app/core/services/device_performance_service.dart';
 import 'package:rucking_app/core/services/remote_config_service.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
@@ -140,6 +141,7 @@ class ActiveSessionPage extends StatelessWidget {
             elevenLabsService: locator<ElevenLabsService>(),
             locationContextService: locator<LocationContextService>(),
             audioService: locator<AIAudioService>(),
+            devicePerformanceService: locator<DevicePerformanceService>(),
           ),
         ),
         BlocProvider(
@@ -375,20 +377,24 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
               buildWhen: (previous, current) {
                 // Always rebuild if the type of state changes (e.g., Loading -> Running)
                 if (previous.runtimeType != current.runtimeType) {
-                  print('[BUILD_WHEN_DEBUG] State type changed: ${previous.runtimeType} -> ${current.runtimeType}');
+                  print(
+                      '[BUILD_WHEN_DEBUG] State type changed: ${previous.runtimeType} -> ${current.runtimeType}');
                   return true;
                 }
                 // If both are ActiveSessionRunning, check for specific significant changes
                 if (previous is ActiveSessionRunning &&
                     current is ActiveSessionRunning) {
                   // Check if elapsedSeconds changed
-                  final elapsedChanged = previous.elapsedSeconds != current.elapsedSeconds;
+                  final elapsedChanged =
+                      previous.elapsedSeconds != current.elapsedSeconds;
                   if (elapsedChanged) {
-                    print('[BUILD_WHEN_DEBUG] elapsedSeconds changed: ${previous.elapsedSeconds} -> ${current.elapsedSeconds}');
+                    print(
+                        '[BUILD_WHEN_DEBUG] elapsedSeconds changed: ${previous.elapsedSeconds} -> ${current.elapsedSeconds}');
                   }
 
                   // While finishing, ignore isPaused toggles to avoid transient pause UI rebuilds
-                  final shouldRebuild = (previous.isPaused != current.isPaused) ||
+                  final shouldRebuild = (previous.isPaused !=
+                          current.isPaused) ||
                       !listEquals(
                           previous.locationPoints,
                           current
@@ -404,7 +410,8 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           current.sessionId; // Important for initial load
 
                   if (shouldRebuild) {
-                    print('[BUILD_WHEN_DEBUG] Rebuilding UI due to state change');
+                    print(
+                        '[BUILD_WHEN_DEBUG] Rebuilding UI due to state change');
                   }
                   return shouldRebuild;
                 }

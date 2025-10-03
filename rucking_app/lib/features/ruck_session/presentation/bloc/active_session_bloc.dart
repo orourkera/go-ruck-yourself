@@ -30,6 +30,7 @@ import 'package:rucking_app/core/services/session_completion_detection_service.d
 import 'package:rucking_app/core/services/battery_optimization_service.dart';
 import 'package:rucking_app/core/services/android_optimization_service.dart';
 import 'package:rucking_app/core/services/connectivity_service.dart';
+import 'package:rucking_app/core/services/device_performance_service.dart';
 import 'package:rucking_app/core/config/app_config.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
@@ -82,6 +83,12 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   final ElevenLabsService _elevenLabsService;
   final LocationContextService _locationContextService;
   final AIAudioService _audioService;
+  final DevicePerformanceService _devicePerformanceService;
+  final bool _skipLocationContextEnrichment;
+  final bool _skipAIAudioPipeline;
+  final int _cheerHistoryLimit;
+  final double _aiCheerleaderMemorySoftLimitMb;
+  final Duration _aiCheerleaderThrottleInterval;
 
   // Coordinator for delegating to managers
   ActiveSessionCoordinator? _coordinator;
@@ -128,7 +135,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   static const Duration _cheerHistoryCacheTtl = Duration(minutes: 10);
   static const Duration _coachingContextCacheTtl = Duration(minutes: 10);
   static const Duration _aiMemorySkipCooldown = Duration(minutes: 3);
-  static const double _aiCheerleaderMemorySoftLimitMb = 360.0;
 
   // Circuit breaker for AI failures
   int _aiCheerleaderFailureCount = 0;
@@ -144,7 +150,6 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
   // AI Cheerleader throttling to prevent blocking distance tracking
   DateTime? _lastAICheerleaderCheck;
   bool _isProcessingAICheerleader = false;
-  static const Duration _aiCheerleaderMinInterval = Duration(seconds: 30);
 
   int? _authRetryCounter;
 
@@ -165,6 +170,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     required ElevenLabsService elevenLabsService,
     required LocationContextService locationContextService,
     required AIAudioService audioService,
+    required DevicePerformanceService devicePerformanceService,
     SessionValidationService? validationService,
   })  : _apiClient = apiClient,
         _locationService = locationService,
@@ -182,6 +188,15 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _elevenLabsService = elevenLabsService,
         _locationContextService = locationContextService,
         _audioService = audioService,
+        _devicePerformanceService = devicePerformanceService,
+        _skipLocationContextEnrichment =
+            devicePerformanceService.shouldSkipLocationContext,
+        _skipAIAudioPipeline = devicePerformanceService.shouldSkipAIAudio,
+        _cheerHistoryLimit = devicePerformanceService.cheerHistoryLimit,
+        _aiCheerleaderMemorySoftLimitMb =
+            devicePerformanceService.aiCheerleaderMemorySoftLimitMb,
+        _aiCheerleaderThrottleInterval =
+            devicePerformanceService.cheerleaderMinTriggerInterval,
         _validationService = validationService ?? SessionValidationService(),
         super(ActiveSessionInitial()) {
     if (GetIt.I.isRegistered<ActiveSessionBloc>()) {
@@ -245,8 +260,8 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
     try {
       final historyResp = await _apiClient.get(
         ApiEndpoints.aiCheerleaderLogs,
-        queryParams: const {
-          'limit': '20',
+        queryParams: {
+          'limit': _cheerHistoryLimit.toString(),
           'offset': '0',
         },
       );
@@ -505,7 +520,7 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       final now = DateTime.now();
       if (_lastAICheerleaderCheck != null &&
           now.difference(_lastAICheerleaderCheck!).inSeconds <
-              _aiCheerleaderMinInterval.inSeconds) {
+              _aiCheerleaderThrottleInterval.inSeconds) {
         // Skip this check - too soon since last check
         // CRITICAL: Don't return here - still need to forward the state!
         // Just skip the AI processing
@@ -528,16 +543,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
                 '[AI_CHEERLEADER] Isolated trigger check failed: $e');
             AppLogger.error('[AI_CHEERLEADER] Stack: $stack');
             // Log to Sentry but don't crash the session
-            await AppErrorHandler.handleError(
-              'ai_cheerleader_crash',
-              'AI Cheerleader crashed at milestone but session continues',
-              context: {
-                'distance_km': coordinatorState.distanceKm.toString(),
-                'elapsed_seconds': coordinatorState.elapsedSeconds.toString(),
-                'personality': _aiCheerleaderPersonality ?? 'unknown',
-                'error': e.toString(),
+            await _reportAICheerleaderIssue(
+              'ai_cheerleader_trigger_async_failure',
+              e,
+              state: coordinatorState is ActiveSessionRunning
+                  ? coordinatorState
+                  : null,
+              extraContext: {
+                'stack_trace': stack.toString(),
+                'coordinator_state': coordinatorState.runtimeType.toString(),
               },
-              severity: ErrorSeverity.warning,
+              severity: ErrorSeverity.error,
             );
           } finally {
             _isProcessingAICheerleader = false;
@@ -618,6 +634,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
               now.difference(_lastAiMemorySkip!) > _aiMemorySkipCooldown) {
             AppLogger.warning(
               '[AI_CHEERLEADER] Skipping cheer trigger due to high memory usage: ${memoryUsageMb.toStringAsFixed(1)}MB',
+            );
+            await _reportAICheerleaderIssue(
+              'ai_cheerleader_memory_skip',
+              Exception(
+                  'AI cheerleader skipped due to high memory usage: ${memoryUsageMb.toStringAsFixed(1)}MB'),
+              state: state,
+              extraContext: {
+                'memory_usage_mb': memoryUsageMb,
+                'memory_soft_limit_mb': _aiCheerleaderMemorySoftLimitMb,
+              },
+              severity: ErrorSeverity.warning,
             );
             _lastAiMemorySkip = now;
           }
@@ -726,70 +753,75 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       context['environment'] = normalizedEnv;
 
       // 2. Add location context if available
-      _logAiDebug('Attempting to enrich location context');
+      if (!_skipLocationContextEnrichment) {
+        _logAiDebug('Attempting to enrich location context');
 
-      try {
-        // SAFETY: Check if locationPoints exists and is accessible
-        final pointsCount = state.locationPoints?.length ?? 0;
-        AppLogger.warning(
-            '[AI_LOCATION_DEBUG] Location points available: $pointsCount');
-        AppLogger.warning(
-            '[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints?.runtimeType ?? "null"}');
+        try {
+          // SAFETY: Check if locationPoints exists and is accessible
+          final pointsCount = state.locationPoints?.length ?? 0;
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] Location points available: $pointsCount');
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] Location points type: ${state.locationPoints?.runtimeType ?? "null"}');
 
-        AppLogger.warning(
-            '[AI_LOCATION_DEBUG] About to check if locationPoints is not empty...');
-        final lastLocation =
-            (state.locationPoints != null && state.locationPoints.isNotEmpty)
-                ? state.locationPoints.last
-                : null;
-        if (lastLocation != null) {
-          final locationContext = await _locationContextService
-              .getLocationContext(
-                lastLocation.latitude,
-                lastLocation.longitude,
-              )
-              .timeout(
-                const Duration(seconds: 5),
-                onTimeout: () => null,
-              );
+          AppLogger.warning(
+              '[AI_LOCATION_DEBUG] About to check if locationPoints is not empty...');
+          final lastLocation =
+              (state.locationPoints != null && state.locationPoints.isNotEmpty)
+                  ? state.locationPoints.last
+                  : null;
+          if (lastLocation != null) {
+            final locationContext = await _locationContextService
+                .getLocationContext(
+                  lastLocation.latitude,
+                  lastLocation.longitude,
+                )
+                .timeout(
+                  const Duration(seconds: 5),
+                  onTimeout: () => null,
+                );
 
-          if (locationContext != null) {
-            final environment =
-                (context['environment'] as Map<String, dynamic>?) ??
-                    <String, dynamic>{};
-            final locationSummary = {
-              'description': locationContext.description,
-              'city': locationContext.city,
-              'terrain': locationContext.terrain,
-              'landmark': locationContext.landmark,
-              'weatherCondition': locationContext.weatherCondition,
-              'temperature': locationContext.temperature,
-            };
-            locationSummary.removeWhere((key, value) =>
-                value == null || (value is String && value.isEmpty));
-            if (locationSummary.isNotEmpty) {
-              environment['location'] = locationSummary;
+            if (locationContext != null) {
+              final environment =
+                  (context['environment'] as Map<String, dynamic>?) ??
+                      <String, dynamic>{};
+              final locationSummary = {
+                'description': locationContext.description,
+                'city': locationContext.city,
+                'terrain': locationContext.terrain,
+                'landmark': locationContext.landmark,
+                'weatherCondition': locationContext.weatherCondition,
+                'temperature': locationContext.temperature,
+              };
+              locationSummary.removeWhere((key, value) =>
+                  value == null || (value is String && value.isEmpty));
+              if (locationSummary.isNotEmpty) {
+                environment['location'] = locationSummary;
+              }
+
+              final weatherMap = <String, dynamic>{};
+              final tempF = locationContext.temperature;
+              if (tempF != null) {
+                weatherMap['tempF'] = tempF;
+              }
+              final condition = locationContext.weatherCondition;
+              if (condition != null && condition.isNotEmpty) {
+                weatherMap['condition'] = condition;
+              }
+              if (weatherMap.isNotEmpty) {
+                environment['weather'] = weatherMap;
+              }
+
+              context['environment'] = environment;
+              _logAiDebug('Location context added to AI environment');
             }
-
-            final weatherMap = <String, dynamic>{};
-            final tempF = locationContext.temperature;
-            if (tempF != null) {
-              weatherMap['tempF'] = tempF;
-            }
-            final condition = locationContext.weatherCondition;
-            if (condition != null && condition.isNotEmpty) {
-              weatherMap['condition'] = condition;
-            }
-            if (weatherMap.isNotEmpty) {
-              environment['weather'] = weatherMap;
-            }
-
-            context['environment'] = environment;
-            _logAiDebug('Location context added to AI environment');
           }
+        } catch (e) {
+          AppLogger.error(
+              '[AI_LOCATION_DEBUG] Error in location processing: $e');
         }
-      } catch (e) {
-        AppLogger.error('[AI_LOCATION_DEBUG] Error in location processing: $e');
+      } else {
+        _logAiDebug('Skipping location context enrichment (low-spec device)');
       }
       _logAiDebug('AI environment prepared for OpenAI generation');
 
@@ -816,34 +848,63 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         _logAiDebug('AI cheerleader message ready for playback');
 
         // 4. Synthesize speech with ElevenLabs
-        final synthesisStartTime = DateTime.now();
-        final audioBytes = await _elevenLabsService.synthesizeSpeech(
-          text: message,
-          personality: _aiCheerleaderPersonality!,
-        );
-        final synthesisEndTime = DateTime.now();
-        final synthesisTimeMs =
-            synthesisEndTime.difference(synthesisStartTime).inMilliseconds;
-        final synthesisSuccess = audioBytes != null;
+        Uint8List? audioBytes;
+        int? synthesisTimeMs;
+        bool synthesisSuccess = false;
 
-        if (audioBytes != null) {
-          _logAiDebug('ElevenLabs synthesis succeeded');
-
-          // 5. Play audio through audio service
-          final playbackSuccess = await _audioService.playCheerleaderAudio(
-            audioBytes: audioBytes,
-            fallbackText: message,
+        if (!_skipAIAudioPipeline) {
+          final synthesisStartTime = DateTime.now();
+          audioBytes = await _elevenLabsService.synthesizeSpeech(
+            text: message,
             personality: _aiCheerleaderPersonality!,
           );
+          final synthesisEndTime = DateTime.now();
+          synthesisTimeMs =
+              synthesisEndTime.difference(synthesisStartTime).inMilliseconds;
+          synthesisSuccess = audioBytes != null;
 
-          if (playbackSuccess) {
-            _logAiDebug('Cheerleader audio playback finished');
+          if (audioBytes != null) {
+            _logAiDebug('ElevenLabs synthesis succeeded');
+
+            // 5. Play audio through audio service
+            final playbackSuccess = await _audioService.playCheerleaderAudio(
+              audioBytes: audioBytes,
+              fallbackText: message,
+              personality: _aiCheerleaderPersonality!,
+            );
+
+            if (playbackSuccess) {
+              _logAiDebug('Cheerleader audio playback finished');
+            } else {
+              AppLogger.warning('[AI_CHEERLEADER] Audio playback failed');
+              await _reportAICheerleaderIssue(
+                'ai_cheerleader_audio_playback_failed',
+                Exception('AI cheerleader audio playback failed'),
+                state: state,
+                trigger: trigger,
+                extraContext: {
+                  'personality': _aiCheerleaderPersonality,
+                  'synthesis_time_ms': synthesisTimeMs,
+                },
+                severity: ErrorSeverity.warning,
+              );
+            }
           } else {
-            AppLogger.warning('[AI_CHEERLEADER] Audio playback failed');
+            AppLogger.warning(
+                '[AI_CHEERLEADER] Audio synthesis failed, skipping playback (TTS disabled)');
+            await _reportAICheerleaderIssue(
+              'ai_cheerleader_audio_synthesis_failed',
+              Exception('AI cheerleader audio synthesis returned null bytes'),
+              state: state,
+              trigger: trigger,
+              extraContext: {
+                'personality': _aiCheerleaderPersonality,
+              },
+              severity: ErrorSeverity.warning,
+            );
           }
         } else {
-          AppLogger.warning(
-              '[AI_CHEERLEADER] Audio synthesis failed, skipping playback (TTS disabled)');
+          _logAiDebug('Skipping audio synthesis/playback on low-spec device');
         }
 
         // 5. Log interaction to analytics
@@ -900,12 +961,35 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         } catch (e) {
           AppLogger.error(
               '[AI_ANALYTICS] Failed to log automatic trigger interaction: $e');
+          await _reportAICheerleaderIssue(
+            'ai_cheerleader_analytics_logging_failed',
+            e,
+            state: state,
+            trigger: trigger,
+            extraContext: {
+              'generation_time_ms': generationTimeMs,
+              'synthesis_success': synthesisSuccess,
+              'synthesis_time_ms': synthesisTimeMs,
+            },
+            severity: ErrorSeverity.warning,
+          );
         }
         _aiCheerleaderFailureCount = 0;
         // Return the generated message for optional UI display
         return message;
       } else {
         AppLogger.warning('[AI_CHEERLEADER] Text generation failed');
+        await _reportAICheerleaderIssue(
+          'ai_cheerleader_empty_response',
+          Exception('AI cheerleader returned an empty response'),
+          state: state,
+          trigger: trigger,
+          extraContext: {
+            'context_char_count': context.length,
+            'generation_time_ms': generationTimeMs,
+          },
+          severity: ErrorSeverity.warning,
+        );
       }
 
       return null;
@@ -919,6 +1003,17 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
         AppLogger.warning(
             '[AI_CHEERLEADER] Circuit breaker triggered - disabling AI after $_aiCheerleaderFailureCount failures');
         _aiCheerleaderEnabled = false;
+        await _reportAICheerleaderIssue(
+          'ai_cheerleader_circuit_breaker_triggered',
+          Exception(
+              'AI cheerleader circuit breaker triggered after $_aiCheerleaderFailureCount failures'),
+          state: state,
+          trigger: trigger,
+          extraContext: {
+            'last_error': e.toString(),
+          },
+          severity: ErrorSeverity.error,
+        );
 
         // Clean up audio resources
         try {
@@ -933,8 +1028,98 @@ class ActiveSessionBloc extends Bloc<ActiveSessionEvent, ActiveSessionState> {
       AppLogger.error(
           '[AI_CHEERLEADER] Pipeline processing failed ($_aiCheerleaderFailureCount/$_maxAiCheerleaderFailures): $e');
       AppLogger.error('[AI_CHEERLEADER] Stack trace: $stackTrace');
+      await _reportAICheerleaderIssue(
+        'ai_cheerleader_pipeline_exception',
+        e,
+        state: state,
+        trigger: trigger,
+        extraContext: {
+          'stack_trace': stackTrace.toString(),
+          'failure_count': _aiCheerleaderFailureCount,
+        },
+        severity: ErrorSeverity.error,
+      );
       return null;
     }
+  }
+
+  Future<void> _reportAICheerleaderIssue(
+    String operation,
+    dynamic error, {
+    ActiveSessionRunning? state,
+    CheerleaderTrigger? trigger,
+    Map<String, dynamic>? extraContext,
+    ErrorSeverity severity = ErrorSeverity.error,
+  }) async {
+    try {
+      final context = _buildAICheerleaderSentryContext(
+        state: state,
+        trigger: trigger,
+        extra: extraContext,
+      );
+      await AppErrorHandler.handleError(
+        operation,
+        error,
+        context: context,
+        userId: _currentUser?.userId,
+        severity: severity,
+      );
+    } catch (loggingError) {
+      AppLogger.error(
+          '[AI_CHEERLEADER] Failed to report issue ($operation): $loggingError');
+    }
+  }
+
+  Map<String, String> _buildAICheerleaderSentryContext({
+    ActiveSessionRunning? state,
+    CheerleaderTrigger? trigger,
+    Map<String, dynamic>? extra,
+  }) {
+    final memoryInfo = MemoryMonitorService.getCurrentMemoryInfo();
+
+    String stringify(dynamic value) {
+      if (value == null) return 'null';
+      if (value is double) {
+        if (value.isNaN) return 'NaN';
+        return value.toStringAsFixed(3);
+      }
+      return value.toString();
+    }
+
+    final context = <String, String>{
+      'session_id': state?.sessionId ?? 'unknown',
+      'session_distance_km':
+          state != null ? stringify(state.distanceKm) : 'null',
+      'session_elapsed_seconds':
+          state != null ? stringify(state.elapsedSeconds) : 'null',
+      'ai_enabled': _aiCheerleaderEnabled.toString(),
+      'ai_failure_count': _aiCheerleaderFailureCount.toString(),
+      'ai_personality': _aiCheerleaderPersonality ?? 'unknown',
+      'ai_explicit_content': _aiCheerleaderExplicitContent.toString(),
+      'ai_trigger_type': trigger?.type.name ?? 'unknown',
+      'ai_trigger_data': trigger?.data?.toString() ?? 'null',
+      'device_low_spec': _devicePerformanceService.isLowSpecDevice.toString(),
+      'device_android_sdk':
+          _devicePerformanceService.androidSdkInt?.toString() ?? 'null',
+      'device_ios_version':
+          _devicePerformanceService.iosSystemVersion ?? 'null',
+      'memory_usage_mb': stringify(memoryInfo['memory_usage_mb']),
+      'memory_soft_limit_mb': stringify(_aiCheerleaderMemorySoftLimitMb),
+      'throttle_interval_seconds':
+          _aiCheerleaderThrottleInterval.inSeconds.toString(),
+      'history_cached': (_cachedCheerHistory != null).toString(),
+      'coaching_cached': (_cachedCoachingContext != null).toString(),
+      'skip_location_context': _skipLocationContextEnrichment.toString(),
+      'skip_ai_audio': _skipAIAudioPipeline.toString(),
+    };
+
+    if (extra != null) {
+      extra.forEach((key, value) {
+        context['extra_$key'] = stringify(value);
+      });
+    }
+
+    return context;
   }
 
   void _startLocationUpdates(String sessionId) {
