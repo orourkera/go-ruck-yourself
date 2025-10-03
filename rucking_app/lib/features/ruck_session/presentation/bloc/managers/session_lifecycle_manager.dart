@@ -52,6 +52,7 @@ class SessionLifecycleManager implements SessionManager {
   Timer? _ticker;
   Timer? _sessionPersistenceTimer;
   StreamSubscription? _connectivitySubscription;
+  Map<String, dynamic>? _completionResponse;
 
   // Sophisticated timer coordination
   late TimerCoordinator _timerCoordinator;
@@ -357,7 +358,7 @@ class SessionLifecycleManager implements SessionManager {
           AppLogger.info(
               '[LIFECYCLE] CALORIES_DEBUG: Sending calories_burned=${completionData['calories_burned']} to backend');
           // Add timeout to prevent hanging on slow API responses
-          await _apiClient
+          final completionResponse = await _apiClient
               .post('/rucks/$_activeSessionId/complete', completionData)
               .timeout(const Duration(seconds: 15), onTimeout: () {
             throw Exception('Session completion API timeout after 15 seconds');
@@ -365,6 +366,16 @@ class SessionLifecycleManager implements SessionManager {
           completionSuccessful = true;
           AppLogger.info(
               '[LIFECYCLE] Session completion successful with comprehensive data');
+
+          // Store the completion response for the coordinator to access
+          if (completionResponse != null && completionResponse is Map<String, dynamic>) {
+            _completionResponse = completionResponse;
+            AppLogger.info('[LIFECYCLE] Stored completion response with ${completionResponse.keys.length} fields');
+            if (completionResponse['splits'] != null) {
+              final splits = completionResponse['splits'];
+              AppLogger.info('[LIFECYCLE] Completion response includes ${splits is List ? splits.length : 0} splits');
+            }
+          }
           break;
         } catch (e) {
           completionError = e.toString();
@@ -903,6 +914,9 @@ class SessionLifecycleManager implements SessionManager {
 
   // Getters for other managers to access session info
   String? get activeSessionId => _activeSessionId;
+
+  /// Get the completion response from the API (includes splits, photos, etc.)
+  Map<String, dynamic>? get completionResponse => _completionResponse;
   DateTime? get sessionStartTime => _sessionStartTime;
   Future<void> _onSessionReset(manager_events.SessionReset event) async {
     try {

@@ -543,6 +543,22 @@ class ActiveSessionCoordinator
       AppLogger.info(
           '[COORDINATOR] Building completion state: distance=${finalDistance}km, duration=${actualMovementSeconds}s, routePoints=${route.length}, calories=${finalCalories}');
 
+      // Get splits from completion response if available, otherwise use local splits
+      List<SessionSplit> finalSplits = _locationManager.splits;
+      final completionResponse = _lifecycleManager.completionResponse;
+      if (completionResponse != null && completionResponse['splits'] != null) {
+        try {
+          final splitsData = completionResponse['splits'] as List;
+          finalSplits = splitsData
+              .map((splitJson) => SessionSplit.fromJson(splitJson as Map<String, dynamic>))
+              .toList();
+          AppLogger.info('[COORDINATOR] Using ${finalSplits.length} splits from completion response');
+        } catch (e) {
+          AppLogger.warning('[COORDINATOR] Failed to parse splits from completion response: $e');
+          // Keep using local splits as fallback
+        }
+      }
+
       _currentAggregatedState = ActiveSessionCompleted(
         sessionId: lifecycleState.sessionId!,
         finalDistanceKm: finalDistance,
@@ -559,7 +575,7 @@ class ActiveSessionCoordinator
         minHeartRate: _heartRateManager.currentState.minHeartRate,
         maxHeartRate: _heartRateManager.currentState.maxHeartRate,
         sessionPhotos: _photoManager.photos,
-        splits: _locationManager.splits,
+        splits: finalSplits,
         completedAt: DateTime.now(),
         isOffline: false,
         ruckWeightKg: lifecycleState.ruckWeightKg,
