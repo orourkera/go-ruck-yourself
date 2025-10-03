@@ -157,12 +157,21 @@ class ArizeObserver:
             model_id = f'rucking-llm-{context_type}' if context_type else 'rucking-llm'
             model_version = model
 
+            # Define schema for Arize
+            schema = Schema(
+                prediction_id_column_name='prediction_id',
+                timestamp_column_name='prediction_timestamp',
+                prediction_label_column_name='prediction_label',
+                feature_column_names=['prompt', 'model_version', 'user_id', 'session_id'] + list(meta.keys())
+            )
+
             response = self.client.log(
                 dataframe=df,
                 model_id=model_id,
                 model_version=model_version,
                 model_type=ModelTypes.GENERATIVE_LLM,
                 environment=Environments.PRODUCTION if self.environment == 'production' else Environments.TRAINING,
+                schema=schema,
             )
 
             if response.status_code == 200:
