@@ -71,20 +71,22 @@ class GuestConversionDialog extends StatelessWidget {
 
             // Message
             Text(
-              'Create a free account to save your progress, track your achievements, and connect with the rucking community!',
+              'Create a free account to unlock the full rucking experience!',
               style: AppTextStyles.bodyLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
 
             // Benefits list
-            _buildBenefit(Icons.save, 'Save all your rucks'),
+            _buildBenefit(Icons.people, 'See and interact with ruck buddies'),
             const SizedBox(height: 12),
-            _buildBenefit(Icons.emoji_events, 'Earn achievements'),
+            _buildBenefit(Icons.favorite, 'Like & comment on rucks'),
             const SizedBox(height: 12),
-            _buildBenefit(Icons.people, 'Connect with ruck buddies'),
+            _buildBenefit(Icons.local_fire_department, 'Precise calorie tracking (with gender/age)'),
             const SizedBox(height: 12),
-            _buildBenefit(Icons.leaderboard, 'Compete on leaderboards'),
+            _buildBenefit(Icons.emoji_events, 'Earn achievements & compete'),
+            const SizedBox(height: 12),
+            _buildBenefit(Icons.save, 'Save & track all your rucks'),
             const SizedBox(height: 32),
 
             // Sign Up button
