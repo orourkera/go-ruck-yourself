@@ -1960,20 +1960,25 @@ class RuckSessionCompleteResource(Resource):
                                     )
                                     recipient_ids = [u['id'] for u in (sharers_resp.data or []) if u.get('id')]
                                     if recipient_ids:
-                                        device_tokens = get_user_device_tokens(recipient_ids)
-                                        if device_tokens:
-                                            pusher = PushNotificationService()
-                                            title = "🎉 First Ruck!"
-                                            body = f"{rucker_name} just completed their first ruck. Drop a congrats, like or follow!"
-                                            data = {
-                                                'type': 'first_ruck_global',
-                                                'ruck_id': ruck_id,
-                                                'user_id': user_id,
-                                            }
-                                            try:
-                                                pusher.send_notification(device_tokens, title, body, data)
-                                            except Exception as send_err:
-                                                logger.error(f"Failed to send first-ruck notification: {send_err}")
+                                        from RuckTracker.services.notification_manager import notification_manager
+                                        title = "🎉 First Ruck!"
+                                        body = f"{rucker_name} just completed their first ruck. Drop a congrats, like or follow!"
+                                        data = {
+                                            'ruck_id': ruck_id,
+                                            'user_id': user_id,
+                                            'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                                        }
+                                        try:
+                                            notification_manager.send_notification(
+                                                recipients=recipient_ids,
+                                                notification_type='first_ruck_global',
+                                                title=title,
+                                                body=body,
+                                                data=data,
+                                                sender_id=user_id
+                                            )
+                                        except Exception as send_err:
+                                            logger.error(f"Failed to send first-ruck notification: {send_err}")
                                     else:
                                         logger.info("No users with allow_ruck_sharing=true to notify for first ruck")
             except Exception as first_err:

@@ -227,16 +227,18 @@ class NotificationManager:
         else:
             title = f'🏆 {len(achievement_names)} Achievements Unlocked!'
             body = f'You earned: {", ".join(achievement_names[:2])}' + (f' and {len(achievement_names)-2} more!' if len(achievement_names) > 2 else '')
-        
+
         return self.send_notification(
             recipients=[recipient_id],
             notification_type='achievement',
             title=title,
             body=body,
             data={
+                'ruck_id': session_id,  # session_id and ruck_id are the same
                 'session_id': session_id,
                 'achievement_count': str(len(achievement_names)),
-                'achievement_names': ','.join(achievement_names)
+                'achievement_names': ','.join(achievement_names),
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK'
             }
         )
     
