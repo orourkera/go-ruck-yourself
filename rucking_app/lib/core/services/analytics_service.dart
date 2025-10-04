@@ -33,6 +33,13 @@ class AnalyticsService {
   static const String _signUpFailed = 'sign_up_failed';
   static const String _signInCompleted = 'sign_in_completed';
 
+  // Guest Mode Events
+  static const String _guestModeEntered = 'guest_mode_entered';
+  static const String _guestSessionCompleted = 'guest_session_completed';
+  static const String _guestConversionPromptShown = 'guest_conversion_prompt_shown';
+  static const String _guestConvertedToAccount = 'guest_converted_to_account';
+  static const String _guestContinuedAsGuest = 'guest_continued_as_guest';
+
   // Permission Events
   static const String _locationPermissionGranted = 'location_permission_granted';
   static const String _locationPermissionDenied = 'location_permission_denied';
@@ -216,6 +223,47 @@ class AnalyticsService {
     trackEvent(_signInCompleted, {
       'method': method,
       'user_id': userId,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // ============= GUEST MODE TRACKING =============
+
+  /// Track guest mode entry
+  static void trackGuestModeEntered() {
+    trackEvent(_guestModeEntered, {
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Track guest session completion
+  static void trackGuestSessionCompleted({required int sessionNumber}) {
+    trackEvent(_guestSessionCompleted, {
+      'session_number': sessionNumber,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Track guest conversion prompt shown
+  static void trackGuestConversionPromptShown({required int sessionCount}) {
+    trackEvent(_guestConversionPromptShown, {
+      'session_count': sessionCount,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Track guest converted to account
+  static void trackGuestConvertedToAccount({required int migratedSessions}) {
+    trackEvent(_guestConvertedToAccount, {
+      'migrated_sessions': migratedSessions,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Track guest continued as guest
+  static void trackGuestContinuedAsGuest({required int sessionCount}) {
+    trackEvent(_guestContinuedAsGuest, {
+      'session_count': sessionCount,
       'timestamp': DateTime.now().toIso8601String(),
     });
   }

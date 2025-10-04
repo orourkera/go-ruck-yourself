@@ -323,10 +323,74 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     const EventsScreen(),
   ];
 
+  /// Build sign-up prompt screen for locked features
+  Widget _buildSignUpPrompt() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 80,
+              color: AppColors.primary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Sign Up to Unlock',
+              style: AppTextStyles.headlineLarge.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Create a free account to access social features, track your progress, and compete with friends!',
+              style: AppTextStyles.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+              ),
+              onPressed: () {
+                Navigator.of(context).pushReplacementNamed('/login');
+              },
+              child: Text(
+                'Sign Up Now',
+                style: AppTextStyles.buttonText.copyWith(color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 0; // Go back to home tab
+                });
+              },
+              child: Text(
+                'Back to Home',
+                style: TextStyle(color: AppColors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Guest mode: restrict access to tabs other than Home
+    final displayedScreen = (widget.isGuestMode && _selectedIndex != 0)
+        ? _buildSignUpPrompt()
+        : _screens[_selectedIndex];
+
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: displayedScreen,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {

@@ -11,6 +11,7 @@ import 'package:rucking_app/shared/widgets/custom_button.dart';
 import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/utils/error_mapper.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/core/services/analytics_service.dart';
 
 /// Login screen for user authentication
 class LoginScreen extends StatefulWidget {
@@ -330,6 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: () {
                       // Track guest mode entry
+                      AnalyticsService.trackGuestModeEntered();
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(builder: (_) => HomeScreen(isGuestMode: true)),
                       );
