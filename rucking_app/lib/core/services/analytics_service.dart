@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 
 /// Analytics service for tracking user events and funnels
@@ -11,6 +13,10 @@ class AnalyticsService {
     _observer ??= FirebaseAnalyticsObserver(analytics: _analytics);
     return _observer!;
   }
+
+  // App Install & Launch Events
+  static const String _appFirstOpen = 'app_first_open';
+  static const String _appOpen = 'app_open';
 
   // Onboarding Funnel Events
   static const String _onboardingStarted = 'onboarding_started';
@@ -69,6 +75,36 @@ class AnalyticsService {
     } catch (e) {
       AppLogger.error('[ANALYTICS] Failed to set user property: $e');
     }
+  }
+
+  // ============= APP INSTALL & LAUNCH TRACKING =============
+
+  /// Track app first open (for download-to-registration funnel)
+  static Future<void> trackAppFirstOpen() async {
+    try {
+      // Use shared preferences to check if this is truly first open
+      final prefs = await SharedPreferences.getInstance();
+      final hasOpenedBefore = prefs.getBool('has_opened_app_before') ?? false;
+
+      if (!hasOpenedBefore) {
+        trackEvent(_appFirstOpen, {
+          'timestamp': DateTime.now().toIso8601String(),
+          'platform': Platform.isIOS ? 'ios' : 'android',
+        });
+        await prefs.setBool('has_opened_app_before', true);
+      }
+    } catch (e) {
+      AppLogger.error('[ANALYTICS] Failed to track first open: $e');
+    }
+  }
+
+  /// Track app open (every launch)
+  static void trackAppOpen({bool isAuthenticated = false}) {
+    trackEvent(_appOpen, {
+      'timestamp': DateTime.now().toIso8601String(),
+      'is_authenticated': isAuthenticated,
+      'platform': Platform.isIOS ? 'ios' : 'android',
+    });
   }
 
   // ============= ONBOARDING FUNNEL TRACKING =============

@@ -9,6 +9,7 @@ import 'package:rucking_app/core/services/dau_tracking_service.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
 import 'package:rucking_app/core/services/navigation_service.dart';
 import 'package:rucking_app/core/services/firebase_messaging_service.dart';
+import 'package:rucking_app/core/services/analytics_service.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
@@ -104,6 +105,9 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
 
     // Initialize DAU tracking service
     getIt<DauTrackingService>().initialize();
+
+    // Track app first open and regular opens
+    AnalyticsService.trackAppFirstOpen();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FirebaseMessagingService().processPendingInitialMessage();
@@ -507,6 +511,14 @@ class _RuckingAppState extends State<RuckingApp> with WidgetsBindingObserver {
           return BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
               debugPrint('🔄 AuthBloc state changed: ${state.runtimeType}');
+
+              // Track app opens with authentication status
+              if (state is Authenticated) {
+                AnalyticsService.trackAppOpen(isAuthenticated: true);
+              } else if (state is Unauthenticated) {
+                AnalyticsService.trackAppOpen(isAuthenticated: false);
+              }
+
               if (state is Unauthenticated) {
                 // Use WidgetsBinding.instance.addPostFrameCallback to avoid conflicts during rebuild
                 WidgetsBinding.instance.addPostFrameCallback((_) {
