@@ -327,17 +327,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Try without account button
+                  // Browse without account button
                   TextButton(
                     onPressed: () {
-                      // Track guest mode entry
-                      AnalyticsService.trackGuestModeEntered();
+                      // Track browse mode entry
+                      AnalyticsService.trackEvent('browse_mode_entered', {
+                        'timestamp': DateTime.now().toIso8601String(),
+                      });
                       Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => HomeScreen(isGuestMode: true)),
+                        MaterialPageRoute(builder: (_) => HomeScreen(isBrowseMode: true)),
                       );
                     },
                     child: Text(
-                      'Try Without Account',
+                      'Browse Without Account',
                       style: TextStyle(
                         fontFamily: 'Bangers',
                         fontSize: 14,

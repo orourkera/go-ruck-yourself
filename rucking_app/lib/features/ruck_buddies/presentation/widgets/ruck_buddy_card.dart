@@ -16,6 +16,8 @@ import 'package:rucking_app/features/social/presentation/bloc/social_event.dart'
 import 'package:rucking_app/features/social/presentation/bloc/social_state.dart';
 import 'package:rucking_app/features/social/data/repositories/social_repository.dart';
 import 'package:rucking_app/core/services/image_cache_manager.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
+import 'package:rucking_app/shared/widgets/browse_mode_blocker_dialog.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
@@ -322,6 +324,16 @@ class _RuckBuddyCardState extends State<RuckBuddyCard>
 
   void _handleLikeTap() {
     if (_isProcessingLike || _ruckId == null) return;
+
+    // Block action if in browse mode
+    if (BrowseModeProvider.isBrowsing(context)) {
+      BrowseModeBlockerDialog.show(
+        context,
+        action: 'like',
+        actionDescription: 'like rucks',
+      );
+      return;
+    }
 
     try {
       developer.log(

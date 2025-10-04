@@ -36,6 +36,8 @@ import 'package:rucking_app/features/ruck_session/presentation/bloc/active_sessi
 import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
 import 'package:rucking_app/features/profile/presentation/bloc/public_profile_bloc.dart';
 import 'package:rucking_app/core/services/service_locator.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
+import 'package:rucking_app/shared/widgets/browse_mode_blocker_dialog.dart';
 
 class RuckBuddyDetailScreen extends StatefulWidget {
   final RuckBuddy ruckBuddy;
@@ -552,6 +554,16 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   void _handleLikeTap() {
     if (_isProcessingLike) return; // Prevent multiple rapid clicks
 
+    // Block action if in browse mode
+    if (BrowseModeProvider.isBrowsing(context)) {
+      BrowseModeBlockerDialog.show(
+        context,
+        action: 'like',
+        actionDescription: 'like rucks',
+      );
+      return;
+    }
+
     // Trigger strong haptic feedback when like button is tapped
     HapticFeedback.heavyImpact();
 
@@ -580,6 +592,17 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
 
   void _submitComment() {
     if (_commentController.text.trim().isEmpty) return;
+
+    // Block action if in browse mode
+    if (BrowseModeProvider.isBrowsing(context)) {
+      BrowseModeBlockerDialog.show(
+        context,
+        action: 'comment',
+        actionDescription: 'comment on rucks',
+      );
+      _commentController.clear();
+      return;
+    }
 
     // Dispatch AddRuckComment to SocialBloc
     context.read<SocialBloc>().add(

@@ -50,12 +50,11 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/features/social_sharing/services/share_prompt_logic.dart';
-import 'package:rucking_app/features/auth/data/services/guest_session_service.dart';
-import 'package:rucking_app/features/auth/presentation/widgets/guest_limit_dialog.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
 import 'package:rucking_app/features/leaderboard/presentation/screens/leaderboard_screen.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 import 'package:rucking_app/shared/utils/route_privacy_utils.dart';
 import 'package:rucking_app/core/services/duel_completion_service.dart';
 import 'package:rucking_app/core/services/location_service.dart';
@@ -138,9 +137,9 @@ double _getFitZoom(List<LatLng> points) {
 
 /// Main home screen that serves as the central hub of the app
 class HomeScreen extends StatefulWidget {
-  final bool isGuestMode;
+  final bool isBrowseMode;
 
-  const HomeScreen({Key? key, this.isGuestMode = false}) : super(key: key);
+  const HomeScreen({Key? key, this.isBrowseMode = false}) : super(key: key);
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -314,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // List of screens for the bottom navigation bar
   List<Widget> get _screens => [
-    _HomeTab(isGuestMode: widget.isGuestMode),
+    _HomeTab(isBrowseMode: widget.isBrowseMode),
     const SessionHistoryScreen(),
     const PremiumTabInterceptor(
       tabIndex: 2,
@@ -325,8 +324,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     const EventsScreen(),
   ];
 
-  /// Build sign-up prompt screen for locked features
-  Widget _buildSignUpPrompt() {
+  /// Build sign-up prompt for Home tab when in browse mode
+  Widget _buildBrowseModeStartPrompt() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -334,13 +333,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.lock_outline,
+              Icons.directions_run,
               size: 80,
               color: AppColors.primary.withOpacity(0.5),
             ),
             const SizedBox(height: 24),
             Text(
-              'Sign Up to Unlock',
+              'Ready to Start Rucking?',
               style: AppTextStyles.headlineLarge.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -348,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
             Text(
-              'Create a free account to access social features, track your progress, and compete with friends!',
+              'Create a free account to track your rucks, earn achievements, and compete with the community!',
               style: AppTextStyles.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -362,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Navigator.of(context).pushReplacementNamed('/login');
               },
               child: Text(
-                'Sign Up Now',
+                'Sign Up to Start Rucking',
                 style: AppTextStyles.buttonText.copyWith(color: Colors.white),
               ),
             ),
@@ -370,12 +369,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             TextButton(
               onPressed: () {
                 setState(() {
-                  _selectedIndex = 0; // Go back to home tab
+                  _selectedIndex = 2; // Navigate to Ruck Buddies to browse
                 });
               },
               child: Text(
-                'Back to Home',
-                style: TextStyle(color: AppColors.grey),
+                'Browse Ruck Buddies',
+                style: TextStyle(color: AppColors.primary),
               ),
             ),
           ],
@@ -386,14 +385,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Guest mode: restrict access to tabs other than Home
-    final displayedScreen = (widget.isGuestMode && _selectedIndex != 0)
-        ? _buildSignUpPrompt()
+    // Browse mode: replace Home tab with sign-up prompt, allow browsing other tabs
+    final displayedScreen = (widget.isBrowseMode && _selectedIndex == 0)
+        ? _buildBrowseModeStartPrompt()
         : _screens[_selectedIndex];
 
-    return Scaffold(
-      body: displayedScreen,
-      bottomNavigationBar: BottomNavigationBar(
+    return BrowseModeProvider(
+      isBrowseMode: widget.isBrowseMode,
+      child: Scaffold(
+        body: displayedScreen,
+        bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
           debugPrint('🐞 Bottom navigation tapped: $index');
@@ -512,13 +513,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       height: 48,
     );
   }
+      ),
+    );
+  }
 }
 
 /// Home tab content
 class _HomeTab extends StatefulWidget {
-  final bool isGuestMode;
+  final bool isBrowseMode;
 
-  const _HomeTab({Key? key, this.isGuestMode = false}) : super(key: key);
+  const _HomeTab({Key? key, this.isBrowseMode = false}) : super(key: key);
 
   @override
   _HomeTabState createState() => _HomeTabState();
@@ -1374,17 +1378,7 @@ class _HomeTabState extends State<_HomeTab>
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      onPressed: () async {
-                        // Check guest limit before allowing ruck start
-                        if (widget.isGuestMode) {
-                          final canStart = await GuestSessionService.canStartGuestSession();
-                          if (!canStart) {
-                            // Show hard limit dialog
-                            GuestLimitDialog.show(context);
-                            return;
-                          }
-                        }
-
+                      onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(

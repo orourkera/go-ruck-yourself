@@ -63,8 +63,6 @@ import 'package:rucking_app/features/premium/presentation/bloc/premium_bloc.dart
 import 'package:rucking_app/features/premium/presentation/bloc/premium_state.dart';
 import 'package:rucking_app/shared/widgets/stat_row.dart';
 import 'package:rucking_app/features/social_sharing/services/share_prompt_logic.dart';
-import 'package:rucking_app/features/auth/presentation/widgets/guest_conversion_dialog.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Screen displayed after a ruck session is completed, showing summary statistics
 /// and allowing the user to rate and add notes about the session
@@ -84,7 +82,6 @@ class SessionCompleteScreen extends StatefulWidget {
   final bool isManual;
   final int? steps;
   final String? aiCompletionInsight;
-  final bool isGuestMode;
 
   const SessionCompleteScreen({
     super.key,
@@ -103,7 +100,6 @@ class SessionCompleteScreen extends StatefulWidget {
     this.isManual = false,
     this.steps,
     this.aiCompletionInsight,
-    this.isGuestMode = false,
   });
 
   @override
@@ -265,13 +261,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
     if (widget.heartRateSamples != null &&
         widget.heartRateSamples!.isNotEmpty) {
       _setHeartRateSamples(widget.heartRateSamples!);
-    }
-
-    // Show guest conversion dialog if in guest mode
-    if (widget.isGuestMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showGuestConversionDialog();
-      });
     }
 
     // Auto-save the main session data immediately
@@ -1353,37 +1342,6 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
           duration: const Duration(seconds: 3),
         );
       }
-    }
-  }
-
-  /// Show guest conversion dialog to encourage sign-up
-  Future<void> _showGuestConversionDialog() async {
-    if (!mounted) return;
-
-    try {
-      // Check if user has already seen the guest conversion prompt
-      final prefs = await SharedPreferences.getInstance();
-      final hasSeenPrompt = prefs.getBool('has_seen_guest_conversion') ?? false;
-
-      if (!hasSeenPrompt) {
-        await Future.delayed(const Duration(milliseconds: 500)); // Small delay for UI
-        if (!mounted) return;
-
-        final result = await GuestConversionDialog.show(
-          context,
-          onContinueAsGuest: () {
-            // Mark as seen so we don't spam them every time
-            prefs.setBool('has_seen_guest_conversion', true);
-          },
-        );
-
-        // If they chose to continue as guest, mark as seen
-        if (result == false) {
-          prefs.setBool('has_seen_guest_conversion', true);
-        }
-      }
-    } catch (e) {
-      AppLogger.error('[GUEST_CONVERSION] Error showing dialog: $e');
     }
   }
 

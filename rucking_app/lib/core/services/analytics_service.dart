@@ -33,12 +33,10 @@ class AnalyticsService {
   static const String _signUpFailed = 'sign_up_failed';
   static const String _signInCompleted = 'sign_in_completed';
 
-  // Guest Mode Events
-  static const String _guestModeEntered = 'guest_mode_entered';
-  static const String _guestSessionCompleted = 'guest_session_completed';
-  static const String _guestConversionPromptShown = 'guest_conversion_prompt_shown';
-  static const String _guestConvertedToAccount = 'guest_converted_to_account';
-  static const String _guestContinuedAsGuest = 'guest_continued_as_guest';
+  // Browse Mode Events
+  static const String _browseModeEntered = 'browse_mode_entered';
+  static const String _browseActionBlocked = 'browse_action_blocked';
+  static const String _browseConvertedToAccount = 'browse_converted_to_account';
 
   // Permission Events
   static const String _locationPermissionGranted = 'location_permission_granted';
@@ -227,43 +225,27 @@ class AnalyticsService {
     });
   }
 
-  // ============= GUEST MODE TRACKING =============
+  // ============= BROWSE MODE TRACKING =============
 
-  /// Track guest mode entry
-  static void trackGuestModeEntered() {
-    trackEvent(_guestModeEntered, {
+  /// Track browse mode entry
+  static void trackBrowseModeEntered() {
+    trackEvent(_browseModeEntered, {
       'timestamp': DateTime.now().toIso8601String(),
     });
   }
 
-  /// Track guest session completion
-  static void trackGuestSessionCompleted({required int sessionNumber}) {
-    trackEvent(_guestSessionCompleted, {
-      'session_number': sessionNumber,
+  /// Track when browse user tries an action that requires sign-up
+  static void trackBrowseActionBlocked({required String action}) {
+    trackEvent(_browseActionBlocked, {
+      'action': action, // 'like', 'comment', 'join_event', etc.
       'timestamp': DateTime.now().toIso8601String(),
     });
   }
 
-  /// Track guest conversion prompt shown
-  static void trackGuestConversionPromptShown({required int sessionCount}) {
-    trackEvent(_guestConversionPromptShown, {
-      'session_count': sessionCount,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-  }
-
-  /// Track guest converted to account
-  static void trackGuestConvertedToAccount({required int migratedSessions}) {
-    trackEvent(_guestConvertedToAccount, {
-      'migrated_sessions': migratedSessions,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-  }
-
-  /// Track guest continued as guest
-  static void trackGuestContinuedAsGuest({required int sessionCount}) {
-    trackEvent(_guestContinuedAsGuest, {
-      'session_count': sessionCount,
+  /// Track browse user converting to account
+  static void trackBrowseConvertedToAccount({required String triggeredBy}) {
+    trackEvent(_browseConvertedToAccount, {
+      'triggered_by': triggeredBy, // 'like_blocked', 'comment_blocked', etc.
       'timestamp': DateTime.now().toIso8601String(),
     });
   }

@@ -38,8 +38,8 @@ class AiObservabilityService {
 
       await _apiClient.post('/observability/llm', payload);
     } catch (err, stack) {
-      AppLogger.warning('[AI_OBSERVABILITY] Failed to log LLM call: $err',
-          stackTrace: stack);
+      AppLogger.warning('[AI_OBSERVABILITY] Failed to log LLM call: $err');
+      AppLogger.debug('[AI_OBSERVABILITY] stack: $stack');
     }
   }
 
