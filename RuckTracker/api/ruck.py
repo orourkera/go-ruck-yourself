@@ -651,6 +651,18 @@ class RuckSessionDetailResource(Resource):
             if 'elevation_loss_m' in session and session.get('elevation_loss_m') is not None:
                 session.setdefault('elevation_loss_meters', session.get('elevation_loss_m'))
 
+            # Fetch user information for the session owner
+            user_id = session.get('user_id')
+            if user_id:
+                try:
+                    user_resp = supabase.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
+                    if user_resp.data:
+                        session['user'] = user_resp.data
+                except Exception as user_err:
+                    logger.warning(f"[RUCK_DETAILS] Failed to fetch user info for user_id {user_id}: {user_err}")
+                    # Fallback to minimal user info
+                    session['user'] = {'id': user_id, 'username': 'Rucker', 'gender': 'male'}
+
             # Ensure raw likes/comments arrays are not present
             session.pop('likes', None)
             session.pop('comments', None)
