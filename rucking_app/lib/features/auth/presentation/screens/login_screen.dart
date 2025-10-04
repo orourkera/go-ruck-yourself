@@ -324,6 +324,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
+
+                  // Try without account button
+                  TextButton(
+                    onPressed: () {
+                      // Track guest mode entry
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => HomeScreen(isGuestMode: true)),
+                      );
+                    },
+                    child: Text(
+                      'Try Without Account',
+                      style: TextStyle(
+                        fontFamily: 'Bangers',
+                        fontSize: 14,
+                        letterSpacing: 0.5,
+                        color: Colors.grey[600],
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

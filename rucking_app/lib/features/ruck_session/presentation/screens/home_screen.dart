@@ -136,7 +136,9 @@ double _getFitZoom(List<LatLng> points) {
 
 /// Main home screen that serves as the central hub of the app
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final bool isGuestMode;
+
+  const HomeScreen({Key? key, this.isGuestMode = false}) : super(key: key);
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
