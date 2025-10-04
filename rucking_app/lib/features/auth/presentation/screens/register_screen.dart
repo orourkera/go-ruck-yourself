@@ -17,9 +17,6 @@ import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:rucking_app/core/services/analytics_service.dart';
-import 'package:rucking_app/features/auth/data/services/guest_session_service.dart';
-import 'package:rucking_app/core/services/api_client.dart';
-import 'package:get_it/get_it.dart';
 
 /// Screen for registering new users
 class RegisterScreen extends StatefulWidget {
@@ -154,29 +151,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /// Migrate guest sessions after successful registration
-  Future<void> _migrateGuestSessionsIfNeeded() async {
-    try {
-      final guestCount = await GuestSessionService.getGuestSessionCount();
-
-      if (guestCount > 0) {
-        AppLogger.info('[GUEST_MIGRATION] Migrating $guestCount guest sessions');
-
-        final apiClient = GetIt.I<ApiClient>();
-        final success = await GuestSessionService.migrateGuestSessions(apiClient);
-
-        if (success) {
-          AppLogger.info('[GUEST_MIGRATION] Successfully migrated all guest sessions');
-        } else {
-          AppLogger.warning('[GUEST_MIGRATION] Some guest sessions failed to migrate');
-        }
-      }
-    } catch (e) {
-      AppLogger.error('[GUEST_MIGRATION] Error during migration: $e');
-      // Don't block registration flow if migration fails
-    }
-  }
-
   String _friendlyErrorMessage(dynamic error) {
     // Always convert error to a String safely, even if it's null or not a String
     if (error == null) return 'An unknown error occurred.';
@@ -193,9 +167,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          // Migrate guest sessions if any exist
-          _migrateGuestSessionsIfNeeded();
-
           // Force app-wide theme rebuild with the new user settings
           // This ensures gender-based theme is applied immediately after registration
           Future.delayed(Duration.zero, () {
