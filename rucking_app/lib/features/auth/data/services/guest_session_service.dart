@@ -7,6 +7,7 @@ import 'package:rucking_app/core/services/api_client.dart';
 class GuestSessionService {
   static const String _guestSessionsKey = 'guest_sessions';
   static const String _guestSessionCountKey = 'guest_session_count';
+  static const int maxGuestSessions = 2; // Hard limit: 2 rucks as guest
 
   /// Save a guest session to local storage
   static Future<void> saveGuestSession(Map<String, dynamic> sessionData) async {
@@ -114,5 +115,17 @@ class GuestSessionService {
   static Future<bool> isGuestMode() async {
     final count = await getGuestSessionCount();
     return count > 0;
+  }
+
+  /// Check if guest has reached the session limit
+  static Future<bool> hasReachedGuestLimit() async {
+    final count = await getGuestSessionCount();
+    return count >= maxGuestSessions;
+  }
+
+  /// Check if guest can start another session
+  static Future<bool> canStartGuestSession() async {
+    final count = await getGuestSessionCount();
+    return count < maxGuestSessions;
   }
 }

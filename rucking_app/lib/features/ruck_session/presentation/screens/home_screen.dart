@@ -50,6 +50,8 @@ import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dar
 import 'package:rucking_app/core/services/session_cache_service.dart';
 import 'package:rucking_app/core/services/app_startup_service.dart';
 import 'package:rucking_app/features/social_sharing/services/share_prompt_logic.dart';
+import 'package:rucking_app/features/auth/data/services/guest_session_service.dart';
+import 'package:rucking_app/features/auth/presentation/widgets/guest_limit_dialog.dart';
 import 'package:rucking_app/core/services/api_client.dart';
 import 'package:rucking_app/features/statistics/presentation/screens/statistics_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/events_screen.dart';
@@ -311,8 +313,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   // List of screens for the bottom navigation bar
-  final List<Widget> _screens = [
-    const _HomeTab(),
+  List<Widget> get _screens => [
+    _HomeTab(isGuestMode: widget.isGuestMode),
     const SessionHistoryScreen(),
     const PremiumTabInterceptor(
       tabIndex: 2,
@@ -514,7 +516,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
 /// Home tab content
 class _HomeTab extends StatefulWidget {
-  const _HomeTab({Key? key}) : super(key: key);
+  final bool isGuestMode;
+
+  const _HomeTab({Key? key, this.isGuestMode = false}) : super(key: key);
 
   @override
   _HomeTabState createState() => _HomeTabState();
@@ -1370,7 +1374,17 @@ class _HomeTabState extends State<_HomeTab>
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      onPressed: () {
+                      onPressed: () async {
+                        // Check guest limit before allowing ruck start
+                        if (widget.isGuestMode) {
+                          final canStart = await GuestSessionService.canStartGuestSession();
+                          if (!canStart) {
+                            // Show hard limit dialog
+                            GuestLimitDialog.show(context);
+                            return;
+                          }
+                        }
+
                         Navigator.push(
                           context,
                           MaterialPageRoute(
