@@ -354,6 +354,31 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     return Scaffold(
       body: Column(
         children: [
+          // Demo data banner for browse mode
+          if (BrowseModeProvider.isGlobalBrowseMode)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: Colors.blue[50],
+              child: Column(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Preview Mode - Sample statistics',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.blue[900],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sign up to see your real progress!',
+                    style: AppTextStyles.bodySmall.copyWith(color: Colors.blue[700]),
+                  ),
+                ],
+              ),
+            ),
           // Tab bar directly without AppBar
           Container(
             color: AppColors.primary,
