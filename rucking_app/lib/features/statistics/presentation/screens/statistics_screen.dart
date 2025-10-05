@@ -9,6 +9,8 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/core/utils/measurement_utils.dart';
 import 'package:rucking_app/core/utils/app_logger.dart';
 import 'package:rucking_app/features/statistics/presentation/widgets/ruck_stats_chart.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
+import 'package:rucking_app/core/data/demo_data.dart';
 
 /// Screen for displaying statistics and analytics
 class StatisticsScreen extends StatefulWidget {
@@ -55,6 +57,20 @@ class _StatisticsScreenState extends State<StatisticsScreen>
 
   /// Fetch statistics data from API
   Future<void> _fetchStatistics() async {
+    // Use demo data for browse mode
+    if (BrowseModeProvider.isGlobalBrowseMode) {
+      setState(() {
+        _weeklyStats = DemoData.getDemoWeeklyStats();
+        _monthlyStats = DemoData.getDemoMonthlyStats();
+        _yearlyStats = DemoData.getDemoMonthlyStats(); // Use same for yearly
+        _isLoadingWeekly = false;
+        _isLoadingMonthly = false;
+        _isLoadingYearly = false;
+        _hasLoadedData = true;
+      });
+      return;
+    }
+
     AppLogger.info('[STATS_SCREEN] Starting to fetch statistics data');
 
     try {
