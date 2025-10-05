@@ -22,10 +22,9 @@ class LeaderboardResource(Resource):
     def get(self):
         """Get leaderboard data with sorting, pagination, and search"""
         try:
-            # Get authenticated user
-            if not hasattr(g, 'user') or g.user is None:
-                return {'error': 'Authentication required'}, 401
-            
+            # Get authenticated user (optional for browse mode)
+            current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
+
             # Parse query parameters - match frontend default
             sort_by = request.args.get('sortBy', 'distance')
             ascending = request.args.get('ascending', 'false').lower() == 'true'
@@ -35,24 +34,27 @@ class LeaderboardResource(Resource):
             offset = int(request.args.get('offset', 0))
             search = request.args.get('search', '').strip()
             time_period = request.args.get('timePeriod', 'all_time')
-            
+
             # Validate sort_by parameter
             valid_sorts = ['powerPoints', 'rucks', 'distance', 'elevation', 'calories']
             if sort_by not in valid_sorts:
                 sort_by = 'powerPoints'
-            
+
             # Build cache key with enforced pagination
-            cache_key = f"leaderboard:{sort_by}:{ascending}:{limit}:{offset}:{search}:{time_period}"
+            cache_key = f"leaderboard:{sort_by}:{ascending}:{limit}:{offset}:{search}:{time_period}:browse"
             cache_service = get_cache_service()
-            
+
             # Try to get from cache first (cache for 5 minutes)
             cached_result = cache_service.get(cache_key)
             if cached_result:
                 logger.debug(f"Returning cached leaderboard data for key: {cache_key}")
                 return cached_result
-            
-            # Use authenticated client with proper RLS for security
-            supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+            # Use admin client for browse mode, authenticated for logged-in users
+            if current_user_id:
+                supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            else:
+                supabase: Client = get_supabase_admin_client()
             logger.debug(f"Using authenticated client with RLS: {type(supabase)}")
             
             # Build the query - this is where the magic happens!
