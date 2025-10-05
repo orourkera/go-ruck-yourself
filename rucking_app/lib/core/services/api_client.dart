@@ -452,6 +452,7 @@ class ApiClient {
         '/public/',
         '/leaderboard',
         '/events',
+        '/achievements', // Allow browse mode to view achievements
       ];
 
       final List<String> authOverrides = [
