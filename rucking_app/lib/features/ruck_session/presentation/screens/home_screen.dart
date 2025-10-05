@@ -362,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               },
               child: Text(
                 'Sign Up to Start Rucking',
-                style: AppTextStyles.buttonText.copyWith(color: Colors.white),
+                style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
               ),
             ),
             const SizedBox(height: 16),
@@ -395,87 +395,88 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Scaffold(
         body: displayedScreen,
         bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          debugPrint('🐞 Bottom navigation tapped: $index');
-          setState(() {
-            _selectedIndex = index;
-          });
-          // Add a post-render check to verify the screen changed
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            debugPrint('🐞 Selected index after render: $_selectedIndex');
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: AppColors.grey,
-        items: [
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/home.png',
-              width: 48,
-              height: 48,
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            debugPrint('🐞 Bottom navigation tapped: $index');
+            setState(() {
+              _selectedIndex = index;
+            });
+            // Add a post-render check to verify the screen changed
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              debugPrint('🐞 Selected index after render: $_selectedIndex');
+            });
+          },
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Theme.of(context).primaryColor,
+          unselectedItemColor: AppColors.grey,
+          items: [
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/images/home.png',
+                width: 48,
+                height: 48,
+              ),
+              activeIcon: Image.asset(
+                'assets/images/home_active.png',
+                width: 48,
+                height: 48,
+              ),
+              label: 'Home',
             ),
-            activeIcon: Image.asset(
-              'assets/images/home_active.png',
-              width: 48,
-              height: 48,
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/images/history.png',
+                width: 48,
+                height: 48,
+              ),
+              activeIcon: Image.asset(
+                'assets/images/history_active.png',
+                width: 48,
+                height: 48,
+              ),
+              label: 'History',
             ),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/history.png',
-              width: 48,
-              height: 48,
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/images/ruckbuddies.png',
+                width: 48,
+                height: 48,
+              ),
+              activeIcon: Image.asset(
+                'assets/images/ruckbuddies_active.png',
+                width: 48,
+                height: 48,
+              ),
+              label: 'Buddies',
             ),
-            activeIcon: Image.asset(
-              'assets/images/history_active.png',
-              width: 48,
-              height: 48,
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/images/duels icon.png',
+                width: 48,
+                height: 48,
+              ),
+              activeIcon: Image.asset(
+                'assets/images/duels active.png',
+                width: 48,
+                height: 48,
+              ),
+              label: 'Ruckers',
             ),
-            label: 'History',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/ruckbuddies.png',
-              width: 48,
-              height: 48,
+            BottomNavigationBarItem(
+              icon: Image.asset(
+                'assets/images/events.png',
+                width: 48,
+                height: 48,
+              ),
+              activeIcon: Image.asset(
+                'assets/images/events active.png',
+                width: 48,
+                height: 48,
+              ),
+              label: 'Events',
             ),
-            activeIcon: Image.asset(
-              'assets/images/ruckbuddies_active.png',
-              width: 48,
-              height: 48,
-            ),
-            label: 'Buddies',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/duels icon.png',
-              width: 48,
-              height: 48,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/duels active.png',
-              width: 48,
-              height: 48,
-            ),
-            label: 'Ruckers',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/events.png',
-              width: 48,
-              height: 48,
-            ),
-            activeIcon: Image.asset(
-              'assets/images/events active.png',
-              width: 48,
-              height: 48,
-            ),
-            label: 'Events',
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -511,9 +512,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       iconPath,
       width: 48,
       height: 48,
-    );
-  }
-      ),
     );
   }
 }

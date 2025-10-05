@@ -21,6 +21,7 @@ import '../../features/notifications/util/notification_navigation.dart';
 import '../../features/notifications/domain/entities/app_notification.dart';
 import '../../features/notifications/presentation/bloc/notification_event.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/live_following/services/voice_message_player.dart';
 
 /// Service for handling Firebase Cloud Messaging (FCM) push notifications
 class FirebaseMessagingService {
@@ -390,8 +391,30 @@ class FirebaseMessagingService {
   /// Handle foreground messages (when app is open)
   void _handleForegroundMessage(RemoteMessage message) {
     AppLogger.debug('Received foreground message: ${message.messageId}');
+
+    // Special handling for voice messages - auto-play audio
+    final messageType = message.data['type'];
+    if (messageType == 'ruck_message') {
+      _handleVoiceMessage(message);
+    }
+
     _showLocalNotification(message);
     _triggerImmediateRefresh();
+  }
+
+  /// Handle voice message - auto-play audio
+  void _handleVoiceMessage(RemoteMessage message) {
+    try {
+      final audioUrl = message.data['audio_url'];
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        AppLogger.info('[VOICE_MESSAGE] Auto-playing voice message');
+        VoiceMessagePlayer().playMessageAudio(audioUrl);
+      } else {
+        AppLogger.warning('[VOICE_MESSAGE] No audio URL in message');
+      }
+    } catch (e) {
+      AppLogger.error('[VOICE_MESSAGE] Error playing voice message: $e');
+    }
   }
 
   /// Show local notification for foreground messages

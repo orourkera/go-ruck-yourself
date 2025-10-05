@@ -532,7 +532,9 @@ app.register_blueprint(gear_referral_bp, url_prefix='/api')
 
 # Ruck Messages (Live Following)
 from RuckTracker.api.ruck_messages import ruck_messages_bp
+from RuckTracker.api.live_following import live_following_bp
 app.register_blueprint(ruck_messages_bp, url_prefix='/api')
+app.register_blueprint(live_following_bp, url_prefix='/api')
 import os as _os
 if _os.environ.get('GEAR_AMAZON_ENABLED', 'false').lower() == 'true':
     from RuckTracker.api.amazon import amazon_bp
