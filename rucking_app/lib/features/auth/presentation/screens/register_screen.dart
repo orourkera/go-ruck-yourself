@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:rucking_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:rucking_app/features/ruck_session/presentation/screens/home_screen.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
