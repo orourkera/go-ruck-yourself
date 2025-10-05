@@ -519,7 +519,7 @@ class AICheerleaderLogResource(Resource):
             try:
                 model_name = os.getenv(
                     'OPENAI_CHEERLEADER_MODEL',
-                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5'),
+                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o-mini'),  # Fast, cheap model for cheerleader
                 )
 
                 # Track timing for Arize
@@ -534,7 +534,7 @@ class AICheerleaderLogResource(Resource):
                     ],
                     max_completion_tokens=120,  # Increased for 2-3 sentences
                     temperature=0.7,
-                    timeout=5.0  # 5 second timeout for API call
+                    timeout=15.0  # Increased timeout for GPT-5 reasoning
                 )
 
                 latency_ms = (time.time() - start_time) * 1000
