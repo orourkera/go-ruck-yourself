@@ -14,6 +14,7 @@ import 'package:rucking_app/features/achievements/presentation/widgets/achieveme
 import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/features/coaching/presentation/screens/plan_creation_screen.dart';
 import 'package:rucking_app/features/coaching/data/services/coaching_service.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 
 /// Achievements Hub Screen - Main screen for viewing and tracking achievements
 class AchievementsHubScreen extends StatefulWidget {
@@ -87,10 +88,14 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         context
             .read<AchievementBloc>()
             .add(LoadAchievements(unitPreference: unitPreference));
-        context.read<AchievementBloc>().add(LoadUserAchievements(userId));
-        context
-            .read<AchievementBloc>()
-            .add(LoadAchievementStats(userId, unitPreference: unitPreference));
+
+        // Only load user-specific data if not in browse mode
+        if (!BrowseModeProvider.isGlobalBrowseMode) {
+          context.read<AchievementBloc>().add(LoadUserAchievements(userId));
+          context
+              .read<AchievementBloc>()
+              .add(LoadAchievementStats(userId, unitPreference: unitPreference));
+        }
       }
     } catch (e) {
       debugPrint('🏆 [AchievementsHub] Error loading unit preference: $e');
@@ -99,10 +104,14 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
         context
             .read<AchievementBloc>()
             .add(const LoadAchievements(unitPreference: 'standard'));
-        context.read<AchievementBloc>().add(LoadUserAchievements(userId));
-        context
-            .read<AchievementBloc>()
-            .add(LoadAchievementStats(userId, unitPreference: 'standard'));
+
+        // Only load user-specific data if not in browse mode
+        if (!BrowseModeProvider.isGlobalBrowseMode) {
+          context.read<AchievementBloc>().add(LoadUserAchievements(userId));
+          context
+              .read<AchievementBloc>()
+              .add(LoadAchievementStats(userId, unitPreference: 'standard'));
+        }
       }
     }
   }
