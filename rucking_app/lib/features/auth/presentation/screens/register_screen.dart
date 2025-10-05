@@ -693,8 +693,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Center(
                       child: TextButton(
                         onPressed: () {
-                          Navigator.of(context)
-                              .pop(); // Go back to login screen
+                          // Navigate to login screen (use pushReplacement since we might have come from browse mode)
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (_) => LoginScreen()),
+                          );
                         },
                         child: Text(
                           'Already have an account? Sign In',
