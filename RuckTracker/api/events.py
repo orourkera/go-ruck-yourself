@@ -2,7 +2,7 @@
 Events API endpoints for event management, participation, comments, and progress tracking
 """
 import logging
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from flask_restful import Api, Resource
 from RuckTracker.api.auth import auth_required, get_user_id
 from datetime import datetime, timedelta, timezone
