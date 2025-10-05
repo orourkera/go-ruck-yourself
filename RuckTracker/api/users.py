@@ -140,12 +140,25 @@ def get_following(user_id):
                     check_res = get_supabase_client().table('user_follows').select('id').eq('follower_id', current_user_id).eq('followed_id', f['followed_id']).execute()
                     is_following = bool(check_res.data)
             
+            # Check if this user has an active ruck with live following enabled
+            active_ruck_res = get_supabase_client().table('ruck_session').select('id, allow_live_following').eq(
+                'user_id', f['followed_id']
+            ).eq('status', 'active').execute()
+
+            active_ruck_id = None
+            allow_live_following = False
+            if active_ruck_res.data:
+                active_ruck_id = str(active_ruck_res.data[0]['id'])
+                allow_live_following = active_ruck_res.data[0].get('allow_live_following', False)
+
             following.append({
                 'id': f['followed_id'],
                 'username': f['user']['username'],
                 'avatarUrl': f['user']['avatar_url'],
                 'isFollowing': is_following,
-                'followedAt': f['created_at']
+                'followedAt': f['created_at'],
+                'activeRuckId': active_ruck_id,
+                'allowLiveFollowing': allow_live_following
             })
         has_more = len(following) == per_page
         return api_response({'following': following, 'pagination': {'page': page, 'hasMore': has_more}})
