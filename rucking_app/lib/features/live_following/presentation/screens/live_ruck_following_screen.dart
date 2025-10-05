@@ -221,7 +221,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
 
                 // Message input
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   color: Theme.of(context).scaffoldBackgroundColor,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,20 +233,28 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                           labelText: 'Voice',
                           prefixIcon: Icon(Icons.record_voice_over),
                           border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                         ),
+                        isExpanded: true,
                         items: _voiceOptions.map((voice) {
                           return DropdownMenuItem(
                             value: voice['id'],
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(voice['name']!),
-                                Text(
-                                  voice['desc']!,
-                                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                ),
-                              ],
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    voice['name']!,
+                                    style: const TextStyle(fontSize: 15),
+                                  ),
+                                  Text(
+                                    voice['desc']!,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         }).toList(),
@@ -257,6 +265,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                             });
                           }
                         },
+                        menuMaxHeight: 300,
                       ),
                       const SizedBox(height: 12),
 
