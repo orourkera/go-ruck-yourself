@@ -512,6 +512,33 @@ class _AchievementsHubScreenState extends State<AchievementsHubScreen>
     }
 
     if (state is AchievementsError) {
+      // In browse mode, show helpful message instead of error
+      if (BrowseModeProvider.isGlobalBrowseMode) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.emoji_events, size: 64, color: AppColors.primary.withOpacity(0.5)),
+                const SizedBox(height: 16),
+                Text(
+                  'Achievements Await!',
+                  style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sign up to unlock achievements, track your progress, and earn rewards as you ruck!',
+                  style: AppTextStyles.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
