@@ -700,7 +700,7 @@ Return JSON format: {"title": "...", "body": "..."}"""
 
             # Track timing for Arize
             start_time = time.time()
-            model_name = os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5'))
+            model_name = os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o-mini'))
 
             response = create_chat_completion(
                 client,
@@ -710,7 +710,8 @@ Return JSON format: {"title": "...", "body": "..."}"""
                     {"role": "user", "content": user_prompt}
                 ],
                 max_completion_tokens=150,
-                temperature=0.7
+                temperature=0.7,
+                timeout=15.0
             )
 
             latency_ms = (time.time() - start_time) * 1000
@@ -850,7 +851,7 @@ Return JSON format: {"title": "...", "body": "..."}"""
 
             # Track timing for Arize
             start_time = time.time()
-            model_name = os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-5')
+            model_name = os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-4o-mini')
 
             response = create_chat_completion(
                 client,
@@ -860,7 +861,8 @@ Return JSON format: {"title": "...", "body": "..."}"""
                     {"role": "user", "content": user_prompt}
                 ],
                 max_completion_tokens=150,
-                temperature=0.7
+                temperature=0.7,
+                timeout=15.0
             )
 
             latency_ms = (time.time() - start_time) * 1000

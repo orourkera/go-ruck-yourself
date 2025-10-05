@@ -552,7 +552,7 @@ class AICheerleaderLogResource(Resource):
                         response=ai_message,
                         latency_ms=latency_ms,
                         user_id=user_id,
-                        session_id=request_body.get('session_id'),
+                        session_id=current_session.get('id'),
                         context_type='ai_cheerleader',
                         prompt_tokens=completion.usage.prompt_tokens if completion.usage else None,
                         completion_tokens=completion.usage.completion_tokens if completion.usage else None,

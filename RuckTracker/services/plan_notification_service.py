@@ -842,12 +842,23 @@ class PlanNotificationService:
             ctx['weather_summary'] = prefs.get('weather_summary')
 
         if session_payload:
+            prefer_metric = prefs.get('prefer_metric', True)
             if session_payload.get('distance_km') is not None:
-                ctx['distance_label'] = f"{session_payload['distance_km']:.1f} km"
+                dist_km = session_payload['distance_km']
+                if prefer_metric:
+                    ctx['distance_label'] = f"{dist_km:.1f} km"
+                else:
+                    dist_mi = dist_km * 0.621371
+                    ctx['distance_label'] = f"{dist_mi:.1f} mi"
             if session_payload.get('duration_minutes') is not None:
                 ctx['duration_minutes'] = session_payload['duration_minutes']
             if session_payload.get('ruck_weight_kg') is not None:
-                ctx['load_label'] = f"{session_payload['ruck_weight_kg']:.1f} kg"
+                weight_kg = session_payload['ruck_weight_kg']
+                if prefer_metric:
+                    ctx['load_label'] = f"{weight_kg:.1f} kg"
+                else:
+                    weight_lbs = weight_kg * 2.20462
+                    ctx['load_label'] = f"{weight_lbs:.1f} lbs"
             if session_payload.get('adherence_score') is not None:
                 ctx['adherence_percent'] = round(float(session_payload['adherence_score']) * 100)
             if session_payload.get('next_tip'):

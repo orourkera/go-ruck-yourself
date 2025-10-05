@@ -426,15 +426,21 @@ class LeaderboardMyRankResource(Resource):
                 
                 # Get user IDs for manual session query
                 user_ids = [user['id'] for user in response.data]
-                
+
+                if not user_ids:
+                    logger.debug('My-rank manual fallback has no user IDs; returning empty rank')
+                    return {'rank': None}
+
                 # Query ruck sessions separately
                 sessions_query = supabase.table('ruck_session').select(
                     'id, user_id, power_points, distance_km, completed_at, '
                     'elevation_gain_m, calories_burned'
                 ).in_('user_id', user_ids)
-                
+
                 sessions_response = sessions_query.execute()
-                logger.debug(f"My-rank manual sessions query returned: {len(sessions_response.data)} sessions")
+                logger.debug(
+                    f"My-rank manual sessions query returned: {len(sessions_response.data)} sessions"
+                )
                 
                 # Group sessions by user_id
                 sessions_by_user = {}
