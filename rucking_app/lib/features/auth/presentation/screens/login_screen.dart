@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                     child: Text(
-                      'Browse Without Account',
+                      'Take a Look Around First',
                       style: TextStyle(
                         fontFamily: 'Bangers',
                         fontSize: 14,
