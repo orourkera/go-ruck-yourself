@@ -24,9 +24,13 @@ class BrowseModeBlockerDialog extends StatelessWidget {
     // Track blocked action
     AnalyticsService.trackBrowseActionBlocked(action: action);
 
-    return showDialog<void>(
+    return showModalBottomSheet<void>(
       context: context,
-      builder: (context) => BrowseModeBlockerDialog(
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => BrowseModeBlockerDialog(
         action: action,
         actionDescription: actionDescription ?? 'perform this action',
       ),
@@ -35,15 +39,21 @@ class BrowseModeBlockerDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             Icon(
               Icons.lock_outline,
               size: 60,
@@ -72,11 +82,12 @@ class BrowseModeBlockerDialog extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () {
-                  // Track conversion
-                  AnalyticsService.trackBrowseConvertedToAccount(triggeredBy: action);
+                  AnalyticsService.trackBrowseConvertedToAccount(
+                    triggeredBy: action,
+                  );
 
                   Navigator.of(context).pop();
-                  Navigator.of(context).pushReplacement(
+                  Navigator.of(context, rootNavigator: true).pushReplacement(
                     MaterialPageRoute(builder: (_) => RegisterScreen()),
                   );
                 },

@@ -12,6 +12,7 @@ import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/utils/error_mapper.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/core/services/analytics_service.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 
 /// Login screen for user authentication
 class LoginScreen extends StatefulWidget {
@@ -29,6 +30,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordFocusNode = FocusNode();
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    BrowseModeProvider.setBrowseMode(false);
+  }
 
   @override
   void dispose() {
@@ -161,6 +168,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ],
+
+                  // Browse without account button (after social options)
+                  TextButton(
+                    onPressed: () {
+                      AnalyticsService.trackEvent('browse_mode_entered', {
+                        'timestamp': DateTime.now().toIso8601String(),
+                      });
+                      BrowseModeProvider.setBrowseMode(true);
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => HomeScreen(isBrowseMode: true),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'Browse Without Account',
+                      style: TextStyle(
+                        fontFamily: 'Bangers',
+                        fontSize: 14,
+                        letterSpacing: 0.5,
+                        color: AppColors.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
 
                   // OR divider
@@ -324,30 +356,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Browse without account button
-                  TextButton(
-                    onPressed: () {
-                      // Track browse mode entry
-                      AnalyticsService.trackEvent('browse_mode_entered', {
-                        'timestamp': DateTime.now().toIso8601String(),
-                      });
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => HomeScreen(isBrowseMode: true)),
-                      );
-                    },
-                    child: Text(
-                      'Browse Without Account',
-                      style: TextStyle(
-                        fontFamily: 'Bangers',
-                        fontSize: 14,
-                        letterSpacing: 0.5,
-                        color: Colors.grey[600],
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
                   ),
                 ],
               ),

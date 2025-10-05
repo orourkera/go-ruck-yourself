@@ -21,6 +21,8 @@ import 'package:rucking_app/shared/widgets/custom_text_field.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
+import 'package:rucking_app/shared/widgets/browse_mode_blocker_dialog.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 import 'package:rucking_app/core/error_messages.dart';
 import 'package:flutter/services.dart';
 import 'package:rucking_app/features/ruck_session/domain/models/ruck_session.dart';
@@ -305,18 +307,22 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   void _createSession() async {
     if (_formKey.currentState!.validate()) {
       String? ruckId; // Declare ruckId variable at function scope
+      if (BrowseModeProvider.isGlobalBrowseMode) {
+        BrowseModeBlockerDialog.show(
+          context,
+          action: 'start',
+          actionDescription: 'start a ruck session',
+        );
+        return;
+      }
+
       final authState = context.read<AuthBloc>().state;
       if (authState is! Authenticated) {
-        StyledSnackBar.showError(
-          context: context,
-          message: 'You must be logged in to create a session',
-          duration: const Duration(seconds: 3),
+        BrowseModeBlockerDialog.show(
+          context,
+          action: 'start',
+          actionDescription: 'start a ruck session',
         );
-        // Navigate to login screen after a brief delay
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (!mounted) return;
-          Navigator.of(context).pushNamed('/login');
-        });
         return;
       }
 

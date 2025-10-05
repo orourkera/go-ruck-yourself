@@ -18,6 +18,9 @@ import 'package:rucking_app/features/premium/presentation/widgets/premium_tab_in
 import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
+import 'package:rucking_app/core/data/demo_data.dart';
+import 'package:rucking_app/shared/widgets/browse_mode_blocker_dialog.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({Key? key}) : super(key: key);
@@ -96,6 +99,12 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen>
     final authState = context.read<AuthBloc>().state;
     final bool preferMetric =
         authState is Authenticated ? authState.user.preferMetric : true;
+
+    // Show demo data for browse mode
+    if (BrowseModeProvider.isBrowsing(context)) {
+      final demoSessions = DemoData.getDemoSessions();
+      return _buildDemoHistoryView(demoSessions, preferMetric);
+    }
 
     return RefreshIndicator(
       key: _refreshKey,
@@ -314,6 +323,64 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDemoHistoryView(List<RuckSession> demoSessions, bool preferMetric) {
+    return Column(
+      children: [
+        // Banner explaining this is demo data
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          color: Colors.blue[50],
+          child: Column(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+              const SizedBox(height: 4),
+              Text(
+                'Preview Mode - This is sample data',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.blue[900],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Sign up to track your own rucks!',
+                style: AppTextStyles.bodySmall.copyWith(color: Colors.blue[700]),
+              ),
+            ],
+          ),
+        ),
+        // Demo sessions list
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: demoSessions.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Opacity(
+                  opacity: 0.7, // Slightly faded to indicate demo
+                  child: SessionCard(
+                    session: demoSessions[index],
+                    onTap: () {
+                      // Show sign-up dialog instead of navigating
+                      BrowseModeBlockerDialog.show(
+                        context,
+                        action: 'view_session_detail',
+                        actionDescription: 'view full session details',
+                      );
+                    },
+                    onDelete: null, // Can't delete demo data
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

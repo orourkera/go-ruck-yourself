@@ -325,8 +325,11 @@ class _RuckBuddyCardState extends State<RuckBuddyCard>
   void _handleLikeTap() {
     if (_isProcessingLike || _ruckId == null) return;
 
+    final bool browsing = BrowseModeProvider.isBrowsing(context) ||
+        BrowseModeProvider.isGlobalBrowseMode;
+
     // Block action if in browse mode
-    if (BrowseModeProvider.isBrowsing(context)) {
+    if (browsing) {
       BrowseModeBlockerDialog.show(
         context,
         action: 'like',

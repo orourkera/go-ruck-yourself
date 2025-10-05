@@ -447,8 +447,24 @@ class ApiClient {
       // Determine if this request should include an auth token.
       // By default, ALL API routes require authentication unless they are
       // explicitly public (e.g. /auth/*, /public/*, /users/register).
-      final bool isPublicEndpoint =
-          endpoint.startsWith('/auth/') || endpoint == '/users/register';
+      final List<String> publicPrefixes = [
+        '/auth/',
+        '/public/',
+        '/leaderboard',
+        '/events',
+      ];
+
+      final List<String> authOverrides = [
+        '/leaderboard/my-rank',
+      ];
+
+      bool isPublicEndpoint = endpoint == '/users/register';
+      if (!isPublicEndpoint) {
+        isPublicEndpoint = publicPrefixes.any((prefix) => endpoint.startsWith(prefix));
+      }
+      if (authOverrides.any((prefix) => endpoint.startsWith(prefix))) {
+        isPublicEndpoint = false;
+      }
 
       if (!isPublicEndpoint) {
         final hasToken = await _ensureAuthToken();

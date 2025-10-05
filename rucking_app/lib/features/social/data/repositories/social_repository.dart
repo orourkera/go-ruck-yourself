@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:rucking_app/core/services/auth_service_consolidated.dart';
 import 'package:rucking_app/core/services/app_error_handler.dart';
 import 'package:rucking_app/core/config/app_config.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 
 import 'package:rucking_app/features/social/domain/models/ruck_like.dart';
 import 'package:rucking_app/features/social/domain/models/ruck_comment.dart';
@@ -430,17 +431,20 @@ class SocialRepository {
   Future<List<RuckComment>> getRuckComments(String ruckId) async {
     try {
       final token = await _authToken;
-      if (token == null) {
+      final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      if (token == null && !BrowseModeProvider.isGlobalBrowseMode) {
         throw UnauthorizedException(message: 'User is not authenticated');
       }
 
-      final endpoint = '${AppConfig.apiBaseUrl}/rucks/$ruckId/comments';
       final response = await _httpClient.get(
         Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -465,6 +469,9 @@ class SocialRepository {
           return [];
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
+        if (BrowseModeProvider.isGlobalBrowseMode) {
+          return [];
+        }
         throw UnauthorizedException(message: 'Unauthorized request');
       } else if (response.statusCode == 404) {
         clearCommentsCache(ruckId);

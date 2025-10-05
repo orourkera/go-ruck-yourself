@@ -554,8 +554,11 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   void _handleLikeTap() {
     if (_isProcessingLike) return; // Prevent multiple rapid clicks
 
+    final bool browsing = BrowseModeProvider.isBrowsing(context) ||
+        BrowseModeProvider.isGlobalBrowseMode;
+
     // Block action if in browse mode
-    if (BrowseModeProvider.isBrowsing(context)) {
+    if (browsing) {
       BrowseModeBlockerDialog.show(
         context,
         action: 'like',
@@ -593,8 +596,11 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
   void _submitComment() {
     if (_commentController.text.trim().isEmpty) return;
 
+    final bool browsing = BrowseModeProvider.isBrowsing(context) ||
+        BrowseModeProvider.isGlobalBrowseMode;
+
     // Block action if in browse mode
-    if (BrowseModeProvider.isBrowsing(context)) {
+    if (browsing) {
       BrowseModeBlockerDialog.show(
         context,
         action: 'comment',
@@ -1199,7 +1205,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                           ),
 
                           // Comment input - only show when not in edit mode
-                          if (!_isEditingComment)
+                          if (!_isEditingComment &&
+                              !BrowseModeProvider.isGlobalBrowseMode)
                             Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Row(
@@ -1239,7 +1246,8 @@ class _RuckBuddyDetailScreenState extends State<RuckBuddyDetailScreen> {
                             ),
 
                           // Custom comment edit input when in edit mode
-                          if (_isEditingComment)
+                          if (_isEditingComment &&
+                              !BrowseModeProvider.isGlobalBrowseMode)
                             Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(

@@ -8,6 +8,7 @@ import 'package:rucking_app/features/social/data/repositories/social_repository.
 import 'package:rucking_app/core/error/exceptions.dart';
 import 'package:rucking_app/features/social/domain/models/ruck_like.dart';
 import 'package:rucking_app/features/social/domain/models/ruck_comment.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 
 /// BLoC for managing social interactions (likes, comments)
 class SocialBloc extends Bloc<SocialEvent, SocialState> {
@@ -245,8 +246,9 @@ class SocialBloc extends Bloc<SocialEvent, SocialState> {
         _updateCommentCount(event.ruckId, comments.length, emit);
       }
     } on UnauthorizedException {
-      // Only emit error if we didn't already show cached comments
-      if (cachedComments == null) {
+      if (BrowseModeProvider.isGlobalBrowseMode) {
+        emit(CommentsLoaded(comments: cachedComments ?? [], ruckId: event.ruckId));
+      } else if (cachedComments == null) {
         emit(CommentsError('Authentication error'));
       }
     } on ServerException {

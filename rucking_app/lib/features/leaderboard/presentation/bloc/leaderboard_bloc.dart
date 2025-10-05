@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
 import '../../data/repositories/leaderboard_repository.dart';
 import '../../data/models/leaderboard_user_model.dart';
 import 'leaderboard_event.dart';
@@ -382,6 +383,9 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
 
   /// Get current user's rank
   Future<int?> _getCurrentUserRank() async {
+    if (BrowseModeProvider.isGlobalBrowseMode) {
+      return null;
+    }
     try {
       return await repository.getCurrentUserRank(sortBy: _currentSortBy);
     } catch (e) {

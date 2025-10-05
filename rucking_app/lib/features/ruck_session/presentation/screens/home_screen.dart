@@ -324,71 +324,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     const EventsScreen(),
   ];
 
-  /// Build sign-up prompt for Home tab when in browse mode
-  Widget _buildBrowseModeStartPrompt() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.directions_run,
-              size: 80,
-              color: AppColors.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Ready to Start Rucking?',
-              style: AppTextStyles.headlineLarge.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Create a free account to track your rucks, earn achievements, and compete with the community!',
-              style: AppTextStyles.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-              ),
-              onPressed: () {
-                Navigator.of(context).pushReplacementNamed('/login');
-              },
-              child: Text(
-                'Sign Up to Start Rucking',
-                style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 2; // Navigate to Ruck Buddies to browse
-                });
-              },
-              child: Text(
-                'Browse Ruck Buddies',
-                style: TextStyle(color: AppColors.primary),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Browse mode: replace Home tab with sign-up prompt, allow browsing other tabs
-    final displayedScreen = (widget.isBrowseMode && _selectedIndex == 0)
-        ? _buildBrowseModeStartPrompt()
-        : _screens[_selectedIndex];
+    final displayedScreen = _screens[_selectedIndex];
+
+    BrowseModeProvider.setBrowseMode(widget.isBrowseMode);
 
     return BrowseModeProvider(
       isBrowseMode: widget.isBrowseMode,
