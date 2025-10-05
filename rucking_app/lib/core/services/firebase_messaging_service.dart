@@ -48,7 +48,8 @@ class FirebaseMessagingService {
     try {
       final isProduction = !kDebugMode;
       AppLogger.info('Starting Firebase Messaging initialization');
-      AppLogger.debug('FCM environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}');
+      AppLogger.debug(
+          'FCM environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}');
 
       // Request permission for notifications (non-blocking)
       _requestNotificationPermissions().catchError(
@@ -76,7 +77,8 @@ class FirebaseMessagingService {
               await Future.delayed(const Duration(seconds: 1));
               attempts++;
             } else {
-              AppLogger.debug('🔔 APNS token obtained: ${apnsToken.substring(0, 32)}...');
+              AppLogger.debug(
+                  '🔔 APNS token obtained: ${apnsToken.substring(0, 32)}...');
             }
           }
 
@@ -147,7 +149,8 @@ class FirebaseMessagingService {
       // Handle app launch from terminated state
       final initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null) {
-        AppLogger.debug('🔔 App launched from notification: ${initialMessage.messageId}');
+        AppLogger.debug(
+            '🔔 App launched from notification: ${initialMessage.messageId}');
         _pendingInitialMessage = initialMessage;
       }
 
@@ -230,8 +233,8 @@ class FirebaseMessagingService {
       playSound: true,
     );
 
-    final androidPlugin = _localNotifications
-        .resolvePlatformSpecificImplementation<
+    final androidPlugin =
+        _localNotifications.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(channel);
@@ -288,14 +291,18 @@ class FirebaseMessagingService {
       final currentState = authBloc.state;
 
       if (currentState is Authenticated) {
-        AppLogger.debug('🔔 User is authenticated, registering device token...');
+        AppLogger.debug(
+            '🔔 User is authenticated, registering device token...');
         await _registerDeviceToken(token);
       } else {
-        AppLogger.debug('⚠️ User not authenticated, skipping device token registration');
-        AppLogger.debug('🔔 Token will be registered after user authentication');
+        AppLogger.debug(
+            '⚠️ User not authenticated, skipping device token registration');
+        AppLogger.debug(
+            '🔔 Token will be registered after user authentication');
       }
     } catch (e) {
-      AppLogger.debug('⚠️ Error checking authentication for token registration: $e');
+      AppLogger.debug(
+          '⚠️ Error checking authentication for token registration: $e');
       // Fallback to attempt registration anyway
       await _registerDeviceToken(token);
     }
@@ -348,13 +355,15 @@ class FirebaseMessagingService {
         final token = await _firebaseMessaging.getToken().timeout(
           const Duration(seconds: 20),
           onTimeout: () {
-            AppLogger.debug('⚠️ FCM token request timed out on attempt $attempt');
+            AppLogger.debug(
+                '⚠️ FCM token request timed out on attempt $attempt');
             return null;
           },
         );
 
         if (token != null && token.isNotEmpty) {
-          AppLogger.debug('✅ FCM token obtained successfully on attempt $attempt');
+          AppLogger.debug(
+              '✅ FCM token obtained successfully on attempt $attempt');
           AppLogger.debug('🔔 Token length: ${token.length} chars');
           return token;
         }
@@ -365,17 +374,20 @@ class FirebaseMessagingService {
 
         // Check if it's the TOO_MANY_REGISTRATIONS error
         if (e.toString().contains('TOO_MANY_REGISTRATIONS')) {
-          AppLogger.debug('🚨 TOO_MANY_REGISTRATIONS detected - attempting cleanup');
+          AppLogger.debug(
+              '🚨 TOO_MANY_REGISTRATIONS detected - attempting cleanup');
 
           try {
             // Delete existing tokens and wait longer
             await _firebaseMessaging.deleteToken();
-            AppLogger.debug('🗑️ Deleted existing tokens due to registration limit');
+            AppLogger.debug(
+                '🗑️ Deleted existing tokens due to registration limit');
 
             // Wait longer before retry
             await Future.delayed(Duration(seconds: attempt * 3));
           } catch (deleteError) {
-            AppLogger.debug('⚠️ Failed to delete token during cleanup: $deleteError');
+            AppLogger.debug(
+                '⚠️ Failed to delete token during cleanup: $deleteError');
           }
         } else {
           // For other errors, wait progressively longer
@@ -405,8 +417,18 @@ class FirebaseMessagingService {
   /// Handle voice message - auto-play audio
   void _handleVoiceMessage(RemoteMessage message) {
     try {
+      final hasAudio = message.data['has_audio'] == 'true';
+      if (!hasAudio) {
+        AppLogger.info(
+            '[VOICE_MESSAGE] Notification received without audio payload');
+        return;
+      }
+
       final audioUrl = message.data['audio_url'];
-      if (audioUrl != null && audioUrl.isNotEmpty) {
+      if (audioUrl != null &&
+          audioUrl.isNotEmpty &&
+          audioUrl.toLowerCase() != 'null' &&
+          audioUrl.toLowerCase() != 'none') {
         AppLogger.info('[VOICE_MESSAGE] Auto-playing voice message');
         VoiceMessagePlayer().playMessageAudio(audioUrl);
       } else {
@@ -529,9 +551,8 @@ class FirebaseMessagingService {
         final tokenLength = token?.length ?? 0;
         results['fcm_token_available'] = token != null;
         results['fcm_token_length'] = tokenLength;
-        results['fcm_token_preview'] = token != null
-            ? token.substring(0, min(20, tokenLength))
-            : '';
+        results['fcm_token_preview'] =
+            token != null ? token.substring(0, min(20, tokenLength)) : '';
         AppLogger.debug('✅ FCM Token available: ${token != null}');
         if (token != null) {
           AppLogger.debug(
@@ -704,7 +725,8 @@ class FirebaseMessagingService {
     AppLogger.debug('🔔 Current token: ${_deviceToken ?? "NULL"}');
 
     if (!_isInitialized) {
-      AppLogger.debug('🔔 Firebase messaging not initialized, initializing now...');
+      AppLogger.debug(
+          '🔔 Firebase messaging not initialized, initializing now...');
       await initialize();
     }
 
@@ -728,7 +750,8 @@ class FirebaseMessagingService {
             await Future.delayed(const Duration(seconds: 1));
             attempts++;
           } else {
-            AppLogger.debug('🔔 APNS token obtained: ${apnsToken.substring(0, 32)}...');
+            AppLogger.debug(
+                '🔔 APNS token obtained: ${apnsToken.substring(0, 32)}...');
           }
         }
 
@@ -748,13 +771,15 @@ class FirebaseMessagingService {
       );
 
       _deviceToken = newToken;
-      AppLogger.debug('🔔 Force refresh result: ${_deviceToken ?? "STILL NULL"}');
+      AppLogger.debug(
+          '🔔 Force refresh result: ${_deviceToken ?? "STILL NULL"}');
 
       if (_deviceToken != null) {
         AppLogger.debug(
             '🔔 Token successfully generated! Length: ${_deviceToken!.length}');
       } else {
-        AppLogger.debug('❌ Token generation failed - checking Firebase app state...');
+        AppLogger.debug(
+            '❌ Token generation failed - checking Firebase app state...');
 
         // Check if Firebase app is properly initialized
         try {
@@ -767,7 +792,8 @@ class FirebaseMessagingService {
             final apnsToken = await _firebaseMessaging.getAPNSToken();
             AppLogger.debug('🔔 APNS Token: ${apnsToken ?? "NULL"}');
           } catch (e) {
-            AppLogger.debug('🔔 APNS Token check failed (normal on Android): $e');
+            AppLogger.debug(
+                '🔔 APNS Token check failed (normal on Android): $e');
           }
         } catch (e) {
           AppLogger.debug('❌ Firebase app check failed: $e');
@@ -789,7 +815,8 @@ class FirebaseMessagingService {
     // Test notification permissions
     try {
       final settings = await _firebaseMessaging.getNotificationSettings();
-      AppLogger.debug('🔔 Notification settings: ${settings.authorizationStatus}');
+      AppLogger.debug(
+          '🔔 Notification settings: ${settings.authorizationStatus}');
       AppLogger.debug('🔔 Alert: ${settings.alert}');
       AppLogger.debug('🔔 Badge: ${settings.badge}');
       AppLogger.debug('🔔 Sound: ${settings.sound}');

@@ -13,14 +13,15 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1'
+PLACEHOLDER_VOICE_ID = 'DEFAULT_VOICE_ID'
 
 # Voice mappings - these IDs should match your ElevenLabs account voices
 # TODO: Replace with your actual ElevenLabs voice IDs
 VOICE_MAPPINGS = {
-    'drill_sergeant': os.getenv('ELEVENLABS_VOICE_DRILL_SERGEANT', 'DEFAULT_VOICE_ID'),
-    'supportive_friend': os.getenv('ELEVENLABS_VOICE_SUPPORTIVE', 'DEFAULT_VOICE_ID'),
-    'data_nerd': os.getenv('ELEVENLABS_VOICE_DATA_NERD', 'DEFAULT_VOICE_ID'),
-    'minimalist': os.getenv('ELEVENLABS_VOICE_MINIMALIST', 'DEFAULT_VOICE_ID'),
+    'drill_sergeant': os.getenv('ELEVENLABS_VOICE_DRILL_SERGEANT', PLACEHOLDER_VOICE_ID),
+    'supportive_friend': os.getenv('ELEVENLABS_VOICE_SUPPORTIVE', PLACEHOLDER_VOICE_ID),
+    'data_nerd': os.getenv('ELEVENLABS_VOICE_DATA_NERD', PLACEHOLDER_VOICE_ID),
+    'minimalist': os.getenv('ELEVENLABS_VOICE_MINIMALIST', PLACEHOLDER_VOICE_ID),
 }
 
 class VoiceMessageService:
@@ -56,7 +57,14 @@ class VoiceMessageService:
                 return None
 
             # Get ElevenLabs voice ID
-            elevenlabs_voice = VOICE_MAPPINGS.get(voice_id, VOICE_MAPPINGS['supportive_friend'])
+            elevenlabs_voice = self._resolve_voice_id(voice_id)
+
+            if not elevenlabs_voice:
+                logger.warning(
+                    "Voice mapping for '%s' is not configured; skipping voice generation",
+                    voice_id,
+                )
+                return None
 
             logger.info(f"Generating voice message: '{message[:50]}...' with voice: {voice_id}")
 
@@ -136,6 +144,21 @@ class VoiceMessageService:
         except Exception as e:
             logger.error(f"Error uploading audio to storage: {e}", exc_info=True)
             return None
+
+    def _resolve_voice_id(self, requested_voice: str) -> Optional[str]:
+        """Resolve configured ElevenLabs voice ID for the requested persona."""
+
+        voice_key = requested_voice if requested_voice in VOICE_MAPPINGS else 'supportive_friend'
+        elevenlabs_voice = VOICE_MAPPINGS.get(voice_key)
+
+        if not elevenlabs_voice or elevenlabs_voice == PLACEHOLDER_VOICE_ID:
+            logger.error(
+                "ElevenLabs voice ID for '%s' is missing. Configure ELEVENLABS_VOICE_* env vars.",
+                voice_key,
+            )
+            return None
+
+        return elevenlabs_voice
 
 
 # Singleton instance

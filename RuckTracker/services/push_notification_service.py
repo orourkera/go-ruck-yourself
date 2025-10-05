@@ -230,7 +230,12 @@ class PushNotificationService:
                 string_data = {}
                 if notification_data:
                     for key, value in notification_data.items():
-                        string_data[key] = str(value)
+                        if value is None:
+                            continue
+                        if isinstance(value, bool):
+                            string_data[key] = 'true' if value else 'false'
+                        else:
+                            string_data[key] = str(value)
                 
                 logger.info(f"📦 Notification data payload: {string_data}")
                 

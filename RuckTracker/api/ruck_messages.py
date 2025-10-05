@@ -93,19 +93,24 @@ class RuckMessagesResource(Resource):
 
             # Send push notification to rucker
             logger.info(f"Sending ruck message notification to {recipient_id}")
+            notification_data = {
+                'ruck_id': ruck_id,
+                'message_id': saved_message['id'],
+                'sender_id': sender_id,
+                'voice_id': voice_id,
+                'has_audio': bool(audio_url),
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+            }
+
+            if audio_url:
+                notification_data['audio_url'] = audio_url
+
             notification_manager.send_notification(
                 recipients=[recipient_id],
                 notification_type='ruck_message',
                 title=f'🎤 {sender_name}',
                 body=message,
-                data={
-                    'ruck_id': ruck_id,
-                    'message_id': saved_message['id'],
-                    'sender_id': sender_id,
-                    'audio_url': audio_url,
-                    'voice_id': voice_id,
-                    'click_action': 'FLUTTER_NOTIFICATION_CLICK'
-                },
+                data=notification_data,
                 sender_id=sender_id
             )
 
