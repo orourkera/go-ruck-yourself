@@ -19,13 +19,13 @@ push_service = PushNotificationService()
 
 class EventsListResource(Resource):
     """Handle event listing and creation"""
-    
-    @auth_required
+
     def get(self):
         """List events with optional filtering"""
         try:
-            current_user_id = get_user_id()
-            logger.info(f"Fetching events for user: {current_user_id}")
+            # Optional auth for browse mode
+            current_user_id = get_user_id() if hasattr(g, 'user') and g.user else None
+            logger.info(f"Fetching events for user: {current_user_id or 'browse_mode'}")
             
             admin_client = get_supabase_admin_client()
             
@@ -62,12 +62,15 @@ class EventsListResource(Resource):
                 now = datetime.utcnow().replace(tzinfo=timezone.utc)
                 query = query.gte('scheduled_start_time', (now - timedelta(hours=24)).isoformat())
             
-            if joined_only:
-                # Get user's joined events only
+            if joined_only and current_user_id:
+                # Get user's joined events only (requires auth)
                 user_participants = admin_client.table('event_participants').select('event_id').eq('user_id', current_user_id).in_('status', ['approved', 'pending']).execute()
                 if user_participants.data:
                     event_ids = [p['event_id'] for p in user_participants.data]
                     query = query.in_('id', event_ids)
+                elif not user_participants.data:
+                    # No joined events for this user
+                    return {'events': [], 'total_count': 0}, 200
                 else:
                     return {'events': [], 'total': 0}, 200
             
@@ -127,7 +130,7 @@ class EventsListResource(Resource):
                     **event,
                     'participant_count': participant_counts.get(event_id, 0),
                     'user_participation_status': user_participations.get(event_id),
-                    'is_creator': event['creator_user_id'] == current_user_id,
+                    'is_creator': event['creator_user_id'] == current_user_id if current_user_id else False,
                     'hosting_club': clubs_data.get(event.get('club_id'))
                 }
                 
