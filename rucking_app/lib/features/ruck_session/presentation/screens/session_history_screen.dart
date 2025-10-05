@@ -365,6 +365,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen>
                   opacity: 0.7, // Slightly faded to indicate demo
                   child: SessionCard(
                     session: demoSessions[index],
+                    preferMetric: preferMetric,
                     onTap: () {
                       // Show sign-up dialog instead of navigating
                       BrowseModeBlockerDialog.show(
@@ -373,7 +374,6 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen>
                         actionDescription: 'view full session details',
                       );
                     },
-                    onDelete: null, // Can't delete demo data
                   ),
                 ),
               );
