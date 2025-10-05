@@ -108,16 +108,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const SizedBox(height: 48),
 
-                  // Title
-                  Text(
-                    'WELCOME BACK',
-                    style: TextStyle(
-                      fontFamily: 'Bangers',
-                      fontSize: 32,
-                      letterSpacing: 1.5,
-                      color: AppColors.textDark,
+                  // App Logo
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.asset(
+                        'assets/images/app_icon.png',
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
 
