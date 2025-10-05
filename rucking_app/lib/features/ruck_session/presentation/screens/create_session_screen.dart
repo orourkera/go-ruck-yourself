@@ -1575,8 +1575,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                           ),
 
                           const SizedBox(height: 16),
-                          const Divider(),
-                          const SizedBox(height: 8),
 
                           // Live Following Toggle
                           SwitchListTile(
@@ -1590,7 +1588,6 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                               });
                             },
                             contentPadding: EdgeInsets.zero,
-                            activeColor: AppColors.primary,
                           ),
                         ],
                       ],
