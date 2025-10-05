@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from .push_notification_service import PushNotificationService, get_user_device_tokens
 from .arize_observability import observe_openai_call
+from .openai_utils import create_chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -701,13 +702,14 @@ Return JSON format: {"title": "...", "body": "..."}"""
             start_time = time.time()
             model_name = os.getenv('OPENAI_RETENTION_MODEL', os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-5'))
 
-            response = client.chat.completions.create(
+            response = create_chat_completion(
+                client,
                 model=model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=150,
+                max_completion_tokens=150,
                 temperature=0.7
             )
 
@@ -850,13 +852,14 @@ Return JSON format: {"title": "...", "body": "..."}"""
             start_time = time.time()
             model_name = os.getenv('OPENAI_PLAN_NOTIFICATIONS_MODEL', 'gpt-5')
 
-            response = client.chat.completions.create(
+            response = create_chat_completion(
+                client,
                 model=model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=150,
+                max_completion_tokens=150,
                 temperature=0.7
             )
 

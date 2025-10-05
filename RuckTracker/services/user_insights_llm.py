@@ -11,6 +11,7 @@ except Exception:  # pragma: no cover
 
 from ..supabase_client import get_supabase_admin_client
 from .arize_observability import observe_openai_call
+from .openai_utils import create_chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +57,12 @@ def generate_llm_candidates(facts: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         start_time = time.time()
         model_name = "gpt-4o-mini"
 
-        resp = client.chat.completions.create(
+        resp = create_chat_completion(
+            client,
             model=model_name,
             messages=messages,
             temperature=0.2,
-            max_tokens=350,
+            max_completion_tokens=350,
         )
 
         latency_ms = (time.time() - start_time) * 1000
@@ -149,4 +151,3 @@ def refresh_user_insights_with_llm(user_id: str) -> bool:
     except Exception as e:
         logger.error(f"[INSIGHTS_LLM] Failed to refresh insights for {user_id}: {e}")
         return False
-

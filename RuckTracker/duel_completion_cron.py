@@ -38,7 +38,9 @@ def check_duel_completion():
     """Call the backend endpoint to check and complete expired duels"""
     try:
         # Get the backend URL from environment or use default
-        backend_url = os.environ.get('BACKEND_URL', 'https://go-ruck-yourself-0b8e9cb68bd4.herokuapp.com')
+        backend_url = os.environ.get(
+            'BACKEND_URL', 'https://go-ruck-yourself-0b8e9cb68bd4.herokuapp.com'
+        )
         endpoint = f"{backend_url}/api/duels/completion-check"
         
         logging.info(f"Checking duel completion at {endpoint}")

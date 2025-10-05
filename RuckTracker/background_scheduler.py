@@ -40,7 +40,11 @@ def check_duel_completion():
         logger.info("Starting duel completion check...")
 
         # Get app URL from environment
-        app_url = os.environ.get('HEROKU_APP_URL') or os.environ.get('APP_URL')
+        app_url = (
+            os.environ.get('BACKEND_URL')
+            or os.environ.get('HEROKU_APP_URL')
+            or os.environ.get('APP_URL')
+        )
 
         if not app_url:
             app_name = os.environ.get('HEROKU_APP_NAME')

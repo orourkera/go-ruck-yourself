@@ -1052,17 +1052,59 @@ class PlanNotificationService:
         """Get user's location from their recent session or profile."""
         try:
             # Try to get from recent ruck sessions
-            recent_session = self.admin_client.table('ruck_session').select(
-                'start_latitude, start_longitude'
-            ).eq('user_id', user_id).not_.is_('start_latitude', 'null').order(
-                'created_at', desc=True
-            ).limit(1).execute()
+            try:
+                recent_session = self.admin_client.table('ruck_session').select(
+                    'start_latitude, start_longitude'
+                ).eq('user_id', user_id).not_.is_('start_latitude', 'null').order(
+                    'created_at', desc=True
+                ).limit(1).execute()
+            except Exception as exc:
+                # Column may have been renamed in newer schemas. Fallback to a generic
+                # select and probe the available keys to avoid hard failures.
+                if 'start_latitude' in str(exc):
+                    logger.warning(
+                        "[PLAN_NOTIFICATIONS] start_latitude column missing; falling back to generic location lookup"
+                    )
+                    recent_session = self.admin_client.table('ruck_session').select('*').eq(
+                        'user_id', user_id
+                    ).eq('status', 'completed').order('created_at', desc=True).limit(1).execute()
+                else:
+                    raise
 
             if recent_session.data and recent_session.data[0].get('start_latitude'):
                 return {
                     'latitude': recent_session.data[0]['start_latitude'],
                     'longitude': recent_session.data[0]['start_longitude']
                 }
+            elif recent_session.data:
+                row = recent_session.data[0]
+                latitude = None
+                longitude = None
+
+                for key in (
+                    'start_lat',
+                    'start_lng',
+                    'start_latitude',
+                    'start_longitude',
+                    'start_location_latitude',
+                    'start_location_longitude',
+                    'latitude',
+                    'longitude',
+                ):
+                    if key in row and row[key] is not None:
+                        if 'lat' in key and latitude is None:
+                            latitude = row[key]
+                        if ('lng' in key or 'lon' in key or key.endswith('longitude')) and longitude is None:
+                            longitude = row[key]
+
+                # Some schemas store the start location as a JSON object
+                start_location = row.get('start_location') or row.get('start_point')
+                if isinstance(start_location, dict):
+                    latitude = latitude or start_location.get('lat') or start_location.get('latitude')
+                    longitude = longitude or start_location.get('lng') or start_location.get('longitude')
+
+                if latitude is not None and longitude is not None:
+                    return {'latitude': latitude, 'longitude': longitude}
 
             # Fallback to user profile location if available
             user_profile = self.admin_client.table('user').select(

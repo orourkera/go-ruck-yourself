@@ -23,7 +23,11 @@ def main():
     try:
         # Use the app's own URL to call the completion endpoint
         # Heroku provides the app URL via environment variables
-        app_url = os.environ.get('HEROKU_APP_URL') or os.environ.get('APP_URL')
+        app_url = (
+            os.environ.get('BACKEND_URL')
+            or os.environ.get('HEROKU_APP_URL')
+            or os.environ.get('APP_URL')
+        )
         
         if not app_url:
             # Fallback: construct URL from Heroku app name

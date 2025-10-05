@@ -10,6 +10,7 @@ import json
 
 from ..supabase_client import get_supabase_client
 from ..services.arize_observability import observe_openai_call
+from ..services.openai_utils import create_chat_completion
 from .schemas import GoalCreateSchema, SUPPORTED_METRICS, SUPPORTED_UNITS, SUPPORTED_WINDOWS
 from ..utils.ai_guardrails import prefilter_user_input, validate_goal_draft_payload
 
@@ -202,13 +203,14 @@ def _llm_parse_goal(cleaned_text: str) -> Dict[str, Any] | None:
 
     try:
         start_time = time.time()
-        completion = openai_client.chat.completions.create(
+        completion = create_chat_completion(
+            openai_client,
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=200,
+            max_completion_tokens=200,
             temperature=0.2,
         )
         latency_ms = (time.time() - start_time) * 1000
@@ -285,13 +287,14 @@ def _llm_compose_message(original_text: str, draft: Dict[str, Any] | None) -> st
             "- No markdown, no lists, no emojis.\n"
         )
         start_time = time.time()
-        resp = openai_client.chat.completions.create(
+        resp = create_chat_completion(
+            openai_client,
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": sys},
                 {"role": "user", "content": user},
             ],
-            max_tokens=60,
+            max_completion_tokens=60,
             temperature=0.3,
         )
         latency_ms = (time.time() - start_time) * 1000

@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from .notification_manager import notification_manager
 from ..supabase_client import get_supabase_admin_client
+from .openai_utils import create_chat_completion
 from .arize_observability import observe_openai_call
 
 logger = logging.getLogger(__name__)
@@ -206,7 +207,8 @@ class PlanAuditService:
             user_prompt = json.dumps(plan_summary)
 
             start_time = time.time()
-            resp = client.chat.completions.create(
+            resp = create_chat_completion(
+                client,
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},

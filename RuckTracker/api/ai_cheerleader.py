@@ -14,6 +14,7 @@ except Exception:  # ModuleNotFoundError or any import-time error
 
 from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..services.arize_observability import observe_openai_call
+from ..services.openai_utils import create_chat_completion
 
 logger = logging.getLogger(__name__)
 
@@ -524,13 +525,14 @@ class AICheerleaderLogResource(Resource):
                 # Track timing for Arize
                 start_time = time.time()
 
-                completion = openai_client.chat.completions.create(
+                completion = create_chat_completion(
+                    openai_client,
                     model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    max_tokens=120,  # Increased for 2-3 sentences
+                    max_completion_tokens=120,  # Increased for 2-3 sentences
                     temperature=0.7,
                     timeout=5.0  # 5 second timeout for API call
                 )
