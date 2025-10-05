@@ -82,7 +82,7 @@ class BrowseModeBlockerDialog extends StatelessWidget {
                 },
                 child: Text(
                   'Create Free Account',
-                  style: AppTextStyles.buttonText.copyWith(color: Colors.white),
+                  style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
                 ),
               ),
             ),

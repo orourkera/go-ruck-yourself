@@ -57,6 +57,12 @@ class NotificationType {
   /// Ruck activity notification (when someone interacts with a ruck you've also interacted with)
   static const String ruckActivity = 'ruck_activity';
 
+  /// Ruck started notification (when someone you follow starts rucking)
+  static const String ruckStarted = 'ruck_started';
+
+  /// Ruck message notification (live voice message during active ruck)
+  static const String ruckMessage = 'ruck_message';
+
   /// Achievement notification
   static const String achievement = 'achievement';
 }

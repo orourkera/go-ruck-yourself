@@ -6,6 +6,7 @@ import 'package:rucking_app/features/duels/presentation/screens/duel_detail_scre
 import 'package:rucking_app/features/clubs/presentation/screens/club_detail_screen.dart';
 import 'package:rucking_app/features/events/presentation/screens/event_detail_screen.dart';
 import 'package:rucking_app/features/profile/presentation/screens/public_profile_screen.dart';
+import 'package:rucking_app/features/live_following/presentation/screens/live_ruck_following_screen.dart';
 
 /// Helper class for handling notification-related navigation
 class NotificationNavigation {
@@ -24,6 +25,24 @@ class NotificationNavigation {
     if (notification.data == null) return;
 
     switch (notification.type) {
+      case NotificationType.ruckStarted: // Navigate to live following
+      case NotificationType.ruckMessage: // Navigate to live following
+        final ruckId = notification.data!['ruck_id']?.toString();
+        final ruckerName = notification.data!['rucker_name']?.toString() ??
+                          notification.data!['sender_name']?.toString() ??
+                          'Rucker';
+        if (ruckId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LiveRuckFollowingScreen(
+                ruckId: ruckId,
+                ruckerName: ruckerName,
+              ),
+            ),
+          );
+        }
+        break;
       case NotificationType.like:
       case NotificationType.comment:
       case NotificationType
