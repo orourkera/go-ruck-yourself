@@ -17,6 +17,8 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/empty_state.dart';
 import 'package:rucking_app/shared/widgets/error_display.dart';
 import 'package:rucking_app/shared/widgets/skeleton/skeleton_widgets.dart';
+import 'package:rucking_app/core/providers/browse_mode_provider.dart';
+import 'package:rucking_app/shared/widgets/browse_mode_blocker_dialog.dart';
 
 enum RuckBuddiesFilter { ALL, FOLLOWING_ONLY, RECENT, NEARBY }
 
@@ -370,6 +372,19 @@ class _RuckBuddiesScreenState extends State<RuckBuddiesScreen> {
                   },
                   onLikeTap: () {
                     // Use the actual like functionality
+                    // Block action if in browse mode
+                    final bool browsing = BrowseModeProvider.isBrowsing(context) ||
+                        BrowseModeProvider.isGlobalBrowseMode;
+
+                    if (browsing) {
+                      BrowseModeBlockerDialog.show(
+                        context,
+                        action: 'like',
+                        actionDescription: 'like rucks',
+                      );
+                      return;
+                    }
+
                     try {
                       debugPrint(
                           '🔍 Attempting to like ruck buddy with id: ${ruckBuddy.id}');
