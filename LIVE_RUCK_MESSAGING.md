@@ -45,8 +45,8 @@ ALTER TABLE ruck_session ADD COLUMN allow_live_following BOOLEAN DEFAULT true;
     - Requesting user follows the rucker
     - Session status = 'active'
 
-### 3. Live Ruck Messages
-**New Feature:** In-ruck messaging system
+### 3. Live Ruck Messages with AI Voice
+**New Feature:** In-ruck messaging system with text-to-speech via ElevenLabs
 
 **Database Schema:**
 ```sql
@@ -56,8 +56,11 @@ CREATE TABLE ruck_messages (
   sender_id UUID REFERENCES "user"(id),
   recipient_id UUID REFERENCES "user"(id),
   message TEXT NOT NULL,
+  voice_id TEXT, -- ElevenLabs voice ID (e.g., 'drill_sergeant', 'supportive_friend')
+  audio_url TEXT, -- URL to generated audio file in storage
   created_at TIMESTAMPTZ DEFAULT NOW(),
   read_at TIMESTAMPTZ,
+  played_at TIMESTAMPTZ,
   CONSTRAINT valid_message_length CHECK (length(message) <= 200)
 );
 
@@ -68,16 +71,86 @@ CREATE INDEX idx_ruck_messages_recipient ON ruck_messages(recipient_id, created_
 **API Endpoints:**
 ```
 POST /api/rucks/{id}/messages
-  Body: { message: "You got this!" }
+  Body: {
+    message: "You got this!",
+    voice_id: "drill_sergeant" // optional, defaults to sender's preference
+  }
+
+  Backend Flow:
+  1. Validate sender follows rucker
+  2. Check session is active and allow_live_following=true
+  3. Generate audio via ElevenLabs text-to-speech
+  4. Upload audio to Supabase storage
+  5. Save message with audio_url
+  6. Send push notification to rucker
+
   Auth: Must follow the rucker
-  Validation: Session must be active, allow_live_following=true
 
 GET /api/rucks/{id}/messages
-  Returns: All messages for this ruck
+  Returns: All messages for this ruck (with audio_url)
   Auth: Must be rucker or follower
 ```
 
-### 4. In-Ruck Message Notifications
+**ElevenLabs Integration:**
+```python
+# New service: RuckTracker/services/voice_message_service.py
+
+import os
+import requests
+from RuckTracker.supabase_client import get_supabase_admin_client
+
+ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
+
+# Voice mappings (use your existing AI cheerleader voices)
+VOICE_MAPPINGS = {
+    'drill_sergeant': 'your-elevenlabs-voice-id-1',
+    'supportive_friend': 'your-elevenlabs-voice-id-2',
+    'data_nerd': 'your-elevenlabs-voice-id-3',
+    'minimalist': 'your-elevenlabs-voice-id-4',
+}
+
+def generate_voice_message(message: str, voice_id: str) -> str:
+    """
+    Generate audio from text using ElevenLabs and upload to storage
+    Returns: Public URL to audio file
+    """
+    # 1. Call ElevenLabs API
+    elevenlabs_voice = VOICE_MAPPINGS.get(voice_id, VOICE_MAPPINGS['supportive_friend'])
+
+    response = requests.post(
+        f'https://api.elevenlabs.io/v1/text-to-speech/{elevenlabs_voice}',
+        headers={'xi-api-key': ELEVENLABS_API_KEY},
+        json={
+            'text': message,
+            'model_id': 'eleven_monolingual_v1',
+            'voice_settings': {
+                'stability': 0.5,
+                'similarity_boost': 0.75
+            }
+        }
+    )
+
+    if response.status_code != 200:
+        raise Exception(f'ElevenLabs API failed: {response.text}')
+
+    # 2. Upload audio to Supabase storage
+    audio_data = response.content
+    filename = f'ruck_messages/{uuid.uuid4()}.mp3'
+
+    supabase = get_supabase_admin_client()
+    upload_result = supabase.storage.from_('ruck-audio').upload(
+        filename,
+        audio_data,
+        {'content-type': 'audio/mpeg'}
+    )
+
+    # 3. Get public URL
+    public_url = supabase.storage.from_('ruck-audio').get_public_url(filename)
+
+    return public_url
+```
+
+### 4. In-Ruck Message Notifications with Audio Playback
 **Notification Type:** `ruck_message`
 
 **Backend:** `notification_manager.py`
@@ -87,7 +160,8 @@ def send_ruck_message_notification(
     sender_name: str,
     message: str,
     ruck_id: str,
-    sender_id: str
+    sender_id: str,
+    audio_url: str
 ) -> bool:
     return self.send_notification(
         recipients=[recipient_id],
@@ -97,6 +171,7 @@ def send_ruck_message_notification(
         data={
             'ruck_id': ruck_id,
             'sender_id': sender_id,
+            'audio_url': audio_url,  # Audio file URL for playback
             'click_action': 'FLUTTER_NOTIFICATION_CLICK'
         },
         sender_id=sender_id
@@ -104,9 +179,37 @@ def send_ruck_message_notification(
 ```
 
 **Frontend:** Active Session Page
-- Listen for `ruck_message` notifications while session active
-- Show toast with sender name + message
-- Play sound/haptic feedback
+**Message Delivery:**
+1. Notification arrives with `audio_url` in data
+2. Auto-download and play audio immediately (no user action needed)
+3. Show toast overlay: "🎤 Mike sent you a message" (with audio playing)
+4. Haptic feedback on delivery
+5. Audio plays through headphones if connected, speaker otherwise
+
+**Audio Player Integration:**
+```dart
+// Use just_audio package for playback
+class LiveMessagePlayer {
+  final player = AudioPlayer();
+
+  Future<void> playMessageAudio(String audioUrl) async {
+    try {
+      await player.setUrl(audioUrl);
+      await player.play();
+
+      // Optionally: Duck other audio (reduce music volume during message)
+      await player.setVolume(1.0);
+    } catch (e) {
+      AppLogger.error('Failed to play message audio: $e');
+      // Fallback: Show text notification only
+    }
+  }
+}
+```
+
+**Settings:**
+- User preference: "Auto-play voice messages" (default: ON)
+- If disabled, show notification with play button instead
 
 ### 5. Following Page Live Indicators
 **Location:** Following/Followers Screen
@@ -139,19 +242,25 @@ GET /api/social/following
 - [ ] Add map with real-time position marker
 - [ ] Add current stats display
 
-### Phase 3: Live Messaging
-- [ ] Create `ruck_messages` table
-- [ ] Add `/api/rucks/{id}/messages` POST endpoint
+### Phase 3: Live Messaging with Voice
+- [ ] Create `ruck_messages` table (with voice_id, audio_url fields)
+- [ ] Create `voice_message_service.py` for ElevenLabs integration
+- [ ] Create Supabase storage bucket: `ruck-audio`
+- [ ] Add `/api/rucks/{id}/messages` POST endpoint (with voice generation)
 - [ ] Add `/api/rucks/{id}/messages` GET endpoint
-- [ ] Create message input UI in LiveRuckFollowingScreen
-- [ ] Add message list display
-- [ ] Implement `send_ruck_message_notification()`
+- [ ] Create message input UI in LiveRuckFollowingScreen with voice picker
+- [ ] Add message list display (text + audio player)
+- [ ] Implement `send_ruck_message_notification()` with audio_url
 
-### Phase 4: In-Ruck Message Display
+### Phase 4: In-Ruck Audio Message Playback
+- [ ] Add `just_audio` package dependency
+- [ ] Create `LiveMessagePlayer` service for audio playback
 - [ ] Add message notification listener in ActiveSessionPage
-- [ ] Show toast/banner when message received
-- [ ] Add haptic feedback + sound
-- [ ] Optional: Add "Messages" button to view all during ruck
+- [ ] Auto-play audio when notification received (if enabled)
+- [ ] Show toast overlay during audio playback: "🎤 [Sender] sent you a message"
+- [ ] Add haptic feedback on message receipt
+- [ ] Add user setting: "Auto-play voice messages" toggle
+- [ ] Optional: Add "Messages" button to view/replay all during ruck
 
 ### Phase 5: Following Page Live Indicators
 - [ ] Update `/api/social/following` to include active_ruck_id
@@ -198,35 +307,90 @@ GET /api/social/following
 
 ## UI/UX Flow
 
-### Follower Journey:
+### Follower Journey (Sending Voice Message):
 1. Receives notification: "Sarah started rucking 🎒"
 2. Taps notification → Opens LiveRuckFollowingScreen
 3. Sees Sarah's current position, distance, pace on map
-4. Sends message: "You got this! 💪"
-5. Sarah's phone vibrates with notification during ruck
+4. **Selects voice from dropdown:** "Drill Sergeant 🎖️"
+5. Types message: "You got this! Push harder!"
+6. Taps Send → Backend generates audio in Drill Sergeant voice
+7. Sarah receives notification + audio auto-plays through her headphones
 
-### Rucker Journey:
+**Message Input UI:**
+```
+┌─────────────────────────────────────┐
+│  Voice: [Drill Sergeant ▼]   🎤    │ ← Dropdown selector
+├─────────────────────────────────────┤
+│  [Type your message here...       ]│ ← Text input
+│  [                              📤]│ ← Send button
+└─────────────────────────────────────┘
+
+Voice Options:
+- 🎖️ Drill Sergeant (intense, motivating)
+- 🤗 Supportive Friend (warm, encouraging)
+- 📊 Data Nerd (analytical, stats-focused)
+- 🧘 Minimalist (calm, brief)
+```
+
+**Preview Button (Optional):**
+- Small speaker icon next to voice selector
+- Tap to hear sample: "Keep pushing! You're doing great!"
+
+### Rucker Journey (Receiving Voice Message):
 1. Starts ruck with "Allow live following" enabled
 2. Friends receive notifications
 3. While rucking, receives message notification
-4. Toast appears: "💬 Mike: You got this! 💪"
-5. Can view all messages after completing ruck
+4. **Audio auto-plays in Drill Sergeant voice:** "You got this! Push harder!"
+5. Toast appears during playback: "🎤 Mike sent you a message"
+6. Haptic buzz on message receipt
+7. Can replay messages from "Messages" button (optional)
+8. All messages saved and viewable after ruck completion
+
+**In-Session Audio Experience:**
+- Message audio plays OVER music/podcasts (audio ducking)
+- Volume automatically adjusts back after message
+- If headphones disconnected, plays through speaker
+- Visual indicator while audio playing (animated speaker icon)
 
 ## Analytics Events
 - `live_following_enabled` (on session start)
 - `live_following_disabled` (on session start)
 - `live_ruck_viewed` (follower opens live screen)
-- `live_message_sent` (follower sends message)
+- `live_message_sent` (follower sends message, includes voice_id)
 - `live_message_received` (rucker receives message)
+- `live_message_played` (audio playback started)
+- `voice_preview_played` (sender previewed voice before sending)
 
 ## Success Metrics
 - % of rucks with live following enabled
 - # of live views per active ruck
-- # of messages sent per active ruck
+- # of voice messages sent per active ruck
+- Most popular voice (Drill Sergeant vs Supportive Friend vs Data Nerd vs Minimalist)
+- Message completion rate: % of messages that finish playing
 - Engagement rate: (rucks with messages / rucks with live following)
+- Conversion: % of message recipients who send messages back on their next ruck
+
+## Cost Considerations
+
+### ElevenLabs Pricing:
+- **Free tier:** 10,000 characters/month (~50 messages)
+- **Starter:** $5/month = 30,000 characters (~150 messages)
+- **Creator:** $22/month = 100,000 characters (~500 messages)
+- **Pro:** $99/month = 500,000 characters (~2,500 messages)
+
+**Average message:** ~50 characters = $0.10-0.20 per message on Creator plan
+
+**Cost Mitigation Strategies:**
+1. **Cache common phrases** - Pre-generate "You got this!", "Keep going!", etc.
+2. **Character limit** - 200 chars max = ~2 seconds of audio
+3. **Rate limiting** - 1 message per user per ruck (or per 5 minutes)
+4. **Premium feature** - Make voice messages premium-only ($4.99/month pays for itself)
+
+**Recommendation:** Start with premium-only, monitor usage, optimize later.
 
 ## Open Questions
 1. Should ruckers see a message counter during their ruck, or just notifications?
 2. Allow group messaging (multiple followers chatting)?
 3. Show follower count "3 friends watching" to rucker?
-4. Emoji-only quick reactions in addition to text messages?
+4. Quick reactions (👍 💪 🔥) as free alternative to voice messages?
+5. Let sender record their own voice instead of TTS (more personal, no ElevenLabs cost)?
