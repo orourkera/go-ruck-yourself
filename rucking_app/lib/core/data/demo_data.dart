@@ -105,6 +105,7 @@ class DemoData {
 
   /// Get demo weekly stats
   static Map<String, dynamic> getDemoWeeklyStats() {
+    final now = DateTime.now();
     return {
       'total_distance_km': 15.2,
       'total_rucks': 2,
@@ -112,6 +113,15 @@ class DemoData {
       'total_elevation_gain_m': 165,
       'avg_pace_s_per_km': 885,
       'total_duration_seconds': 13500, // ~3.75 hours
+      'time_series': [
+        {'date': now.subtract(const Duration(days: 6)).toIso8601String(), 'distance_km': 0, 'calories': 0, 'duration_seconds': 0, 'power_points': 0},
+        {'date': now.subtract(const Duration(days: 5)).toIso8601String(), 'distance_km': 0, 'calories': 0, 'duration_seconds': 0, 'power_points': 0},
+        {'date': now.subtract(const Duration(days: 4)).toIso8601String(), 'distance_km': 0, 'calories': 0, 'duration_seconds': 0, 'power_points': 0},
+        {'date': now.subtract(const Duration(days: 3)).toIso8601String(), 'distance_km': 5.2, 'calories': 420, 'duration_seconds': 4800, 'power_points': 45},
+        {'date': now.subtract(const Duration(days: 2)).toIso8601String(), 'distance_km': 0, 'calories': 0, 'duration_seconds': 0, 'power_points': 0},
+        {'date': now.subtract(const Duration(days: 1)).toIso8601String(), 'distance_km': 8.5, 'calories': 650, 'duration_seconds': 8100, 'power_points': 78},
+        {'date': now.toIso8601String(), 'distance_km': 0, 'calories': 0, 'duration_seconds': 0, 'power_points': 0},
+      ],
     };
   }
 }
