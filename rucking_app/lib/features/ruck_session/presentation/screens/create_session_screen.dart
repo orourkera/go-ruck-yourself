@@ -86,6 +86,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
   late final VoidCallback _durationListener;
 
   bool _isOfflineMode = false;
+  bool _allowLiveFollowing = true; // Default to enabled
 
   // Coaching plan data
   Map<String, dynamic>? _coachingPlan;
@@ -437,6 +438,7 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         Map<String, dynamic> createRequestData = {
           'ruck_weight_kg': weightForApiKg,
           'is_manual': false, // Regular active sessions are not manual
+          'allow_live_following': _allowLiveFollowing,
         };
 
         // Add event context if creating session for an event
@@ -1564,6 +1566,25 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
                                   'aiCheerleaderExplicitContent', value);
                             },
                             contentPadding: EdgeInsets.zero,
+                          ),
+
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          const SizedBox(height: 8),
+
+                          // Live Following Toggle
+                          SwitchListTile(
+                            title: const Text('Allow Live Following'),
+                            subtitle: const Text(
+                                'Let friends follow your ruck live and send voice messages'),
+                            value: _allowLiveFollowing,
+                            onChanged: (bool value) {
+                              setState(() {
+                                _allowLiveFollowing = value;
+                              });
+                            },
+                            contentPadding: EdgeInsets.zero,
+                            activeColor: AppColors.primary,
                           ),
                         ],
                       ],
