@@ -122,13 +122,25 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
         setState(() {
           _isLoading = false;
         });
-        // Show error to user
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load live data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+
+        // Check if session ended - stop polling
+        if (e.toString().contains('not currently active') || e.toString().contains('400')) {
+          _refreshTimer?.cancel();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This ruck has ended'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          // Show error to user
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load live data: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
