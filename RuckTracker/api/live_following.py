@@ -5,7 +5,7 @@ Provides real-time session data for followers
 import logging
 from flask import Blueprint, g
 from flask_restful import Resource, Api
-from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,8 @@ class LiveRuckDataResource(Resource):
     def get(self, ruck_id):
         """Get current position and stats for live following"""
         try:
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            # Use admin client to bypass RLS (we do auth checks manually)
+            supabase = get_supabase_admin_client()
             viewer_id = g.user.id
 
             # Get session
