@@ -33,10 +33,12 @@ class LiveRuckDataResource(Resource):
 
             # Check if session is active
             if session['status'] != 'active':
+                logger.warning(f"Session {ruck_id} is not active: status={session['status']}")
                 return {'error': 'This ruck is not currently active'}, 400
 
             # Check if live following is enabled
             if not session.get('allow_live_following', True):
+                logger.warning(f"Session {ruck_id} has live following disabled")
                 return {'error': 'Live following is disabled for this ruck'}, 403
 
             # Check if viewer follows the rucker (unless they are the rucker)
