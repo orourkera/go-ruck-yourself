@@ -38,6 +38,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
   bool _isLoading = true;
   bool _isSendingMessage = false;
   String _selectedVoice = 'supportive_friend';
+  String _selectedDelay = 'now';
 
   // Live session data
   double _currentDistance = 0.0;
@@ -177,11 +178,17 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
       }
 
       // Send message (with or without audio)
-      await _apiClient.post('/rucks/${widget.ruckId}/messages', {
+      final payload = {
         'message': message,
         'voice_id': _selectedVoice,
-        // audio upload TODO
-      });
+      };
+
+      // Add delay if selected
+      if (_selectedDelay != 'now') {
+        payload['delay_minutes'] = int.parse(_selectedDelay);
+      }
+
+      await _apiClient.post('/rucks/${widget.ruckId}/messages', payload);
 
       _messageController.clear();
 
@@ -234,9 +241,9 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Map showing live location
-                Expanded(
-                  flex: 2,
+                // Map showing live location (reduced height)
+                SizedBox(
+                  height: 200,
                   child: _buildMap(),
                 ),
 
@@ -322,6 +329,32 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                       ),
                       const SizedBox(height: 12),
 
+                      // Delay selector
+                      DropdownButtonFormField<String>(
+                        value: _selectedDelay,
+                        decoration: const InputDecoration(
+                          labelText: 'Send',
+                          prefixIcon: Icon(Icons.schedule),
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                        ),
+                        isExpanded: true,
+                        items: const [
+                          DropdownMenuItem(value: 'now', child: Text('Send Now')),
+                          DropdownMenuItem(value: '5', child: Text('In 5 minutes')),
+                          DropdownMenuItem(value: '15', child: Text('In 15 minutes')),
+                          DropdownMenuItem(value: '30', child: Text('In 30 minutes')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedDelay = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
                       // Message input
                       Row(
                         children: [
@@ -391,17 +424,31 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
               ),
             ],
           ),
-        // Current location marker
+        // Current location marker (matching active session style)
         MarkerLayer(
           markers: [
             Marker(
               point: _currentLocation!,
-              width: 40,
-              height: 40,
-              child: Icon(
-                Icons.person_pin_circle,
-                color: AppColors.primary,
-                size: 40,
+              width: 30,
+              height: 30,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
           ],
