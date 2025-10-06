@@ -54,7 +54,7 @@ class RuckMessagesResource(Resource):
                 return {'error': 'Cannot send messages to your own ruck'}, 400
 
             # Check if sender follows recipient
-            follow_check = supabase.table('follows').select('id').eq(
+            follow_check = supabase.table('user_follows').select('id').eq(
                 'follower_id', sender_id
             ).eq('followed_id', recipient_id).execute()
 

@@ -43,7 +43,7 @@ class LiveRuckDataResource(Resource):
 
             # Check if viewer follows the rucker (unless they are the rucker)
             if viewer_id != rucker_id:
-                follow_check = supabase.table('follows').select('id').eq(
+                follow_check = supabase.table('user_follows').select('id').eq(
                     'follower_id', viewer_id
                 ).eq('followed_id', rucker_id).execute()
 
