@@ -44,12 +44,18 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
   List<LatLng> _route = [];
   DateTime? _lastUpdate;
 
-  // Voice options
+  // Voice options (matching AI cheerleader personalities)
   final List<Map<String, String>> _voiceOptions = [
-    {'id': 'drill_sergeant', 'name': '🎖️ Drill Sergeant', 'desc': 'Intense & motivating'},
     {'id': 'supportive_friend', 'name': '🤗 Supportive Friend', 'desc': 'Warm & encouraging'},
-    {'id': 'data_nerd', 'name': '📊 Data Nerd', 'desc': 'Analytical & precise'},
-    {'id': 'minimalist', 'name': '🧘 Minimalist', 'desc': 'Calm & brief'},
+    {'id': 'drill_sergeant', 'name': '🎖️ Drill Sergeant', 'desc': 'Intense & motivating'},
+    {'id': 'southern_redneck', 'name': '🤠 Southern Redneck', 'desc': 'Y\'all got this!'},
+    {'id': 'yoga_instructor', 'name': '🧘 Yoga Instructor', 'desc': 'Calm & mindful'},
+    {'id': 'british_butler', 'name': '🎩 British Butler', 'desc': 'Proper & refined'},
+    {'id': 'sports_commentator', 'name': '📢 Sports Commentator', 'desc': 'Energetic play-by-play'},
+    {'id': 'cowboy', 'name': '🤠 Cowboy/Cowgirl', 'desc': 'Giddy up partner!'},
+    {'id': 'nature_lover', 'name': '🌲 Nature Lover', 'desc': 'Peaceful & connected'},
+    {'id': 'burt_reynolds', 'name': '😎 Burt Reynolds', 'desc': 'Smooth & confident'},
+    {'id': 'tom_selleck', 'name': '🥸 Tom Selleck', 'desc': 'Charming & steady'},
   ];
 
   @override

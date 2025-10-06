@@ -389,7 +389,9 @@ class LocationTrackingManager implements SessionManager {
     if (_locationSubscription != null) {
       AppLogger.info(
           '[LOCATION_MANAGER] Restarting location tracking after resume (potential dead stream)');
-      await _stopLocationTracking();
+      final previousSessionId = _activeSessionId;
+      await _stopLocationTracking(clearSessionId: false);
+      _activeSessionId = previousSessionId;
       await _startLocationTracking();
     } else {
       AppLogger.info(
@@ -460,9 +462,8 @@ class LocationTrackingManager implements SessionManager {
       // If more than 5 minutes have passed, this is likely a recovery scenario
       if (timeSinceLastLocation.inMinutes >= 5) {
         AppLogger.warning(
-          '[LOCATION_MANAGER] ⚠️ LARGE TIME GAP DETECTED: ${timeSinceLastLocation.inMinutes} minutes since last location. '
-          'Likely phone recovery scenario - checking for invalid distance jump.'
-        );
+            '[LOCATION_MANAGER] ⚠️ LARGE TIME GAP DETECTED: ${timeSinceLastLocation.inMinutes} minutes since last location. '
+            'Likely phone recovery scenario - checking for invalid distance jump.');
 
         // Check if the distance jump would be unrealistic
         if (_locationPoints.isNotEmpty) {
@@ -480,14 +481,14 @@ class LocationTrackingManager implements SessionManager {
           // If implied speed > 50 km/h (13.9 m/s) for running, it's definitely invalid
           // Also check for very large distance jumps (> 1km per minute of gap)
           final minutesGap = timeSinceLastLocation.inMinutes;
-          final maxReasonableDistance = minutesGap * 1000.0; // 1km per minute max
+          final maxReasonableDistance =
+              minutesGap * 1000.0; // 1km per minute max
 
           if (impliedSpeed > 13.9 || distance > maxReasonableDistance) {
             AppLogger.error(
-              '[LOCATION_MANAGER] 🚨 INVALID RECOVERY DETECTED: Implied speed ${(impliedSpeed * 3.6).toStringAsFixed(1)} km/h '
-              'over ${timeSinceLastLocation.inMinutes} minutes. Distance jump: ${(distance / 1000).toStringAsFixed(2)} km. '
-              'REJECTING this location update to prevent data corruption.'
-            );
+                '[LOCATION_MANAGER] 🚨 INVALID RECOVERY DETECTED: Implied speed ${(impliedSpeed * 3.6).toStringAsFixed(1)} km/h '
+                'over ${timeSinceLastLocation.inMinutes} minutes. Distance jump: ${(distance / 1000).toStringAsFixed(2)} km. '
+                'REJECTING this location update to prevent data corruption.');
 
             // Update timestamps but don't add the location point
             _lastRawLocationTimestamp = now;
@@ -499,7 +500,8 @@ class LocationTrackingManager implements SessionManager {
 
             // Schedule clearing the error message
             Future.delayed(const Duration(seconds: 5), () {
-              if (_currentState.errorMessage == 'Session recovered - GPS reconnecting...') {
+              if (_currentState.errorMessage ==
+                  'Session recovered - GPS reconnecting...') {
                 _updateState(_currentState.copyWith(errorMessage: null));
               }
             });
@@ -508,9 +510,8 @@ class LocationTrackingManager implements SessionManager {
           }
 
           AppLogger.info(
-            '[LOCATION_MANAGER] Gap detected but distance reasonable: ${(distance / 1000).toStringAsFixed(2)} km '
-            'at ${(impliedSpeed * 3.6).toStringAsFixed(1)} km/h - accepting location.'
-          );
+              '[LOCATION_MANAGER] Gap detected but distance reasonable: ${(distance / 1000).toStringAsFixed(2)} km '
+              'at ${(impliedSpeed * 3.6).toStringAsFixed(1)} km/h - accepting location.');
         }
       }
     }
@@ -1212,7 +1213,7 @@ class LocationTrackingManager implements SessionManager {
     }
   }
 
-  Future<void> _stopLocationTracking() async {
+  Future<void> _stopLocationTracking({bool clearSessionId = true}) async {
     AppLogger.info('[LOCATION_MANAGER] Stopping location tracking');
 
     await _locationSubscription?.cancel();
@@ -1240,8 +1241,11 @@ class LocationTrackingManager implements SessionManager {
       _pendingLocationPoints.clear();
     }
 
-    // CRITICAL: Clear session ID to prevent further uploads
-    _activeSessionId = null;
+    // CRITICAL: Clear session ID to prevent further uploads unless caller
+    // explicitly wants to preserve it (e.g., pause/resume path).
+    if (clearSessionId) {
+      _activeSessionId = null;
+    }
 
     AppLogger.info(
         '[LOCATION_MANAGER] Location tracking fully stopped, session ID cleared');
@@ -1545,10 +1549,13 @@ class LocationTrackingManager implements SessionManager {
             // Drop oldest points if we're at the limit
             final availableSpace = 1000 - _pendingLocationPoints.length;
             if (availableSpace > 0) {
-              _pendingLocationPoints.addAll(chunk.take(availableSpace).toList());
-              AppLogger.warning('[LOCATION_MANAGER] Pending queue at limit, dropped ${chunk.length - availableSpace} points');
+              _pendingLocationPoints
+                  .addAll(chunk.take(availableSpace).toList());
+              AppLogger.warning(
+                  '[LOCATION_MANAGER] Pending queue at limit, dropped ${chunk.length - availableSpace} points');
             } else {
-              AppLogger.warning('[LOCATION_MANAGER] Pending queue full (1000 points), dropping ${chunk.length} failed points');
+              AppLogger.warning(
+                  '[LOCATION_MANAGER] Pending queue full (1000 points), dropping ${chunk.length} failed points');
             }
           }
 
@@ -1581,10 +1588,13 @@ class LocationTrackingManager implements SessionManager {
           } else {
             final availableSpace = 1000 - _pendingLocationPoints.length;
             if (availableSpace > 0) {
-              _pendingLocationPoints.addAll(remaining.take(availableSpace).toList());
-              AppLogger.warning('[LOCATION_MANAGER] Re-queued ${availableSpace} of ${remaining.length} points (queue limit reached)');
+              _pendingLocationPoints
+                  .addAll(remaining.take(availableSpace).toList());
+              AppLogger.warning(
+                  '[LOCATION_MANAGER] Re-queued ${availableSpace} of ${remaining.length} points (queue limit reached)');
             } else {
-              AppLogger.warning('[LOCATION_MANAGER] Pending queue full, dropped ${remaining.length} unprocessed points');
+              AppLogger.warning(
+                  '[LOCATION_MANAGER] Pending queue full, dropped ${remaining.length} unprocessed points');
             }
           }
         } catch (_) {}

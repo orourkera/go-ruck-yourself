@@ -431,15 +431,37 @@ class LeaderboardMyRankResource(Resource):
                     logger.debug('My-rank manual fallback has no user IDs; returning empty rank')
                     return {'rank': None}
 
-                # Query ruck sessions separately
-                sessions_query = supabase.table('ruck_session').select(
-                    'id, user_id, power_points, distance_km, completed_at, '
-                    'elevation_gain_m, calories_burned'
-                ).in_('user_id', user_ids)
+                # Query ruck sessions separately in manageable chunks to avoid PostgREST limits
+                sessions_data = []
+                chunk_size = 50
+                for i in range(0, len(user_ids), chunk_size):
+                    user_id_chunk = user_ids[i:i + chunk_size]
 
-                sessions_response = sessions_query.execute()
+                    sessions_query = supabase.table('ruck_session').select(
+                        'id, user_id, power_points, distance_km, completed_at, '
+                        'elevation_gain_m, calories_burned, status, started_at, created_at'
+                    ).in_('user_id', user_id_chunk)
+
+                    try:
+                        chunk_response = sessions_query.execute()
+                        if chunk_response.data:
+                            sessions_data.extend(chunk_response.data)
+                        logger.debug(
+                            "My-rank manual sessions chunk: %s users -> %s sessions",
+                            len(user_id_chunk),
+                            len(chunk_response.data) if chunk_response.data else 0,
+                        )
+                    except Exception as chunk_error:
+                        logger.error(
+                            "My-rank sessions chunk query failed for %s users: %s",
+                            len(user_id_chunk),
+                            chunk_error,
+                        )
+
+                sessions_response = type('Response', (), {'data': sessions_data})()
                 logger.debug(
-                    f"My-rank manual sessions query returned: {len(sessions_response.data)} sessions"
+                    "My-rank manual sessions query returned: %s sessions",
+                    len(sessions_response.data),
                 )
                 
                 # Group sessions by user_id

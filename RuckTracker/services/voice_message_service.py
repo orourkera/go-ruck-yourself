@@ -15,13 +15,19 @@ ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1'
 PLACEHOLDER_VOICE_ID = 'DEFAULT_VOICE_ID'
 
-# Voice mappings - these IDs should match your ElevenLabs account voices
+# Voice mappings - match AI cheerleader personalities
 # TODO: Replace with your actual ElevenLabs voice IDs
 VOICE_MAPPINGS = {
+    'supportive_friend': os.getenv('ELEVENLABS_VOICE_SUPPORTIVE_FRIEND', PLACEHOLDER_VOICE_ID),
     'drill_sergeant': os.getenv('ELEVENLABS_VOICE_DRILL_SERGEANT', PLACEHOLDER_VOICE_ID),
-    'supportive_friend': os.getenv('ELEVENLABS_VOICE_SUPPORTIVE', PLACEHOLDER_VOICE_ID),
-    'data_nerd': os.getenv('ELEVENLABS_VOICE_DATA_NERD', PLACEHOLDER_VOICE_ID),
-    'minimalist': os.getenv('ELEVENLABS_VOICE_MINIMALIST', PLACEHOLDER_VOICE_ID),
+    'southern_redneck': os.getenv('ELEVENLABS_VOICE_SOUTHERN_REDNECK', PLACEHOLDER_VOICE_ID),
+    'yoga_instructor': os.getenv('ELEVENLABS_VOICE_YOGA_INSTRUCTOR', PLACEHOLDER_VOICE_ID),
+    'british_butler': os.getenv('ELEVENLABS_VOICE_BRITISH_BUTLER', PLACEHOLDER_VOICE_ID),
+    'sports_commentator': os.getenv('ELEVENLABS_VOICE_SPORTS_COMMENTATOR', PLACEHOLDER_VOICE_ID),
+    'cowboy': os.getenv('ELEVENLABS_VOICE_COWBOY', PLACEHOLDER_VOICE_ID),
+    'nature_lover': os.getenv('ELEVENLABS_VOICE_NATURE_LOVER', PLACEHOLDER_VOICE_ID),
+    'burt_reynolds': os.getenv('ELEVENLABS_VOICE_BURT_REYNOLDS', PLACEHOLDER_VOICE_ID),
+    'tom_selleck': os.getenv('ELEVENLABS_VOICE_TOM_SELLECK', PLACEHOLDER_VOICE_ID),
 }
 
 class VoiceMessageService:
