@@ -22,12 +22,12 @@ class LiveRuckDataResource(Resource):
             # Get session
             session_response = supabase.table('ruck_session').select(
                 'id, user_id, status, allow_live_following, distance_km, duration_seconds, average_pace, started_at'
-            ).eq('id', ruck_id).single().execute()
+            ).eq('id', ruck_id).execute()
 
-            if not session_response.data:
+            if not session_response.data or len(session_response.data) == 0:
                 return {'error': 'Session not found'}, 404
 
-            session = session_response.data
+            session = session_response.data[0]
             rucker_id = session['user_id']
 
             # Check if session is active
