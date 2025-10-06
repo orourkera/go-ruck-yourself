@@ -97,14 +97,14 @@ def main():
     # Create scheduler
     scheduler = BlockingScheduler()
     
-    # Add duel completion job (every 5 minutes)
-    scheduler.add_job(
-        check_duel_completion,
-        'interval',
-        minutes=5,
-        id='duel_completion',
-        name='Check Duel Completion'
-    )
+    # Duel completion disabled - not using duels currently
+    # scheduler.add_job(
+    #     check_duel_completion,
+    #     'interval',
+    #     minutes=5,
+    #     id='duel_completion',
+    #     name='Check Duel Completion'
+    # )
 
     # Add coaching plan notification job (every 15 minutes)
     # More frequent checks ensure timely delivery of morning hype and evening briefs

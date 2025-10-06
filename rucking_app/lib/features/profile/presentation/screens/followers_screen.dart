@@ -22,33 +22,12 @@ class FollowersScreen extends StatefulWidget {
 }
 
 class _FollowersScreenState extends State<FollowersScreen> {
-  final ScrollController _scrollController = ScrollController();
-
   @override
   void initState() {
     super.initState();
     context
         .read<SocialListBloc>()
         .add(LoadSocialList(widget.userId, widget.isFollowersPage));
-
-    // Add scroll listener for pagination
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.9) {
-      // Load more when scrolled to 90%
-      final state = context.read<SocialListBloc>().state;
-      if (state is SocialListLoaded && state.hasMore) {
-        context.read<SocialListBloc>().add(LoadMoreUsers());
-      }
-    }
   }
 
   @override
@@ -63,12 +42,8 @@ class _FollowersScreenState extends State<FollowersScreen> {
             return Center(child: Text(state.message));
           if (state is SocialListLoaded) {
             return ListView.builder(
-              controller: _scrollController,
-              itemCount: state.users.length + (state.hasMore ? 1 : 0),
+              itemCount: state.users.length,
               itemBuilder: (context, index) {
-                if (index == state.users.length)
-                  return Center(child: CircularProgressIndicator());
-
                 final user = state.users[index];
                 return SocialUserTile(
                   user: user,
