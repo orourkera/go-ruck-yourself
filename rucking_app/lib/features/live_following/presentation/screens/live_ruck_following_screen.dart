@@ -11,6 +11,9 @@ import 'package:rucking_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:rucking_app/shared/theme/app_colors.dart';
 import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
+import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:rucking_app/core/services/storage_service.dart';
+import 'dart:io';
 
 /// Screen for following someone's live ruck with real-time updates
 class LiveRuckFollowingScreen extends StatefulWidget {
@@ -154,9 +157,29 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
     });
 
     try {
+      // Get ElevenLabs API key from storage
+      final storageService = GetIt.I<StorageService>();
+      final apiKey = await storageService.getString('elevenlabs_api_key');
+
+      String? audioUrl;
+
+      if (apiKey != null && apiKey.isNotEmpty) {
+        // Generate audio client-side using existing ElevenLabs service
+        final elevenlabs = ElevenLabsService(apiKey);
+        final audioBytes = await elevenlabs.synthesizeSpeech(message, _selectedVoice);
+
+        if (audioBytes != null) {
+          // Upload audio to backend (backend will store in Supabase)
+          // For now, send without audio - TODO: implement audio upload
+          AppLogger.info('[LIVE_FOLLOWING] Generated ${audioBytes.length} bytes of audio');
+        }
+      }
+
+      // Send message (with or without audio)
       await _apiClient.post('/rucks/${widget.ruckId}/messages', {
         'message': message,
         'voice_id': _selectedVoice,
+        // audio upload TODO
       });
 
       _messageController.clear();
