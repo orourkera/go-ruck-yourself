@@ -181,7 +181,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
       }
 
       // Send message (with or without audio)
-      final payload = {
+      final Map<String, dynamic> payload = {
         'message': message,
         'voice_id': _selectedVoice,
       };
