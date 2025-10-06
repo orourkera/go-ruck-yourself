@@ -116,6 +116,13 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
         setState(() {
           _isLoading = false;
         });
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load live data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
