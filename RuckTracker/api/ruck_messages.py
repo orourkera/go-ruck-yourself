@@ -43,8 +43,8 @@ class RuckMessagesResource(Resource):
             session = session_response.data[0]
             recipient_id = session['user_id']
 
-            # Validation checks
-            if session['status'] != 'active':
+            # Validation checks (in_progress or active)
+            if session['status'] not in ['active', 'in_progress']:
                 return {'error': 'Can only send messages to active rucks'}, 400
 
             if not session.get('allow_live_following', True):

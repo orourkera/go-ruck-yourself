@@ -31,8 +31,8 @@ class LiveRuckDataResource(Resource):
             session = session_response.data[0]
             rucker_id = session['user_id']
 
-            # Check if session is active
-            if session['status'] != 'active':
+            # Check if session is active (in_progress or active)
+            if session['status'] not in ['active', 'in_progress']:
                 logger.warning(f"Session {ruck_id} is not active: status={session['status']}")
                 return {'error': 'This ruck is not currently active'}, 400
 
