@@ -122,7 +122,7 @@ def get_following(user_id):
     try:
         current_user_id = g.user.id if hasattr(g, 'user') and g.user else None
         page = int(request.args.get('page', 1))
-        per_page = 20
+        per_page = 100  # Increased from 20 to show more users
         offset = (page - 1) * per_page
         following_res = get_supabase_client().table('user_follows').select('followed_id, created_at, user:followed_id(username, avatar_url)').eq('follower_id', user_id).order('created_at', desc=True).range(offset, offset + per_page - 1).execute()
         following = []
