@@ -5,7 +5,7 @@ Handles live messaging during active ruck sessions
 import logging
 from flask import Blueprint, request, g
 from flask_restful import Resource, Api
-from RuckTracker.supabase_client import get_supabase_client
+from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
 from RuckTracker.services.voice_message_service import voice_message_service
 from RuckTracker.services.notification_manager import notification_manager
 from datetime import datetime
@@ -28,18 +28,19 @@ class RuckMessagesResource(Resource):
             if len(message) > 200:
                 return {'error': 'Message must be 200 characters or less'}, 400
 
-            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            # Use admin client to bypass RLS (we do auth checks manually)
+            supabase = get_supabase_admin_client()
             sender_id = g.user.id
 
             # Get session details
             session_response = supabase.table('ruck_session').select(
                 'id, user_id, status, allow_live_following'
-            ).eq('id', ruck_id).single().execute()
+            ).eq('id', ruck_id).execute()
 
-            if not session_response.data:
+            if not session_response.data or len(session_response.data) == 0:
                 return {'error': 'Session not found'}, 404
 
-            session = session_response.data
+            session = session_response.data[0]
             recipient_id = session['user_id']
 
             # Validation checks
