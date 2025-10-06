@@ -168,7 +168,10 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
       if (apiKey != null && apiKey.isNotEmpty) {
         // Generate audio client-side using existing ElevenLabs service
         final elevenlabs = ElevenLabsService(apiKey);
-        final audioBytes = await elevenlabs.synthesizeSpeech(message, _selectedVoice);
+        final audioBytes = await elevenlabs.synthesizeSpeech(
+          text: message,
+          personality: _selectedVoice,
+        );
 
         if (audioBytes != null) {
           // Upload audio to backend (backend will store in Supabase)
