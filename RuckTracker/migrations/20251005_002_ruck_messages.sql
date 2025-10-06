@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS ruck_messages (
   voice_id TEXT, -- ElevenLabs voice identifier (drill_sergeant, supportive_friend, etc.)
   audio_url TEXT, -- URL to generated audio file in Supabase storage
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  scheduled_for TIMESTAMPTZ, -- When to send (NULL = send immediately)
+  sent_at TIMESTAMPTZ, -- When notification was actually sent
   read_at TIMESTAMPTZ,
   played_at TIMESTAMPTZ,
   CONSTRAINT valid_message_length CHECK (length(message) > 0 AND length(message) <= 200)

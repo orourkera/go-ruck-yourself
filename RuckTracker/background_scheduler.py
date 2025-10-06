@@ -90,6 +90,78 @@ def process_plan_notifications():
     except Exception as e:
         logger.error(f"Error processing plan notifications: {e}")
 
+def process_scheduled_messages():
+    """Process and send scheduled voice messages"""
+    try:
+        from RuckTracker.supabase_client import get_supabase_admin_client
+        from RuckTracker.services.notification_manager import notification_manager
+        from RuckTracker.services.voice_message_service import voice_message_service
+        from datetime import datetime
+
+        supabase = get_supabase_admin_client()
+
+        # Find messages scheduled for now or earlier that haven't been sent
+        now = datetime.utcnow().isoformat()
+        result = supabase.table('ruck_messages').select(
+            '*, sender:sender_id(username), recipient:recipient_id(id)'
+        ).lte('scheduled_for', now).is_('sent_at', 'null').execute()
+
+        if not result.data:
+            return
+
+        logger.info(f"Processing {len(result.data)} scheduled messages")
+
+        for msg in result.data:
+            try:
+                # Generate audio if not already generated
+                if not msg.get('audio_url') and msg.get('voice_id'):
+                    audio_url = voice_message_service.generate_voice_message(
+                        msg['message'],
+                        msg['voice_id']
+                    )
+                    # Update message with audio URL
+                    if audio_url:
+                        supabase.table('ruck_messages').update({
+                            'audio_url': audio_url
+                        }).eq('id', msg['id']).execute()
+                        msg['audio_url'] = audio_url
+
+                # Send notification
+                sender_name = msg.get('sender', {}).get('username', 'Someone')
+                notification_data = {
+                    'ruck_id': msg['ruck_id'],
+                    'message_id': msg['id'],
+                    'sender_id': msg['sender_id'],
+                    'voice_id': msg['voice_id'],
+                    'has_audio': bool(msg.get('audio_url')),
+                    'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                }
+
+                if msg.get('audio_url'):
+                    notification_data['audio_url'] = msg['audio_url']
+
+                notification_manager.send_notification(
+                    recipients=[msg['recipient_id']],
+                    notification_type='ruck_message',
+                    title=f'🎤 {sender_name}',
+                    body=msg['message'],
+                    data=notification_data,
+                    sender_id=msg['sender_id']
+                )
+
+                # Mark as sent
+                supabase.table('ruck_messages').update({
+                    'sent_at': datetime.utcnow().isoformat()
+                }).eq('id', msg['id']).execute()
+
+                logger.info(f"Sent scheduled message {msg['id']}")
+
+            except Exception as msg_error:
+                logger.error(f"Failed to send scheduled message {msg.get('id')}: {msg_error}")
+
+    except Exception as e:
+        logger.error(f"Error processing scheduled messages: {e}")
+
 def main():
     """Main scheduler loop"""
     logger.info("Starting background scheduler...")
@@ -115,6 +187,15 @@ def main():
         id='plan_notifications',
         name='Process Coaching Plan Notifications',
         misfire_grace_time=300  # Allow 5 minute grace period for misfires
+    )
+
+    # Add scheduled voice messages job (every 1 minute)
+    scheduler.add_job(
+        process_scheduled_messages,
+        'interval',
+        minutes=1,
+        id='scheduled_messages',
+        name='Process Scheduled Voice Messages'
     )
     
     try:

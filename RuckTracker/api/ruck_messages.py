@@ -21,6 +21,7 @@ class RuckMessagesResource(Resource):
             data = request.get_json()
             message = data.get('message', '').strip()
             voice_id = data.get('voice_id', 'supportive_friend')
+            delay_minutes = data.get('delay_minutes', 0)
 
             if not message:
                 return {'error': 'Message is required'}, 400
@@ -65,14 +66,20 @@ class RuckMessagesResource(Resource):
             sender_response = supabase.table('user').select('username').eq('id', sender_id).single().execute()
             sender_name = sender_response.data.get('username', 'Someone') if sender_response.data else 'Someone'
 
-            # Generate voice audio
-            logger.info(f"Generating voice message for ruck {ruck_id}: voice={voice_id}, length={len(message)}")
-            audio_url = voice_message_service.generate_voice_message(message, voice_id)
+            # Calculate scheduled time if delayed
+            from datetime import datetime, timedelta
+            scheduled_for = None
+            if delay_minutes > 0:
+                scheduled_for = (datetime.utcnow() + timedelta(minutes=delay_minutes)).isoformat()
 
-            if not audio_url:
-                logger.warning("Voice generation failed, saving message without audio")
-                # Still save the message even if voice generation fails
-                audio_url = None
+            # Generate voice audio (only if sending immediately)
+            audio_url = None
+            if delay_minutes == 0:
+                logger.info(f"Generating voice message for ruck {ruck_id}: voice={voice_id}, length={len(message)}")
+                audio_url = voice_message_service.generate_voice_message(message, voice_id)
+
+                if not audio_url:
+                    logger.warning("Voice generation failed, saving message without audio")
 
             # Save message to database
             message_data = {
@@ -82,7 +89,9 @@ class RuckMessagesResource(Resource):
                 'message': message,
                 'voice_id': voice_id,
                 'audio_url': audio_url,
-                'created_at': datetime.utcnow().isoformat()
+                'created_at': datetime.utcnow().isoformat(),
+                'scheduled_for': scheduled_for,
+                'sent_at': None if scheduled_for else datetime.utcnow().isoformat(),
             }
 
             insert_result = supabase.table('ruck_messages').insert(message_data).execute()
@@ -92,32 +101,40 @@ class RuckMessagesResource(Resource):
 
             saved_message = insert_result.data[0]
 
-            # Send push notification to rucker
-            logger.info(f"Sending ruck message notification to {recipient_id}")
-            notification_data = {
-                'ruck_id': ruck_id,
-                'message_id': saved_message['id'],
-                'sender_id': sender_id,
-                'voice_id': voice_id,
-                'has_audio': bool(audio_url),
-                'click_action': 'FLUTTER_NOTIFICATION_CLICK'
-            }
+            # Send push notification immediately OR schedule for later
+            if delay_minutes == 0:
+                # Send now
+                logger.info(f"Sending ruck message notification to {recipient_id}")
+                notification_data = {
+                    'ruck_id': ruck_id,
+                    'message_id': saved_message['id'],
+                    'sender_id': sender_id,
+                    'voice_id': voice_id,
+                    'has_audio': bool(audio_url),
+                    'click_action': 'FLUTTER_NOTIFICATION_CLICK'
+                }
 
-            if audio_url:
-                notification_data['audio_url'] = audio_url
+                if audio_url:
+                    notification_data['audio_url'] = audio_url
 
-            notification_manager.send_notification(
-                recipients=[recipient_id],
-                notification_type='ruck_message',
-                title=f'🎤 {sender_name}',
-                body=message,
-                data=notification_data,
-                sender_id=sender_id
-            )
+                notification_manager.send_notification(
+                    recipients=[recipient_id],
+                    notification_type='ruck_message',
+                    title=f'🎤 {sender_name}',
+                    body=message,
+                    data=notification_data,
+                    sender_id=sender_id
+                )
+                response_message = 'Message sent!'
+            else:
+                # Scheduled for later - background worker will send it
+                logger.info(f"Scheduled message for {scheduled_for} (in {delay_minutes} minutes)")
+                response_message = f'Message scheduled for {delay_minutes} minutes from now'
 
             return {
                 'status': 'success',
-                'message': saved_message
+                'message': saved_message,
+                'response': response_message
             }, 201
 
         except Exception as e:
