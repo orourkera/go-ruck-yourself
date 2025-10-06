@@ -90,9 +90,10 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
 
       if (data != null && mounted) {
         setState(() {
-          _currentDistance = (data['distance_km'] as num?)?.toDouble() ?? 0.0;
-          _currentDuration = data['duration_seconds'] as int? ?? 0;
-          _currentPace = (data['average_pace'] as num?)?.toDouble() ?? 0.0;
+          // Handle null values from API - session might be new
+          _currentDistance = (data['distance_km'] as num?)?.toDouble() ?? _currentDistance;
+          _currentDuration = data['duration_seconds'] as int? ?? _currentDuration;
+          _currentPace = (data['average_pace'] as num?)?.toDouble() ?? _currentPace;
           _lastUpdate = data['last_location_update'] != null
               ? DateTime.parse(data['last_location_update'])
               : null;
@@ -277,29 +278,33 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                       // Voice selector
                       DropdownButtonFormField<String>(
                         value: _selectedVoice,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Voice',
-                          prefixIcon: Icon(Icons.record_voice_over),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                          prefixIcon: const Icon(Icons.record_voice_over),
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
                         ),
                         isExpanded: true,
+                        itemHeight: 70, // Increased height for two-line items
                         items: _voiceOptions.map((voice) {
                           return DropdownMenuItem(
                             value: voice['id'],
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     voice['name']!,
-                                    style: const TextStyle(fontSize: 15),
+                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
+                                  const SizedBox(height: 2),
                                   Text(
                                     voice['desc']!,
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -313,7 +318,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                             });
                           }
                         },
-                        menuMaxHeight: 300,
+                        menuMaxHeight: 400,
                       ),
                       const SizedBox(height: 12),
 
