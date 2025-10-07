@@ -55,3 +55,9 @@ sentry_issues_*.json
 
 # Web (if applicable)
 .dart_tool/build/
+
+# Sora video outputs
+route_card.png
+ruck_summary.mp4
+*.mp4
+scripts/*.png

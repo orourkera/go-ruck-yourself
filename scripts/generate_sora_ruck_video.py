@@ -142,32 +142,19 @@ def encode_route_polyline(points: Sequence[Tuple[float, float]] | Sequence[Seque
 
 
 def fetch_stadia_static(route: Sequence[Tuple[float, float]], token: str) -> Image.Image:
-    """Retrieve a static map image with the route overlayed using Stadia Maps."""
+    """Create a simple background image (Stadia doesn't have static API)."""
+    # Create a gradient background instead
+    from PIL import ImageDraw
+    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color='#2d5016')
+    draw = ImageDraw.Draw(img)
 
-    # Calculate bounds for the route
-    lons = [p[0] for p in route]
-    lats = [p[1] for p in route]
-    min_lon, max_lon = min(lons), max(lons)
-    min_lat, max_lat = min(lats), max(lats)
+    # Add simple gradient
+    for y in range(CARD_HEIGHT):
+        opacity = int(255 * (1 - y / CARD_HEIGHT))
+        color = (45 + opacity // 4, 80 + opacity // 4, 22 + opacity // 4)
+        draw.line([(0, y), (CARD_WIDTH, y)], fill=color)
 
-    # Add 10% padding
-    lon_pad = (max_lon - min_lon) * 0.1
-    lat_pad = (max_lat - min_lat) * 0.1
-    bbox = f"{min_lon-lon_pad},{min_lat-lat_pad},{max_lon+lon_pad},{max_lat+lat_pad}"
-
-    # Build path parameter (lon,lat pairs separated by |)
-    path_coords = "|".join([f"{lon},{lat}" for lon, lat in route])
-
-    url = (
-        f"https://tiles.stadiamaps.com/static/outdoors/"
-        f"path({path_coords})/"
-        f"{CARD_WIDTH}x{CARD_HEIGHT}@2x.png"
-        f"?api_key={token}"
-    )
-
-    resp = requests.get(url, timeout=20)
-    resp.raise_for_status()
-    return Image.open(BytesIO(resp.content)).convert("RGB")
+    return img
 
 
 def _load_font(size: int) -> ImageFont.FreeTypeFont:
