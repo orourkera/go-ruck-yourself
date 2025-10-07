@@ -961,6 +961,49 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                             },
                           ),
                         ),
+                        // AI Cheerleader voice selector (compact)
+                        if (state is ActiveSessionRunning && widget.aiCheerleaderEnabled)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Icon(Icons.record_voice_over, size: 16, color: Colors.grey[600]),
+                                const SizedBox(width: 4),
+                                FutureBuilder<String>(
+                                  future: SharedPreferences.getInstance().then((prefs) =>
+                                    prefs.getString('aiCheerleaderPersonality') ?? 'Drill Sergeant'),
+                                  builder: (context, snapshot) {
+                                    final currentVoice = snapshot.data ?? 'Drill Sergeant';
+                                    return DropdownButton<String>(
+                                      value: currentVoice,
+                                      isDense: true,
+                                      underline: const SizedBox(),
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                      items: const [
+                                        DropdownMenuItem(value: 'Supportive Friend', child: Text('🤗 Supportive')),
+                                        DropdownMenuItem(value: 'Drill Sergeant', child: Text('🎖️ Drill Sgt')),
+                                        DropdownMenuItem(value: 'Southern Redneck', child: Text('🤠 Redneck')),
+                                        DropdownMenuItem(value: 'Yoga Instructor', child: Text('🧘 Yoga')),
+                                        DropdownMenuItem(value: 'British Butler', child: Text('🎩 Butler')),
+                                        DropdownMenuItem(value: 'Sports Commentator', child: Text('📢 Sports')),
+                                        DropdownMenuItem(value: 'Cowboy/Cowgirl', child: Text('🤠 Cowboy')),
+                                        DropdownMenuItem(value: 'Nature Lover', child: Text('🌲 Nature')),
+                                        DropdownMenuItem(value: 'Burt Reynolds', child: Text('😎 Burt')),
+                                        DropdownMenuItem(value: 'Tom Selleck', child: Text('🥸 Tom')),
+                                      ],
+                                      onChanged: (value) async {
+                                        if (value != null) {
+                                          final prefs = await SharedPreferences.getInstance();
+                                          await prefs.setString('aiCheerleaderPersonality', value);
+                                        }
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                         // AI Cheerleader message display
                         if (state is ActiveSessionRunning &&
                             state.aiCheerMessage != null &&
