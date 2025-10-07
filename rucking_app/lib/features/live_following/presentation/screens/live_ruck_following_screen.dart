@@ -13,6 +13,7 @@ import 'package:rucking_app/shared/theme/app_text_styles.dart';
 import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
+import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
 import 'dart:io';
 
 /// Screen for following someone's live ruck with real-time updates
@@ -128,13 +129,14 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
           _isLoading = false;
         });
 
-        // Check if session ended - stop polling
+        // Check if session ended - navigate to completed ruck detail
         if (e.toString().contains('not currently active') || e.toString().contains('400')) {
           _refreshTimer?.cancel();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('This ruck has ended'),
-              backgroundColor: Colors.orange,
+
+          // Navigate to ruck detail screen
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => RuckBuddyDetailScreen.fromRuckId(widget.ruckId),
             ),
           );
         } else {
