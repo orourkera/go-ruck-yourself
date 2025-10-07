@@ -226,8 +226,10 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Column(
           children: [
@@ -279,116 +281,134 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                 const Divider(height: 1),
 
                 // Message input
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Voice selector
-                      DropdownButtonFormField<String>(
-                        value: _selectedVoice,
-                        decoration: InputDecoration(
-                          labelText: 'Voice',
-                          prefixIcon: const Icon(Icons.record_voice_over),
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-                        ),
-                        isExpanded: true,
-                        itemHeight: 70, // Increased height for two-line items
-                        items: _voiceOptions.map((voice) {
-                          return DropdownMenuItem(
-                            value: voice['id'],
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    voice['name']!,
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    voice['desc']!,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedVoice = value;
-                            });
-                          }
-                        },
-                        menuMaxHeight: 400,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Delay selector
-                      DropdownButtonFormField<String>(
-                        value: _selectedDelay,
-                        decoration: const InputDecoration(
-                          labelText: 'Send',
-                          prefixIcon: Icon(Icons.schedule),
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                        ),
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(value: 'now', child: Text('Send Now')),
-                          DropdownMenuItem(value: '5', child: Text('In 5 minutes')),
-                          DropdownMenuItem(value: '15', child: Text('In 15 minutes')),
-                          DropdownMenuItem(value: '30', child: Text('In 30 minutes')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedDelay = value;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Message input
-                      Row(
+                AnimatedPadding(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  padding: EdgeInsets.only(bottom: bottomInset > 0 ? bottomInset - 12 : 0),
+                  child: SafeArea(
+                    top: false,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _messageController,
-                              maxLength: 200,
-                              maxLines: 2,
-                              decoration: const InputDecoration(
-                                hintText: 'Send encouragement...',
-                                border: OutlineInputBorder(),
-                                counterText: '',
+                          // Voice selector
+                          DropdownButtonFormField<String>(
+                            value: _selectedVoice,
+                            decoration: InputDecoration(
+                              labelText: 'Voice',
+                              prefixIcon: const Icon(Icons.record_voice_over),
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 20,
+                                horizontal: 12,
                               ),
                             ),
+                            isExpanded: true,
+                            itemHeight: 70, // Increased height for two-line items
+                            items: _voiceOptions.map((voice) {
+                              return DropdownMenuItem(
+                                value: voice['id'],
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        voice['name']!,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        voice['desc']!,
+                                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _selectedVoice = value;
+                                });
+                              }
+                            },
+                            menuMaxHeight: 400,
                           ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: _isSendingMessage
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.send),
-                            color: AppColors.primary,
-                            iconSize: 32,
-                            onPressed: _isSendingMessage ? null : _sendMessage,
+                          const SizedBox(height: 12),
+
+                          // Delay selector
+                          DropdownButtonFormField<String>(
+                            value: _selectedDelay,
+                            decoration: const InputDecoration(
+                              labelText: 'Send',
+                              prefixIcon: Icon(Icons.schedule),
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 12,
+                              ),
+                            ),
+                            isExpanded: true,
+                            items: const [
+                              DropdownMenuItem(value: 'now', child: Text('Send Now')),
+                              DropdownMenuItem(value: '5', child: Text('In 5 minutes')),
+                              DropdownMenuItem(value: '15', child: Text('In 15 minutes')),
+                              DropdownMenuItem(value: '30', child: Text('In 30 minutes')),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _selectedDelay = value;
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Message input
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _messageController,
+                                  maxLength: 200,
+                                  maxLines: 2,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Send encouragement...',
+                                    border: OutlineInputBorder(),
+                                    counterText: '',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: _isSendingMessage
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.send),
+                                color: AppColors.primary,
+                                iconSize: 32,
+                                onPressed: _isSendingMessage ? null : _sendMessage,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],

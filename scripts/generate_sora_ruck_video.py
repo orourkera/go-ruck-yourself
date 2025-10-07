@@ -225,32 +225,53 @@ def call_sora(
     duration_seconds: int,
     output_path: Path,
 ) -> Path:
-    image_b64 = base64.b64encode(route_card_path.read_bytes()).decode("utf-8")
+    """Call Sora API using the videos endpoint."""
+    import requests
 
-    response = client.responses.create(
-        model=SORA_MODEL,
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": prompt},
-                    {"type": "input_image", "image_base64": image_b64},
-                ],
-            }
-        ],
-        video={"duration_seconds": duration_seconds, "format": "mp4"},
-    )
+    api_key = client.api_key
 
-    try:
-        video_part = response.output[0].content[0].video
-        video_data = getattr(video_part, "data", None) or getattr(video_part, "b64_json", None)
-        if video_data is None:
-            raise ValueError("Sora response missing video content")
-    except (AttributeError, IndexError) as exc:  # pragma: no cover - defensive parsing
-        raise ValueError(f"Unexpected Sora response structure: {response}") from exc
+    # Try the documented Sora API format
+    with open(route_card_path, 'rb') as f:
+        files = {
+            'model': (None, SORA_MODEL),
+            'prompt': (None, prompt),
+            'image': ('route_card.png', f, 'image/png'),
+        }
+
+        headers = {
+            'Authorization': f'Bearer {api_key}'
+        }
+
+        print(f"Calling Sora API with model: {SORA_MODEL}")
+        print(f"Prompt: {prompt[:100]}...")
+
+        resp = requests.post(
+            'https://api.openai.com/v1/videos',
+            headers=headers,
+            files=files,
+            timeout=120
+        )
+
+        # Print response for debugging
+        print(f"Response status: {resp.status_code}")
+        print(f"Response body: {resp.text[:500]}")
+
+        resp.raise_for_status()
+
+        result = resp.json()
+
+    # Download the video from the returned URL
+    video_url = result.get('url') or result.get('data', {}).get('url')
+    if not video_url:
+        raise ValueError(f"No video URL in response: {result}")
+
+    print(f"Downloading video from: {video_url}")
+    video_resp = requests.get(video_url, timeout=60)
+    video_resp.raise_for_status()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(base64.b64decode(video_data))
+    output_path.write_bytes(video_resp.content)
+    print(f"Video saved to: {output_path}")
     return output_path
 
 
