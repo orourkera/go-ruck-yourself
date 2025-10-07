@@ -28,6 +28,7 @@ import 'package:rucking_app/features/health_integration/domain/health_service.da
 import 'package:rucking_app/features/ai_cheerleader/services/ai_cheerleader_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/openai_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/location_context_service.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/ai_audio_service.dart';
 import 'package:rucking_app/core/services/device_performance_service.dart';
