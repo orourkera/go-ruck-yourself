@@ -962,7 +962,7 @@ class _ActiveSessionViewState extends State<_ActiveSessionView> {
                           ),
                         ),
                         // AI Cheerleader voice selector (compact)
-                        if (state is ActiveSessionRunning && widget.aiCheerleaderEnabled)
+                        if (state is ActiveSessionRunning)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                             child: Row(
