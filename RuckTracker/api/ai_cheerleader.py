@@ -87,7 +87,7 @@ DEFAULT_USER_PROMPT_TEMPLATE = """Context data:
 
 Last message: {last_message}
 
-Analyze which bucket the last message used, then generate a fresh message from a DIFFERENT bucket with completely new phrasing."""
+Internally analyze which bucket the last message used (don't output this analysis). Then generate ONLY the encouragement message from a DIFFERENT bucket with completely new phrasing. Output just the message, nothing else."""
 
 # Cache for prompts (refresh every 5 minutes)
 _prompt_cache = None
