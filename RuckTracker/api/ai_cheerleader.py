@@ -73,6 +73,7 @@ COACHING PLAN TIPS:
 
 ENVIRONMENT/LOCATION:
 - Comment on the location or route
+- Give interesting insights on the location itself (relevant stats, historical facts, local trivia)
 - Reference weather conditions
 - Acknowledge terrain challenges
 - Connect environment to experience
