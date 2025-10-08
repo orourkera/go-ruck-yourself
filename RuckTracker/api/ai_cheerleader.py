@@ -568,8 +568,11 @@ class AICheerleaderLogResource(Resource):
                     last_message = "No previous message"
 
             user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message)
-            
-            logger.info(f"[AI_CHEERLEADER] Calling OpenAI with {len(context_str)} chars of context")
+
+            logger.info(f"[AI_CHEERLEADER] Last message: {last_message[:100] if last_message else 'None'}...")
+            logger.info(f"[AI_CHEERLEADER] System prompt length: {len(system_prompt)} chars")
+            logger.info(f"[AI_CHEERLEADER] User prompt length: {len(user_prompt)} chars")
+            logger.info(f"[AI_CHEERLEADER] Calling OpenAI with model: {os.getenv('OPENAI_CHEERLEADER_MODEL', 'gpt-4.1')}")
             
             # Call OpenAI with timeout and error handling
             try:
