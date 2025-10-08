@@ -286,7 +286,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                 AnimatedPadding(
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
-                  padding: EdgeInsets.only(bottom: bottomInset > 0 ? bottomInset - 12 : 0),
+                  padding: EdgeInsets.only(bottom: bottomInset),
                   child: SafeArea(
                     top: false,
                     child: Container(
