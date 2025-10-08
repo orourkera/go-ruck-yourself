@@ -563,7 +563,7 @@ class AICheerleaderLogResource(Resource):
             last_message = "No previous message"
             if ai_logs and len(ai_logs) > 0:
                 try:
-                    last_message = ai_logs[0].get('message', 'No previous message')
+                    last_message = ai_logs[0].get('openai_response', 'No previous message')
                 except (KeyError, IndexError, AttributeError):
                     last_message = "No previous message"
 
