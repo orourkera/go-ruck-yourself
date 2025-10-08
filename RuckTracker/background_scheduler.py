@@ -96,12 +96,12 @@ def process_scheduled_messages():
         from RuckTracker.supabase_client import get_supabase_admin_client
         from RuckTracker.services.notification_manager import notification_manager
         from RuckTracker.services.voice_message_service import voice_message_service
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         supabase = get_supabase_admin_client()
 
         # Find messages scheduled for now or earlier that haven't been sent
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         result = supabase.table('ruck_messages').select(
             '*, sender:sender_id(username), recipient:recipient_id(id)'
         ).lte('scheduled_for', now).is_('sent_at', 'null').execute()
@@ -151,7 +151,7 @@ def process_scheduled_messages():
 
                 # Mark as sent
                 supabase.table('ruck_messages').update({
-                    'sent_at': datetime.utcnow().isoformat()
+                    'sent_at': datetime.now(timezone.utc).isoformat()
                 }).eq('id', msg['id']).execute()
 
                 logger.info(f"Sent scheduled message {msg['id']}")
