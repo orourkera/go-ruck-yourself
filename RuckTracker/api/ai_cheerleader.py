@@ -576,6 +576,7 @@ class AICheerleaderLogResource(Resource):
 
             user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message).replace('{explicit_allowed}', str(explicit_allowed))
 
+            logger.info(f"[AI_CHEERLEADER] Explicit language allowed: {explicit_allowed}")
             logger.info(f"[AI_CHEERLEADER] Last message: {last_message[:100] if last_message else 'None'}...")
             logger.info(f"[AI_CHEERLEADER] System prompt length: {len(system_prompt)} chars")
             logger.info(f"[AI_CHEERLEADER] User prompt length: {len(user_prompt)} chars")
