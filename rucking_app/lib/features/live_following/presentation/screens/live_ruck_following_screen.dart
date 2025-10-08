@@ -292,91 +292,72 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       color: Theme.of(context).scaffoldBackgroundColor,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Voice selector
-                          DropdownButtonFormField<String>(
-                            value: _selectedVoice,
-                            decoration: InputDecoration(
-                              labelText: 'Voice',
-                              prefixIcon: const Icon(Icons.record_voice_over),
-                              border: const OutlineInputBorder(),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 20,
-                                horizontal: 12,
-                              ),
-                            ),
-                            isExpanded: true,
-                            itemHeight: 70, // Increased height for two-line items
-                            items: _voiceOptions.map((voice) {
-                              return DropdownMenuItem(
-                                value: voice['id'],
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        voice['name']!,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        voice['desc']!,
-                                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Voice selector (compact)
+                            Row(
+                              children: [
+                                const Icon(Icons.record_voice_over, size: 16),
+                                const SizedBox(width: 8),
+                                const Text('Voice:', style: TextStyle(fontSize: 14)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: DropdownButton<String>(
+                                    value: _selectedVoice,
+                                    isExpanded: true,
+                                    isDense: true,
+                                    items: _voiceOptions.map((voice) {
+                                      return DropdownMenuItem(
+                                        value: voice['id'],
+                                        child: Text(voice['name']!, style: const TextStyle(fontSize: 13)),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setState(() {
+                                          _selectedVoice = value;
+                                        });
+                                      }
+                                    },
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() {
-                                  _selectedVoice = value;
-                                });
-                              }
-                            },
-                            menuMaxHeight: 400,
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Delay selector
-                          DropdownButtonFormField<String>(
-                            value: _selectedDelay,
-                            decoration: const InputDecoration(
-                              labelText: 'Send',
-                              prefixIcon: Icon(Icons.schedule),
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 12,
-                              ),
+                              ],
                             ),
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 'now', child: Text('Send Now')),
-                              DropdownMenuItem(value: '5', child: Text('In 5 minutes')),
-                              DropdownMenuItem(value: '15', child: Text('In 15 minutes')),
-                              DropdownMenuItem(value: '30', child: Text('In 30 minutes')),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() {
-                                  _selectedDelay = value;
-                                });
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 12),
+                            const SizedBox(height: 8),
+
+                            // Delay selector (compact)
+                            Row(
+                              children: [
+                                const Icon(Icons.schedule, size: 16),
+                                const SizedBox(width: 8),
+                                const Text('Send:', style: TextStyle(fontSize: 14)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: DropdownButton<String>(
+                                    value: _selectedDelay,
+                                    isExpanded: true,
+                                    isDense: true,
+                                    items: const [
+                                      DropdownMenuItem(value: 'now', child: Text('Now')),
+                                      DropdownMenuItem(value: '5', child: Text('In 5 min')),
+                                      DropdownMenuItem(value: '15', child: Text('In 15 min')),
+                                      DropdownMenuItem(value: '30', child: Text('In 30 min')),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setState(() {
+                                          _selectedDelay = value;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
 
                           // Message input
                           Row(
