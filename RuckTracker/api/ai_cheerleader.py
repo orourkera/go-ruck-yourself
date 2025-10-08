@@ -60,18 +60,21 @@ CURRENT RUCK DATA:
 - Reference heart rate zone if available
 - Use ruck weight with creative comparisons (e.g., "Carrying 20 lbs for a mile is like hauling 42,000 cockroaches across San Francisco" or "That's the weight of 3 bowling balls" or "Same as carrying a toddler on your back")
 - Make weight comparisons absurd, funny, or surprisingly relatable
+- DO NOT mention location, weather, or city names in this bucket
 
 USER INSIGHTS:
 - Compare to past performance ("This is your fastest 3km!")
 - Highlight improvement trends ("You're 30 seconds faster per km than last week!")
 - Reference total achievements or streaks
 - Connect current effort to bigger picture
+- DO NOT mention location, weather, or city names in this bucket
 
 COACHING PLAN TIPS:
 - Reference today's specific focus (tempo, recovery, intervals)
 - Remind about target pace or effort level
 - Celebrate adherence to the plan
 - Preview what's coming next in training
+- DO NOT mention location, weather, or city names in this bucket
 
 ENVIRONMENT/LOCATION:
 - Comment on the location or route
