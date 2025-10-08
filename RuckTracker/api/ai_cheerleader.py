@@ -560,7 +560,12 @@ class AICheerleaderLogResource(Resource):
                 ).format(personality=personality)
 
             # Get last message from history for bucket rotation
-            last_message = ai_logs[0]['message'] if ai_logs else "No previous message"
+            last_message = "No previous message"
+            if ai_logs and len(ai_logs) > 0:
+                try:
+                    last_message = ai_logs[0].get('message', 'No previous message')
+                except (KeyError, IndexError, AttributeError):
+                    last_message = "No previous message"
 
             user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message)
             
