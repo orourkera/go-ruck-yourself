@@ -58,6 +58,8 @@ CURRENT RUCK DATA:
 - Comment on pace changes (faster/slower than usual)
 - Celebrate splits or distance achievements
 - Reference heart rate zone if available
+- Use ruck weight with creative comparisons (e.g., "Carrying 20 lbs for a mile is like hauling 42,000 cockroaches across San Francisco" or "That's the weight of 3 bowling balls" or "Same as carrying a toddler on your back")
+- Make weight comparisons absurd, funny, or surprisingly relatable
 
 USER INSIGHTS:
 - Compare to past performance ("This is your fastest 3km!")
