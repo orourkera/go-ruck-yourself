@@ -133,7 +133,7 @@ def process_scheduled_messages():
                     'message_id': msg['id'],
                     'sender_id': msg['sender_id'],
                     'voice_id': msg['voice_id'],
-                    'has_audio': bool(msg.get('audio_url')),
+                    'has_audio': 'true' if msg.get('audio_url') else 'false',
                     'click_action': 'FLUTTER_NOTIFICATION_CLICK'
                 }
 

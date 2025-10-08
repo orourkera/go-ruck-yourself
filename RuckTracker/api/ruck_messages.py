@@ -110,7 +110,7 @@ class RuckMessagesResource(Resource):
                     'message_id': saved_message['id'],
                     'sender_id': sender_id,
                     'voice_id': voice_id,
-                    'has_audio': bool(audio_url),
+                    'has_audio': 'true' if audio_url else 'false',
                     'click_action': 'FLUTTER_NOTIFICATION_CLICK'
                 }
 
