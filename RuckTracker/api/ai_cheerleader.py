@@ -88,13 +88,16 @@ Be specific, be creative, rotate buckets, avoid repetition."""
 DEFAULT_USER_PROMPT_TEMPLATE = """Context data:
 {context}
 
-Last message: {last_message}
+Last 10 messages: {last_message}
 
 Explicit language allowed: {explicit_allowed}
 
 Internally analyze which bucket the last message used (don't output this analysis). Then generate ONLY the encouragement message from a DIFFERENT bucket with completely new phrasing.
 
-If explicit language is allowed, use strong, raw, profanity-laced language like a hardcore coach (think: "fuck yeah!", "badass", "beast mode", etc.). Be aggressive and intense when appropriate.
+CRITICAL RULES:
+1. Do NOT repeat specific data points from previous messages in the same bucket (e.g., if you mentioned "10 total sessions" before in USER INSIGHTS, use different stats like pace improvement or distance PR)
+2. Vary the angle within each bucket - USER INSIGHTS has many dimensions (pace, distance, streaks, achievements, improvement trends)
+3. If explicit language is allowed, use strong, raw, profanity-laced language like a hardcore coach (think: "fuck yeah!", "badass", "crushing it", etc.). Be aggressive and intense.
 
 Output just the message, nothing else."""
 
@@ -282,7 +285,7 @@ class AICheerleaderLogResource(Resource):
                 # Get recent AI responses to avoid repetition - reduce limit for performance
                 ai_logs_resp = supabase_admin.table('ai_cheerleader_logs').select(
                     'openai_response'
-                ).eq('user_id', user_id).order('created_at', desc=True).limit(5).execute()  # Reduced from 20 to 5
+                ).eq('user_id', user_id).order('created_at', desc=True).limit(10).execute()  # Get last 10 for better variety checking
                 ai_logs = ai_logs_resp.data or []
                 logger.info(f"[AI_CHEERLEADER] Found {len(ai_logs)} previous AI responses for user {user_id}")
 
@@ -569,18 +572,19 @@ class AICheerleaderLogResource(Resource):
                     "\n- Sound like a charismatic friend giving inside jokes or bold comparisons. No hashtags or internet slang."\
                 ).format(personality=personality)
 
-            # Get last message from history for bucket rotation
-            last_message = "No previous message"
+            # Get last 10 messages from history for better variety checking
+            last_messages = "No previous messages"
             if ai_logs and len(ai_logs) > 0:
                 try:
-                    last_message = ai_logs[0].get('openai_response', 'No previous message')
+                    messages_list = [log.get('openai_response', '') for log in ai_logs if log.get('openai_response')]
+                    last_messages = '\n'.join([f"{i+1}. {msg}" for i, msg in enumerate(messages_list)])
                 except (KeyError, IndexError, AttributeError):
-                    last_message = "No previous message"
+                    last_messages = "No previous messages"
 
-            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message).replace('{explicit_allowed}', str(explicit_allowed))
+            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_messages).replace('{explicit_allowed}', str(explicit_allowed))
 
             logger.info(f"[AI_CHEERLEADER] Explicit language allowed: {explicit_allowed}")
-            logger.info(f"[AI_CHEERLEADER] Last message: {last_message[:100] if last_message else 'None'}...")
+            logger.info(f"[AI_CHEERLEADER] Last {len(ai_logs)} messages included for variety checking")
             logger.info(f"[AI_CHEERLEADER] System prompt length: {len(system_prompt)} chars")
             logger.info(f"[AI_CHEERLEADER] User prompt length: {len(user_prompt)} chars")
             logger.info(f"[AI_CHEERLEADER] Calling OpenAI with model: {os.getenv('OPENAI_CHEERLEADER_MODEL', 'gpt-4.1')}")
