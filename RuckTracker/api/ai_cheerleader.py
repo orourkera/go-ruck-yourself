@@ -49,7 +49,7 @@ YOUR TASK:
    - Uses completely different word choice and phrasing
    - References specific, concrete data points
    - Is maximally creative and varied
-   - Stays under 75 words
+   - Stays under 90 words (aim for 75-90 for good detail)
 
 BUCKET-SPECIFIC INSTRUCTIONS:
 
@@ -87,7 +87,13 @@ DEFAULT_USER_PROMPT_TEMPLATE = """Context data:
 
 Last message: {last_message}
 
-Internally analyze which bucket the last message used (don't output this analysis). Then generate ONLY the encouragement message from a DIFFERENT bucket with completely new phrasing. Output just the message, nothing else."""
+Explicit language allowed: {explicit_allowed}
+
+Internally analyze which bucket the last message used (don't output this analysis). Then generate ONLY the encouragement message from a DIFFERENT bucket with completely new phrasing.
+
+If explicit language is allowed, use strong, raw, profanity-laced language like a hardcore coach (think: "fuck yeah!", "badass", "beast mode", etc.). Be aggressive and intense when appropriate.
+
+Output just the message, nothing else."""
 
 # Cache for prompts (refresh every 5 minutes)
 _prompt_cache = None
@@ -209,6 +215,7 @@ class AICheerleaderLogResource(Resource):
             personality = data.get('personality') or 'AI Cheerleader'
             environment = data.get('environment') or current_session.get('environment') or {}
             location_ctx = data.get('location') or current_session.get('location') or {}
+            explicit_allowed = data.get('explicit_content', False)
 
             if not user_id:
                 return {"error": "Missing user_id"}, 400
@@ -567,7 +574,7 @@ class AICheerleaderLogResource(Resource):
                 except (KeyError, IndexError, AttributeError):
                     last_message = "No previous message"
 
-            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message)
+            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message).replace('{explicit_allowed}', str(explicit_allowed))
 
             logger.info(f"[AI_CHEERLEADER] Last message: {last_message[:100] if last_message else 'None'}...")
             logger.info(f"[AI_CHEERLEADER] System prompt length: {len(system_prompt)} chars")
@@ -591,7 +598,7 @@ class AICheerleaderLogResource(Resource):
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    max_completion_tokens=120,  # 75 words ~= 100 tokens
+                    max_completion_tokens=150,  # 90 words ~= 120 tokens
                     temperature=1.3,  # Maximum creativity while staying coherent
                     timeout=20.0  # Longer timeout for better model
                 )
