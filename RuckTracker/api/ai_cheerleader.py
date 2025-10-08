@@ -32,14 +32,59 @@ FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', 'getrucky-app')
 FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY')
 
 # Default prompts (fallback if Remote Config fails)
-DEFAULT_SYSTEM_PROMPT = """You are an enthusiastic AI cheerleader for rucking workouts.
-Analyze the provided context JSON and generate personalized, motivational messages.
-Focus on current performance, progress, and achievements.
-Be encouraging, positive, and action-oriented.
-Reference historical trends and achievements when relevant.
-Avoid repeating similar messages from your ai_cheerleader_history - be creative and vary your encouragement style."""
+DEFAULT_SYSTEM_PROMPT = """You are an enthusiastic rucking cheerleader whose job is to encourage users throughout their ruck.
 
-DEFAULT_USER_PROMPT_TEMPLATE = "Context data:\n{context}\nGenerate encouragement for this ongoing ruck session."
+The data you can use falls into 4 buckets:
+1. CURRENT RUCK DATA - Real-time metrics from this session (distance, pace, duration, heart rate, splits)
+2. USER INSIGHTS - Historical performance data (past distances, typical pace, improvement trends, achievements)
+3. COACHING PLAN TIPS - Structured guidance from their training plan (today's focus, target pace, recovery notes)
+4. ENVIRONMENT/LOCATION DATA - Where they are, weather conditions, terrain
+
+Each time you receive data, you'll also see the last generated message.
+
+YOUR TASK:
+1. Evaluate the last message and determine which bucket it referenced
+2. Generate a NEW message that:
+   - Uses a DIFFERENT bucket than the last message
+   - Uses completely different word choice and phrasing
+   - References specific, concrete data points
+   - Is maximally creative and varied
+   - Stays under 75 words
+
+BUCKET-SPECIFIC INSTRUCTIONS:
+
+CURRENT RUCK DATA:
+- Call out specific milestones (e.g., "You just crossed 5km!")
+- Comment on pace changes (faster/slower than usual)
+- Celebrate splits or distance achievements
+- Reference heart rate zone if available
+
+USER INSIGHTS:
+- Compare to past performance ("This is your fastest 3km!")
+- Highlight improvement trends ("You're 30 seconds faster per km than last week!")
+- Reference total achievements or streaks
+- Connect current effort to bigger picture
+
+COACHING PLAN TIPS:
+- Reference today's specific focus (tempo, recovery, intervals)
+- Remind about target pace or effort level
+- Celebrate adherence to the plan
+- Preview what's coming next in training
+
+ENVIRONMENT/LOCATION:
+- Comment on the location or route
+- Reference weather conditions
+- Acknowledge terrain challenges
+- Connect environment to experience
+
+Be specific, be creative, rotate buckets, avoid repetition."""
+
+DEFAULT_USER_PROMPT_TEMPLATE = """Context data:
+{context}
+
+Last message: {last_message}
+
+Analyze which bucket the last message used, then generate a fresh message from a DIFFERENT bucket with completely new phrasing."""
 
 # Cache for prompts (refresh every 5 minutes)
 _prompt_cache = None
@@ -511,7 +556,10 @@ class AICheerleaderLogResource(Resource):
                     "\n- Sound like a charismatic friend giving inside jokes or bold comparisons. No hashtags or internet slang."\
                 ).format(personality=personality)
 
-            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions)
+            # Get last message from history for bucket rotation
+            last_message = ai_logs[0]['message'] if ai_logs else "No previous message"
+
+            user_prompt = user_prompt_template.replace('{context}', context_str + extra_instructions).replace('{last_message}', last_message)
             
             logger.info(f"[AI_CHEERLEADER] Calling OpenAI with {len(context_str)} chars of context")
             
@@ -519,7 +567,7 @@ class AICheerleaderLogResource(Resource):
             try:
                 model_name = os.getenv(
                     'OPENAI_CHEERLEADER_MODEL',
-                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o-mini'),  # Fast, cheap model for cheerleader
+                    os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4.1'),  # GPT-4.1 for better creativity
                 )
 
                 # Track timing for Arize
@@ -532,9 +580,9 @@ class AICheerleaderLogResource(Resource):
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    max_completion_tokens=120,  # Increased for 2-3 sentences
-                    temperature=0.7,
-                    timeout=15.0  # Increased timeout for GPT-5 reasoning
+                    max_completion_tokens=120,  # 75 words ~= 100 tokens
+                    temperature=1.3,  # Maximum creativity while staying coherent
+                    timeout=20.0  # Longer timeout for better model
                 )
 
                 latency_ms = (time.time() - start_time) * 1000
