@@ -6,7 +6,9 @@ import logging
 from flask import Blueprint, g
 from flask_restful import Resource, Api
 from RuckTracker.supabase_client import get_supabase_client, get_supabase_admin_client
-from datetime import datetime
+from datetime import datetime, timezone
+from dateutil import parser
+from geopy.distance import geodesic
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +83,37 @@ class LiveRuckDataResource(Resource):
                     for i, p in enumerate(points) if i % step == 0
                 ]
 
+            # Calculate live metrics for active sessions
+            distance_km = session.get('distance_km', 0) or 0
+            duration_seconds = session.get('duration_seconds', 0) or 0
+            average_pace = session.get('average_pace', 0) or 0
+
+            # For active sessions, calculate real-time values
+            if session['status'] in ['active', 'in_progress'] and session.get('started_at'):
+                # Calculate duration from started_at
+                started_at = parser.parse(session['started_at'])
+                duration_seconds = int((datetime.now(timezone.utc) - started_at).total_seconds())
+
+                # Calculate distance from location points if we have them
+                if route_response.data and len(route_response.data) > 1:
+                    total_distance = 0
+                    points = route_response.data
+                    for i in range(1, len(points)):
+                        point1 = (points[i-1]['latitude'], points[i-1]['longitude'])
+                        point2 = (points[i]['latitude'], points[i]['longitude'])
+                        total_distance += geodesic(point1, point2).kilometers
+                    distance_km = total_distance
+
+                    # Calculate pace (minutes per km) if we have distance
+                    if distance_km > 0 and duration_seconds > 0:
+                        average_pace = (duration_seconds / 60) / distance_km
+
             return {
                 'status': 'success',
                 'ruck_id': ruck_id,
-                'distance_km': session['distance_km'],
-                'duration_seconds': session['duration_seconds'],
-                'average_pace': session['average_pace'],
+                'distance_km': distance_km,
+                'duration_seconds': duration_seconds,
+                'average_pace': average_pace,
                 'current_location': current_location,
                 'route': route,
                 'last_location_update': last_location_update,
