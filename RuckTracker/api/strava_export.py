@@ -2,14 +2,31 @@ import logging
 import requests as http_requests
 import xml.etree.ElementTree as ET
 import io
+import os
+import time
 from datetime import datetime
 from flask import g
 from flask_restful import Resource, request
 from RuckTracker.supabase_client import get_supabase_client
 from RuckTracker.api.auth import auth_required
+from RuckTracker.services.openai_utils import create_chat_completion
 from typing import Dict, List, Any, Optional, Tuple
 
+# Safe import for OpenAI
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
 logger = logging.getLogger(__name__)
+
+# Initialize OpenAI client if available
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+if OpenAI is None:
+    logger.warning("[STRAVA] OpenAI library not available; AI descriptions disabled")
+    openai_client = None
+else:
+    openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 class StravaExportResource(Resource):
     @auth_required
@@ -650,77 +667,106 @@ class StravaExportResource(Resource):
         return None
 
     def _generate_fun_summary(self, session: Dict[str, Any], distance_meters: float, elapsed_time: int, moving_time: int) -> str:
-        """Generate a fun, motivational summary for the Strava description."""
+        """Generate a fun, motivational summary for the Strava description using AI."""
+
+        # If OpenAI is not available, use fallback
+        if not openai_client:
+            return self._generate_fallback_summary(session, distance_meters, elapsed_time, moving_time)
+
+        try:
+            # Get session metrics
+            distance_km = distance_meters / 1000
+            ruck_weight = session.get('ruck_weight_kg', 0)
+            elevation_gain = session.get('elevation_gain_m', 0)
+            calories = session.get('calories_burned', 0)
+            avg_hr = session.get('avg_heart_rate', 0)
+            max_hr = session.get('max_heart_rate', 0)
+
+            # Calculate pace (min/km)
+            pace_min_km = (moving_time / 60) / distance_km if distance_km > 0 else 0
+            pace_formatted = f"{int(pace_min_km)}:{int((pace_min_km % 1) * 60):02d}"
+
+            # Build context for AI
+            context = {
+                'distance_km': round(distance_km, 2),
+                'duration_minutes': round(moving_time / 60, 1),
+                'pace_per_km': pace_formatted,
+                'ruck_weight_kg': round(ruck_weight, 1) if ruck_weight > 0 else None,
+                'elevation_gain_m': round(elevation_gain) if elevation_gain > 0 else None,
+                'calories': round(calories) if calories > 0 else None,
+                'avg_heart_rate': round(avg_hr) if avg_hr > 0 else None,
+                'max_heart_rate': round(max_hr) if max_hr > 0 else None
+            }
+
+            # Remove None values
+            context = {k: v for k, v in context.items() if v is not None}
+
+            # System prompt - similar style to AI cheerleader but for Strava
+            system_prompt = """You are a motivational fitness companion writing a Strava activity description for a ruck (weighted hiking/walking).
+
+Your task: Create a 2-3 sentence description that's motivational, fun, and celebrates the achievement.
+
+Style guidelines:
+- Be enthusiastic and supportive
+- Use creative comparisons for weight/distance when relevant
+- Include 1-2 relevant emojis max
+- Keep it concise (under 50 words)
+- Vary your language - avoid generic phrases like "Great job!"
+- Focus on one standout aspect of the ruck
+- Make it shareable and inspiring"""
+
+            user_prompt = f"""Write a Strava description for this ruck session:
+{context}
+
+Create something unique and motivating that celebrates this specific achievement."""
+
+            # Use same model and settings as AI cheerleader
+            model_name = os.getenv(
+                'OPENAI_CHEERLEADER_MODEL',
+                os.getenv('OPENAI_DEFAULT_MODEL', 'gpt-4o-mini')
+            )
+
+            logger.info(f"[STRAVA] Generating AI description with model: {model_name}")
+
+            completion = create_chat_completion(
+                openai_client,
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_completion_tokens=100,
+                temperature=1.3,  # Same high creativity as cheerleader
+                timeout=10.0
+            )
+
+            ai_description = (completion.choices[0].message.content or "").strip()
+
+            # Limit length if needed
+            words = ai_description.split()
+            if len(words) > 60:
+                ai_description = ' '.join(words[:60])
+
+            logger.info(f"[STRAVA] Generated AI description: {ai_description[:100]}...")
+            return ai_description
+
+        except Exception as e:
+            logger.warning(f"[STRAVA] AI generation failed, using fallback: {e}")
+            return self._generate_fallback_summary(session, distance_meters, elapsed_time, moving_time)
+
+    def _generate_fallback_summary(self, session: Dict[str, Any], distance_meters: float, elapsed_time: int, moving_time: int) -> str:
+        """Fallback summary generator when AI is not available."""
         import random
-        
-        # Get session metrics
+
         distance_km = distance_meters / 1000
         ruck_weight = session.get('ruck_weight_kg', 0)
-        elevation_gain = session.get('elevation_gain_m', 0)
-        calories = session.get('calories_burned', 0)
-        
-        # Calculate pace (min/km)
-        pace_min_km = (moving_time / 60) / distance_km if distance_km > 0 else 0
-        
-        # Fun opening phrases
-        openings = [
-            "Crushed another ruck! 💪",
-            "Pack on, head up, feet moving! 🎯",
-            "Another day, another ruck conquered! 🔥",
-            "Ruck life is the good life! 🎒",
-            "Miles earned, not given! ⚡",
-            "Heavy pack, light heart! ❤️",
-            "Embracing the suck, loving the journey! 🚶‍♂️",
-            "Ruck hard or go home! 💯"
+
+        summaries = [
+            f"Crushed {distance_km:.1f}km with {ruck_weight:.0f}kg! 💪 Another solid ruck in the books.",
+            f"Pack on, feet moving! {distance_km:.1f}km conquered. 🎯",
+            f"Ruck life! {distance_km:.1f}km down, mental toughness up. 🔥",
+            f"Earned every step of those {distance_km:.1f}km! Stay hard! 💎",
+            f"{ruck_weight:.0f}kg for {distance_km:.1f}km - embracing the suck! 🎒"
         ]
-        
-        # Achievement highlights based on metrics
-        achievements = []
-        
-        if ruck_weight >= 20:
-            achievements.append(f"Carrying {ruck_weight:.0f}kg like a beast! 🦍")
-        elif ruck_weight >= 10:
-            achievements.append(f"Solid {ruck_weight:.0f}kg load handled with style! 💼")
-        
-        if distance_km >= 10:
-            achievements.append("Double digits on the distance - legendary! 🏆")
-        elif distance_km >= 5:
-            achievements.append("Solid mileage in the books! 📚")
-        
-        if elevation_gain and elevation_gain >= 200:
-            achievements.append(f"Conquered {elevation_gain:.0f}m of elevation - hill crushing mode! ⛰️")
-        elif elevation_gain and elevation_gain >= 100:
-            achievements.append("Hills didn't stand a chance! 🏔️")
-        
-        if pace_min_km > 0 and pace_min_km <= 8:
-            achievements.append("Keeping that pace tight! ⚡")
-        
-        if calories and calories >= 500:
-            achievements.append(f"Torched {calories:.0f} calories - furnace mode! 🔥")
-        
-        # Motivational endings
-        endings = [
-            "One step closer to greatness! 🌟",
-            "The grind never stops! 💪",
-            "Building that mental toughness! 🧠",
-            "Earned every step! 👟",
-            "Ruck on! 🎯",
-            "Stay hard! 💎",
-            "Progress over perfection! 📈",
-            "This is the way! 🛡️"
-        ]
-        
-        # Construct the summary
-        summary_parts = [random.choice(openings)]
-        
-        if achievements:
-            if len(achievements) == 1:
-                summary_parts.append(achievements[0])
-            else:
-                # Pick 1-2 achievements randomly
-                selected = random.sample(achievements, min(2, len(achievements)))
-                summary_parts.extend(selected)
-        
-        summary_parts.append(random.choice(endings))
-        
-        return " ".join(summary_parts)
+
+        return random.choice(summaries)
