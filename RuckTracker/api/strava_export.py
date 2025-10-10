@@ -447,15 +447,19 @@ class StravaExportResource(Resource):
         # Create a mapping of timestamps to heart rate values for efficient lookup
         hr_by_timestamp = {}
         if hasattr(self, '_current_hr_samples'):
+            logger.info(f"[STRAVA GPX] Processing {len(self._current_hr_samples)} HR samples for timestamp mapping")
             for hr_sample in self._current_hr_samples:
                 hr_timestamp = hr_sample.get('timestamp')
-                if hr_timestamp:
+                bpm = hr_sample.get('bpm')
+                if hr_timestamp and bpm:
                     # Convert to comparable format
                     if isinstance(hr_timestamp, str):
-                        hr_by_timestamp[hr_timestamp] = hr_sample.get('heart_rate')
+                        hr_by_timestamp[hr_timestamp] = bpm  # Fixed: use 'bpm' field
                     else:
-                        hr_by_timestamp[hr_timestamp.isoformat()] = hr_sample.get('heart_rate')
-        
+                        hr_by_timestamp[hr_timestamp.isoformat()] = bpm  # Fixed: use 'bpm' field
+            logger.info(f"[STRAVA GPX] Created HR timestamp map with {len(hr_by_timestamp)} entries")
+
+        hr_matches = 0
         for point in location_points:
             trkpt = ET.SubElement(trkseg, 'trkpt')
             trkpt.set('lat', str(point['latitude']))
@@ -491,6 +495,7 @@ class StravaExportResource(Resource):
                         tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
                     hr_elem = ET.SubElement(tpx_elem, 'gpxtpx:hr')
                     hr_elem.text = str(int(heart_rate))
+                    hr_matches += 1
             
             # Add speed if available (convert m/s to m/s for GPX)
             if point.get('speed_mps') is not None:
@@ -511,7 +516,12 @@ class StravaExportResource(Resource):
                         tpx_elem = ET.SubElement(extensions, 'gpxtpx:TrackPointExtension')
                     course_elem = ET.SubElement(tpx_elem, 'gpxtpx:course')
                     course_elem.text = str(course_deg)
-        
+
+        # Log HR matching results
+        if hasattr(self, '_current_hr_samples') and self._current_hr_samples:
+            logger.info(f"[STRAVA GPX] Embedded {hr_matches} HR values out of {len(location_points)} GPS points "
+                       f"({hr_matches * 100 // len(location_points) if location_points else 0}% coverage)")
+
         # Convert to string
         return ET.tostring(gpx, encoding='unicode')
     
@@ -528,7 +538,8 @@ class StravaExportResource(Resource):
             
             # Store heart rate samples for GPX generation
             self._current_hr_samples = heart_rate_samples or []
-            
+            logger.info(f"[STRAVA] Preparing to embed {len(self._current_hr_samples)} HR samples into GPX")
+
             # Generate GPX content with heart rate data
             gpx_content = self._generate_gpx_content(session, session_name, description, location_points)
             
