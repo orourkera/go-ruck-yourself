@@ -398,6 +398,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           maxHr: event.maxHr,
           calorieMethod: event.calorieMethod,
           calorieActiveOnly: event.calorieActiveOnly,
+          stravaAutoExport: event.stravaAutoExport,
         );
         emit(Authenticated(updatedUser)); // Emit new state with updated user
       } catch (e) {

@@ -118,6 +118,7 @@ class AuthUpdateProfileRequested extends AuthEvent {
   final int? maxHr;
   final String? calorieMethod;
   final bool? calorieActiveOnly;
+  final bool? stravaAutoExport;
 
   const AuthUpdateProfileRequested({
     this.username,
@@ -132,6 +133,7 @@ class AuthUpdateProfileRequested extends AuthEvent {
     this.maxHr,
     this.calorieMethod,
     this.calorieActiveOnly,
+    this.stravaAutoExport,
   });
 
   @override
@@ -147,7 +149,8 @@ class AuthUpdateProfileRequested extends AuthEvent {
         restingHr,
         maxHr,
         calorieMethod,
-        calorieActiveOnly
+        calorieActiveOnly,
+        stravaAutoExport
       ];
 }
 

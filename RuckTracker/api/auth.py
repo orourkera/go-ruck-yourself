@@ -414,7 +414,7 @@ class ForgotPasswordResource(Resource):
             
             # Send the password reset email with the web callback URL
             # This will redirect to our /auth/callback endpoint which handles mobile app redirect
-            response = supabase.auth.reset_password_email(
+            response = supabase.auth.reset_password_for_email(
                 email=email,
                 options={
                     'redirect_to': callback_url,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_session/audio_session.dart' as audio_session;
 import 'package:audioplayers/audioplayers.dart';
@@ -9,6 +10,14 @@ class VoiceMessagePlayer {
   static final VoiceMessagePlayer _instance = VoiceMessagePlayer._internal();
   factory VoiceMessagePlayer() => _instance;
   VoiceMessagePlayer._internal() {
+    _initializePlayer();
+  }
+
+  late AudioPlayer _player;
+
+  void _initializePlayer() {
+    _player = AudioPlayer();
+
     _completionSubscription = _player.onPlayerComplete.listen((_) {
       AppLogger.info('[VOICE_MESSAGE] Audio playback completed');
       _isPlaying = false;
@@ -18,10 +27,17 @@ class VoiceMessagePlayer {
       Future.microtask(() => _playNext());
     });
 
+    // Add error listener for debugging
+    _player.onPlayerStateChanged.listen((state) {
+      AppLogger.info('[VOICE_MESSAGE] Player state changed: $state');
+    });
+
+    _player.onLog.listen((msg) {
+      AppLogger.debug('[VOICE_MESSAGE][AudioPlayer] $msg');
+    });
+
     _configureAudioPlayer();
   }
-
-  final AudioPlayer _player = AudioPlayer();
   final List<String> _queue = <String>[];
   StreamSubscription<void>? _completionSubscription;
   bool _isPlaying = false;
@@ -59,20 +75,79 @@ class VoiceMessagePlayer {
     try {
       _isPlaying = true;
       AppLogger.info('[VOICE_MESSAGE] Playing audio from: $nextUrl');
+      AppLogger.info('[VOICE_MESSAGE] Queue size: ${_queue.length} remaining');
+      AppLogger.info('[VOICE_MESSAGE] Platform: ${Platform.operatingSystem}');
 
+      // Ensure audio session is configured
       await _ensureAudioSession();
+
+      // Android-specific: Add delay to ensure audio system is ready
+      if (Platform.isAndroid) {
+        AppLogger.info('[VOICE_MESSAGE] Android detected - adding initialization delay');
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      // Extra logging for Android debugging
+      AppLogger.info('[VOICE_MESSAGE] Setting audio session active...');
       await _audioSession?.setActive(true);
 
+      // Reset player before playing
+      await _player.stop();
+      await _player.release();
+
+      AppLogger.info('[VOICE_MESSAGE] Setting volume to 1.0...');
       await _player.setVolume(1.0);
-      await _player.play(UrlSource(nextUrl));
-    } catch (e) {
+
+      // Set release mode to stop to ensure proper cleanup
+      await _player.setReleaseMode(ReleaseMode.stop);
+
+      // Try different source types for better compatibility
+      AppLogger.info('[VOICE_MESSAGE] Creating UrlSource...');
+      final source = UrlSource(nextUrl);
+
+      AppLogger.info('[VOICE_MESSAGE] Starting playback...');
+      await _player.play(source, mode: PlayerMode.mediaPlayer);
+      AppLogger.info('[VOICE_MESSAGE] Playback started successfully');
+    } catch (e, stackTrace) {
       AppLogger.error('[VOICE_MESSAGE] Failed to play audio: $e');
+      AppLogger.error('[VOICE_MESSAGE] Stack trace: $stackTrace');
+      AppLogger.error('[VOICE_MESSAGE] URL was: $nextUrl');
+
       _isPlaying = false;
-      await _deactivateAudioSession();
+
+      // Try alternative playback method for Android
+      if (Platform.isAndroid && e.toString().contains('(-19)')) {
+        AppLogger.info('[VOICE_MESSAGE] Attempting Android fallback playback');
+        await _androidFallbackPlay(nextUrl);
+      } else {
+        await _deactivateAudioSession();
+      }
 
       if (_queue.isNotEmpty) {
+        AppLogger.info('[VOICE_MESSAGE] Retrying with next item in queue');
         await _playNext();
       }
+    }
+  }
+
+  Future<void> _androidFallbackPlay(String url) async {
+    try {
+      AppLogger.info('[VOICE_MESSAGE] Android fallback: Recreating player');
+
+      // Dispose old player
+      await _player.dispose();
+      await _completionSubscription?.cancel();
+
+      // Create fresh player
+      _initializePlayer();
+
+      // Try to play with LOW_LATENCY mode
+      await _player.setVolume(1.0);
+      await _player.play(UrlSource(url), mode: PlayerMode.lowLatency);
+
+      AppLogger.info('[VOICE_MESSAGE] Android fallback playback started');
+    } catch (e) {
+      AppLogger.error('[VOICE_MESSAGE] Android fallback also failed: $e');
     }
   }
 
@@ -101,9 +176,30 @@ class VoiceMessagePlayer {
 
   Future<void> _configureAudioPlayer() async {
     try {
+      // Use media player mode for better Android compatibility
       await _player.setPlayerMode(PlayerMode.mediaPlayer);
+
+      // Set audio context to ensure Android plays properly
+      await _player.setAudioContext(
+        AudioContext(
+          android: AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: true,
+            contentType: AndroidContentType.speech,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gain,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: {
+              AVAudioSessionOptions.defaultToSpeaker,
+              AVAudioSessionOptions.mixWithOthers,
+            },
+          ),
+        ),
+      );
     } catch (e) {
-      AppLogger.warning('[VOICE_MESSAGE] Failed to set player mode: $e');
+      AppLogger.warning('[VOICE_MESSAGE] Failed to configure audio player: $e');
     }
   }
 
@@ -123,12 +219,13 @@ class VoiceMessagePlayer {
         avAudioSessionSetActiveOptions:
             audio_session.AVAudioSessionSetActiveOptions.none,
         androidAudioAttributes: const audio_session.AndroidAudioAttributes(
-          usage: audio_session.AndroidAudioUsage.assistanceNavigationGuidance,
+          usage: audio_session.AndroidAudioUsage.media,
           contentType: audio_session.AndroidAudioContentType.speech,
+          flags: audio_session.AndroidAudioFlags.none,
         ),
         androidAudioFocusGainType:
-            audio_session.AndroidAudioFocusGainType.gainTransientMayDuck,
-        androidWillPauseWhenDucked: false,
+            audio_session.AndroidAudioFocusGainType.gain,
+        androidWillPauseWhenDucked: true,
       ));
 
       _audioSessionConfigured = true;

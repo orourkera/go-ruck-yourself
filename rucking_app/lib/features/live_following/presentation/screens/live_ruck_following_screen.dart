@@ -14,7 +14,6 @@ import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
-import 'dart:io';
 
 /// Screen for following someone's live ruck with real-time updates
 class LiveRuckFollowingScreen extends StatefulWidget {
@@ -40,6 +39,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
   bool _isSendingMessage = false;
   String _selectedVoice = 'supportive_friend';
   String _selectedDelay = 'now';
+  bool _sessionCompleted = false;  // Track if session has ended
 
   // Live session data
   double _currentDistance = 0.0;
@@ -91,6 +91,24 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
       final data = await _apiClient.get('/rucks/${widget.ruckId}/live');
 
       if (data != null && mounted) {
+        // Check if session is no longer active
+        final isActive = data['is_active'] ?? true;
+        final status = data['status']?.toString().toLowerCase();
+
+        if (!isActive || status == 'completed' || status == 'stopped') {
+          // Stop refreshing
+          _refreshTimer?.cancel();
+
+          // Mark session as completed and update UI
+          if (mounted) {
+            setState(() {
+              _sessionCompleted = true;
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+
         setState(() {
           // Handle null values from API - session might be new
           _currentDistance = (data['distance_km'] as num?)?.toDouble() ?? _currentDistance;
@@ -129,21 +147,49 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
           _isLoading = false;
         });
 
-        // Check if session ended - navigate to completed ruck detail
-        if (e.toString().contains('not currently active') || e.toString().contains('400')) {
+        final errorString = e.toString().toLowerCase();
+
+        // Check different error scenarios
+        if (errorString.contains('403')) {
+          // Permission denied - either live following disabled or not following user
           _refreshTimer?.cancel();
 
-          // Navigate to ruck detail screen
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => RuckBuddyDetailScreen.fromRuckId(widget.ruckId),
-            ),
-          );
-        } else {
-          // Show error to user
+          String message = 'Unable to view live ruck';
+          if (errorString.contains('must follow')) {
+            message = 'You must follow ${widget.ruckerName} to view their live ruck';
+          } else if (errorString.contains('disabled')) {
+            message = '${widget.ruckerName} has disabled live following for this ruck';
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to load live data: $e'),
+              content: Text(message),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+
+          // Go back to previous screen
+          Navigator.of(context).pop();
+
+        } else if (errorString.contains('not currently active') ||
+                   errorString.contains('400') ||
+                   errorString.contains('404') ||
+                   errorString.contains('not found')) {
+          // Session ended - stop refreshing and mark as completed
+          _refreshTimer?.cancel();
+
+          if (mounted) {
+            setState(() {
+              _sessionCompleted = true;
+              _isLoading = false;
+            });
+          }
+        } else {
+          // Generic error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Unable to load live ruck data. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -228,7 +274,6 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
   Widget build(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
     final preferMetric = authState is Authenticated ? authState.user.preferMetric : true;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -237,8 +282,11 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
           children: [
             Text('${widget.ruckerName}\'s Ruck'),
             Text(
-              '🔴 LIVE',
-              style: TextStyle(fontSize: 12, color: Colors.red),
+              _sessionCompleted ? '✅ COMPLETED' : '🔴 LIVE',
+              style: TextStyle(
+                fontSize: 12,
+                color: _sessionCompleted ? Colors.green : Colors.red,
+              ),
             ),
           ],
         ),
@@ -246,155 +294,197 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Map showing live location (reduced height)
-                SizedBox(
-                  height: 200,
-                  child: _buildMap(),
-                ),
-
-                // Stats
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Theme.of(context).cardColor,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStat(
-                        'Distance',
-                        MeasurementUtils.formatDistance(_currentDistance, metric: preferMetric),
-                        Icons.straighten,
-                      ),
-                      _buildStat(
-                        'Time',
-                        _formatDuration(_currentDuration),
-                        Icons.timer,
-                      ),
-                      _buildStat(
-                        'Pace',
-                        MeasurementUtils.formatPace(_currentPace, metric: preferMetric),
-                        Icons.speed,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Divider(height: 1),
-
-                // Message input
-                AnimatedPadding(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  padding: EdgeInsets.only(bottom: bottomInset),
-                  child: SafeArea(
-                    top: false,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Voice selector (compact)
-                            Row(
-                              children: [
-                                const Icon(Icons.record_voice_over, size: 16),
-                                const SizedBox(width: 8),
-                                const Text('Voice:', style: TextStyle(fontSize: 14)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: DropdownButton<String>(
-                                    value: _selectedVoice,
-                                    isExpanded: true,
-                                    isDense: true,
-                                    items: _voiceOptions.map((voice) {
-                                      return DropdownMenuItem(
-                                        value: voice['id'],
-                                        child: Text(voice['name']!, style: const TextStyle(fontSize: 13)),
-                                      );
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() {
-                                          _selectedVoice = value;
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Show completion banner if session ended
+                  if (_sessionCompleted)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.green.shade50,
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${widget.ruckerName} has completed their ruck!',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(height: 8),
-
-                            // Delay selector (compact)
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule, size: 16),
-                                const SizedBox(width: 8),
-                                const Text('Send:', style: TextStyle(fontSize: 14)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: DropdownButton<String>(
-                                    value: _selectedDelay,
-                                    isExpanded: true,
-                                    isDense: true,
-                                    items: const [
-                                      DropdownMenuItem(value: 'now', child: Text('Now')),
-                                      DropdownMenuItem(value: '5', child: Text('In 5 min')),
-                                      DropdownMenuItem(value: '15', child: Text('In 15 min')),
-                                      DropdownMenuItem(value: '30', child: Text('In 30 min')),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() {
-                                          _selectedDelay = value;
-                                        });
-                                      }
-                                    },
-                                  ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Live tracking has ended.',
+                            style: AppTextStyles.bodyMedium,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => RuckBuddyDetailScreen.fromRuckId(widget.ruckId),
                                 ),
-                              ],
+                              );
+                            },
+                            icon: const Icon(Icons.visibility),
+                            label: const Text('View Completed Ruck Details'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
                             ),
-                            const SizedBox(height: 8),
-
-                          // Message input
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _messageController,
-                                  maxLength: 200,
-                                  maxLines: 2,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Send encouragement...',
-                                    border: OutlineInputBorder(),
-                                    counterText: '',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: _isSendingMessage
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.send),
-                                color: AppColors.primary,
-                                iconSize: 32,
-                                onPressed: _isSendingMessage ? null : _sendMessage,
-                              ),
-                            ],
                           ),
                         ],
                       ),
                     ),
+
+                  // Map showing live location (reduced height)
+                  SizedBox(
+                    height: 200,
+                    child: _buildMap(),
                   ),
-                ),
-              ],
+
+                  // Stats
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Theme.of(context).cardColor,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStat(
+                          'Distance',
+                          MeasurementUtils.formatDistance(_currentDistance, metric: preferMetric),
+                          Icons.straighten,
+                        ),
+                        _buildStat(
+                          'Time',
+                          _formatDuration(_currentDuration),
+                          Icons.timer,
+                        ),
+                        _buildStat(
+                          'Pace',
+                          MeasurementUtils.formatPace(_currentPace, metric: preferMetric),
+                          Icons.speed,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 1),
+
+                  // Message input section (disabled if session completed)
+                  if (!_sessionCompleted)
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Voice selector (compact)
+                          Row(
+                          children: [
+                            const Icon(Icons.record_voice_over, size: 16),
+                            const SizedBox(width: 8),
+                            const Text('Voice:', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButton<String>(
+                                value: _selectedVoice,
+                                isExpanded: true,
+                                isDense: true,
+                                items: _voiceOptions.map((voice) {
+                                  return DropdownMenuItem(
+                                    value: voice['id'],
+                                    child: Text(voice['name']!, style: const TextStyle(fontSize: 13)),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _selectedVoice = value;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Delay selector (compact)
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule, size: 16),
+                            const SizedBox(width: 8),
+                            const Text('Send:', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButton<String>(
+                                value: _selectedDelay,
+                                isExpanded: true,
+                                isDense: true,
+                                items: const [
+                                  DropdownMenuItem(value: 'now', child: Text('Now')),
+                                  DropdownMenuItem(value: '5', child: Text('In 5 min')),
+                                  DropdownMenuItem(value: '15', child: Text('In 15 min')),
+                                  DropdownMenuItem(value: '30', child: Text('In 30 min')),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _selectedDelay = value;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Message input
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                maxLength: 200,
+                                maxLines: 2,
+                                decoration: const InputDecoration(
+                                  hintText: 'Send encouragement...',
+                                  border: OutlineInputBorder(),
+                                  counterText: '',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: _isSendingMessage
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.send),
+                              color: AppColors.primary,
+                              iconSize: 32,
+                              onPressed: _isSendingMessage ? null : _sendMessage,
+                            ),
+                          ],
+                        ),
+
+                        // Add padding at the bottom to account for keyboard
+                        SizedBox(
+                          height: MediaQuery.of(context).viewInsets.bottom,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }

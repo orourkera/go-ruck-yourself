@@ -397,6 +397,7 @@ class AuthService {
     int? maxHr,
     String? calorieMethod,
     bool? calorieActiveOnly,
+    bool? stravaAutoExport,
   }) async {
     try {
       final data = <String, dynamic>{};
@@ -417,6 +418,7 @@ class AuthService {
       if (maxHr != null) data['max_hr'] = maxHr;
       if (calorieMethod != null) data['calorie_method'] = calorieMethod;
       if (calorieActiveOnly != null) data['calorie_active_only'] = calorieActiveOnly;
+      if (stravaAutoExport != null) data['strava_auto_export'] = stravaAutoExport;
 
       if (data.isEmpty) {
         final currentUser = await getCurrentUser();

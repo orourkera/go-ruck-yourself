@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:get_it/get_it.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/services/strava_service.dart';
 import '../../core/utils/app_logger.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -17,12 +18,14 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget>
   final StravaService _stravaService = StravaService();
   StravaConnectionStatus? _connectionStatus;
   bool _isLoading = false;
+  bool _autoExport = true;  // Default to true for auto-export
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadConnectionStatus();
+    _loadAutoExportPreference();
   }
 
   @override
@@ -37,6 +40,58 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget>
     // When returning from external Strava OAuth, the app resumes. Refresh status.
     if (state == AppLifecycleState.resumed) {
       _loadConnectionStatus();
+    }
+  }
+
+  void _loadAutoExportPreference() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      setState(() {
+        _autoExport = authState.user.stravaAutoExport ?? true;
+      });
+    }
+  }
+
+  Future<void> _updateAutoExportPreference(bool value) async {
+    setState(() => _autoExport = value);
+
+    // Update user preference in the backend
+    final authBloc = context.read<AuthBloc>();
+    final authState = authBloc.state;
+    if (authState is Authenticated) {
+      try {
+        // Use the proper event to update profile
+        authBloc.add(AuthUpdateProfileRequested(
+          stravaAutoExport: value,
+        ));
+
+        AppLogger.info('[STRAVA_SETTINGS] Updated auto-export preference: $value');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                value
+                  ? 'Rucks will auto-export to Strava'
+                  : 'Auto-export disabled. You can still manually export rucks.',
+              ),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } catch (e) {
+        AppLogger.error('[STRAVA_SETTINGS] Failed to update auto-export preference: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update preference'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          // Revert on failure
+          setState(() => _autoExport = !value);
+        }
+      }
     }
   }
 
@@ -267,6 +322,33 @@ class _StravaSettingsWidgetState extends State<StravaSettingsWidget>
                       ),
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  // Auto-export toggle
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Auto-export rucks to Strava',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: _autoExport,
+                        onChanged: _updateAutoExportPreference,
+                        activeColor: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                  Text(
+                    _autoExport
+                      ? 'Completed rucks will automatically post to your Strava feed'
+                      : 'You can manually export rucks from the completion screen',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [

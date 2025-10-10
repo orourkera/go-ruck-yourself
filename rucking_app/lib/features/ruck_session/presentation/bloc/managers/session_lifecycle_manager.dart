@@ -746,6 +746,8 @@ class SessionLifecycleManager implements SessionManager {
         return;
       }
 
+      Map<String, dynamic>? backendSession;
+
       // CRITICAL: Validate session exists in backend before recovery
       try {
         AppLogger.info(
@@ -758,6 +760,16 @@ class SessionLifecycleManager implements SessionManager {
         if (resp is Map && resp.isEmpty) {
           throw Exception('Session validation failed: empty payload');
         }
+
+        if (resp is Map<String, dynamic>) {
+          backendSession = resp;
+        } else if (resp is List && resp.isNotEmpty) {
+          final first = resp.first;
+          if (first is Map<String, dynamic>) {
+            backendSession = first;
+          }
+        }
+
         AppLogger.info('[RECOVERY] ✅ Session $sessionId validated in backend');
       } catch (e) {
         AppLogger.error(
@@ -789,20 +801,69 @@ class SessionLifecycleManager implements SessionManager {
       _activeSessionId = sessionId;
       _sessionStartTime = startTime;
 
-      final ruckWeight =
+      double ruckWeight =
           (sessionData['ruck_weight_kg'] as num?)?.toDouble() ?? 0.0;
-      final userWeight = 70.0; // Default weight if not stored
-      final lastDuration = Duration(
+      double userWeight = 70.0; // Default weight if not stored
+      Duration lastDuration = Duration(
           seconds: (sessionData['elapsed_seconds'] as num?)?.toInt() ?? 0);
 
-      final totalDistance =
+      double totalDistance =
           (sessionData['distance_km'] as num?)?.toDouble() ?? 0.0;
-      final elevationGain =
+      double elevationGain =
           (sessionData['elevation_gain'] as num?)?.toDouble() ?? 0.0;
-      final elevationLoss =
+      double elevationLoss =
           (sessionData['elevation_loss'] as num?)?.toDouble() ?? 0.0;
-      final caloriesBurned =
+      double caloriesBurned =
           (sessionData['calories'] as num?)?.toDouble() ?? 0.0;
+
+      if (backendSession != null) {
+        AppLogger.info('[RECOVERY] Backend session data available for fallback');
+        final backendDistance =
+            (backendSession['distance_km'] as num?)?.toDouble() ?? 0.0;
+        if (backendDistance > 0.0 && totalDistance < backendDistance) {
+          AppLogger.info(
+              '[RECOVERY] Using backend distance ${backendDistance}km (local ${totalDistance}km)');
+          totalDistance = backendDistance;
+        }
+
+        final backendDurationSec =
+            (backendSession['duration_seconds'] as num?)?.toInt();
+        if (backendDurationSec != null && backendDurationSec > 0 &&
+            lastDuration.inSeconds < backendDurationSec) {
+          AppLogger.info(
+              '[RECOVERY] Using backend duration ${backendDurationSec}s (local ${lastDuration.inSeconds}s)');
+          lastDuration = Duration(seconds: backendDurationSec);
+        }
+
+        final backendElevationGain =
+            (backendSession['elevation_gain_m'] as num?)?.toDouble() ?? 0.0;
+        final backendElevationLoss =
+            (backendSession['elevation_loss_m'] as num?)?.toDouble() ?? 0.0;
+        if (backendElevationGain > 0 && elevationGain < backendElevationGain) {
+          elevationGain = backendElevationGain;
+        }
+        if (backendElevationLoss > 0 && elevationLoss < backendElevationLoss) {
+          elevationLoss = backendElevationLoss;
+        }
+
+        final backendCalories =
+            (backendSession['calories_burned'] as num?)?.toDouble() ?? 0.0;
+        if (backendCalories > 0 && caloriesBurned < backendCalories) {
+          caloriesBurned = backendCalories;
+        }
+
+        final backendRuckWeight =
+            (backendSession['ruck_weight_kg'] as num?)?.toDouble();
+        if (backendRuckWeight != null && backendRuckWeight > 0) {
+          ruckWeight = backendRuckWeight;
+        }
+
+        final backendUserWeight =
+            (backendSession['user_weight_kg'] as num?)?.toDouble();
+        if (backendUserWeight != null && backendUserWeight > 0) {
+          userWeight = backendUserWeight;
+        }
+      }
 
       // Calculate gap distance from last saved location to current location
       double gapDistance = 0.0;

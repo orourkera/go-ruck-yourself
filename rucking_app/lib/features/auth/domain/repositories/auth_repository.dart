@@ -69,6 +69,7 @@ abstract class AuthRepository {
     int? maxHr,
     String? calorieMethod,
     bool? calorieActiveOnly,
+    bool? stravaAutoExport,
   });
 
   /// Delete the current user's account

@@ -435,6 +435,9 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
               duration: const Duration(seconds: 2),
             );
           }
+
+          // Auto-export to Strava if enabled
+          _autoExportToStravaIfEnabled();
         }
       } else {
         // Unexpected response format, but assume success if no exception was thrown
@@ -798,6 +801,46 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Future<void> _autoExportToStravaIfEnabled() async {
+    try {
+      // Check if user has Strava connected and auto-export enabled
+      final authState = context.read<AuthBloc>().state;
+      if (authState is! Authenticated) return;
+
+      final user = authState.user;
+      final autoExport = user.stravaAutoExport ?? true; // Default to true
+
+      if (!autoExport) {
+        AppLogger.info('[STRAVA_AUTO_EXPORT] Auto-export disabled by user preference');
+        return;
+      }
+
+      // Check Strava connection status
+      StravaConnectionStatus status;
+      try {
+        status = await _stravaService.getConnectionStatus();
+      } catch (e) {
+        AppLogger.info('[STRAVA_AUTO_EXPORT] Failed to check Strava status: $e');
+        return;
+      }
+
+      if (!status.connected) {
+        AppLogger.info('[STRAVA_AUTO_EXPORT] Strava not connected, skipping auto-export');
+        return;
+      }
+
+      AppLogger.info('[STRAVA_AUTO_EXPORT] Auto-exporting to Strava...');
+
+      // Perform the export
+      await _exportToStrava();
+
+    } catch (e) {
+      AppLogger.error('[STRAVA_AUTO_EXPORT] Error during auto-export: $e');
+      // Don't show error to user for auto-export failures
+      // They can still manually export if needed
     }
   }
 

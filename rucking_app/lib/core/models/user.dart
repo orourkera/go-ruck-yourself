@@ -56,6 +56,9 @@ class User extends Equatable {
   final bool? notificationDuels;
   final bool? notificationFirstRuck;
 
+  /// Strava auto-export preference (true by default when connected)
+  final bool? stravaAutoExport;
+
   /// User stats information
   final UserStats? stats;
 
@@ -84,6 +87,7 @@ class User extends Equatable {
     this.notificationEvents,
     this.notificationDuels,
     this.notificationFirstRuck,
+    this.stravaAutoExport,
     this.stats,
     this.hrZones,
   });
@@ -110,6 +114,7 @@ class User extends Equatable {
     bool? notificationEvents,
     bool? notificationDuels,
     bool? notificationFirstRuck,
+    bool? stravaAutoExport,
     UserStats? stats,
     List<HRZone>? hrZones,
   }) {
@@ -135,6 +140,7 @@ class User extends Equatable {
       notificationDuels: notificationDuels ?? this.notificationDuels,
       notificationFirstRuck:
           notificationFirstRuck ?? this.notificationFirstRuck,
+      stravaAutoExport: stravaAutoExport ?? this.stravaAutoExport,
       stats: stats ?? this.stats,
       hrZones: hrZones ?? this.hrZones,
     );
@@ -187,6 +193,7 @@ class User extends Equatable {
       notificationEvents: json['notification_events'] as bool?,
       notificationDuels: json['notification_duels'] as bool?,
       notificationFirstRuck: json['notification_first_ruck'] as bool?,
+      stravaAutoExport: json['strava_auto_export'] as bool? ?? true,  // Default true when Strava connected
       stats: json['stats'] != null
           ? UserStats.fromJson(json['stats'] as Map<String, dynamic>)
           : null,
@@ -231,6 +238,8 @@ class User extends Equatable {
       data['notification_duels'] = notificationDuels;
     if (notificationFirstRuck != null)
       data['notification_first_ruck'] = notificationFirstRuck;
+    if (stravaAutoExport != null)
+      data['strava_auto_export'] = stravaAutoExport;
     if (stats != null) data['stats'] = stats!.toJson();
     if (hrZones != null)
       data['hr_zones'] = hrZones!.map((z) => z.toJson()).toList();
@@ -259,6 +268,7 @@ class User extends Equatable {
         notificationEvents,
         notificationDuels,
         notificationFirstRuck,
+        stravaAutoExport,
         stats,
         hrZones
       ];

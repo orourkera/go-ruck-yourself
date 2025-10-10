@@ -147,11 +147,23 @@ class FirebaseMessagingService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessageTap);
 
       // Handle app launch from terminated state
+      // Only process initial message if app was actually terminated (not just backgrounded)
       final initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null) {
         AppLogger.debug(
             '🔔 App launched from notification: ${initialMessage.messageId}');
         _pendingInitialMessage = initialMessage;
+
+        // Process initial message after a delay to ensure app is fully loaded
+        // This prevents the splash screen from showing when resuming from background
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_pendingInitialMessage != null) {
+            final message = _pendingInitialMessage!;
+            _pendingInitialMessage = null;
+            _navigateFromNotification(message.data);
+            _triggerImmediateRefresh();
+          }
+        });
       }
 
       _isInitialized = true;
@@ -417,7 +429,13 @@ class FirebaseMessagingService {
   /// Handle voice message - auto-play audio
   void _handleVoiceMessage(RemoteMessage message) {
     try {
+      // Log all message data for debugging
+      AppLogger.info('[VOICE_MESSAGE] Message data: ${message.data}');
+      AppLogger.info('[VOICE_MESSAGE] Message type: ${message.data['type']}');
+
       final hasAudio = message.data['has_audio'] == 'true';
+      AppLogger.info('[VOICE_MESSAGE] Has audio flag: $hasAudio');
+
       if (!hasAudio) {
         AppLogger.info(
             '[VOICE_MESSAGE] Notification received without audio payload');
@@ -425,17 +443,24 @@ class FirebaseMessagingService {
       }
 
       final audioUrl = message.data['audio_url'];
+      AppLogger.info('[VOICE_MESSAGE] Audio URL received: $audioUrl');
+
       if (audioUrl != null &&
           audioUrl.isNotEmpty &&
           audioUrl.toLowerCase() != 'null' &&
           audioUrl.toLowerCase() != 'none') {
-        AppLogger.info('[VOICE_MESSAGE] Auto-playing voice message');
+        AppLogger.info('[VOICE_MESSAGE] Attempting to auto-play voice message');
+        AppLogger.info('[VOICE_MESSAGE] URL length: ${audioUrl.length}');
+        AppLogger.info('[VOICE_MESSAGE] URL starts with: ${audioUrl.substring(0, audioUrl.length > 50 ? 50 : audioUrl.length)}');
+
         VoiceMessagePlayer().playMessageAudio(audioUrl);
       } else {
-        AppLogger.warning('[VOICE_MESSAGE] No audio URL in message');
+        AppLogger.warning('[VOICE_MESSAGE] No valid audio URL in message');
+        AppLogger.warning('[VOICE_MESSAGE] audioUrl value: $audioUrl');
       }
-    } catch (e) {
-      AppLogger.error('[VOICE_MESSAGE] Error playing voice message: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('[VOICE_MESSAGE] Error handling voice message: $e');
+      AppLogger.error('[VOICE_MESSAGE] Stack trace: $stackTrace');
     }
   }
 
@@ -481,8 +506,13 @@ class FirebaseMessagingService {
   /// Handle background message taps (when app is in background)
   void _handleBackgroundMessageTap(RemoteMessage message) {
     AppLogger.debug('Background message tapped: ${message.messageId}');
-    _navigateFromNotification(message.data);
-    _triggerImmediateRefresh();
+
+    // Add a small delay to ensure the app is fully in foreground before navigating
+    // This prevents the app from appearing to restart
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _navigateFromNotification(message.data);
+      _triggerImmediateRefresh();
+    });
   }
 
   /// Handle local notification taps

@@ -99,6 +99,7 @@ class AuthRepositoryImpl implements AuthRepository {
     int? maxHr,
     String? calorieMethod,
     bool? calorieActiveOnly,
+    bool? stravaAutoExport,
   }) async {
     return await _authService.updateProfile(
       username: username,
@@ -118,6 +119,7 @@ class AuthRepositoryImpl implements AuthRepository {
       maxHr: maxHr,
       calorieMethod: calorieMethod,
       calorieActiveOnly: calorieActiveOnly,
+      stravaAutoExport: stravaAutoExport,
     );
   }
 
