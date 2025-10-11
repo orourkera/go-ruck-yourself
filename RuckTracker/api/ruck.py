@@ -544,10 +544,10 @@ class RuckSessionDetailResource(Resource):
         try:
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
 
-            # Fetch base session (no embedded photos to avoid FK join issues)
+            # Fetch base session with user info via foreign key join
             session_resp = (
                 supabase.table('ruck_session')
-                .select('*')
+                .select('*, user:user_id(id, username, gender, avatar_url)')
                 .eq('id', ruck_id)
                 .single()
                 .execute()
@@ -651,41 +651,16 @@ class RuckSessionDetailResource(Resource):
             if 'elevation_loss_m' in session and session.get('elevation_loss_m') is not None:
                 session.setdefault('elevation_loss_meters', session.get('elevation_loss_m'))
 
-            # Fetch user information for the session owner
-            user_id = session.get('user_id')
-            if user_id:
-                try:
-                    user_resp = supabase.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
-                    if user_resp.data:
-                        session['user'] = user_resp.data
-                        logger.info(f"[RUCK_DETAILS] Successfully fetched user info for user_id {user_id}: {user_resp.data.get('username')}")
-                    else:
-                        # This shouldn't happen - user should always exist
-                        logger.error(f"[RUCK_DETAILS] User {user_id} not found in database - this is unexpected!")
-                        # Use admin client to debug
-                        admin_client = get_supabase_admin_client()
-                        admin_resp = admin_client.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
-                        if admin_resp.data:
-                            session['user'] = admin_resp.data
-                            logger.info(f"[RUCK_DETAILS] Found user with admin client: {admin_resp.data}")
-                        else:
-                            logger.error(f"[RUCK_DETAILS] User {user_id} not found even with admin client!")
-                            session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
-                except Exception as user_err:
-                    logger.error(f"[RUCK_DETAILS] Exception fetching user info for user_id {user_id}: {user_err}")
-                    # Try with admin client to bypass any RLS issues
-                    try:
-                        admin_client = get_supabase_admin_client()
-                        admin_resp = admin_client.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
-                        if admin_resp.data:
-                            session['user'] = admin_resp.data
-                            logger.info(f"[RUCK_DETAILS] Recovered user with admin client: {admin_resp.data.get('username')}")
-                        else:
-                            logger.error(f"[RUCK_DETAILS] User {user_id} not found even with admin client after exception!")
-                            session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
-                    except Exception as admin_err:
-                        logger.error(f"[RUCK_DETAILS] Admin client also failed: {admin_err}")
-                        session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
+            # User information is already included via foreign key join in the select statement above
+            # The user data will be in session['user'] from the FK relationship
+            if session.get('user'):
+                logger.info(f"[RUCK_DETAILS] User info included from FK join: {session['user'].get('username')}")
+            else:
+                # This shouldn't happen since every session has a user_id
+                user_id = session.get('user_id')
+                logger.error(f"[RUCK_DETAILS] No user data in FK join for user_id {user_id} - this is unexpected!")
+                # Fallback to show something
+                session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
 
             # Ensure raw likes/comments arrays are not present
             session.pop('likes', None)
