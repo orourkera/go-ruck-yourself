@@ -92,12 +92,17 @@ class RuckSessionListResource(Resource):
                     'ruck_weight_kg': active_session['ruck_weight_kg']
                 }, 200
 
+            # Get user's sharing preference
+            user_resp = supabase.table('user').select('allow_ruck_sharing').eq('id', g.user.id).single().execute()
+            allow_sharing = user_resp.data.get('allow_ruck_sharing', True) if user_resp.data else True
+
             # Create new session
             session_data = {
                 'user_id': g.user.id,
                 'ruck_weight_kg': data.get('ruck_weight_kg', 0.0),
                 'weight_kg': data.get('weight_kg'),
                 'is_manual': data.get('is_manual', False),
+                'is_public': allow_sharing,
                 'status': 'created',
                 'created_at': datetime.utcnow().isoformat()
             }
