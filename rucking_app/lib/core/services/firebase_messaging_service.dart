@@ -152,14 +152,23 @@ class FirebaseMessagingService {
       if (initialMessage != null) {
         AppLogger.debug(
             '🔔 App launched from notification: ${initialMessage.messageId}');
+        AppLogger.debug('🔔 Initial message type: ${initialMessage.data['type']}');
+        AppLogger.debug('🔔 Initial message data: ${initialMessage.data}');
         _pendingInitialMessage = initialMessage;
 
         // Process initial message after a delay to ensure app is fully loaded
-        // This prevents the splash screen from showing when resuming from background
-        Future.delayed(const Duration(seconds: 2), () {
+        // Shorter delay for ruck_started notifications for faster navigation
+        final isRuckStarted = initialMessage.data['type'] == 'ruck_started';
+        final delayDuration = isRuckStarted
+            ? const Duration(milliseconds: 1000)
+            : const Duration(seconds: 2);
+
+        Future.delayed(delayDuration, () {
           if (_pendingInitialMessage != null) {
             final message = _pendingInitialMessage!;
             _pendingInitialMessage = null;
+
+            AppLogger.info('Processing initial notification navigation');
             _navigateFromNotification(message.data);
             _triggerImmediateRefresh();
           }
@@ -506,11 +515,23 @@ class FirebaseMessagingService {
   /// Handle background message taps (when app is in background)
   void _handleBackgroundMessageTap(RemoteMessage message) {
     AppLogger.debug('Background message tapped: ${message.messageId}');
+    AppLogger.debug('Notification data: ${message.data}');
+    AppLogger.debug('Notification type: ${message.data['type']}');
 
     // Add a small delay to ensure the app is fully in foreground before navigating
     // This prevents the app from appearing to restart
     Future.delayed(const Duration(milliseconds: 500), () {
-      _navigateFromNotification(message.data);
+      // Ensure we have the necessary data for navigation
+      final data = Map<String, dynamic>.from(message.data);
+
+      // If this is a ruck_started notification, ensure we have the required fields
+      if (data['type'] == 'ruck_started') {
+        AppLogger.info('Processing ruck_started notification tap');
+        AppLogger.info('Ruck ID: ${data['ruck_id']}');
+        AppLogger.info('Rucker name: ${data['rucker_name']}');
+      }
+
+      _navigateFromNotification(data);
       _triggerImmediateRefresh();
     });
   }
@@ -531,9 +552,27 @@ class FirebaseMessagingService {
 
   /// Navigate based on notification data
   void _navigateFromNotification(Map<String, dynamic> data) {
-    final context = _getNavigatorContext();
-    if (context == null) return;
+    // Try to get context, with retry logic if needed
+    BuildContext? context = _getNavigatorContext();
 
+    // If context is not immediately available, try again after a delay
+    if (context == null) {
+      AppLogger.warning('Navigation context not available, retrying...');
+      Future.delayed(const Duration(milliseconds: 500), () {
+        context = _getNavigatorContext();
+        if (context != null) {
+          _performNavigation(context!, data);
+        } else {
+          AppLogger.error('Failed to get navigation context after retry');
+        }
+      });
+      return;
+    }
+
+    _performNavigation(context, data);
+  }
+
+  void _performNavigation(BuildContext context, Map<String, dynamic> data) {
     // Create AppNotification from data
     final notification = AppNotification(
       id: data['notification_id'] ?? '',
@@ -543,6 +582,8 @@ class FirebaseMessagingService {
       createdAt: DateTime.now(),
       isRead: false,
     );
+
+    AppLogger.info('Navigating to destination for notification type: ${notification.type}');
 
     // Use existing navigation helper
     NotificationNavigation.navigateToNotificationDestination(

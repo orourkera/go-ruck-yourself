@@ -14,6 +14,7 @@ import 'package:rucking_app/shared/widgets/map/robust_tile_layer.dart';
 import 'package:rucking_app/features/ai_cheerleader/services/elevenlabs_service.dart';
 import 'package:rucking_app/core/services/storage_service.dart';
 import 'package:rucking_app/features/ruck_buddies/presentation/pages/ruck_buddy_detail_screen.dart';
+import 'package:rucking_app/shared/widgets/styled_snackbar.dart';
 
 /// Screen for following someone's live ruck with real-time updates
 class LiveRuckFollowingScreen extends StatefulWidget {
@@ -95,9 +96,49 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
         final isActive = data['is_active'] ?? true;
         final status = data['status']?.toString().toLowerCase();
 
-        if (!isActive || status == 'completed' || status == 'stopped') {
+        // Check if this is a stale session (no updates for over 1 hour)
+        bool isStale = false;
+        if (data['last_location_update'] != null) {
+          final lastUpdate = DateTime.parse(data['last_location_update']);
+          final hoursSinceUpdate = DateTime.now().difference(lastUpdate).inHours;
+          if (hoursSinceUpdate >= 1) {
+            isStale = true;
+          }
+        } else if (data['started_at'] != null) {
+          // Fallback to started_at if no location updates
+          final startedAt = DateTime.parse(data['started_at']);
+          final hoursSinceStart = DateTime.now().difference(startedAt).inHours;
+          if (hoursSinceStart >= 12) {  // Consider stale after 12 hours from start
+            isStale = true;
+          }
+        }
+
+        if (!isActive || status == 'completed' || status == 'stopped' || isStale) {
           // Stop refreshing
           _refreshTimer?.cancel();
+
+          // If it's stale, redirect to completed ruck view
+          if (isStale && mounted) {
+            StyledSnackBar.show(
+              context: context,
+              message: 'This ruck session appears to be inactive',
+              type: SnackBarType.normal,
+              duration: const Duration(seconds: 2),
+            );
+
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => RuckBuddyDetailScreen.fromRuckId(
+                      widget.ruckId,
+                    ),
+                  ),
+                );
+              }
+            });
+            return;
+          }
 
           // Mark session as completed and update UI
           if (mounted) {
@@ -149,6 +190,14 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
 
         final errorString = e.toString().toLowerCase();
 
+        // For BadRequestException (400), the ruck is likely completed
+        bool isCompleted = false;
+        if (errorString.contains('badrequestexception') ||
+            errorString.contains('bad request') ||
+            errorString.contains('400')) {
+          isCompleted = true;
+        }
+
         // Check different error scenarios
         if (errorString.contains('403')) {
           // Permission denied - either live following disabled or not following user
@@ -161,37 +210,50 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
             message = '${widget.ruckerName} has disabled live following for this ruck';
           }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
-            ),
+          StyledSnackBar.show(
+            context: context,
+            message: message,
+            type: SnackBarType.error,
+            duration: const Duration(seconds: 3),
           );
 
           // Go back to previous screen
           Navigator.of(context).pop();
 
-        } else if (errorString.contains('not currently active') ||
-                   errorString.contains('400') ||
+        } else if (isCompleted ||
+                   errorString.contains('not currently active') ||
                    errorString.contains('404') ||
                    errorString.contains('not found')) {
-          // Session ended - stop refreshing and mark as completed
+          // Session ended - stop refreshing and redirect to completed ruck
           _refreshTimer?.cancel();
 
           if (mounted) {
-            setState(() {
-              _sessionCompleted = true;
-              _isLoading = false;
+            // Show a message that the session has ended first
+            StyledSnackBar.showSuccess(
+              context: context,
+              message: '${widget.ruckerName}\'s ruck has completed',
+              duration: const Duration(seconds: 2),
+            );
+
+            // Then navigate to the completed ruck detail screen
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => RuckBuddyDetailScreen.fromRuckId(
+                      widget.ruckId,
+                    ),
+                  ),
+                );
+              }
             });
           }
         } else {
           // Generic error
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Unable to load live ruck data. Please try again.'),
-              backgroundColor: Colors.red,
-            ),
+          StyledSnackBar.showError(
+            context: context,
+            message: 'Unable to load live ruck data',
+            duration: const Duration(seconds: 3),
           );
         }
       }
@@ -244,21 +306,19 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
       _messageController.clear();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Message sent to ${widget.ruckerName}! 🎤'),
-            backgroundColor: AppColors.primary,
-          ),
+        StyledSnackBar.showSuccess(
+          context: context,
+          message: 'Message sent to ${widget.ruckerName}! 🎤',
+          duration: const Duration(seconds: 2),
         );
       }
     } catch (e) {
       AppLogger.error('[LIVE_FOLLOWING] Error sending message: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send message'),
-            backgroundColor: Colors.red,
-          ),
+        StyledSnackBar.showError(
+          context: context,
+          message: 'Failed to send message',
+          duration: const Duration(seconds: 3),
         );
       }
     } finally {
@@ -282,7 +342,7 @@ class _LiveRuckFollowingScreenState extends State<LiveRuckFollowingScreen> {
           children: [
             Text('${widget.ruckerName}\'s Ruck'),
             Text(
-              _sessionCompleted ? '✅ COMPLETED' : '🔴 LIVE',
+              _sessionCompleted ? 'COMPLETED' : 'LIVE',
               style: TextStyle(
                 fontSize: 12,
                 color: _sessionCompleted ? Colors.green : Colors.red,

@@ -90,6 +90,177 @@ def process_plan_notifications():
     except Exception as e:
         logger.error(f"Error processing plan notifications: {e}")
 
+def auto_complete_stale_sessions():
+    """Auto-complete sessions that haven't had location updates for over 4 hours"""
+    try:
+        from datetime import datetime, timezone
+        import math
+
+        logger.info("Checking for stale sessions to auto-complete...")
+
+        def haversine_distance(lat1, lon1, lat2, lon2):
+            """Calculate distance between two GPS points in kilometers"""
+            R = 6371.0  # Earth radius in kilometers
+
+            lat1_rad = math.radians(lat1)
+            lat2_rad = math.radians(lat2)
+            delta_lat = math.radians(lat2 - lat1)
+            delta_lon = math.radians(lon2 - lon1)
+
+            a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+            return R * c
+
+        supabase = get_supabase_admin_client()
+
+        # Find sessions that are in_progress with last location update > 1 hour ago
+        # First get all in_progress sessions
+        sessions_resp = supabase.table('ruck_session') \
+            .select('id, user_id, started_at, status') \
+            .eq('status', 'in_progress') \
+            .execute()
+
+        if not sessions_resp.data:
+            logger.debug("No in-progress sessions found")
+            return
+
+        stale_sessions = []
+        cancelled_sessions = []
+
+        for session in sessions_resp.data:
+            session_id = session['id']
+
+            # Get last location point for this session
+            location_resp = supabase.table('location_point') \
+                .select('timestamp') \
+                .eq('session_id', session_id) \
+                .order('timestamp', desc=True) \
+                .limit(1) \
+                .execute()
+
+            if location_resp.data:
+                # Has location data - check if stale
+                last_location_time = datetime.fromisoformat(location_resp.data[0]['timestamp'].replace('Z', '+00:00'))
+                hours_since_location = (datetime.now(timezone.utc) - last_location_time).total_seconds() / 3600
+
+                if hours_since_location >= 4.0:  # Changed from 1 hour to 4 hours
+                    stale_sessions.append({
+                        'id': session_id,
+                        'user_id': session['user_id'],
+                        'last_location_time': last_location_time.isoformat(),
+                        'hours_inactive': hours_since_location
+                    })
+            else:
+                # No location data at all
+                started_at = datetime.fromisoformat(session['started_at'].replace('Z', '+00:00'))
+                hours_since_start = (datetime.now(timezone.utc) - started_at).total_seconds() / 3600
+
+                if hours_since_start >= 4.0:  # Changed from 1 hour to 4 hours
+                    cancelled_sessions.append({
+                        'id': session_id,
+                        'user_id': session['user_id'],
+                        'started_at': session['started_at']
+                    })
+
+        # Auto-complete stale sessions with location data
+        completed_count = 0
+        for session_info in stale_sessions:
+            try:
+                session_id = session_info['id']
+
+                # Calculate distance from location points
+                location_points = supabase.table('location_point') \
+                    .select('latitude, longitude, altitude, timestamp') \
+                    .eq('session_id', session_id) \
+                    .order('timestamp', asc=True) \
+                    .execute()
+
+                total_distance = 0.0
+                elevation_gain = 0.0
+
+                if location_points.data and len(location_points.data) > 1:
+                    for i in range(1, len(location_points.data)):
+                        prev_point = location_points.data[i-1]
+                        curr_point = location_points.data[i]
+
+                        # Calculate distance using haversine formula
+                        lat1, lon1 = prev_point['latitude'], prev_point['longitude']
+                        lat2, lon2 = curr_point['latitude'], curr_point['longitude']
+
+                        # Use proper haversine distance calculation
+                        distance = haversine_distance(lat1, lon1, lat2, lon2)
+                        total_distance += distance
+
+                        # Calculate elevation gain
+                        if curr_point.get('altitude') and prev_point.get('altitude'):
+                            alt_diff = curr_point['altitude'] - prev_point['altitude']
+                            if alt_diff > 0:
+                                elevation_gain += alt_diff
+
+                # Get session details for duration calculation
+                session_details = supabase.table('ruck_session') \
+                    .select('started_at, ruck_weight_kg, user_weight_kg') \
+                    .eq('id', session_id) \
+                    .single() \
+                    .execute()
+
+                started_at = datetime.fromisoformat(session_details.data['started_at'].replace('Z', '+00:00'))
+                last_location = datetime.fromisoformat(session_info['last_location_time'].replace('Z', '+00:00'))
+                duration_seconds = int((last_location - started_at).total_seconds())
+
+                # Simple calorie calculation
+                calories = (duration_seconds / 60.0) * 75 * 0.5  # Basic estimate
+
+                # Update session to completed
+                update_data = {
+                    'status': 'completed',
+                    'completed_at': session_info['last_location_time'],
+                    'distance_km': round(total_distance, 2),
+                    'duration_seconds': duration_seconds,
+                    'elevation_gain_m': round(elevation_gain, 1),
+                    'calories_burned': round(calories, 0),
+                    'notes': f'Auto-completed after {session_info["hours_inactive"]:.1f} hours of inactivity'
+                }
+
+                supabase.table('ruck_session') \
+                    .update(update_data) \
+                    .eq('id', session_id) \
+                    .execute()
+
+                completed_count += 1
+                logger.info(f"Auto-completed session {session_id} after {session_info['hours_inactive']:.1f} hours inactive")
+
+            except Exception as e:
+                logger.error(f"Failed to auto-complete session {session_info['id']}: {e}")
+
+        # Cancel sessions with no location data
+        cancelled_count = 0
+        for session_info in cancelled_sessions:
+            try:
+                supabase.table('ruck_session') \
+                    .update({
+                        'status': 'cancelled',
+                        'completed_at': session_info['started_at'],
+                        'notes': 'Auto-cancelled: No location data recorded'
+                    }) \
+                    .eq('id', session_info['id']) \
+                    .execute()
+
+                cancelled_count += 1
+                logger.info(f"Auto-cancelled session {session_info['id']} (no location data)")
+
+            except Exception as e:
+                logger.error(f"Failed to auto-cancel session {session_info['id']}: {e}")
+
+        if completed_count > 0 or cancelled_count > 0:
+            logger.info(f"Auto-completion summary: {completed_count} completed, {cancelled_count} cancelled")
+        else:
+            logger.debug("No stale sessions found to auto-complete")
+
+    except Exception as e:
+        logger.error(f"Error during auto-completion of stale sessions: {e}")
+
 def process_scheduled_messages():
     """Process and send scheduled voice messages"""
     try:
@@ -197,7 +368,17 @@ def main():
         id='scheduled_messages',
         name='Process Scheduled Voice Messages'
     )
-    
+
+    # Add auto-complete stale sessions job (every 10 minutes)
+    scheduler.add_job(
+        auto_complete_stale_sessions,
+        'interval',
+        minutes=10,
+        id='auto_complete_sessions',
+        name='Auto-complete Stale Sessions',
+        misfire_grace_time=300  # Allow 5 minute grace period for misfires
+    )
+
     try:
         logger.info("Scheduler started. Press Ctrl+C to exit.")
         scheduler.start()
