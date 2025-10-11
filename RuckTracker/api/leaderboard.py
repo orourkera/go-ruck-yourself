@@ -103,53 +103,100 @@ class LeaderboardResource(Resource):
                 cached_result['activeRuckersCount'] = active_ruckers_count
                 return cached_result
 
-            # Build the query - this is where the magic happens!
-            # CRITICAL: Filter out users who disabled public ruck sharing
-            query = (
-                supabase.table('user').select(
-                    '''
-                    id,
-                    username,
-                    avatar_url,
-                    created_at,
-                    ruck_session(
+            # Build the query - different approach for rucking_now vs other time periods
+            if time_period == 'rucking_now':
+                # For rucking_now, query active sessions and join users
+                # This ensures we only get users who are currently rucking
+                from datetime import datetime, timezone, timedelta
+
+                # Get active sessions from last 24 hours
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+
+                # Query sessions that are in_progress/paused and started within 24h
+                sessions_query = supabase.table('ruck_session') \
+                    .select('*, user:user_id(id, username, avatar_url, gender, allow_ruck_sharing)') \
+                    .in_('status', ['in_progress', 'paused']) \
+                    .gte('started_at', cutoff)
+
+                if search:
+                    # For search, we need to filter on the joined user table - not directly supported
+                    # So we'll filter after fetching
+                    pass
+
+                response = sessions_query.execute()
+
+                # Filter out users who disabled sharing and apply search
+                filtered_data = []
+                for session in response.data if response.data else []:
+                    user_data = session.get('user')
+                    if user_data and user_data.get('allow_ruck_sharing'):
+                        if search and search.lower() not in user_data.get('username', '').lower():
+                            continue
+                        # Transform to match expected format
+                        user_id = user_data['id']
+                        # Check if we already have this user
+                        existing = next((u for u in filtered_data if u['id'] == user_id), None)
+                        if not existing:
+                            filtered_data.append({
+                                'id': user_id,
+                                'username': user_data['username'],
+                                'avatar_url': user_data.get('avatar_url'),
+                                'gender': user_data.get('gender'),
+                                'ruck_session': [session]
+                            })
+                        else:
+                            existing['ruck_session'].append(session)
+
+                response.data = filtered_data
+            else:
+                # For other time periods, use the original query approach
+                query = (
+                    supabase.table('user').select(
+                        '''
                         id,
-                        distance_km,
-                        elevation_gain_m,
-                        calories_burned,
-                        power_points,
-                        completed_at,
-                        started_at,
-                        status
+                        username,
+                        avatar_url,
+                        gender,
+                        created_at,
+                        ruck_session(
+                            id,
+                            distance_km,
+                            elevation_gain_m,
+                            calories_burned,
+                            power_points,
+                            completed_at,
+                            started_at,
+                            status
+                        )
+                        '''
                     )
-                    '''
+                    .eq('allow_ruck_sharing', True)  # Enforce privacy filter
                 )
-                .eq('allow_ruck_sharing', True)  # Enforce privacy filter
-            )
+
+                # Add search filter if provided
+                if search:
+                    query = query.ilike('username', f'%{search}%')
             
-            # Add search filter if provided
-            if search:
-                query = query.ilike('username', f'%{search}%')
-            
-            # Execute the query
-            logger.debug("Executing leaderboard query with admin client...")
-            logger.debug(f"Query object type: {type(query)}")
-            try:
-                response = query.execute()
-                logger.debug(f"Query executed successfully, response type: {type(response)}")
-                
-                # Check if embed worked
-                has_ruck_session_data = False
-                if response.data and len(response.data) > 0:
-                    first_user = response.data[0]
-                    has_ruck_session_data = 'ruck_session' in first_user and first_user['ruck_session'] is not None
-                
-                # If embed failed, fall back to manual approach (and clear any partial embed data)
-                if not has_ruck_session_data:
-                    # Clear any partial embedded data to prevent double counting
-                    for user in response.data:
-                        user['ruck_session'] = []
-                    logger.debug("Embed failed, using manual approach")
+            # Execute the query (skip for rucking_now since we already executed it)
+            if time_period != 'rucking_now':
+                logger.debug("Executing leaderboard query with admin client...")
+                logger.debug(f"Query object type: {type(query)}")
+                try:
+                    response = query.execute()
+                    logger.debug(f"Query executed successfully, response type: {type(response)}")
+
+                    # Check if embed worked
+                    has_ruck_session_data = False
+                    if response.data and len(response.data) > 0:
+                        first_user = response.data[0]
+                        has_ruck_session_data = 'ruck_session' in first_user and first_user['ruck_session'] is not None
+
+                    # If embed failed, fall back to manual approach (and clear any partial embed data)
+                    if not has_ruck_session_data:
+                        # Clear any partial embedded data to prevent double counting
+                        for user in response.data:
+                            user['ruck_session'] = []
+                        logger.debug("Embed failed, using manual approach")
                     
                     # Get user IDs for manual session query
                     user_ids = [user['id'] for user in response.data]
@@ -196,11 +243,11 @@ class LeaderboardResource(Resource):
                     
                     logger.debug("Manual approach complete - users now have ruck_session data")
                 
-                logger.debug(f"Response data count: {len(response.data) if response.data else 0}")
-            except Exception as e:
-                logger.error(f"Query execution failed: {str(e)}")
-                logger.error(f"Query error type: {type(e)}")
-                return {'users': [], 'total': 0, 'hasMore': False, 'activeRuckersCount': 0}
+                    logger.debug(f"Response data count: {len(response.data) if response.data else 0}")
+                except Exception as e:
+                    logger.error(f"Query execution failed: {str(e)}")
+                    logger.error(f"Query error type: {type(e)}")
+                    return {'users': [], 'total': 0, 'hasMore': False, 'activeRuckersCount': 0}
             
             if not response.data:
                 return {'users': [], 'total': 0, 'activeRuckersCount': active_ruckers_count}
