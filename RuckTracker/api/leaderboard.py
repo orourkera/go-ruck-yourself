@@ -125,9 +125,12 @@ class LeaderboardResource(Resource):
 
                 response = sessions_query.execute()
 
+                logger.info(f"[LEADERBOARD] rucking_now query returned {len(response.data) if response.data else 0} sessions")
+
                 # Filter out users who disabled sharing and apply search
                 filtered_data = []
                 for session in response.data if response.data else []:
+                    logger.debug(f"[LEADERBOARD] Processing session {session.get('id')}, user data: {session.get('user')}")
                     user_data = session.get('user')
                     if user_data and user_data.get('allow_ruck_sharing'):
                         if search and search.lower() not in user_data.get('username', '').lower():
