@@ -358,10 +358,11 @@ class SessionLifecycleManager implements SessionManager {
           AppLogger.info(
               '[LIFECYCLE] CALORIES_DEBUG: Sending calories_burned=${completionData['calories_burned']} to backend');
           // Add timeout to prevent hanging on slow API responses
+          // Increased to 30s to accommodate poor cell service (2 bars)
           final completionResponse = await _apiClient
               .post('/rucks/$_activeSessionId/complete', completionData)
-              .timeout(const Duration(seconds: 15), onTimeout: () {
-            throw Exception('Session completion API timeout after 15 seconds');
+              .timeout(const Duration(seconds: 30), onTimeout: () {
+            throw Exception('Session completion API timeout after 30 seconds');
           });
           completionSuccessful = true;
           AppLogger.info(
