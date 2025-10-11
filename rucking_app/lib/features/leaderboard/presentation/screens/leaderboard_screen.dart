@@ -626,7 +626,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildEmptyState() {
     // Different messages based on time period
     String subtitle;
-    if (_selectedTimePeriod == 'rucking_now') {
+    if (_currentTimePeriod == 'rucking_now') {
       subtitle = 'Ruckers will only show here if they have enabled live ruck sharing in their privacy settings.';
     } else {
       subtitle = 'Be the first to complete a public ruck!';
