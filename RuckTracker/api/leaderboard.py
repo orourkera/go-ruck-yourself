@@ -189,16 +189,23 @@ class LeaderboardResource(Resource):
                 if user_id not in user_stats:
                     # Get ruck sessions safely (might be missing if user has no sessions)
                     ruck_sessions = user_data.get('ruck_session', [])
-                    
+
+                    # Check if THIS user is currently rucking (for display purposes)
+                    is_currently_rucking = False
+                    for ruck in ruck_sessions:
+                        if ruck.get('status') in ['in_progress', 'paused']:
+                            is_currently_rucking = True
+                            break
+
                     # Get the user's most recent location from their latest ruck
                     latest_ruck = None
                     if ruck_sessions:
-                        latest_ruck = max(ruck_sessions, 
+                        latest_ruck = max(ruck_sessions,
                                         key=lambda x: x['completed_at'] if x['completed_at'] else '1900-01-01')
-                    
+
                     # Location extraction removed – `waypoints` not selected anymore.
                     location = None
-                    
+
                     user_stats[user_id] = {
                         'id': user_id,
                         'username': user_data['username'],
