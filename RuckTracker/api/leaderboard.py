@@ -44,18 +44,13 @@ class LeaderboardResource(Resource):
             cache_key = f"leaderboard:{sort_by}:{ascending}:{limit}:{offset}:{search}:{time_period}:browse"
             cache_service = get_cache_service()
 
-            # Use admin client for browse mode, authenticated for logged-in users
-            if current_user_id:
-                supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
-            else:
-                supabase: Client = get_supabase_admin_client()
-            logger.debug(f"Using authenticated client with RLS: {type(supabase)}")
-
-            # ALWAYS fetch active ruckers count (don't cache this, it changes frequently)
+            # ALWAYS fetch active ruckers count using admin client (don't cache this, it changes frequently)
+            # Use admin client to bypass RLS and see ALL active sessions
             active_ruckers_count = 0
             try:
+                admin_client = get_supabase_admin_client()
                 # Query for all sessions that are in_progress or paused
-                active_sessions_response = supabase.table('ruck_session') \
+                active_sessions_response = admin_client.table('ruck_session') \
                     .select('id, user_id') \
                     .in_('status', ['in_progress', 'paused']) \
                     .execute()
@@ -72,6 +67,13 @@ class LeaderboardResource(Resource):
                 logger.error(f"[LEADERBOARD] Failed to count active ruckers: {e}")
                 active_ruckers_count = 0
 
+            # Use admin client for browse mode, authenticated for logged-in users (for leaderboard data)
+            if current_user_id:
+                supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+            else:
+                supabase: Client = get_supabase_admin_client()
+            logger.debug(f"Using authenticated client with RLS for leaderboard data: {type(supabase)}")
+
             # Try to get leaderboard data from cache first (cache for 5 minutes)
             cached_result = cache_service.get(cache_key)
             if cached_result:
@@ -79,7 +81,7 @@ class LeaderboardResource(Resource):
                 # Update the cached result with fresh active ruckers count
                 cached_result['activeRuckersCount'] = active_ruckers_count
                 return cached_result
-            
+
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
             query = (
