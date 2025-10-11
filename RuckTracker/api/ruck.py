@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 import json
 import math
 from typing import Optional, Union
-from ..supabase_client import get_supabase_client
+from ..supabase_client import get_supabase_client, get_supabase_admin_client
 from ..services.redis_cache_service import cache_get, cache_set, cache_delete_pattern
 from .goals import _compute_window_bounds, _km_to_mi
 from ..utils.auth_helper import get_current_user_id
@@ -658,10 +658,27 @@ class RuckSessionDetailResource(Resource):
                     user_resp = supabase.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
                     if user_resp.data:
                         session['user'] = user_resp.data
+                        # Store username separately for easier access
+                        session['user_name'] = user_resp.data.get('username', '')
                 except Exception as user_err:
                     logger.warning(f"[RUCK_DETAILS] Failed to fetch user info for user_id {user_id}: {user_err}")
-                    # Fallback to minimal user info
-                    session['user'] = {'id': user_id, 'username': 'Rucker', 'gender': 'male'}
+                    # Try to get username from session if stored there
+                    stored_username = session.get('user_name', '')
+                    if not stored_username:
+                        # Last resort: Try admin client to fetch username
+                        try:
+                            admin_client = get_supabase_admin_client()
+                            admin_user_resp = admin_client.table('user').select('username').eq('id', user_id).single().execute()
+                            if admin_user_resp.data:
+                                stored_username = admin_user_resp.data.get('username', 'Rucker')
+                            else:
+                                stored_username = 'Rucker'
+                        except:
+                            stored_username = 'Rucker'
+
+                    # Fallback to minimal user info but preserve username
+                    session['user'] = {'id': user_id, 'username': stored_username, 'gender': 'male'}
+                    session['user_name'] = stored_username
 
             # Ensure raw likes/comments arrays are not present
             session.pop('likes', None)
