@@ -159,53 +159,36 @@ class LeaderboardResource(Resource):
             if not response.data:
                 return {'users': [], 'total': 0}
             
-            # Process and aggregate user data
-            user_stats = {}
+            # First, get the count of ALL active ruckers in the system (not just this page)
             active_ruckers_count = 0
-            
+            try:
+                # Query for all sessions that are in_progress or paused
+                active_sessions_response = supabase.table('ruck_session') \
+                    .select('id, user_id') \
+                    .in_('status', ['in_progress', 'paused']) \
+                    .execute()
+
+                if active_sessions_response.data:
+                    # Count unique users with active sessions
+                    active_user_ids = set()
+                    for session in active_sessions_response.data:
+                        if session.get('user_id'):
+                            active_user_ids.add(session['user_id'])
+                    active_ruckers_count = len(active_user_ids)
+                    logger.info(f"[LEADERBOARD] Found {active_ruckers_count} active ruckers across entire system")
+            except Exception as e:
+                logger.error(f"[LEADERBOARD] Failed to count active ruckers: {e}")
+                active_ruckers_count = 0
+
+            # Process and aggregate user data for the current page
+            user_stats = {}
+
             for user_data in response.data:
                 user_id = user_data['id']
                 
                 if user_id not in user_stats:
                     # Get ruck sessions safely (might be missing if user has no sessions)
                     ruck_sessions = user_data.get('ruck_session', [])
-                    
-                    # Check if user is currently rucking (has active session)
-                    # Only count sessions that are recent (within last 4 hours) to avoid old stuck sessions
-                    is_currently_rucking = False
-                    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=4)
-
-                    for ruck in ruck_sessions:
-                        # Check if actively rucking (in_progress or paused)
-                        if ruck.get('status') in ['in_progress', 'paused']:
-                            # If status is in_progress/paused, they're actively rucking!
-                            is_currently_rucking = True
-                            break
-
-                        # Also check recently completed sessions (within 4 hours)
-                        if ruck.get('status') == 'completed' and ruck.get('completed_at'):
-                            timestamp = ruck.get('completed_at')
-                            if timestamp:
-                                try:
-                                    # Handle both with and without 'Z' suffix
-                                    if timestamp.endswith('Z'):
-                                        session_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                                    elif '+' in timestamp or timestamp.endswith('+00'):
-                                        session_time = datetime.fromisoformat(timestamp)
-                                    else:
-                                        # Assume UTC if no timezone info
-                                        session_time = datetime.fromisoformat(timestamp + '+00:00')
-
-                                    if session_time > cutoff_time:
-                                        is_currently_rucking = True
-                                        break
-                                except (ValueError, AttributeError):
-                                    # If we can't parse the timestamp, skip this session
-                                    pass
-                    
-                    if is_currently_rucking:
-                        active_ruckers_count += 1
-                        logger.debug(f"Active rucker found: user {user_id[:8]}... - session within 4 hours")
                     
                     # Get the user's most recent location from their latest ruck
                     latest_ruck = None

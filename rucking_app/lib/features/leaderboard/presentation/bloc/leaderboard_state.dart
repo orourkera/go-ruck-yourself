@@ -25,16 +25,18 @@ class LeaderboardLoadingMore extends LeaderboardState {
   final String sortBy;
   final bool ascending;
   final String? searchQuery;
+  final int activeRuckersCount;
 
   const LeaderboardLoadingMore({
     required this.currentUsers,
     required this.sortBy,
     required this.ascending,
     this.searchQuery,
+    this.activeRuckersCount = 0,
   });
 
   @override
-  List<Object?> get props => [currentUsers, sortBy, ascending, searchQuery];
+  List<Object?> get props => [currentUsers, sortBy, ascending, searchQuery, activeRuckersCount];
 }
 
 /// Loaded and ready to rock like a front porch swing

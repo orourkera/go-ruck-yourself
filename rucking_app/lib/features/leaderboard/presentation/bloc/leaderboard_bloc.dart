@@ -291,6 +291,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
       sortBy: currentState.sortBy,
       ascending: currentState.ascending,
       searchQuery: currentState.searchQuery,
+      activeRuckersCount: currentState.activeRuckersCount,
     ));
 
     try {

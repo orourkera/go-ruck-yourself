@@ -177,10 +177,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
                   builder: (context, state) {
                     int activeCount = 0;
+                    // Check states that have activeRuckersCount
                     if (state is LeaderboardLoaded) {
-                      // Use backend-provided activeRuckersCount
+                      activeCount = state.activeRuckersCount;
+                    } else if (state is LeaderboardUpdating) {
+                      activeCount = state.activeRuckersCount;
+                    } else if (state is LeaderboardLoadingMore) {
                       activeCount = state.activeRuckersCount;
                     }
+
                     return activeCount > 0
                         ? Transform.scale(
                             scale: 1.5, // Make it 50% bigger
