@@ -44,18 +44,41 @@ class LeaderboardResource(Resource):
             cache_key = f"leaderboard:{sort_by}:{ascending}:{limit}:{offset}:{search}:{time_period}:browse"
             cache_service = get_cache_service()
 
-            # Try to get from cache first (cache for 5 minutes)
-            cached_result = cache_service.get(cache_key)
-            if cached_result:
-                logger.debug(f"Returning cached leaderboard data for key: {cache_key}")
-                return cached_result
-
             # Use admin client for browse mode, authenticated for logged-in users
             if current_user_id:
                 supabase: Client = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
             else:
                 supabase: Client = get_supabase_admin_client()
             logger.debug(f"Using authenticated client with RLS: {type(supabase)}")
+
+            # ALWAYS fetch active ruckers count (don't cache this, it changes frequently)
+            active_ruckers_count = 0
+            try:
+                # Query for all sessions that are in_progress or paused
+                active_sessions_response = supabase.table('ruck_session') \
+                    .select('id, user_id') \
+                    .in_('status', ['in_progress', 'paused']) \
+                    .execute()
+
+                if active_sessions_response.data:
+                    # Count unique users with active sessions
+                    active_user_ids = set()
+                    for session in active_sessions_response.data:
+                        if session.get('user_id'):
+                            active_user_ids.add(session['user_id'])
+                    active_ruckers_count = len(active_user_ids)
+                    logger.info(f"[LEADERBOARD] Found {active_ruckers_count} active ruckers across entire system")
+            except Exception as e:
+                logger.error(f"[LEADERBOARD] Failed to count active ruckers: {e}")
+                active_ruckers_count = 0
+
+            # Try to get leaderboard data from cache first (cache for 5 minutes)
+            cached_result = cache_service.get(cache_key)
+            if cached_result:
+                logger.debug(f"Returning cached leaderboard data for key: {cache_key}")
+                # Update the cached result with fresh active ruckers count
+                cached_result['activeRuckersCount'] = active_ruckers_count
+                return cached_result
             
             # Build the query - this is where the magic happens!
             # CRITICAL: Filter out users who disabled public ruck sharing
@@ -157,30 +180,10 @@ class LeaderboardResource(Resource):
                 return {'users': [], 'total': 0, 'hasMore': False, 'activeRuckersCount': 0}
             
             if not response.data:
-                return {'users': [], 'total': 0}
-            
-            # First, get the count of ALL active ruckers in the system (not just this page)
-            active_ruckers_count = 0
-            try:
-                # Query for all sessions that are in_progress or paused
-                active_sessions_response = supabase.table('ruck_session') \
-                    .select('id, user_id') \
-                    .in_('status', ['in_progress', 'paused']) \
-                    .execute()
-
-                if active_sessions_response.data:
-                    # Count unique users with active sessions
-                    active_user_ids = set()
-                    for session in active_sessions_response.data:
-                        if session.get('user_id'):
-                            active_user_ids.add(session['user_id'])
-                    active_ruckers_count = len(active_user_ids)
-                    logger.info(f"[LEADERBOARD] Found {active_ruckers_count} active ruckers across entire system")
-            except Exception as e:
-                logger.error(f"[LEADERBOARD] Failed to count active ruckers: {e}")
-                active_ruckers_count = 0
+                return {'users': [], 'total': 0, 'activeRuckersCount': active_ruckers_count}
 
             # Process and aggregate user data for the current page
+            # (active_ruckers_count already fetched above before cache check)
             user_stats = {}
 
             for user_data in response.data:
