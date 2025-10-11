@@ -545,13 +545,30 @@ class RuckSessionDetailResource(Resource):
             supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
 
             # Fetch base session with user info via foreign key join
-            session_resp = (
-                supabase.table('ruck_session')
-                .select('*, user:user_id(id, username, gender, avatar_url)')
-                .eq('id', ruck_id)
-                .single()
-                .execute()
-            )
+            try:
+                session_resp = (
+                    supabase.table('ruck_session')
+                    .select('*, user:user_id(id, username, gender, avatar_url)')
+                    .eq('id', ruck_id)
+                    .single()
+                    .execute()
+                )
+            except Exception as query_error:
+                # If RLS blocks the query or session doesn't exist, try with admin client
+                logger.warning(f"[RUCK_DETAILS] User client query failed for ruck {ruck_id}: {query_error}")
+                admin_client = get_supabase_admin_client()
+                try:
+                    session_resp = (
+                        admin_client.table('ruck_session')
+                        .select('*, user:user_id(id, username, gender, avatar_url)')
+                        .eq('id', ruck_id)
+                        .single()
+                        .execute()
+                    )
+                except Exception as admin_error:
+                    logger.error(f"[RUCK_DETAILS] Admin client also failed for ruck {ruck_id}: {admin_error}")
+                    return {'message': 'Session not found'}, 404
+
             if not session_resp.data:
                 return {'message': 'Session not found'}, 404
             session = session_resp.data
