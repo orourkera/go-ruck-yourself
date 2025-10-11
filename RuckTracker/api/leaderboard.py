@@ -48,21 +48,42 @@ class LeaderboardResource(Resource):
             # Use admin client to bypass RLS and see ALL active sessions
             active_ruckers_count = 0
             try:
+                from datetime import datetime, timezone, timedelta
                 admin_client = get_supabase_admin_client()
+
                 # Query for all sessions that are in_progress or paused
+                # Also get started_at to filter out stale sessions
                 active_sessions_response = admin_client.table('ruck_session') \
-                    .select('id, user_id') \
+                    .select('id, user_id, started_at, status') \
                     .in_('status', ['in_progress', 'paused']) \
                     .execute()
 
                 if active_sessions_response.data:
-                    # Count unique users with active sessions
+                    # Count unique users with active sessions that started within last 24 hours
+                    # (to avoid counting stale sessions that auto-complete job hasn't cleaned up yet)
                     active_user_ids = set()
+                    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+
                     for session in active_sessions_response.data:
-                        if session.get('user_id'):
-                            active_user_ids.add(session['user_id'])
+                        if session.get('user_id') and session.get('started_at'):
+                            try:
+                                started_at_str = session['started_at']
+                                if started_at_str.endswith('Z'):
+                                    started_at = datetime.fromisoformat(started_at_str.replace('Z', '+00:00'))
+                                elif '+' in started_at_str:
+                                    started_at = datetime.fromisoformat(started_at_str)
+                                else:
+                                    started_at = datetime.fromisoformat(started_at_str + '+00:00')
+
+                                # Only count if session started within last 24 hours
+                                if started_at > cutoff_time:
+                                    active_user_ids.add(session['user_id'])
+                            except (ValueError, AttributeError) as e:
+                                logger.warning(f"[LEADERBOARD] Failed to parse started_at for session {session.get('id')}: {e}")
+                                continue
+
                     active_ruckers_count = len(active_user_ids)
-                    logger.info(f"[LEADERBOARD] Found {active_ruckers_count} active ruckers across entire system")
+                    logger.info(f"[LEADERBOARD] Found {active_ruckers_count} active ruckers across entire system (started within 24h)")
             except Exception as e:
                 logger.error(f"[LEADERBOARD] Failed to count active ruckers: {e}")
                 active_ruckers_count = 0
