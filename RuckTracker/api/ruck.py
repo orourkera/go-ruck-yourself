@@ -658,27 +658,34 @@ class RuckSessionDetailResource(Resource):
                     user_resp = supabase.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
                     if user_resp.data:
                         session['user'] = user_resp.data
-                        # Store username separately for easier access
-                        session['user_name'] = user_resp.data.get('username', '')
+                        logger.info(f"[RUCK_DETAILS] Successfully fetched user info for user_id {user_id}: {user_resp.data.get('username')}")
+                    else:
+                        # This shouldn't happen - user should always exist
+                        logger.error(f"[RUCK_DETAILS] User {user_id} not found in database - this is unexpected!")
+                        # Use admin client to debug
+                        admin_client = get_supabase_admin_client()
+                        admin_resp = admin_client.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
+                        if admin_resp.data:
+                            session['user'] = admin_resp.data
+                            logger.info(f"[RUCK_DETAILS] Found user with admin client: {admin_resp.data}")
+                        else:
+                            logger.error(f"[RUCK_DETAILS] User {user_id} not found even with admin client!")
+                            session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
                 except Exception as user_err:
-                    logger.warning(f"[RUCK_DETAILS] Failed to fetch user info for user_id {user_id}: {user_err}")
-                    # Try to get username from session if stored there
-                    stored_username = session.get('user_name', '')
-                    if not stored_username:
-                        # Last resort: Try admin client to fetch username
-                        try:
-                            admin_client = get_supabase_admin_client()
-                            admin_user_resp = admin_client.table('user').select('username').eq('id', user_id).single().execute()
-                            if admin_user_resp.data:
-                                stored_username = admin_user_resp.data.get('username', 'Rucker')
-                            else:
-                                stored_username = 'Rucker'
-                        except:
-                            stored_username = 'Rucker'
-
-                    # Fallback to minimal user info but preserve username
-                    session['user'] = {'id': user_id, 'username': stored_username, 'gender': 'male'}
-                    session['user_name'] = stored_username
+                    logger.error(f"[RUCK_DETAILS] Exception fetching user info for user_id {user_id}: {user_err}")
+                    # Try with admin client to bypass any RLS issues
+                    try:
+                        admin_client = get_supabase_admin_client()
+                        admin_resp = admin_client.table('user').select('id, username, gender, avatar_url').eq('id', user_id).single().execute()
+                        if admin_resp.data:
+                            session['user'] = admin_resp.data
+                            logger.info(f"[RUCK_DETAILS] Recovered user with admin client: {admin_resp.data.get('username')}")
+                        else:
+                            logger.error(f"[RUCK_DETAILS] User {user_id} not found even with admin client after exception!")
+                            session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
+                    except Exception as admin_err:
+                        logger.error(f"[RUCK_DETAILS] Admin client also failed: {admin_err}")
+                        session['user'] = {'id': user_id, 'username': 'Unknown User', 'gender': 'male'}
 
             # Ensure raw likes/comments arrays are not present
             session.pop('likes', None)
