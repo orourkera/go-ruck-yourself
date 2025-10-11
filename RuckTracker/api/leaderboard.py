@@ -174,12 +174,17 @@ class LeaderboardResource(Resource):
                     # Only count sessions that are recent (within last 4 hours) to avoid old stuck sessions
                     is_currently_rucking = False
                     cutoff_time = datetime.now(timezone.utc) - timedelta(hours=4)
-                    
+
                     for ruck in ruck_sessions:
-                        if ruck.get('status') in ['in_progress', 'paused'] and not ruck.get('completed_at'):
-                            # Check if session was created/started recently (within 24 hours)
-                            # Use created_at if available, otherwise use started_at
-                            timestamp = ruck.get('created_at') or ruck.get('started_at')
+                        # Check if actively rucking (in_progress or paused)
+                        if ruck.get('status') in ['in_progress', 'paused']:
+                            # If status is in_progress/paused, they're actively rucking!
+                            is_currently_rucking = True
+                            break
+
+                        # Also check recently completed sessions (within 4 hours)
+                        if ruck.get('status') == 'completed' and ruck.get('completed_at'):
+                            timestamp = ruck.get('completed_at')
                             if timestamp:
                                 try:
                                     # Handle both with and without 'Z' suffix
@@ -190,7 +195,7 @@ class LeaderboardResource(Resource):
                                     else:
                                         # Assume UTC if no timezone info
                                         session_time = datetime.fromisoformat(timestamp + '+00:00')
-                                    
+
                                     if session_time > cutoff_time:
                                         is_currently_rucking = True
                                         break
