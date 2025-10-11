@@ -624,6 +624,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   /// Empty state when no users found
   Widget _buildEmptyState() {
+    // Different messages based on time period
+    String subtitle;
+    if (_selectedTimePeriod == 'rucking_now') {
+      subtitle = 'Ruckers will only show here if they have enabled live ruck sharing in their privacy settings.';
+    } else {
+      subtitle = 'Be the first to complete a public ruck!';
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -639,8 +647,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Be the first to complete a public ruck!',
+            Text(
+              subtitle,
               textAlign: TextAlign.center,
             ),
           ],
