@@ -66,7 +66,16 @@ class LiveRuckDataResource(Resource):
                     'latitude': point['latitude'],
                     'longitude': point['longitude']
                 }
-                last_location_update = point['timestamp']
+                # Parse timestamp and ensure it's UTC with timezone info
+                timestamp_str = point['timestamp']
+                if timestamp_str:
+                    # Parse the timestamp (stored as timestamp without time zone, but actually UTC)
+                    dt = parser.parse(timestamp_str)
+                    # If no timezone, assume UTC
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    # Convert to ISO format with 'Z' suffix for explicit UTC
+                    last_location_update = dt.isoformat().replace('+00:00', 'Z')
 
             # Get route (sampled for performance)
             route_response = supabase.table('location_point').select(
