@@ -314,7 +314,7 @@ class UserCoachingPlanProgressResource(Resource):
             # Use admin client so authenticated users aren't blocked by RLS/record ownership
             client = get_supabase_admin_client()
             plan_query = client.table('user_coaching_plans').select(
-                'id, coaching_plan_id, start_date, current_week, plan_modifications'
+                'id, user_id, coaching_plan_id, start_date, current_week, plan_modifications'
             ).eq('user_id', str(user_id)).eq('current_status', 'active')
 
             # Only filter by plan_id if it's provided and not 'null' string

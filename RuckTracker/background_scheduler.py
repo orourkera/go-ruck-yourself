@@ -142,6 +142,9 @@ def auto_complete_stale_sessions():
             if location_resp.data:
                 # Has location data - check if stale
                 last_location_time = datetime.fromisoformat(location_resp.data[0]['timestamp'].replace('Z', '+00:00'))
+                # Ensure timezone-aware (location_point.timestamp is stored without timezone but is UTC)
+                if last_location_time.tzinfo is None:
+                    last_location_time = last_location_time.replace(tzinfo=timezone.utc)
                 hours_since_location = (datetime.now(timezone.utc) - last_location_time).total_seconds() / 3600
 
                 if hours_since_location >= 4.0:  # Changed from 1 hour to 4 hours
