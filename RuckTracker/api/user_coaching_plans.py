@@ -319,7 +319,11 @@ class UserCoachingPlanProgressResource(Resource):
 
             # Only filter by plan_id if it's provided and not 'null' string
             if plan_id and plan_id != 'null':
-                plan_query = plan_query.eq('id', plan_id)
+                try:
+                    plan_id_int = int(plan_id)
+                    plan_query = plan_query.eq('id', plan_id_int)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid plan_id format: {plan_id}, ignoring filter")
 
             plan_resp = plan_query.limit(1).execute()
 
