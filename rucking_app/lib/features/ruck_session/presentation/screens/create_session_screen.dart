@@ -152,8 +152,32 @@ class _CreateSessionScreenState extends State<CreateSessionScreen> {
         _userWeightController.text = lastUserWeight;
       }
 
-      // Load AI Cheerleader preferences (default to true for new users)
-      _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? true;
+      // Load AI Cheerleader preferences with smart default
+      // Check if user has ever used AI cheerleader
+      bool hasEverUsedAI = false;
+      try {
+        final authState = context.read<AuthBloc>().state;
+        if (authState is Authenticated) {
+          final apiClient = GetIt.instance<ApiClient>();
+          final logsResponse = await apiClient.get(
+            '/ai-cheerleader/logs/check',
+          );
+          hasEverUsedAI = logsResponse?['has_logs'] == true;
+        }
+      } catch (e) {
+        AppLogger.warning('Failed to check AI cheerleader usage history: $e');
+        // Default to false on error so we enable for them
+        hasEverUsedAI = false;
+      }
+
+      // Smart default: if user has never used AI cheerleader, enable it
+      // If they have used it before, respect their saved preference
+      if (hasEverUsedAI) {
+        _aiCheerleaderEnabled = prefs.getBool('aiCheerleaderEnabled') ?? true;
+      } else {
+        // User has never used it - enable by default (ignore saved pref)
+        _aiCheerleaderEnabled = true;
+      }
 
       // Validate saved personality exists in current options
       final savedPersonality =

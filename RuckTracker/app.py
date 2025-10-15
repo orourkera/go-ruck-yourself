@@ -628,6 +628,7 @@ from .api.weather import WeatherResource
 from .api.ai_cheerleader import (
     AICheerleaderLogResource,
     AICheerleaderLogsResource,
+    AICheerleaderLogsCheckResource,
 )
 from .api.observability import LLMObservabilityResource
 from .api.user_insights import UserInsightsResource
@@ -934,6 +935,7 @@ api.add_resource(WeatherResource, '/api/weather')
 # Register both the legacy '/api/ai-cheerleader/log' and the client-used '/api/ai-cheerleader'
 api.add_resource(AICheerleaderLogResource, '/api/ai-cheerleader', '/api/ai-cheerleader/log')
 api.add_resource(AICheerleaderLogsResource, '/api/ai-cheerleader/logs', '/api/ai-cheerleader/user-history')
+api.add_resource(AICheerleaderLogsCheckResource, '/api/ai-cheerleader/logs/check')
 api.add_resource(LLMObservabilityResource, '/api/observability/llm')
 # TEMPORARY: Map deprecated user-history endpoint to logs endpoint until frontend is deployed
 # TODO: Remove /api/ai-cheerleader/user-history mapping after frontend update is deployed

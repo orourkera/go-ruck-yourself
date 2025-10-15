@@ -759,4 +759,30 @@ class AICheerleaderLogsResource(Resource):
             return {"error": "Internal server error"}, 500
 
 
+class AICheerleaderLogsCheckResource(Resource):
+    """Check if user has ever used AI cheerleader"""
+
+    def get(self):
+        try:
+            if not getattr(g, 'user', None):
+                return {"error": "Unauthorized"}, 401
+
+            supabase = get_supabase_client(user_jwt=getattr(g, 'access_token', None))
+
+            # Check if user has any AI cheerleader logs
+            result = supabase.table('ai_cheerleader_logs') \
+                .select('id') \
+                .eq('user_id', g.user.id) \
+                .limit(1) \
+                .execute()
+
+            has_logs = len(result.data or []) > 0
+
+            return {"has_logs": has_logs}, 200
+
+        except Exception as e:
+            logger.error(f"Error checking AI cheerleader logs: {str(e)}")
+            return {"error": "Internal server error"}, 500
+
+
 # AICheerleaderUserHistoryResource removed - now using user-insights endpoint for structured data
