@@ -215,6 +215,7 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
       'ruck_weight': ruckWeight,
       'total_distance': (allTime['distance_km'] as num?)?.toDouble() ?? 0.0,
       'average_ruck_weight': averageRuckWeightKg,
+      'mode_ruck_weight_kg': (facts['mode_ruck_weight_kg'] as num?)?.toDouble(),
       'prefer_metric': preferMetric ?? _useMetric,
     };
   }

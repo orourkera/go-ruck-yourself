@@ -84,17 +84,24 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
       // Pre-populate equipment data from history if available
       double? equipmentWeight;
 
-      if (insights['ruck_weight'] != null && insights['ruck_weight'] > 0) {
-        equipmentWeight = (insights['ruck_weight'] as num).toDouble();
-      } else if (insights['average_ruck_weight'] != null &&
+      // Check for mode weight (most common) first
+      if (insights['mode_ruck_weight_kg'] != null && insights['mode_ruck_weight_kg'] > 0) {
+        equipmentWeight = (insights['mode_ruck_weight_kg'] as num).toDouble();
+      }
+      // Then try average
+      else if (insights['average_ruck_weight'] != null &&
           insights['average_ruck_weight'] > 0) {
         equipmentWeight = (insights['average_ruck_weight'] as num).toDouble();
+      }
+      // Then try last non-zero
+      else if (insights['ruck_weight'] != null && insights['ruck_weight'] > 0) {
+        equipmentWeight = (insights['ruck_weight'] as num).toDouble();
       }
 
       if (equipmentWeight != null) {
         _personalization = _personalization.copyWith(
           equipmentType:
-              'rucksack', // Default to rucksack if they have weight history
+              'ruck', // Default to ruck if they have weight history
           equipmentWeight: equipmentWeight,
         );
       }
@@ -129,11 +136,13 @@ class _PersonalizationQuestionsState extends State<PersonalizationQuestions> {
     final insights = widget.userInsights;
     if (insights == null) return false;
 
-    // Check for any indication of weight usage
+    // Check for any indication of weight usage (prioritize new fields)
+    final modeWeight = insights['mode_ruck_weight_kg'];
     final ruckWeight = insights['ruck_weight'];
     final averageRuckWeight = insights['average_ruck_weight'];
 
-    return (ruckWeight != null && ruckWeight > 0) ||
+    return (modeWeight != null && modeWeight > 0) ||
+        (ruckWeight != null && ruckWeight > 0) ||
         (averageRuckWeight != null && averageRuckWeight > 0);
   }
 
