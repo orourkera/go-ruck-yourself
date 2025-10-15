@@ -121,6 +121,18 @@ class _RuckerRatingWidgetState extends State<RuckerRatingWidget> {
       }
     }
 
+    // Fallback: Calculate pace from total distance/duration if no splits
+    if (avgPaceMinPerKm <= 0) {
+      final totalDistance = (totals30d['distance_km'] as num?)?.toDouble() ?? 0;
+      final totalDuration = (totals30d['duration_s'] as num?)?.toDouble() ?? 0;
+
+      if (totalDistance > 0 && totalDuration > 0) {
+        // Pace = duration / distance (in min/km)
+        avgPaceMinPerKm = (totalDuration / 60.0) / totalDistance;
+        AppLogger.debug('Using fallback pace calculation: ${avgPaceMinPerKm} min/km from ${totalDistance}km in ${totalDuration}s');
+      }
+    }
+
     // Get sessions and distance
     final sessions30d = totals30d['sessions'] as int? ?? 0;
     final distance30d = (totals30d['distance_km'] as num?)?.toDouble() ?? 0.0;
