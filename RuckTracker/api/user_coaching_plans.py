@@ -1245,17 +1245,17 @@ def _calculate_session_adherence(session_id, planned_session_type):
         # Get session data
         client = get_supabase_client()
         session_resp = client.table('ruck_session').select(
-            'duration_s, distance_km, ruck_weight_kg, heart_rate_avg'
+            'duration_seconds, distance_km, ruck_weight_kg, avg_heart_rate'
         ).eq('id', session_id).single().execute()
-        
+
         if not session_resp.data:
             return 0.5  # Default partial adherence
-            
+
         session = session_resp.data
-        
+
         # Simple adherence scoring based on session type
         # This can be enhanced with more sophisticated logic
-        duration_minutes = (session.get('duration_s') or 0) / 60
+        duration_minutes = (session.get('duration_seconds') or 0) / 60
         distance_km = session.get('distance_km') or 0
         
         if planned_session_type == 'recovery':

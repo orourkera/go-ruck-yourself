@@ -891,11 +891,20 @@ Return JSON format: {"title": "...", "body": "..."}"""
                 }
             )
 
-            parsed_content = json.loads(content)
-            if 'title' in parsed_content and 'body' in parsed_content:
-                return parsed_content
-            logger.error(f"AI plan notification response missing title/body: {content}")
-            return None
+            # Parse JSON response with error handling
+            if not content:
+                logger.error(f"OpenAI returned empty content for plan notification {notification_type}")
+                return None
+
+            try:
+                parsed_content = json.loads(content)
+                if 'title' in parsed_content and 'body' in parsed_content:
+                    return parsed_content
+                logger.error(f"AI plan notification response missing title/body: {content}")
+                return None
+            except json.JSONDecodeError as json_err:
+                logger.error(f"Failed to parse AI plan notification JSON: {json_err}, content: {content[:200]}")
+                return None
 
         except Exception as exc:
             logger.error(f"Failed to generate AI plan notification: {exc}")

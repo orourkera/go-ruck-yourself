@@ -13,6 +13,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from dateutil import parser
 from datetime import timezone
 
+try:
+    import pytz
+except ImportError:  # pragma: no cover - pytz is included in prod, but guard just in case
+    pytz = None
+
 from .notification_manager import notification_manager
 from ..supabase_client import get_supabase_admin_client
 
@@ -370,6 +375,33 @@ class PlanNotificationService:
         self.weather_base_url = "https://api.openweathermap.org/data/2.5"
 
     # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _safe_timezone(self, timezone_name: Optional[str]):
+        name = timezone_name or 'UTC'
+        if pytz:
+            try:
+                return pytz.timezone(name)
+            except Exception as exc:
+                logger.warning(f"Invalid timezone '{name}': {exc}; using UTC")
+                return pytz.UTC
+        else:  # Fallback when pytz is unavailable
+            if name.upper() != 'UTC':
+                logger.warning(f"pytz not installed; defaulting to UTC instead of '{name}'")
+            return timezone.utc
+
+    def _localize_datetime(self, dt: datetime, tzinfo) -> datetime:
+        if dt.tzinfo is not None:
+            return dt.astimezone(tzinfo)
+        localize = getattr(tzinfo, 'localize', None)
+        if callable(localize):
+            try:
+                return localize(dt)
+            except Exception:
+                return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=tzinfo)
+
+    # ------------------------------------------------------------------
     # Public orchestration APIs
     # ------------------------------------------------------------------
     def seed_plan_schedule(self, user_id: str, plan_id: int) -> None:
@@ -522,25 +554,13 @@ class PlanNotificationService:
         # Get timezone from session or fall back to plan timezone
         session_timezone = session.get('scheduled_timezone') or timezone_name
 
-        # Use pytz for proper timezone handling
-        try:
-            import pytz
-            tzinfo = pytz.timezone(session_timezone)
-        except ImportError:
-            # Fallback if pytz not installed yet
-            from datetime import timezone as dt_timezone
-            tzinfo = dt_timezone.utc
-            logger.warning(f"pytz not installed, using UTC instead of '{session_timezone}'")
-        except Exception as e:
-            # Fallback for invalid timezone
-            import pytz
-            tzinfo = pytz.UTC
-            logger.warning(f"Invalid timezone '{session_timezone}': {e}, using UTC")
+        tzinfo = self._safe_timezone(session_timezone)
         start_time = self._resolve_session_start_time(session, behavior, prefs)
         session_start_dt = datetime.combine(
             datetime.fromisoformat(scheduled_date).date(),
             start_time
-        ).replace(tzinfo=tzinfo)
+        )
+        session_start_dt = self._localize_datetime(session_start_dt, tzinfo)
 
         evening_offset = prefs.get('evening_brief_offset_minutes', DEFAULT_EVENING_OFFSET_MINUTES)
         evening_dt = session_start_dt - timedelta(minutes=evening_offset)
@@ -763,7 +783,7 @@ class PlanNotificationService:
         weekday = datetime.utcnow().strftime('%A')
         summary_needed = prefs.get('weekly_digest_day')
         if summary_needed and weekday == summary_needed:
-            tzinfo = timezone.utc(timezone_name) or timezone.utc
+            tzinfo = self._safe_timezone(timezone_name)
             now_local = datetime.now(tzinfo)
             digest_local = now_local.replace(hour=19, minute=0, second=0, microsecond=0)
             if digest_local <= now_local:
@@ -1001,18 +1021,12 @@ class PlanNotificationService:
                 timezone_name = session.get('scheduled_timezone') or prefs.get('timezone', 'UTC')
 
                 try:
-                    # Parse date and time
                     date_str = scheduled_date if isinstance(scheduled_date, str) else scheduled_date.isoformat()
                     time_str = scheduled_time if isinstance(scheduled_time, str) else '06:00:00'
-
-                    # Combine date and time
                     datetime_str = f"{date_str} {time_str}"
                     session_datetime = datetime.fromisoformat(datetime_str)
-
-                    # Apply timezone
-                    tz_obj = timezone.utc(timezone_name)
-                    if tz_obj:
-                        session_datetime = session_datetime.replace(tzinfo=tz_obj)
+                    tz_obj = self._safe_timezone(timezone_name)
+                    session_datetime = self._localize_datetime(session_datetime, tz_obj)
                 except Exception as e:
                     logger.warning(f"Failed to parse session datetime: {e}")
                     return None
@@ -1028,10 +1042,8 @@ class PlanNotificationService:
                     time_str = scheduled_time if isinstance(scheduled_time, str) else '06:00:00'
                     datetime_str = f"{date_str} {time_str}"
                     session_datetime = datetime.fromisoformat(datetime_str)
-
-                    tz_obj = timezone.utc(timezone_name)
-                    if tz_obj:
-                        session_datetime = session_datetime.replace(tzinfo=tz_obj)
+                    tz_obj = self._safe_timezone(timezone_name)
+                    session_datetime = self._localize_datetime(session_datetime, tz_obj)
                 except Exception as e:
                     logger.warning(f"Failed to parse session payload datetime: {e}")
                     return None
@@ -1040,6 +1052,8 @@ class PlanNotificationService:
                 # Default to tomorrow morning if no date specified
                 session_datetime = datetime.now() + timedelta(days=1)
                 session_datetime = session_datetime.replace(hour=6, minute=0, second=0)
+                default_tz = self._safe_timezone(prefs.get('timezone', 'UTC'))
+                session_datetime = self._localize_datetime(session_datetime, default_tz)
 
             # Fetch weather forecast
             weather_data = self._fetch_weather_forecast(
@@ -1060,75 +1074,33 @@ class PlanNotificationService:
             return None
 
     def _get_user_location(self, user_id: str) -> Optional[Dict[str, float]]:
-        """Get user's location from their recent session or profile."""
+        """Get user's location from their recent session's location points."""
         try:
-            # Try to get from recent ruck sessions
-            try:
-                recent_session = self.admin_client.table('ruck_session').select(
-                    'start_latitude, start_longitude'
-                ).eq('user_id', user_id).not_.is_('start_latitude', 'null').order(
-                    'created_at', desc=True
-                ).limit(1).execute()
-            except Exception as exc:
-                # Column may have been renamed in newer schemas. Fallback to a generic
-                # select and probe the available keys to avoid hard failures.
-                if 'start_latitude' in str(exc):
-                    logger.warning(
-                        "[PLAN_NOTIFICATIONS] start_latitude column missing; falling back to generic location lookup"
-                    )
-                    recent_session = self.admin_client.table('ruck_session').select('*').eq(
-                        'user_id', user_id
-                    ).eq('status', 'completed').order('created_at', desc=True).limit(1).execute()
-                else:
-                    raise
+            # Get most recent completed session
+            recent_session = self.admin_client.table('ruck_session').select(
+                'id'
+            ).eq('user_id', user_id).eq('status', 'completed').order(
+                'completed_at', desc=True
+            ).limit(1).execute()
 
-            if recent_session.data and recent_session.data[0].get('start_latitude'):
-                return {
-                    'latitude': recent_session.data[0]['start_latitude'],
-                    'longitude': recent_session.data[0]['start_longitude']
-                }
-            elif recent_session.data:
-                row = recent_session.data[0]
-                latitude = None
-                longitude = None
+            if not recent_session.data:
+                logger.warning(f"No completed sessions found for user {user_id}")
+                return None
 
-                for key in (
-                    'start_lat',
-                    'start_lng',
-                    'start_latitude',
-                    'start_longitude',
-                    'start_location_latitude',
-                    'start_location_longitude',
-                    'latitude',
-                    'longitude',
-                ):
-                    if key in row and row[key] is not None:
-                        if 'lat' in key and latitude is None:
-                            latitude = row[key]
-                        if ('lng' in key or 'lon' in key or key.endswith('longitude')) and longitude is None:
-                            longitude = row[key]
+            session_id = recent_session.data[0]['id']
 
-                # Some schemas store the start location as a JSON object
-                start_location = row.get('start_location') or row.get('start_point')
-                if isinstance(start_location, dict):
-                    latitude = latitude or start_location.get('lat') or start_location.get('latitude')
-                    longitude = longitude or start_location.get('lng') or start_location.get('longitude')
-
-                if latitude is not None and longitude is not None:
-                    return {'latitude': latitude, 'longitude': longitude}
-
-            # Fallback to user profile location if available
-            user_profile = self.admin_client.table('user').select(
+            # Get first location point from that session (likely their home/start location)
+            location_resp = self.admin_client.table('location_point').select(
                 'latitude, longitude'
-            ).eq('id', user_id).limit(1).execute()
+            ).eq('session_id', session_id).order('timestamp', desc=False).limit(1).execute()
 
-            if user_profile.data and user_profile.data[0].get('latitude'):
+            if location_resp.data and location_resp.data[0].get('latitude'):
                 return {
-                    'latitude': user_profile.data[0]['latitude'],
-                    'longitude': user_profile.data[0]['longitude']
+                    'latitude': float(location_resp.data[0]['latitude']),
+                    'longitude': float(location_resp.data[0]['longitude'])
                 }
 
-            logger.warning(f"No location found for user {user_id}")
+            logger.warning(f"No location points found for user {user_id}'s recent session {session_id}")
             return None
 
         except Exception as e:
@@ -1160,7 +1132,7 @@ class PlanNotificationService:
             forecasts = data.get('list', [])
 
             # Find the forecast closest to our target time
-            target_timestamp = target_datetime.timestamp()
+            target_timestamp = target_datetime.astimezone(timezone.utc).timestamp()
             closest_forecast = None
             min_time_diff = float('inf')
 
