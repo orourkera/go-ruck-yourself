@@ -896,14 +896,26 @@ Return JSON format: {"title": "...", "body": "..."}"""
                 logger.error(f"OpenAI returned empty content for plan notification {notification_type}")
                 return None
 
+            # Strip markdown code fences if present (OpenAI sometimes wraps JSON in ```json)
+            content_stripped = content.strip()
+            if content_stripped.startswith('```json'):
+                content_stripped = content_stripped[7:]  # Remove ```json
+            elif content_stripped.startswith('```'):
+                content_stripped = content_stripped[3:]  # Remove ```
+
+            if content_stripped.endswith('```'):
+                content_stripped = content_stripped[:-3]  # Remove trailing ```
+
+            content_stripped = content_stripped.strip()
+
             try:
-                parsed_content = json.loads(content)
+                parsed_content = json.loads(content_stripped)
                 if 'title' in parsed_content and 'body' in parsed_content:
                     return parsed_content
-                logger.error(f"AI plan notification response missing title/body: {content}")
+                logger.error(f"AI plan notification response missing title/body: {content_stripped}")
                 return None
             except json.JSONDecodeError as json_err:
-                logger.error(f"Failed to parse AI plan notification JSON: {json_err}, content: {content[:200]}")
+                logger.error(f"Failed to parse AI plan notification JSON: {json_err}, content: {content_stripped[:200]}")
                 return None
 
         except Exception as exc:
